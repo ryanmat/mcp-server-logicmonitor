@@ -1,6 +1,7 @@
 # Description: LogicMonitor API client for making authenticated requests.
 # Description: Handles HTTP communication, error mapping, and response parsing.
 
+import asyncio
 import json
 
 import httpx
@@ -19,7 +20,7 @@ from lm_mcp.exceptions import (
 class LogicMonitorClient:
     """Async HTTP client for LogicMonitor REST API.
 
-    Handles authentication, request building, and error mapping.
+    Handles authentication, request building, error mapping, and retry logic.
     Use as async context manager for proper resource cleanup.
     """
 
@@ -29,6 +30,7 @@ class LogicMonitorClient:
         auth: AuthProvider,
         timeout: int = 30,
         api_version: int = 3,
+        max_retries: int = 3,
     ):
         """Initialize the client.
 
@@ -37,10 +39,12 @@ class LogicMonitorClient:
             auth: Authentication provider for generating auth headers.
             timeout: Request timeout in seconds.
             api_version: LogicMonitor API version.
+            max_retries: Maximum retry attempts for rate-limited requests.
         """
         self.base_url = base_url.rstrip("/")
         self.auth = auth
         self.api_version = api_version
+        self.max_retries = max_retries
         self._client = httpx.AsyncClient(timeout=timeout)
 
     async def close(self) -> None:
@@ -73,11 +77,39 @@ class LogicMonitorClient:
         headers.update(self.auth.get_auth_headers(method, path, body))
         return headers
 
-    def _handle_error_response(self, response: httpx.Response) -> None:
+    def _parse_error_response(self, response: httpx.Response) -> tuple[str, int | None]:
+        """Parse error message and retry-after from response.
+
+        Args:
+            response: The HTTP response to parse.
+
+        Returns:
+            Tuple of (error message, retry_after value or None).
+        """
+        try:
+            error_data = response.json()
+            message = error_data.get("errorMessage", response.text)
+        except (json.JSONDecodeError, ValueError):
+            message = response.text
+
+        retry_after = None
+        if "Retry-After" in response.headers:
+            try:
+                retry_after = int(response.headers["Retry-After"])
+            except ValueError:
+                pass
+
+        return message, retry_after
+
+    def _raise_for_status(
+        self, response: httpx.Response, message: str, retry_after: int | None
+    ) -> None:
         """Raise appropriate exception for error responses.
 
         Args:
             response: The HTTP response to check.
+            message: Parsed error message.
+            retry_after: Retry-After header value if present.
 
         Raises:
             AuthenticationError: For 401 responses.
@@ -88,12 +120,6 @@ class LogicMonitorClient:
         """
         status = response.status_code
 
-        try:
-            error_data = response.json()
-            message = error_data.get("errorMessage", response.text)
-        except (json.JSONDecodeError, ValueError):
-            message = response.text
-
         if status == 401:
             raise AuthenticationError(message)
         elif status == 403:
@@ -101,12 +127,6 @@ class LogicMonitorClient:
         elif status == 404:
             raise NotFoundError(message)
         elif status == 429:
-            retry_after = None
-            if "Retry-After" in response.headers:
-                try:
-                    retry_after = int(response.headers["Retry-After"])
-                except ValueError:
-                    pass
             raise RateLimitError(message, retry_after=retry_after)
         elif status >= 500:
             raise ServerError(message)
@@ -118,7 +138,9 @@ class LogicMonitorClient:
         params: dict | None = None,
         json_body: dict | None = None,
     ) -> dict:
-        """Make an authenticated request to the LogicMonitor API.
+        """Make an authenticated request to the LogicMonitor API with retry.
+
+        Implements exponential backoff for rate-limited (429) responses.
 
         Args:
             method: HTTP method (GET, POST, PUT, PATCH, DELETE).
@@ -134,28 +156,46 @@ class LogicMonitorClient:
             AuthenticationError: For 401 responses.
             LMPermissionError: For 403 responses.
             NotFoundError: For 404 responses.
-            RateLimitError: For 429 responses.
+            RateLimitError: For 429 responses after retries exhausted.
             ServerError: For 5xx responses.
         """
         url = f"{self.base_url}{path}"
         body_str = json.dumps(json_body) if json_body else ""
         headers = self._get_headers(method, path, body_str)
 
-        try:
-            response = await self._client.request(
-                method=method,
-                url=url,
-                params=params,
-                json=json_body,
-                headers=headers,
-            )
-        except httpx.ConnectError as e:
-            raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}")
+        last_retry_after: int | None = None
+        last_message = "Rate limited"
 
-        if response.status_code >= 400:
-            self._handle_error_response(response)
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = await self._client.request(
+                    method=method,
+                    url=url,
+                    params=params,
+                    json=json_body,
+                    headers=headers,
+                )
+            except httpx.ConnectError as e:
+                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}")
 
-        return response.json()
+            if response.status_code == 429:
+                message, retry_after = self._parse_error_response(response)
+                last_message = message
+                last_retry_after = retry_after
+
+                if attempt < self.max_retries:
+                    backoff = 2**attempt
+                    wait_time = backoff if retry_after is None else min(retry_after, backoff)
+                    await asyncio.sleep(wait_time)
+                    continue
+
+            if response.status_code >= 400:
+                message, retry_after = self._parse_error_response(response)
+                self._raise_for_status(response, message, retry_after)
+
+            return response.json()
+
+        raise RateLimitError(last_message, retry_after=last_retry_after)
 
     async def get(self, path: str, params: dict | None = None) -> dict:
         """Make a GET request.

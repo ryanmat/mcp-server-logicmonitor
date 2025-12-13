@@ -16,6 +16,8 @@ class LMConfig(BaseSettings):
     bearer_token: str | None = None
     api_version: int = 3
     timeout: int = 30
+    enable_write_operations: bool = False
+    max_retries: int = 3
 
     model_config = {
         "env_prefix": "LM_",
