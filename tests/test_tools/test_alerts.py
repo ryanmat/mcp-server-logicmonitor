@@ -1,0 +1,276 @@
+# Description: Tests for alert MCP tools.
+# Description: Validates get_alerts, get_alert_details, acknowledge_alert, add_alert_note.
+
+import json
+
+import httpx
+import pytest
+import respx
+
+from lm_mcp.auth.bearer import BearerAuth
+from lm_mcp.client import LogicMonitorClient
+
+
+@pytest.fixture
+def auth():
+    """Create a BearerAuth instance for testing."""
+    return BearerAuth("test-token")
+
+
+@pytest.fixture
+def client(auth):
+    """Create a LogicMonitorClient instance for testing."""
+    return LogicMonitorClient(
+        base_url="https://test.logicmonitor.com/santaba/rest",
+        auth=auth,
+        timeout=30,
+        api_version=3,
+    )
+
+
+class TestGetAlerts:
+    """Tests for get_alerts tool."""
+
+    @respx.mock
+    async def test_get_alerts_returns_formatted_response(self, client):
+        """get_alerts returns properly formatted alert list."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "LMA123",
+                            "severity": 4,
+                            "monitorObjectName": "server01",
+                            "alertValue": "CPU usage 95%",
+                            "startEpoch": 1702400000,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        result = await get_alerts(client)
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["total"] == 1
+        assert len(data["alerts"]) == 1
+        assert data["alerts"][0]["id"] == "LMA123"
+
+    @respx.mock
+    async def test_get_alerts_with_severity_filter(self, client):
+        """get_alerts passes severity filter to API."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, severity="critical")
+
+        assert "filter" in route.calls[0].request.url.params
+        assert "severity:4" in route.calls[0].request.url.params.get("filter", "")
+
+    @respx.mock
+    async def test_get_alerts_with_limit(self, client):
+        """get_alerts passes size parameter to API."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, limit=10)
+
+        assert route.calls[0].request.url.params.get("size") == "10"
+
+    @respx.mock
+    async def test_get_alerts_handles_error(self, client):
+        """get_alerts returns error response on API failure."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(401, json={"errorMessage": "Unauthorized"})
+        )
+
+        result = await get_alerts(client)
+
+        assert len(result) == 1
+        assert "Error:" in result[0].text
+
+
+class TestGetAlertDetails:
+    """Tests for get_alert_details tool."""
+
+    @respx.mock
+    async def test_get_alert_details_returns_alert(self, client):
+        """get_alert_details returns single alert details."""
+        from lm_mcp.tools.alerts import get_alert_details
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts/123").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "LMA123",
+                    "severity": 4,
+                    "monitorObjectName": "server01",
+                    "alertValue": "CPU usage 95%",
+                    "resourceTemplateName": "CPU",
+                    "instanceName": "cpu-0",
+                },
+            )
+        )
+
+        result = await get_alert_details(client, alert_id="123")
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["id"] == "LMA123"
+        assert data["severity"] == 4
+
+    @respx.mock
+    async def test_get_alert_details_strips_lma_prefix(self, client):
+        """get_alert_details strips LMA prefix from alert ID."""
+        from lm_mcp.tools.alerts import get_alert_details
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts/456").mock(
+            return_value=httpx.Response(200, json={"id": "LMA456"})
+        )
+
+        await get_alert_details(client, alert_id="LMA456")
+
+        assert "/alerts/456" in str(route.calls[0].request.url)
+
+    @respx.mock
+    async def test_get_alert_details_not_found(self, client):
+        """get_alert_details returns error for missing alert."""
+        from lm_mcp.tools.alerts import get_alert_details
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Alert not found"})
+        )
+
+        result = await get_alert_details(client, alert_id="999")
+
+        assert "Error:" in result[0].text
+
+
+class TestAcknowledgeAlert:
+    """Tests for acknowledge_alert tool."""
+
+    @respx.mock
+    async def test_acknowledge_alert_blocked_by_default(self, client, monkeypatch):
+        """acknowledge_alert is blocked when writes disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import acknowledge_alert
+
+        result = await acknowledge_alert(client, alert_id="123")
+
+        assert "Error:" in result[0].text
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_acknowledge_alert_succeeds_when_enabled(self, client, monkeypatch):
+        """acknowledge_alert works when writes enabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import acknowledge_alert
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/123/ack").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        result = await acknowledge_alert(client, alert_id="123", note="Investigating")
+
+        assert len(result) == 1
+        assert "Error:" not in result[0].text
+
+
+class TestAddAlertNote:
+    """Tests for add_alert_note tool."""
+
+    @respx.mock
+    async def test_add_alert_note_blocked_by_default(self, client, monkeypatch):
+        """add_alert_note is blocked when writes disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import add_alert_note
+
+        result = await add_alert_note(client, alert_id="123", note="Test note")
+
+        assert "Error:" in result[0].text
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_add_alert_note_succeeds_when_enabled(self, client, monkeypatch):
+        """add_alert_note works when writes enabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import add_alert_note
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/123/note").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        result = await add_alert_note(client, alert_id="123", note="Test note")
+
+        assert len(result) == 1
+        assert "Error:" not in result[0].text
+
+    @respx.mock
+    async def test_add_alert_note_requires_note(self, client, monkeypatch):
+        """add_alert_note validates note is not empty."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import add_alert_note
+
+        result = await add_alert_note(client, alert_id="123", note="")
+
+        assert "Error:" in result[0].text
+        assert "Note cannot be empty" in result[0].text
