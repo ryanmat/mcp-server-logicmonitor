@@ -78,5 +78,8 @@ CLAUDE_PLANS/
 .anthropic/
 .cursor/
 
+# Development planning docs
+docs/
+
 # uv cache
 .uv/

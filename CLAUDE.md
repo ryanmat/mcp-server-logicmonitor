@@ -190,6 +190,11 @@ Problem-Solving Approach:
 
 - Documentation: [text](https://www.logicmonitor.com/support)
 
+## Folder Structure
+
+- `docs/` - Internal planning documents only (excluded from git). Used for implementation plans, specs, and progress tracking.
+- When creating customer-facing or internal-facing documentation, create a separate folder (e.g., `documentation/` or `public-docs/`).
+
 ## Implementation Files
 
 - Plan: docs/plan.md
