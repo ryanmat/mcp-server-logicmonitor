@@ -48,7 +48,6 @@ class TestFoundationIntegration:
     def test_config_instantiation_with_env(self, monkeypatch):
         """LMConfig can be instantiated with mock environment variables."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_AUTH_METHOD", "bearer")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
 
         from lm_mcp import LMConfig
@@ -111,7 +110,6 @@ class TestFoundationIntegration:
     def test_config_validation_raises_correct_exception_type(self, monkeypatch):
         """Config validation errors are ValueError not our custom exceptions."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_AUTH_METHOD", "bearer")
         monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
 
         from lm_mcp import LMConfig

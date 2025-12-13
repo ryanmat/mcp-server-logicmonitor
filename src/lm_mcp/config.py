@@ -1,8 +1,6 @@
 # Description: Configuration module for LogicMonitor MCP Server.
 # Description: Handles environment variable loading and validation for LM API credentials.
 
-from typing import Literal
-
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
@@ -11,13 +9,10 @@ class LMConfig(BaseSettings):
     """Configuration for LogicMonitor MCP Server.
 
     Loads configuration from environment variables with LM_ prefix.
-    Supports both LMv1 (HMAC) and Bearer token authentication methods.
+    Uses Bearer token authentication.
     """
 
     portal: str
-    auth_method: Literal["lmv1", "bearer"] = "lmv1"
-    access_id: str | None = None
-    access_key: str | None = None
     bearer_token: str | None = None
     api_version: int = 3
     timeout: int = 30
@@ -40,16 +35,10 @@ class LMConfig(BaseSettings):
         return v.rstrip("/")
 
     @model_validator(mode="after")
-    def validate_auth_credentials(self) -> "LMConfig":
-        """Validate that required credentials are present for the auth method."""
-        if self.auth_method == "lmv1":
-            if not self.access_id:
-                raise ValueError("access_id is required when auth_method is lmv1")
-            if not self.access_key:
-                raise ValueError("access_key is required when auth_method is lmv1")
-        elif self.auth_method == "bearer":
-            if not self.bearer_token:
-                raise ValueError("bearer_token is required when auth_method is bearer")
+    def validate_bearer_token(self) -> "LMConfig":
+        """Validate that bearer token is present."""
+        if not self.bearer_token:
+            raise ValueError("bearer_token is required")
         return self
 
     @property
