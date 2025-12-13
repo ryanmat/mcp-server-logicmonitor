@@ -74,6 +74,7 @@ Thumbs.db
 .claude-*
 claude-*.md
 *.claude
+CLAUDE.md
 CLAUDE_PLANS/
 .anthropic/
 .cursor/
