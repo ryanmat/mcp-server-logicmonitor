@@ -1,0 +1,16 @@
+{{/*
+Description: ConfigMap for LogicMonitor MCP server configuration.
+Description: Contains non-sensitive configuration values.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "lm-mcp.fullname" . }}
+  labels:
+    {{- include "lm-mcp.labels" . | nindent 4 }}
+data:
+  portal: {{ .Values.logicmonitor.portal | quote }}
+  enable-write-operations: {{ .Values.logicmonitor.enableWriteOperations | quote }}
+  api-version: {{ .Values.logicmonitor.apiVersion | quote }}
+  timeout: {{ .Values.logicmonitor.timeout | quote }}
+  max-retries: {{ .Values.logicmonitor.maxRetries | quote }}

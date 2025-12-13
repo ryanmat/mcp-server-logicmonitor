@@ -1,0 +1,19 @@
+# Description: Helm chart metadata for LogicMonitor MCP server.
+# Description: Defines chart version and application version.
+
+apiVersion: v2
+name: lm-mcp
+description: MCP server for LogicMonitor platform API integration
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - logicmonitor
+  - mcp
+  - monitoring
+  - api
+home: https://github.com/ryanmat/mcp-server-logicmonitor
+sources:
+  - https://github.com/ryanmat/mcp-server-logicmonitor
+maintainers:
+  - name: LogicMonitor MCP Team

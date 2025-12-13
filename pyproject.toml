@@ -5,6 +5,21 @@ description = "MCP server for LogicMonitor platform API integration"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
+keywords = ["logicmonitor", "mcp", "model-context-protocol", "monitoring", "api"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+    "Typing :: Typed",
+]
 dependencies = [
     "mcp>=1.0.0",
     "httpx>=0.27.0",
@@ -13,8 +28,13 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ryanmat/mcp-server-logicmonitor"
+Repository = "https://github.com/ryanmat/mcp-server-logicmonitor"
+Issues = "https://github.com/ryanmat/mcp-server-logicmonitor/issues"
+
 [project.scripts]
-lm-mcp = "lm_mcp.server:main"
+lm-mcp-server = "lm_mcp.server:main"
 
 [dependency-groups]
 dev = [

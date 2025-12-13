@@ -1,0 +1,64 @@
+# Description: Deploy to Azure AKS cluster.
+# Description: Manual trigger for production deployments.
+
+name: Deploy to AKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+      image_tag:
+        description: "Image tag to deploy"
+        required: true
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install lm-mcp deploy/helm/lm-mcp \
+            --namespace lm-mcp \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ inputs.image_tag }} \
+            --set logicmonitor.portal=${{ vars.LM_PORTAL }} \
+            --set logicmonitor.existingSecret=lm-mcp-credentials \
+            --set logicmonitor.enableWriteOperations=${{ vars.LM_ENABLE_WRITE_OPERATIONS || 'false' }} \
+            --wait \
+            --timeout 5m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/lm-mcp -n lm-mcp
+          kubectl get pods -n lm-mcp

@@ -1,0 +1,46 @@
+# Description: Files to exclude from Docker build context.
+# Description: Reduces build context size and prevents sensitive data leaks.
+
+# Git
+.git/
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Documentation and planning
+docs/
+*.md
+!README.md
+
+# Claude artifacts
+.claude/
+CLAUDE.md
