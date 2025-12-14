@@ -11,6 +11,7 @@ Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. En
 - **SDT Management**: List, create, and delete Scheduled Downtime
 - **Collector Management**: List and view collector details
 - **Website Monitoring**: List websites, get synthetic check details and data
+- **Resource Management**: Get and update device properties
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 
@@ -169,6 +170,14 @@ Then set environment variables in your shell or `.env` file.
 | `get_website_groups` | List website groups | No |
 | `get_website_data` | Get monitoring data for a website checkpoint | No |
 
+### Resource Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_device_properties` | List all properties for a device | No |
+| `get_device_property` | Get a specific device property | No |
+| `update_device_property` | Update or create a custom device property | Yes |
+
 ## Example Usage
 
 Once configured, you can ask Claude:
@@ -184,6 +193,8 @@ Once configured, you can ask Claude:
 - "Show me the widgets on the Production Overview dashboard"
 - "List all website checks"
 - "Show me the response times for website ID 100"
+- "What properties does device ID 100 have?"
+- "Update the location property on device 100 to US-West"
 
 ## Development
 
@@ -222,6 +233,7 @@ src/lm_mcp/
     ├── datasources.py # DataSource tools
     ├── devices.py     # Device management tools
     ├── metrics.py     # Metrics and data tools
+    ├── resources.py   # Resource/property management tools
     ├── sdts.py        # SDT management tools
     └── websites.py    # Website/synthetic monitoring tools
 ```

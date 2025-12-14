@@ -28,6 +28,11 @@ from lm_mcp.tools.metrics import (
     get_device_instances,
     get_graph_data,
 )
+from lm_mcp.tools.resources import (
+    get_device_properties,
+    get_device_property,
+    update_device_property,
+)
 from lm_mcp.tools.sdts import create_sdt, delete_sdt, list_sdts
 from lm_mcp.tools.websites import (
     get_website,
@@ -994,3 +999,102 @@ class TestWebsiteMonitoringFlow:
         assert len(data_result) == 1
         assert "ResponseTime" in data_result[0].text
         assert "StatusCode" in data_result[0].text
+
+
+class TestResourceManagementFlow:
+    """Test resource/property management workflow."""
+
+    @respx.mock
+    async def test_device_property_workflow(self, client, enable_writes):
+        """
+        Workflow: Get device → List properties → Get property → Update property.
+
+        This simulates managing device properties.
+        """
+        # Mock: Get device
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "displayName": "prod-web-01",
+                    "hostGroupIds": "1",
+                },
+            )
+        )
+
+        # Mock: Get device properties
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100/properties").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "name": "system.hostname",
+                            "value": "prod-web-01.example.com",
+                            "type": "system",
+                            "inherit": False,
+                        },
+                        {
+                            "name": "location",
+                            "value": "US-East",
+                            "type": "custom",
+                            "inherit": False,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get specific property
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties/location"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "name": "location",
+                    "value": "US-East",
+                    "type": "custom",
+                    "inherit": False,
+                },
+            )
+        )
+
+        # Mock: Update property
+        respx.put(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties/location"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "name": "location",
+                    "value": "US-West",
+                    "type": "custom",
+                },
+            )
+        )
+
+        # Step 1: Get device details
+        device_result = await get_device(client, 100)
+        assert len(device_result) == 1
+        assert "prod-web-01" in device_result[0].text
+
+        # Step 2: List all properties
+        props_result = await get_device_properties(client, device_id=100)
+        assert len(props_result) == 1
+        assert "system.hostname" in props_result[0].text
+        assert "location" in props_result[0].text
+
+        # Step 3: Get specific property
+        prop_result = await get_device_property(client, device_id=100, property_name="location")
+        assert len(prop_result) == 1
+        assert "US-East" in prop_result[0].text
+
+        # Step 4: Update property
+        update_result = await update_device_property(
+            client, device_id=100, property_name="location", property_value="US-West"
+        )
+        assert len(update_result) == 1
+        assert "success" in update_result[0].text.lower()
