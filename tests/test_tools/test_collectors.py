@@ -36,9 +36,7 @@ class TestGetCollectors:
         """get_collectors returns properly formatted collector list."""
         from lm_mcp.tools.collectors import get_collectors
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -84,9 +82,7 @@ class TestGetCollector:
         """get_collector returns single collector details."""
         from lm_mcp.tools.collectors import get_collector
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/5"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/5").mock(
             return_value=httpx.Response(
                 200,
                 json={

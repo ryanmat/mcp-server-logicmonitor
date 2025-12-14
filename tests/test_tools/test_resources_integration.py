@@ -168,9 +168,7 @@ class TestCollectorQueries:
         from lm_mcp.tools.collectors import get_collector, get_collectors
 
         # Mock: List collectors
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -184,9 +182,7 @@ class TestCollectorQueries:
         )
 
         # Mock: Get collector details
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/2"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/2").mock(
             return_value=httpx.Response(
                 200,
                 json={

@@ -15,6 +15,12 @@ from lm_mcp.tools.alerts import (
 )
 from lm_mcp.tools.collectors import get_collector, get_collectors
 from lm_mcp.tools.devices import get_device, get_device_groups, get_devices
+from lm_mcp.tools.metrics import (
+    get_device_data,
+    get_device_datasources,
+    get_device_instances,
+    get_graph_data,
+)
 from lm_mcp.tools.sdts import create_sdt, delete_sdt, list_sdts
 
 
@@ -131,14 +137,12 @@ class TestIncidentResponseFlow:
         )
 
         # Mock: Acknowledge alert
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/alert/alerts/12345/ack"
-        ).mock(return_value=httpx.Response(200, json={"id": "LMA12345", "acked": True}))
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/12345/ack").mock(
+            return_value=httpx.Response(200, json={"id": "LMA12345", "acked": True})
+        )
 
         # Mock: Add note
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/alert/alerts/12345/note"
-        ).mock(
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/12345/note").mock(
             return_value=httpx.Response(
                 200, json={"id": "LMA12345", "note": "Investigating high CPU"}
             )
@@ -230,9 +234,9 @@ class TestMaintenanceWindowFlow:
         )
 
         # Mock: Delete SDT
-        respx.delete(
-            "https://test.logicmonitor.com/santaba/rest/sdt/sdts/SDT_500"
-        ).mock(return_value=httpx.Response(200, json={}))
+        respx.delete("https://test.logicmonitor.com/santaba/rest/sdt/sdts/SDT_500").mock(
+            return_value=httpx.Response(200, json={})
+        )
 
         # Step 1: Find the device
         devices_result = await get_devices(client, name_filter="db-server")
@@ -270,9 +274,7 @@ class TestHealthCheckFlow:
         This simulates a daily health check routine.
         """
         # Mock: Get collectors
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -296,9 +298,7 @@ class TestHealthCheckFlow:
         )
 
         # Mock: Get specific collector
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/1").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -406,9 +406,7 @@ class TestErrorRecovery:
     @respx.mock
     async def test_not_found_handling(self, client):
         """Verify 404 errors are handled gracefully."""
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/alert/alerts/99999"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts/99999").mock(
             return_value=httpx.Response(
                 404, json={"errorMessage": "Alert not found", "errorCode": 1404}
             )
@@ -431,3 +429,160 @@ class TestErrorRecovery:
         result = await get_devices(client)
         assert len(result) == 1
         assert "error" in result[0].text.lower()
+
+
+class TestMetricsInvestigationFlow:
+    """Test metrics investigation workflow."""
+
+    @respx.mock
+    async def test_cpu_metrics_investigation(self, client):
+        """
+        Workflow: Find device → List datasources → Get instances → Get metrics.
+
+        This simulates investigating CPU usage on a device.
+        """
+        # Mock: Get device
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "displayName": "prod-web-01",
+                    "hostGroupIds": "1",
+                },
+            )
+        )
+
+        # Mock: Get device datasources
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/devicedatasources"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1001,
+                            "dataSourceId": 50,
+                            "dataSourceName": "CPU",
+                            "instanceNumber": 1,
+                            "monitoringInstanceNumber": 1,
+                        },
+                        {
+                            "id": 1002,
+                            "dataSourceId": 51,
+                            "dataSourceName": "Memory",
+                            "instanceNumber": 1,
+                            "monitoringInstanceNumber": 1,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get CPU instances
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/devicedatasources/1001/instances"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 5001,
+                            "displayName": "CPU_Total",
+                            "description": "Total CPU usage",
+                            "groupName": "",
+                            "lockDescription": False,
+                            "stopMonitoring": False,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get CPU data
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/devicedatasources/1001/instances/5001/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["CPUBusyPercent", "CPUIdlePercent"],
+                    "values": {
+                        "CPUBusyPercent": [25.5, 30.2, 28.1, 95.0, 92.5],
+                        "CPUIdlePercent": [74.5, 69.8, 71.9, 5.0, 7.5],
+                    },
+                    "time": [
+                        1702500000,
+                        1702500060,
+                        1702500120,
+                        1702500180,
+                        1702500240,
+                    ],
+                },
+            )
+        )
+
+        # Step 1: Get device details
+        device_result = await get_device(client, 100)
+        assert len(device_result) == 1
+        assert "prod-web-01" in device_result[0].text
+
+        # Step 2: List available datasources
+        ds_result = await get_device_datasources(client, device_id=100)
+        assert len(ds_result) == 1
+        assert "CPU" in ds_result[0].text
+        assert "Memory" in ds_result[0].text
+
+        # Step 3: Get CPU instances
+        instances_result = await get_device_instances(
+            client, device_id=100, device_datasource_id=1001
+        )
+        assert len(instances_result) == 1
+        assert "CPU_Total" in instances_result[0].text
+
+        # Step 4: Get CPU metrics
+        data_result = await get_device_data(
+            client, device_id=100, device_datasource_id=1001, instance_id=5001
+        )
+        assert len(data_result) == 1
+        assert "CPUBusyPercent" in data_result[0].text
+
+    @respx.mock
+    async def test_graph_data_retrieval(self, client):
+        """
+        Workflow: Get graph data for visualization.
+
+        This simulates retrieving graph data for a dashboard.
+        """
+        # Mock: Get graph data
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/devicedatasources/1001/instances/5001/graphs/200/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "lines": [
+                        {"legend": "CPU Usage %", "data": [25.5, 30.2, 28.1]},
+                        {"legend": "CPU Idle %", "data": [74.5, 69.8, 71.9]},
+                    ],
+                    "timestamps": [1702500000, 1702500060, 1702500120],
+                },
+            )
+        )
+
+        # Get graph data
+        result = await get_graph_data(
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            instance_id=5001,
+            graph_id=200,
+        )
+
+        assert len(result) == 1
+        assert "CPU Usage %" in result[0].text
+        assert "timestamps" in result[0].text
