@@ -7,7 +7,7 @@ Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, a
 ## Features
 
 - **Alert Management**: Get alerts, view details, acknowledge alerts, add notes, view alert rules
-- **Device Management**: List devices, get device details, browse device groups
+- **Device Management**: Full CRUD - list, create, update, delete devices and device groups
 - **Metrics & Data**: Query device datasources, instances, and metric data
 - **Dashboard Management**: List dashboards, view widgets, create dashboards
 - **SDT Management**: List, create, and delete Scheduled Downtime
@@ -21,8 +21,10 @@ Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, a
 - **LogicModules**: Query ConfigSources, EventSources, PropertySources, TopologySources
 - **Network Discovery**: List and execute netscans
 - **SNMP Management**: Query OID definitions
+- **Pagination Support**: Handle large result sets with offset-based pagination
 - **Security-First**: Read-only by default, write operations require explicit opt-in
-- **Rate Limit Handling**: Automatic retry with exponential backoff
+- **Rate Limit Handling**: Automatic retry with exponential backoff and jitter
+- **Server Error Recovery**: Automatic retry on 5xx server errors
 
 ## Installation
 
@@ -50,12 +52,12 @@ uv sync
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `LM_PORTAL` | Yes | - | LogicMonitor portal (e.g., `company.logicmonitor.com`) |
-| `LM_BEARER_TOKEN` | Yes | - | API Bearer token |
-| `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | Enable write operations (ack alerts, create SDTs) |
+| `LM_PORTAL` | Yes | - | LogicMonitor portal hostname (e.g., `company.logicmonitor.com`) |
+| `LM_BEARER_TOKEN` | Yes | - | API Bearer token (min 10 characters) |
+| `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | Enable write operations (create, update, delete resources) |
 | `LM_API_VERSION` | No | `3` | API version |
-| `LM_TIMEOUT` | No | `30` | Request timeout in seconds |
-| `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited requests |
+| `LM_TIMEOUT` | No | `30` | Request timeout in seconds (range: 5-300) |
+| `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited/server error requests (range: 0-10) |
 
 ### Getting a Bearer Token
 
