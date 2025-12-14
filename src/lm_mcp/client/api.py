@@ -3,6 +3,7 @@
 
 import asyncio
 import json
+import random
 
 import httpx
 
@@ -178,14 +179,19 @@ class LogicMonitorClient:
             except httpx.ConnectError as e:
                 raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}")
 
-            if response.status_code == 429:
+            # Retry on rate limit (429) or server errors (5xx)
+            if response.status_code == 429 or response.status_code >= 500:
                 message, retry_after = self._parse_error_response(response)
                 last_message = message
                 last_retry_after = retry_after
 
                 if attempt < self.max_retries:
-                    backoff = 2**attempt
-                    wait_time = backoff if retry_after is None else min(retry_after, backoff)
+                    # Exponential backoff with jitter to prevent thundering herd
+                    base_backoff = 2**attempt
+                    jitter = random.uniform(0, 0.5 * base_backoff)
+                    wait_time = base_backoff + jitter
+                    if retry_after is not None:
+                        wait_time = min(retry_after, wait_time)
                     await asyncio.sleep(wait_time)
                     continue
 

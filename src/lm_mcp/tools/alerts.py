@@ -40,6 +40,7 @@ async def get_alerts(
     severity: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get alerts from LogicMonitor.
 
@@ -47,13 +48,14 @@ async def get_alerts(
         client: LogicMonitor API client.
         severity: Filter by severity (critical, error, warning, info).
         status: Filter by status (active, acknowledged).
-        limit: Maximum number of alerts to return.
+        limit: Maximum number of alerts to return (max 1000).
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with alert data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": min(limit, 1000), "offset": offset}
 
         filters = []
         if severity and severity.lower() in SEVERITY_MAP:
@@ -81,10 +83,15 @@ async def get_alerts(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(alerts)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(alerts),
+                "offset": offset,
+                "has_more": has_more,
                 "alerts": alerts,
             }
         )

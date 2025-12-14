@@ -1,5 +1,5 @@
-# Description: Tests for rate limit retry logic.
-# Description: Validates exponential backoff behavior on 429 responses.
+# Description: Tests for retry logic.
+# Description: Validates exponential backoff behavior on 429 and 5xx responses.
 
 import httpx
 import pytest
@@ -81,14 +81,28 @@ class TestRetryLogic:
         assert exc_info.value.retry_after == 30
 
     @respx.mock
-    async def test_non_429_errors_not_retried(self, client):
-        """Non-429 errors are not retried."""
+    async def test_5xx_errors_are_retried(self, client):
+        """5xx server errors are retried with exponential backoff."""
         route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices")
         route.mock(return_value=httpx.Response(500, json={"errmsg": "Server error"}))
 
         from lm_mcp.exceptions import ServerError
 
         with pytest.raises(ServerError):
+            await client.get("/device/devices")
+
+        # Initial request + 3 retries = 4 total calls
+        assert route.call_count == 4
+
+    @respx.mock
+    async def test_4xx_errors_not_retried(self, client):
+        """4xx client errors (except 429) are not retried."""
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices")
+        route.mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
+
+        from lm_mcp.exceptions import NotFoundError
+
+        with pytest.raises(NotFoundError):
             await client.get("/device/devices")
 
         assert route.call_count == 1

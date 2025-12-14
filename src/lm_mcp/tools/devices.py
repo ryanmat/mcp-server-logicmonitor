@@ -18,6 +18,7 @@ async def get_devices(
     group_id: int | None = None,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List devices from LogicMonitor.
 
@@ -25,13 +26,14 @@ async def get_devices(
         client: LogicMonitor API client.
         group_id: Filter by device group ID.
         name_filter: Filter by device name (supports wildcards).
-        limit: Maximum number of devices to return.
+        limit: Maximum number of devices to return (max 1000).
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with device data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": min(limit, 1000), "offset": offset}
 
         filters = []
         if group_id:
@@ -55,10 +57,15 @@ async def get_devices(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(devices)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(devices),
+                "offset": offset,
+                "has_more": has_more,
                 "devices": devices,
             }
         )
