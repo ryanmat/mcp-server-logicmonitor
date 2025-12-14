@@ -20,6 +20,7 @@ from lm_mcp.tools.dashboards import (
     get_dashboard_widgets,
     get_dashboards,
 )
+from lm_mcp.tools.datasources import get_datasource, get_datasources
 from lm_mcp.tools.devices import get_device, get_device_groups, get_devices
 from lm_mcp.tools.metrics import (
     get_device_data,
@@ -751,3 +752,100 @@ class TestDashboardManagementFlow:
         list_result = await get_dashboards(client)
         assert len(list_result) == 1
         assert "New Monitoring Dashboard" in list_result[0].text
+
+
+class TestDatasourceExplorationFlow:
+    """Test DataSource exploration workflow."""
+
+    @respx.mock
+    async def test_datasource_discovery(self, client):
+        """
+        Workflow: List datasources → Get details → Check datapoints.
+
+        This simulates exploring available monitoring modules.
+        """
+        # Mock: List datasources
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 100,
+                            "name": "WinCPU",
+                            "displayName": "Windows CPU",
+                            "description": "Windows CPU monitoring",
+                            "appliesTo": "isWindows()",
+                            "group": "Core",
+                            "collectMethod": "wmi",
+                            "hasMultiInstances": True,
+                        },
+                        {
+                            "id": 101,
+                            "name": "LinuxCPU",
+                            "displayName": "Linux CPU",
+                            "description": "Linux CPU monitoring",
+                            "appliesTo": "isLinux()",
+                            "group": "Core",
+                            "collectMethod": "snmp",
+                            "hasMultiInstances": True,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get datasource details
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "WinCPU",
+                    "displayName": "Windows CPU",
+                    "description": "Windows CPU monitoring",
+                    "appliesTo": "isWindows()",
+                    "group": "Core",
+                    "collectMethod": "wmi",
+                    "collectInterval": 60,
+                    "hasMultiInstances": True,
+                    "dataPoints": [
+                        {
+                            "id": 1,
+                            "name": "CPUBusyPercent",
+                            "description": "CPU busy percentage",
+                            "type": 0,
+                            "alertExpr": "> 90",
+                        },
+                        {
+                            "id": 2,
+                            "name": "CPUIdlePercent",
+                            "description": "CPU idle percentage",
+                            "type": 0,
+                            "alertExpr": "",
+                        },
+                    ],
+                    "graphs": [
+                        {
+                            "id": 10,
+                            "name": "CPUGraph",
+                            "title": "CPU Usage",
+                        }
+                    ],
+                },
+            )
+        )
+
+        # Step 1: List available datasources
+        ds_list = await get_datasources(client)
+        assert len(ds_list) == 1
+        assert "WinCPU" in ds_list[0].text
+        assert "LinuxCPU" in ds_list[0].text
+
+        # Step 2: Get details on Windows CPU datasource
+        ds_detail = await get_datasource(client, datasource_id=100)
+        assert len(ds_detail) == 1
+        assert "CPUBusyPercent" in ds_detail[0].text
+        assert "CPUIdlePercent" in ds_detail[0].text
+        assert "CPU Usage" in ds_detail[0].text

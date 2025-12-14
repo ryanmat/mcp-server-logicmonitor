@@ -137,6 +137,13 @@ Then set environment variables in your shell or `.env` file.
 | `get_dashboard_widgets` | Get widgets for a specific dashboard | No |
 | `create_dashboard` | Create a new dashboard | Yes |
 
+### DataSource Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_datasources` | List all DataSources (LogicModules) | No |
+| `get_datasource` | Get DataSource details with datapoints and graphs | No |
+
 ### SDT Tools
 
 | Tool | Description | Write |
@@ -196,13 +203,14 @@ src/lm_mcp/
 │   ├── __init__.py   # Client exports
 │   └── api.py        # Async HTTP client
 └── tools/
-    ├── __init__.py   # Tool utilities
-    ├── alerts.py     # Alert management tools
-    ├── collectors.py # Collector tools
-    ├── dashboards.py # Dashboard tools
-    ├── devices.py    # Device management tools
-    ├── metrics.py    # Metrics and data tools
-    └── sdts.py       # SDT management tools
+    ├── __init__.py    # Tool utilities
+    ├── alerts.py      # Alert management tools
+    ├── collectors.py  # Collector tools
+    ├── dashboards.py  # Dashboard tools
+    ├── datasources.py # DataSource tools
+    ├── devices.py     # Device management tools
+    ├── metrics.py     # Metrics and data tools
+    └── sdts.py        # SDT management tools
 ```
 
 ## Troubleshooting
