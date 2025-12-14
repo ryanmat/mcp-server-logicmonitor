@@ -6,7 +6,7 @@ Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, a
 
 ## Features
 
-- **Alert Management**: Get alerts, view details, acknowledge alerts, add notes
+- **Alert Management**: Get alerts, view details, acknowledge alerts, add notes, view alert rules
 - **Device Management**: List devices, get device details, browse device groups
 - **Metrics & Data**: Query device datasources, instances, and metric data
 - **Dashboard Management**: List dashboards, view widgets, create dashboards
@@ -160,6 +160,13 @@ LM_BEARER_TOKEN = "your-bearer-token"
 | `acknowledge_alert` | Acknowledge an alert with optional note | Yes |
 | `add_alert_note` | Add a note to an alert | Yes |
 
+### Alert Rule Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_alert_rules` | List alert rules with optional name/priority filters | No |
+| `get_alert_rule` | Get detailed information about a specific alert rule | No |
+
 ### Device Tools
 
 | Tool | Description | Write |
@@ -257,6 +264,7 @@ LM_BEARER_TOKEN = "your-bearer-token"
 Once configured, you can ask your AI assistant:
 
 - "Show me all critical alerts"
+- "What alert rules route to the Primary On-Call chain?"
 - "What devices are in the Production group?"
 - "Acknowledge alert LMA12345 with note 'Investigating'"
 - "Create a 1-hour maintenance window for device ID 100"
@@ -309,6 +317,7 @@ src/lm_mcp/
 └── tools/
     ├── __init__.py    # Tool utilities
     ├── alerts.py      # Alert management tools
+    ├── alert_rules.py # Alert rule tools
     ├── collectors.py  # Collector tools
     ├── dashboards.py  # Dashboard tools
     ├── datasources.py # DataSource tools

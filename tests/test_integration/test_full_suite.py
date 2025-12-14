@@ -7,6 +7,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools.alert_rules import get_alert_rule, get_alert_rules
 from lm_mcp.tools.alerts import (
     acknowledge_alert,
     add_alert_note,
@@ -1442,3 +1443,87 @@ class TestOpsManagementFlow:
         add_result = await add_ops_note(client, note="Deployment completed", tags=["deployment"])
         assert len(add_result) == 1
         assert "success" in add_result[0].text.lower()
+
+
+class TestAlertRulesWorkflow:
+    """Test alert rules exploration workflow."""
+
+    @respx.mock
+    async def test_alert_rules_exploration(self, client):
+        """
+        Workflow: List rules → Get details → Understand routing.
+
+        This simulates exploring alert routing configuration.
+        """
+        # Mock: List alert rules
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/rules").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 100,
+                            "name": "Critical Production",
+                            "priority": 1,
+                            "escalatingChainId": 200,
+                            "escalatingChain": {"name": "Primary On-Call"},
+                            "levelStr": "Critical",
+                            "devices": ["prod-*"],
+                            "deviceGroups": ["Production/*"],
+                            "datasource": "*",
+                            "suppressAlertClear": False,
+                            "suppressAlertAckSdt": False,
+                        },
+                        {
+                            "id": 101,
+                            "name": "Warning Catch-All",
+                            "priority": 10,
+                            "escalatingChainId": 201,
+                            "escalatingChain": {"name": "Email Only"},
+                            "levelStr": "Warn",
+                            "devices": ["*"],
+                            "deviceGroups": ["*"],
+                            "datasource": "*",
+                            "suppressAlertClear": True,
+                            "suppressAlertAckSdt": True,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get specific rule details
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/rules/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "Critical Production",
+                    "priority": 1,
+                    "escalatingChainId": 200,
+                    "escalatingChain": {"name": "Primary On-Call", "period": 15},
+                    "levelStr": "Critical",
+                    "devices": ["prod-*"],
+                    "deviceGroups": ["Production/*"],
+                    "datasource": "*",
+                    "datapoint": "*",
+                    "instance": "*",
+                    "suppressAlertClear": False,
+                    "suppressAlertAckSdt": False,
+                    "resourceProperties": [{"name": "system.category", "value": "production"}],
+                },
+            )
+        )
+
+        # Step 1: List all alert rules
+        rules_result = await get_alert_rules(client)
+        assert len(rules_result) == 1
+        assert "Critical Production" in rules_result[0].text
+        assert "Warning Catch-All" in rules_result[0].text
+
+        # Step 2: Get details on critical rule
+        rule_result = await get_alert_rule(client, rule_id=100)
+        assert len(rule_result) == 1
+        assert "Primary On-Call" in rule_result[0].text
+        assert "production" in rule_result[0].text
