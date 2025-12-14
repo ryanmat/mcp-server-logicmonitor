@@ -12,6 +12,7 @@ Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. En
 - **Collector Management**: List and view collector details
 - **Website Monitoring**: List websites, get synthetic check details and data
 - **Resource Management**: Get and update device properties
+- **Report Management**: List, view, and run reports
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 
@@ -178,6 +179,15 @@ Then set environment variables in your shell or `.env` file.
 | `get_device_property` | Get a specific device property | No |
 | `update_device_property` | Update or create a custom device property | Yes |
 
+### Report Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_reports` | List reports with optional filters | No |
+| `get_report` | Get detailed information about a specific report | No |
+| `get_report_groups` | List report groups | No |
+| `run_report` | Execute/run a report | Yes |
+
 ## Example Usage
 
 Once configured, you can ask Claude:
@@ -195,6 +205,8 @@ Once configured, you can ask Claude:
 - "Show me the response times for website ID 100"
 - "What properties does device ID 100 have?"
 - "Update the location property on device 100 to US-West"
+- "List all reports"
+- "Run the Daily Alert Summary report"
 
 ## Development
 
@@ -233,6 +245,7 @@ src/lm_mcp/
     ├── datasources.py # DataSource tools
     ├── devices.py     # Device management tools
     ├── metrics.py     # Metrics and data tools
+    ├── reports.py     # Report management tools
     ├── resources.py   # Resource/property management tools
     ├── sdts.py        # SDT management tools
     └── websites.py    # Website/synthetic monitoring tools

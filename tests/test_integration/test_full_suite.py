@@ -28,6 +28,12 @@ from lm_mcp.tools.metrics import (
     get_device_instances,
     get_graph_data,
 )
+from lm_mcp.tools.reports import (
+    get_report,
+    get_report_groups,
+    get_reports,
+    run_report,
+)
 from lm_mcp.tools.resources import (
     get_device_properties,
     get_device_property,
@@ -1098,3 +1104,108 @@ class TestResourceManagementFlow:
         )
         assert len(update_result) == 1
         assert "success" in update_result[0].text.lower()
+
+
+class TestReportManagementFlow:
+    """Test report management workflow."""
+
+    @respx.mock
+    async def test_report_workflow(self, client, enable_writes):
+        """
+        Workflow: List reports → Get details → List groups → Run report.
+
+        This simulates exploring and running reports.
+        """
+        # Mock: List reports
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 100,
+                            "name": "Daily Alert Summary",
+                            "description": "Daily alerts",
+                            "type": "Alert",
+                            "groupId": 1,
+                            "groupFullPath": "Reports/Alerts",
+                            "format": "PDF",
+                            "schedule": "daily",
+                            "lastGenerateOn": 1702500000,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get report details
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "Daily Alert Summary",
+                    "description": "Daily alerts",
+                    "type": "Alert",
+                    "groupId": 1,
+                    "groupFullPath": "Reports/Alerts",
+                    "format": "PDF",
+                    "delivery": "email",
+                    "schedule": "daily",
+                    "dateRange": "last24hours",
+                    "recipients": [
+                        {"type": "admin", "method": "email", "addr": "admin@example.com"}
+                    ],
+                    "lastGenerateOn": 1702500000,
+                    "lastGenerateSize": 2048,
+                    "lastGeneratePages": 10,
+                    "lastmodifyUserName": "admin",
+                },
+            )
+        )
+
+        # Mock: List report groups
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/groups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Alerts",
+                            "description": "Alert reports",
+                            "numOfReports": 5,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Run report
+        respx.post("https://test.logicmonitor.com/santaba/rest/functions").mock(
+            return_value=httpx.Response(200, json={"taskId": "task-12345"})
+        )
+
+        # Step 1: List available reports
+        reports_result = await get_reports(client)
+        assert len(reports_result) == 1
+        assert "Daily Alert Summary" in reports_result[0].text
+
+        # Step 2: Get report details
+        report_result = await get_report(client, report_id=100)
+        assert len(report_result) == 1
+        assert "Daily Alert Summary" in report_result[0].text
+        assert "admin@example.com" in report_result[0].text
+
+        # Step 3: List report groups
+        groups_result = await get_report_groups(client)
+        assert len(groups_result) == 1
+        assert "Alerts" in groups_result[0].text
+
+        # Step 4: Run the report
+        run_result = await run_report(client, report_id=100)
+        assert len(run_result) == 1
+        assert "success" in run_result[0].text.lower()
+        assert "task-12345" in run_result[0].text
