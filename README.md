@@ -251,6 +251,11 @@ Gemini CLI supports MCP servers. Configure in `~/.gemini/settings.json`:
 | `get_devices` | List devices with optional group/name filters | No |
 | `get_device` | Get detailed information about a specific device | No |
 | `get_device_groups` | List device groups | No |
+| `create_device` | Create a new device | Yes |
+| `update_device` | Update an existing device | Yes |
+| `delete_device` | Delete a device | Yes |
+| `create_device_group` | Create a new device group | Yes |
+| `delete_device_group` | Delete a device group | Yes |
 
 ### Metrics Tools
 
@@ -428,6 +433,10 @@ Once configured, you can ask your AI assistant:
 - "What devices are in the Production group?"
 - "Acknowledge alert LMA12345 with note 'Investigating'"
 - "Create a 1-hour maintenance window for device ID 100"
+- "Add device 10.0.0.1 to the Production group using collector 5"
+- "Create a device group called 'Staging' under Production"
+- "Update server01 description to 'Primary web server'"
+- "Delete the old test-server device"
 - "List all collectors and their status"
 - "Show me the CPU metrics for device ID 100"
 - "What datasources are monitoring server prod-web-01?"

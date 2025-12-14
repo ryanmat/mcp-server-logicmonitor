@@ -1,5 +1,5 @@
 # Description: Tests for device MCP tools.
-# Description: Validates get_devices, get_device, get_device_groups functions.
+# Description: Validates device and device group CRUD functions.
 
 import json
 
@@ -169,3 +169,224 @@ class TestGetDeviceGroups:
         await get_device_groups(client, parent_id=1)
 
         assert "filter" in route.calls[0].request.url.params
+
+
+class TestCreateDevice:
+    """Tests for create_device tool."""
+
+    @respx.mock
+    async def test_create_device_returns_blocked_when_disabled(self, client, monkeypatch):
+        """create_device returns error when write operations disabled."""
+        from lm_mcp.tools.devices import create_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        result = await create_device(
+            client, name="10.0.0.1", display_name="test-server", preferred_collector_id=1
+        )
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_create_device_success(self, client, monkeypatch):
+        """create_device creates device when write enabled."""
+        from lm_mcp.tools.devices import create_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "10.0.0.1",
+                    "displayName": "test-server",
+                    "currentCollectorId": 1,
+                },
+            )
+        )
+
+        result = await create_device(
+            client, name="10.0.0.1", display_name="test-server", preferred_collector_id=1
+        )
+
+        data = json.loads(result[0].text)
+        assert data["message"] == "Device created successfully"
+        assert data["device"]["id"] == 100
+
+
+class TestUpdateDevice:
+    """Tests for update_device tool."""
+
+    @respx.mock
+    async def test_update_device_returns_blocked_when_disabled(self, client, monkeypatch):
+        """update_device returns error when write operations disabled."""
+        from lm_mcp.tools.devices import update_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        result = await update_device(client, device_id=100, display_name="new-name")
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_update_device_success(self, client, monkeypatch):
+        """update_device updates device when write enabled."""
+        from lm_mcp.tools.devices import update_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.patch("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "displayName": "new-name",
+                    "description": "Updated description",
+                },
+            )
+        )
+
+        result = await update_device(
+            client, device_id=100, display_name="new-name", description="Updated description"
+        )
+
+        data = json.loads(result[0].text)
+        assert data["message"] == "Device updated successfully"
+        assert data["device"]["name"] == "new-name"
+
+    @respx.mock
+    async def test_update_device_no_changes(self, client, monkeypatch):
+        """update_device returns error when no updates provided."""
+        from lm_mcp.tools.devices import update_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        result = await update_device(client, device_id=100)
+
+        assert "No updates provided" in result[0].text
+
+
+class TestDeleteDevice:
+    """Tests for delete_device tool."""
+
+    @respx.mock
+    async def test_delete_device_returns_blocked_when_disabled(self, client, monkeypatch):
+        """delete_device returns error when write operations disabled."""
+        from lm_mcp.tools.devices import delete_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        result = await delete_device(client, device_id=100)
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_delete_device_success(self, client, monkeypatch):
+        """delete_device deletes device when write enabled."""
+        from lm_mcp.tools.devices import delete_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.delete("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_device(client, device_id=100)
+
+        data = json.loads(result[0].text)
+        assert "deleted successfully" in data["message"]
+        assert data["hard_delete"] is False
+
+
+class TestCreateDeviceGroup:
+    """Tests for create_device_group tool."""
+
+    @respx.mock
+    async def test_create_device_group_returns_blocked_when_disabled(self, client, monkeypatch):
+        """create_device_group returns error when write operations disabled."""
+        from lm_mcp.tools.devices import create_device_group
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        result = await create_device_group(client, name="Test Group")
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_create_device_group_success(self, client, monkeypatch):
+        """create_device_group creates group when write enabled."""
+        from lm_mcp.tools.devices import create_device_group
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/device/groups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 50,
+                    "name": "Test Group",
+                    "parentId": 1,
+                    "fullPath": "/Test Group",
+                },
+            )
+        )
+
+        result = await create_device_group(client, name="Test Group", description="Test")
+
+        data = json.loads(result[0].text)
+        assert data["message"] == "Device group created successfully"
+        assert data["group"]["id"] == 50
+
+
+class TestDeleteDeviceGroup:
+    """Tests for delete_device_group tool."""
+
+    @respx.mock
+    async def test_delete_device_group_returns_blocked_when_disabled(self, client, monkeypatch):
+        """delete_device_group returns error when write operations disabled."""
+        from lm_mcp.tools.devices import delete_device_group
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        result = await delete_device_group(client, group_id=50)
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_delete_device_group_success(self, client, monkeypatch):
+        """delete_device_group deletes group when write enabled."""
+        from lm_mcp.tools.devices import delete_device_group
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.delete("https://test.logicmonitor.com/santaba/rest/device/groups/50").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_device_group(client, group_id=50)
+
+        data = json.loads(result[0].text)
+        assert "deleted successfully" in data["message"]
