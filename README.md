@@ -1,6 +1,8 @@
 # LogicMonitor MCP Server
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants like Claude to interact with LogicMonitor monitoring data through structured tools.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through structured tools.
+
+Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, and more.
 
 ## Features
 
@@ -190,7 +192,7 @@ Then set environment variables in your shell or `.env` file.
 
 ## Example Usage
 
-Once configured, you can ask Claude:
+Once configured, you can ask your AI assistant:
 
 - "Show me all critical alerts"
 - "What devices are in the Production group?"
