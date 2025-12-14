@@ -4,8 +4,10 @@
 import asyncio
 
 from mcp.server import Server
+from mcp.types import TextContent
 
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.registry import TOOLS, get_tool_handler
 
 # Create server instance
 server = Server("logicmonitor-platform")
@@ -26,6 +28,34 @@ def get_client() -> LogicMonitorClient:
     if _client is None:
         raise RuntimeError("Client not initialized")
     return _client
+
+
+@server.list_tools()
+async def list_tools():
+    """Return all available LogicMonitor tools."""
+    return TOOLS
+
+
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    """Execute a LogicMonitor tool.
+
+    Args:
+        name: Tool name to execute.
+        arguments: Tool arguments.
+
+    Returns:
+        List of TextContent with the tool result.
+    """
+    try:
+        handler = get_tool_handler(name)
+        client = get_client()
+        result = await handler(client, **arguments)
+        return result
+    except ValueError as e:
+        return [TextContent(type="text", text=f"Error: {e}")]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Error executing {name}: {e}")]
 
 
 async def run_server() -> None:

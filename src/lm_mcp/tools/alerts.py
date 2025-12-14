@@ -195,3 +195,68 @@ async def add_alert_note(
         )
     except Exception as e:
         return handle_error(e)
+
+
+# Maximum items for bulk operations to prevent accidental mass changes
+BULK_OPERATION_LIMIT = 100
+
+
+@require_write_permission
+async def bulk_acknowledge_alerts(
+    client: "LogicMonitorClient",
+    alert_ids: list[str],
+    note: str = "",
+) -> list[TextContent]:
+    """Acknowledge multiple alerts at once.
+
+    Args:
+        client: LogicMonitor API client.
+        alert_ids: List of alert IDs (with or without LMA prefix). Max 100 per call.
+        note: Optional note to add with acknowledgment.
+
+    Returns:
+        List of TextContent with results for each alert.
+    """
+    if not alert_ids:
+        return format_response(
+            {
+                "error": True,
+                "code": "VALIDATION_ERROR",
+                "message": "No alert IDs provided",
+                "suggestion": "Provide at least one alert ID",
+            }
+        )
+
+    if len(alert_ids) > BULK_OPERATION_LIMIT:
+        return format_response(
+            {
+                "error": True,
+                "code": "BULK_LIMIT_EXCEEDED",
+                "message": f"Too many items ({len(alert_ids)}). Max {BULK_OPERATION_LIMIT}.",
+                "suggestion": "Split into smaller batches",
+            }
+        )
+
+    results = {"success": [], "failed": []}
+
+    for alert_id in alert_ids:
+        try:
+            clean_id = _normalize_alert_id(alert_id)
+            body = {}
+            if note:
+                body["ackComment"] = note
+
+            await client.post(f"/alert/alerts/{clean_id}/ack", json_body=body or None)
+            results["success"].append(alert_id)
+        except Exception as e:
+            results["failed"].append({"id": alert_id, "error": str(e)})
+
+    return format_response(
+        {
+            "total": len(alert_ids),
+            "acknowledged": len(results["success"]),
+            "failed": len(results["failed"]),
+            "success_ids": results["success"],
+            "failures": results["failed"],
+        }
+    )

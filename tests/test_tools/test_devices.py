@@ -302,6 +302,12 @@ class TestDeleteDevice:
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
 
+        # GET device info first
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200, json={"id": 100, "displayName": "test-server", "name": "192.168.1.1"}
+            )
+        )
         respx.delete("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
             return_value=httpx.Response(200, json={})
         )
@@ -309,8 +315,10 @@ class TestDeleteDevice:
         result = await delete_device(client, device_id=100)
 
         data = json.loads(result[0].text)
-        assert "deleted successfully" in data["message"]
+        assert data["success"] is True
+        assert "test-server" in data["message"]
         assert data["hard_delete"] is False
+        assert data["recoverable"] is True
 
 
 class TestCreateDeviceGroup:
@@ -382,6 +390,19 @@ class TestDeleteDeviceGroup:
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
 
+        # GET group info first for impact assessment
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/50").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 50,
+                    "name": "Test Group",
+                    "fullPath": "/Test Group",
+                    "numOfHosts": 0,
+                    "numOfDirectSubGroups": 0,
+                },
+            )
+        )
         respx.delete("https://test.logicmonitor.com/santaba/rest/device/groups/50").mock(
             return_value=httpx.Response(200, json={})
         )
@@ -389,4 +410,6 @@ class TestDeleteDeviceGroup:
         result = await delete_device_group(client, group_id=50)
 
         data = json.loads(result[0].text)
-        assert "deleted successfully" in data["message"]
+        assert data["success"] is True
+        assert "Test Group" in data["message"]
+        assert data["recoverable"] is True

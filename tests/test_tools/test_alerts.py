@@ -274,3 +274,131 @@ class TestAddAlertNote:
 
         assert "Error:" in result[0].text
         assert "Note cannot be empty" in result[0].text
+
+
+class TestBulkAcknowledgeAlerts:
+    """Tests for bulk_acknowledge_alerts tool."""
+
+    @respx.mock
+    async def test_bulk_acknowledge_blocked_by_default(self, client, monkeypatch):
+        """bulk_acknowledge_alerts is blocked when writes disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import bulk_acknowledge_alerts
+
+        result = await bulk_acknowledge_alerts(client, alert_ids=["123", "456"])
+
+        assert "Error:" in result[0].text
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_bulk_acknowledge_succeeds(self, client, monkeypatch):
+        """bulk_acknowledge_alerts acknowledges multiple alerts."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import bulk_acknowledge_alerts
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/123/ack").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/456/ack").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        result = await bulk_acknowledge_alerts(client, alert_ids=["123", "456"], note="Batch ack")
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["total"] == 2
+        assert data["acknowledged"] == 2
+        assert data["failed"] == 0
+
+    @respx.mock
+    async def test_bulk_acknowledge_partial_failure(self, client, monkeypatch):
+        """bulk_acknowledge_alerts handles partial failures."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import bulk_acknowledge_alerts
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/123/ack").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+        respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/999/ack").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Alert not found"})
+        )
+
+        result = await bulk_acknowledge_alerts(client, alert_ids=["123", "999"])
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 2
+        assert data["acknowledged"] == 1
+        assert data["failed"] == 1
+        assert "123" in data["success_ids"]
+
+    @respx.mock
+    async def test_bulk_acknowledge_empty_list(self, client, monkeypatch):
+        """bulk_acknowledge_alerts validates non-empty list."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import bulk_acknowledge_alerts
+
+        result = await bulk_acknowledge_alerts(client, alert_ids=[])
+
+        assert "Error:" in result[0].text
+        assert "No alert IDs provided" in result[0].text
+
+    @respx.mock
+    async def test_bulk_acknowledge_strips_lma_prefix(self, client, monkeypatch):
+        """bulk_acknowledge_alerts strips LMA prefix from IDs."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alerts import bulk_acknowledge_alerts
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/alert/alerts/789/ack").mock(
+            return_value=httpx.Response(200, json={"success": True})
+        )
+
+        await bulk_acknowledge_alerts(client, alert_ids=["LMA789"])
+
+        assert route.called
+        assert "/alerts/789/ack" in str(route.calls[0].request.url)

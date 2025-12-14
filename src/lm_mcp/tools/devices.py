@@ -281,15 +281,22 @@ async def delete_device(
 ) -> list[TextContent]:
     """Delete a device from LogicMonitor.
 
+    WARNING: This removes the device and all its monitoring data.
+    By default, uses soft delete (recoverable from Recently Deleted).
+
     Args:
         client: LogicMonitor API client.
         device_id: Device ID to delete.
-        delete_hard: If True, permanently delete. If False, move to Recently Deleted.
+        delete_hard: If True, permanently delete. If False (default), move to Recently Deleted.
 
     Returns:
         List of TextContent with deletion confirmation or error.
     """
     try:
+        # Get device info first for confirmation
+        device = await client.get(f"/device/devices/{device_id}")
+        device_name = device.get("displayName") or device.get("name", f"ID:{device_id}")
+
         params = {}
         if delete_hard:
             params["deleteHard"] = "true"
@@ -298,8 +305,11 @@ async def delete_device(
 
         return format_response(
             {
-                "message": f"Device {device_id} deleted successfully",
+                "success": True,
+                "message": f"Device '{device_name}' deleted",
+                "device_id": device_id,
                 "hard_delete": delete_hard,
+                "recoverable": not delete_hard,
             }
         )
     except Exception as e:
@@ -369,16 +379,32 @@ async def delete_device_group(
 ) -> list[TextContent]:
     """Delete a device group from LogicMonitor.
 
+    WARNING: If delete_children is True, this will delete ALL devices and subgroups.
+    By default, fails if group contains devices (safe mode).
+
     Args:
         client: LogicMonitor API client.
         group_id: Device group ID to delete.
-        delete_children: If True, delete all child devices and subgroups.
-        delete_hard: If True, permanently delete. If False, move to Recently Deleted.
+        delete_children: If True, delete all child devices and subgroups. Default False.
+        delete_hard: If True, permanently delete. If False (default), move to Recently Deleted.
 
     Returns:
         List of TextContent with deletion confirmation or error.
     """
     try:
+        # Get group info first for confirmation and impact assessment
+        group = await client.get(f"/device/groups/{group_id}")
+        group_name = group.get("name", f"ID:{group_id}")
+        full_path = group.get("fullPath", group_name)
+        device_count = group.get("numOfHosts", 0)
+        subgroup_count = group.get("numOfDirectSubGroups", 0)
+
+        # Safety check: warn about impact if deleting children
+        if delete_children and (device_count > 0 or subgroup_count > 0):
+            impact_warning = f"IMPACT: {device_count} devices, {subgroup_count} subgroups deleted"
+        else:
+            impact_warning = None
+
         params: dict = {}
         if delete_children:
             params["deleteChildren"] = "true"
@@ -387,12 +413,18 @@ async def delete_device_group(
 
         await client.delete(f"/device/groups/{group_id}", params=params or None)
 
-        return format_response(
-            {
-                "message": f"Device group {group_id} deleted successfully",
-                "delete_children": delete_children,
-                "hard_delete": delete_hard,
-            }
-        )
+        response = {
+            "success": True,
+            "message": f"Device group '{full_path}' deleted",
+            "group_id": group_id,
+            "delete_children": delete_children,
+            "hard_delete": delete_hard,
+            "recoverable": not delete_hard,
+        }
+
+        if impact_warning:
+            response["impact"] = impact_warning
+
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

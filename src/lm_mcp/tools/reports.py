@@ -203,3 +203,203 @@ async def run_report(
         )
     except Exception as e:
         return handle_error(e)
+
+
+async def get_scheduled_reports(
+    client: "LogicMonitorClient",
+    enabled_only: bool = False,
+    limit: int = 50,
+) -> list[TextContent]:
+    """Get reports with schedules configured.
+
+    Args:
+        client: LogicMonitor API client.
+        enabled_only: Only return reports with enabled schedules.
+        limit: Maximum number of reports to return.
+
+    Returns:
+        List of TextContent with scheduled report data or error.
+    """
+    try:
+        params: dict = {"size": limit}
+
+        result = await client.get("/report/reports", params=params)
+
+        scheduled = []
+        for item in result.get("items", []):
+            schedule = item.get("schedule")
+            if schedule:
+                if enabled_only and not schedule.get("enabled", False):
+                    continue
+                scheduled.append(
+                    {
+                        "id": item.get("id"),
+                        "name": item.get("name"),
+                        "type": item.get("type"),
+                        "schedule_enabled": schedule.get("enabled", False),
+                        "schedule_type": schedule.get("type"),
+                        "schedule_cron": schedule.get("cron"),
+                        "timezone": schedule.get("timezone"),
+                        "next_run": schedule.get("nextRunTime"),
+                        "last_generated": item.get("lastGenerateOn"),
+                    }
+                )
+
+        return format_response(
+            {
+                "total": len(scheduled),
+                "count": len(scheduled),
+                "scheduled_reports": scheduled,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_report_schedule(
+    client: "LogicMonitorClient",
+    report_id: int,
+    enabled: bool | None = None,
+    schedule_type: str | None = None,
+    cron: str | None = None,
+    timezone: str | None = None,
+) -> list[TextContent]:
+    """Update a report's schedule configuration.
+
+    Args:
+        client: LogicMonitor API client.
+        report_id: Report ID to update.
+        enabled: Enable or disable the schedule.
+        schedule_type: Schedule type (daily, weekly, monthly, custom).
+        cron: Cron expression for custom schedules.
+        timezone: Timezone for schedule (e.g., America/Los_Angeles).
+
+    Returns:
+        List of TextContent with updated schedule or error.
+    """
+    try:
+        # Get current report to preserve other fields
+        current = await client.get(f"/report/reports/{report_id}")
+
+        schedule = current.get("schedule", {}) or {}
+
+        if enabled is not None:
+            schedule["enabled"] = enabled
+        if schedule_type is not None:
+            schedule["type"] = schedule_type
+        if cron is not None:
+            schedule["cron"] = cron
+        if timezone is not None:
+            schedule["timezone"] = timezone
+
+        current["schedule"] = schedule
+
+        result = await client.put(f"/report/reports/{report_id}", json_body=current)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Report {report_id} schedule updated",
+                "report": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "schedule": result.get("schedule"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_report(
+    client: "LogicMonitorClient",
+    name: str,
+    report_type: str,
+    group_id: int = 1,
+    description: str | None = None,
+    format: str = "PDF",
+    schedule_enabled: bool = False,
+    schedule_cron: str | None = None,
+) -> list[TextContent]:
+    """Create a new report.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Report name.
+        report_type: Report type (Alert, Host Metric, etc.).
+        group_id: Report group ID (default: 1 for root).
+        description: Report description.
+        format: Output format (PDF, CSV, HTML).
+        schedule_enabled: Enable scheduled generation.
+        schedule_cron: Cron expression for schedule.
+
+    Returns:
+        List of TextContent with created report or error.
+    """
+    try:
+        payload: dict = {
+            "name": name,
+            "type": report_type,
+            "groupId": group_id,
+            "format": format.upper(),
+        }
+
+        if description:
+            payload["description"] = description
+
+        if schedule_enabled and schedule_cron:
+            payload["schedule"] = {
+                "enabled": True,
+                "type": "custom",
+                "cron": schedule_cron,
+            }
+
+        result = await client.post("/report/reports", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Report '{name}' created",
+                "report": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "type": result.get("type"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_report(
+    client: "LogicMonitorClient",
+    report_id: int,
+) -> list[TextContent]:
+    """Delete a report.
+
+    Args:
+        client: LogicMonitor API client.
+        report_id: Report ID to delete.
+
+    Returns:
+        List of TextContent with deletion result or error.
+    """
+    try:
+        # Get report info first
+        report = await client.get(f"/report/reports/{report_id}")
+        report_name = report.get("name", f"ID:{report_id}")
+
+        await client.delete(f"/report/reports/{report_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Report '{report_name}' deleted",
+                "report_id": report_id,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
