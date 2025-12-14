@@ -17,6 +17,10 @@ Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, a
 - **Report Management**: List, view, and run reports
 - **Escalation Management**: View escalation chains and recipient groups
 - **Ops Management**: Get audit logs and manage ops notes
+- **User & Role Management**: View users, roles, and access groups
+- **LogicModules**: Query ConfigSources, EventSources, PropertySources, TopologySources
+- **Network Discovery**: List and execute netscans
+- **SNMP Management**: Query OID definitions
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 
@@ -214,6 +218,8 @@ LM_BEARER_TOKEN = "your-bearer-token"
 |------|-------------|-------|
 | `get_collectors` | List all collectors | No |
 | `get_collector` | Get detailed information about a specific collector | No |
+| `get_collector_groups` | List collector groups | No |
+| `get_collector_group` | Get detailed collector group info | No |
 
 ### Website Tools
 
@@ -258,6 +264,87 @@ LM_BEARER_TOKEN = "your-bearer-token"
 | `get_ops_notes` | List ops notes with optional tag filter | No |
 | `get_ops_note` | Get detailed information about a specific ops note | No |
 | `add_ops_note` | Add a new ops note with optional tags and scopes | Yes |
+
+### User & Role Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_users` | List users with optional name filter | No |
+| `get_user` | Get detailed user information | No |
+| `get_roles` | List roles with optional name filter | No |
+| `get_role` | Get detailed role information with privileges | No |
+
+### Service Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_services` | List services (LM Service Insight) | No |
+| `get_service` | Get detailed service information | No |
+| `get_service_groups` | List service groups | No |
+
+### Netscan Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_netscans` | List network discovery scans | No |
+| `get_netscan` | Get detailed netscan information | No |
+| `run_netscan` | Execute a netscan immediately | Yes |
+
+### ConfigSource Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_configsources` | List ConfigSources | No |
+| `get_configsource` | Get detailed ConfigSource information | No |
+
+### EventSource Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_eventsources` | List EventSources | No |
+| `get_eventsource` | Get detailed EventSource information | No |
+
+### PropertySource Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_propertysources` | List PropertySources | No |
+| `get_propertysource` | Get detailed PropertySource information | No |
+
+### TopologySource Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_topologysources` | List TopologySources | No |
+| `get_topologysource` | Get detailed TopologySource information | No |
+
+### Dashboard Group Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_dashboard_groups` | List dashboard groups | No |
+| `get_dashboard_group` | Get detailed dashboard group information | No |
+
+### API Token Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_api_tokens` | List API tokens for a user | No |
+| `get_api_token` | Get detailed API token information | No |
+
+### Access Group Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_access_groups` | List access groups (RBAC) | No |
+| `get_access_group` | Get detailed access group information | No |
+
+### OID Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_oids` | List SNMP OIDs | No |
+| `get_oid` | Get detailed OID information | No |
 
 ## Example Usage
 
@@ -315,20 +402,31 @@ src/lm_mcp/
 │   ├── __init__.py   # Client exports
 │   └── api.py        # Async HTTP client
 └── tools/
-    ├── __init__.py    # Tool utilities
-    ├── alerts.py      # Alert management tools
-    ├── alert_rules.py # Alert rule tools
-    ├── collectors.py  # Collector tools
-    ├── dashboards.py  # Dashboard tools
-    ├── datasources.py # DataSource tools
-    ├── devices.py     # Device management tools
-    ├── escalations.py # Escalation chain and recipient tools
-    ├── metrics.py     # Metrics and data tools
-    ├── ops.py         # Audit log and ops notes tools
-    ├── reports.py     # Report management tools
-    ├── resources.py   # Resource/property management tools
-    ├── sdts.py        # SDT management tools
-    └── websites.py    # Website/synthetic monitoring tools
+    ├── __init__.py        # Tool utilities
+    ├── access_groups.py   # Access group tools
+    ├── alerts.py          # Alert management tools
+    ├── alert_rules.py     # Alert rule tools
+    ├── api_tokens.py      # API token tools
+    ├── collectors.py      # Collector and collector group tools
+    ├── configsources.py   # ConfigSource tools
+    ├── dashboards.py      # Dashboard tools
+    ├── dashboard_groups.py # Dashboard group tools
+    ├── datasources.py     # DataSource tools
+    ├── devices.py         # Device management tools
+    ├── escalations.py     # Escalation chain and recipient tools
+    ├── eventsources.py    # EventSource tools
+    ├── metrics.py         # Metrics and data tools
+    ├── netscans.py        # Netscan tools
+    ├── oids.py            # OID tools
+    ├── ops.py             # Audit log and ops notes tools
+    ├── propertysources.py # PropertySource tools
+    ├── reports.py         # Report management tools
+    ├── resources.py       # Resource/property management tools
+    ├── sdts.py            # SDT management tools
+    ├── services.py        # Service tools
+    ├── topologysources.py # TopologySource tools
+    ├── users.py           # User and role tools
+    └── websites.py        # Website/synthetic monitoring tools
 ```
 
 ## Troubleshooting
