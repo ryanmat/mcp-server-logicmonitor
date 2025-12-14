@@ -14,6 +14,12 @@ from lm_mcp.tools.alerts import (
     get_alerts,
 )
 from lm_mcp.tools.collectors import get_collector, get_collectors
+from lm_mcp.tools.dashboards import (
+    create_dashboard,
+    get_dashboard,
+    get_dashboard_widgets,
+    get_dashboards,
+)
 from lm_mcp.tools.devices import get_device, get_device_groups, get_devices
 from lm_mcp.tools.metrics import (
     get_device_data,
@@ -586,3 +592,162 @@ class TestMetricsInvestigationFlow:
         assert len(result) == 1
         assert "CPU Usage %" in result[0].text
         assert "timestamps" in result[0].text
+
+
+class TestDashboardManagementFlow:
+    """Test dashboard management workflow."""
+
+    @respx.mock
+    async def test_dashboard_exploration(self, client):
+        """
+        Workflow: List dashboards → Get dashboard details → Get widgets.
+
+        This simulates exploring available dashboards.
+        """
+        # Mock: List dashboards
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 100,
+                            "name": "Production Overview",
+                            "description": "Main production dashboard",
+                            "groupId": 1,
+                            "groupFullPath": "Dashboards",
+                            "owner": "admin",
+                            "widgetsConfig": [1, 2, 3, 4, 5],
+                        },
+                        {
+                            "id": 101,
+                            "name": "Network Status",
+                            "description": "Network monitoring",
+                            "groupId": 1,
+                            "groupFullPath": "Dashboards",
+                            "owner": "admin",
+                            "widgetsConfig": [6, 7],
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get dashboard details
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "Production Overview",
+                    "description": "Main production dashboard",
+                    "groupId": 1,
+                    "owner": "admin",
+                },
+            )
+        )
+
+        # Mock: Get widgets
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/100/widgets"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1001,
+                            "name": "CPU Overview",
+                            "type": "cgraph",
+                            "description": "CPU metrics",
+                            "columnIdx": 0,
+                            "rowSpan": 1,
+                            "colSpan": 6,
+                        },
+                        {
+                            "id": 1002,
+                            "name": "Memory Overview",
+                            "type": "cgraph",
+                            "description": "Memory metrics",
+                            "columnIdx": 6,
+                            "rowSpan": 1,
+                            "colSpan": 6,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Step 1: List available dashboards
+        dashboards_result = await get_dashboards(client)
+        assert len(dashboards_result) == 1
+        assert "Production Overview" in dashboards_result[0].text
+        assert "Network Status" in dashboards_result[0].text
+
+        # Step 2: Get specific dashboard details
+        dashboard_result = await get_dashboard(client, dashboard_id=100)
+        assert len(dashboard_result) == 1
+        assert "Production Overview" in dashboard_result[0].text
+
+        # Step 3: Get widgets on the dashboard
+        widgets_result = await get_dashboard_widgets(client, dashboard_id=100)
+        assert len(widgets_result) == 1
+        assert "CPU Overview" in widgets_result[0].text
+        assert "Memory Overview" in widgets_result[0].text
+
+    @respx.mock
+    async def test_create_dashboard_workflow(self, client, enable_writes):
+        """
+        Workflow: Create dashboard → Verify creation.
+
+        This simulates creating a new dashboard.
+        """
+        # Mock: Create dashboard
+        respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 200,
+                    "name": "New Monitoring Dashboard",
+                    "groupId": 1,
+                    "description": "Created via API",
+                },
+            )
+        )
+
+        # Mock: List dashboards to verify
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 200,
+                            "name": "New Monitoring Dashboard",
+                            "description": "Created via API",
+                            "groupId": 1,
+                            "groupFullPath": "Dashboards",
+                            "owner": "admin",
+                            "widgetsConfig": [],
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Step 1: Create new dashboard
+        create_result = await create_dashboard(
+            client,
+            name="New Monitoring Dashboard",
+            description="Created via API",
+        )
+        assert len(create_result) == 1
+        assert "success" in create_result[0].text.lower()
+
+        # Step 2: Verify dashboard exists
+        list_result = await get_dashboards(client)
+        assert len(list_result) == 1
+        assert "New Monitoring Dashboard" in list_result[0].text

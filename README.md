@@ -7,6 +7,7 @@ Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. En
 - **Alert Management**: Get alerts, view details, acknowledge alerts, add notes
 - **Device Management**: List devices, get device details, browse device groups
 - **Metrics & Data**: Query device datasources, instances, and metric data
+- **Dashboard Management**: List dashboards, view widgets, create dashboards
 - **SDT Management**: List, create, and delete Scheduled Downtime
 - **Collector Management**: List and view collector details
 - **Security-First**: Read-only by default, write operations require explicit opt-in
@@ -127,6 +128,15 @@ Then set environment variables in your shell or `.env` file.
 | `get_device_data` | Get metric data for a specific instance | No |
 | `get_graph_data` | Get graph data for visualization | No |
 
+### Dashboard Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_dashboards` | List dashboards with optional filters | No |
+| `get_dashboard` | Get detailed dashboard information | No |
+| `get_dashboard_widgets` | Get widgets for a specific dashboard | No |
+| `create_dashboard` | Create a new dashboard | Yes |
+
 ### SDT Tools
 
 | Tool | Description | Write |
@@ -153,6 +163,8 @@ Once configured, you can ask Claude:
 - "List all collectors and their status"
 - "Show me the CPU metrics for device ID 100"
 - "What datasources are monitoring server prod-web-01?"
+- "List all dashboards"
+- "Show me the widgets on the Production Overview dashboard"
 
 ## Development
 
@@ -187,6 +199,7 @@ src/lm_mcp/
     ├── __init__.py   # Tool utilities
     ├── alerts.py     # Alert management tools
     ├── collectors.py # Collector tools
+    ├── dashboards.py # Dashboard tools
     ├── devices.py    # Device management tools
     ├── metrics.py    # Metrics and data tools
     └── sdts.py       # SDT management tools
