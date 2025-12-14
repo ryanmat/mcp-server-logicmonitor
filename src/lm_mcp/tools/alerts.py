@@ -39,6 +39,16 @@ async def get_alerts(
     client: "LogicMonitorClient",
     severity: str | None = None,
     status: str | None = None,
+    cleared: bool | None = None,
+    acked: bool | None = None,
+    sdted: bool | None = None,
+    start_epoch: int | None = None,
+    end_epoch: int | None = None,
+    datapoint: str | None = None,
+    instance: str | None = None,
+    datasource: str | None = None,
+    device: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[TextContent]:
@@ -48,6 +58,21 @@ async def get_alerts(
         client: LogicMonitor API client.
         severity: Filter by severity (critical, error, warning, info).
         status: Filter by status (active, acknowledged).
+        cleared: Filter by cleared status (True/False).
+        acked: Filter by acknowledged status (True/False).
+        sdted: Filter by SDT status (True/False).
+        start_epoch: Filter alerts started after this epoch timestamp.
+        end_epoch: Filter alerts started before this epoch timestamp.
+        datapoint: Filter by datapoint name (supports wildcards).
+        instance: Filter by instance name (supports wildcards).
+        datasource: Filter by datasource/template name (supports wildcards).
+        device: Filter by device/monitor object name (supports wildcards).
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "severity:4,cleared:false",
+            "monitorObjectName~prod,resourceTemplateName:CPU"
         limit: Maximum number of alerts to return (max 1000).
         offset: Number of results to skip for pagination.
 
@@ -57,17 +82,41 @@ async def get_alerts(
     try:
         params: dict = {"size": min(limit, 1000), "offset": offset}
 
-        filters = []
-        if severity and severity.lower() in SEVERITY_MAP:
-            filters.append(f"severity:{SEVERITY_MAP[severity.lower()]}")
-        if status:
-            if status.lower() == "active":
-                filters.append("cleared:false,acked:false")
-            elif status.lower() == "acknowledged":
-                filters.append("acked:true")
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if severity and severity.lower() in SEVERITY_MAP:
+                filters.append(f"severity:{SEVERITY_MAP[severity.lower()]}")
+            if status:
+                if status.lower() == "active":
+                    filters.append("cleared:false")
+                    filters.append("acked:false")
+                elif status.lower() == "acknowledged":
+                    filters.append("acked:true")
+            if cleared is not None:
+                filters.append(f"cleared:{str(cleared).lower()}")
+            if acked is not None:
+                filters.append(f"acked:{str(acked).lower()}")
+            if sdted is not None:
+                filters.append(f"sdted:{str(sdted).lower()}")
+            if start_epoch is not None:
+                filters.append(f"startEpoch>:{start_epoch}")
+            if end_epoch is not None:
+                filters.append(f"endEpoch<:{end_epoch}")
+            if datapoint:
+                filters.append(f"dataPointName~{datapoint}")
+            if instance:
+                filters.append(f"instanceName~{instance}")
+            if datasource:
+                filters.append(f"resourceTemplateName~{datasource}")
+            if device:
+                filters.append(f"monitorObjectName~{device}")
 
-        if filters:
-            params["filter"] = ",".join(filters)
+            if filters:
+                params["filter"] = ",".join(filters)
 
         result = await client.get("/alert/alerts", params=params)
 

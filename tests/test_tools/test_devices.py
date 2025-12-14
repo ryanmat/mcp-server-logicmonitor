@@ -86,6 +86,70 @@ class TestGetDevices:
 
         assert "filter" in route.calls[0].request.url.params
 
+    @respx.mock
+    async def test_get_devices_with_raw_filter(self, client):
+        """get_devices passes raw filter expression to API."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, filter="systemProperties.name:system.hostname")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "systemProperties" in params["filter"]
+
+    @respx.mock
+    async def test_get_devices_with_status_filter(self, client):
+        """get_devices filters by device status."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, status="dead")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "hostStatus" in params["filter"]
+
+    @respx.mock
+    async def test_get_devices_combined_filters(self, client):
+        """get_devices combines multiple filter parameters."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, name_filter="prod*", status="normal", group_id=5)
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        # Should contain all three filters combined with AND
+        assert "displayName" in params["filter"]
+        assert "hostStatus" in params["filter"]
+        assert "hostGroupIds" in params["filter"]
+
+    @respx.mock
+    async def test_get_devices_raw_filter_overrides_named(self, client):
+        """Raw filter takes precedence when provided."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, name_filter="ignored", filter="customProperties.name:env")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "customProperties" in params["filter"]
+        # Raw filter should be used, not the named filter
+        assert "displayName~ignored" not in params["filter"]
+
 
 class TestGetDevice:
     """Tests for get_device tool."""

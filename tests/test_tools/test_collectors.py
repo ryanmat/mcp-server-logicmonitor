@@ -113,3 +113,121 @@ class TestGetCollector:
         result = await get_collector(client, collector_id=999)
 
         assert "Error:" in result[0].text
+
+
+class TestGetCollectorsFilters:
+    """Tests for get_collectors filter parameters."""
+
+    @respx.mock
+    async def test_get_collectors_with_hostname_filter(self, client):
+        """get_collectors filters by hostname."""
+        from lm_mcp.tools.collectors import get_collectors
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_collectors(client, hostname_filter="prod")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "hostname~prod" in params["filter"]
+
+    @respx.mock
+    async def test_get_collectors_with_group_id(self, client):
+        """get_collectors filters by collector group ID."""
+        from lm_mcp.tools.collectors import get_collectors
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_collectors(client, collector_group_id=5)
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "collectorGroupId:5" in params["filter"]
+
+    @respx.mock
+    async def test_get_collectors_with_raw_filter(self, client):
+        """get_collectors passes raw filter expression to API."""
+        from lm_mcp.tools.collectors import get_collectors
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_collectors(client, filter="hostname~prod,collectorGroupId:1")
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "hostname~prod,collectorGroupId:1"
+
+    @respx.mock
+    async def test_get_collectors_with_offset(self, client):
+        """get_collectors passes offset for pagination."""
+        from lm_mcp.tools.collectors import get_collectors
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_collectors(client, offset=50)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["offset"] == "50"
+
+    @respx.mock
+    async def test_get_collectors_pagination_info(self, client):
+        """get_collectors returns pagination info."""
+        from lm_mcp.tools.collectors import get_collectors
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [{"id": 1, "hostname": "collector01"}],
+                    "total": 100,
+                },
+            )
+        )
+
+        result = await get_collectors(client, limit=10, offset=0)
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 100
+        assert data["has_more"] is True
+        assert data["offset"] == 0
+
+
+class TestGetCollectorGroupsFilters:
+    """Tests for get_collector_groups filter parameters."""
+
+    @respx.mock
+    async def test_get_collector_groups_with_raw_filter(self, client):
+        """get_collector_groups passes raw filter expression to API."""
+        from lm_mcp.tools.collectors import get_collector_groups
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/groups"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_collector_groups(client, filter="name~prod,autoBalance:true")
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "name~prod,autoBalance:true"
+
+    @respx.mock
+    async def test_get_collector_groups_with_offset(self, client):
+        """get_collector_groups passes offset for pagination."""
+        from lm_mcp.tools.collectors import get_collector_groups
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/groups"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_collector_groups(client, offset=25)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["offset"] == "25"

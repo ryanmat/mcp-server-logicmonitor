@@ -18,7 +18,9 @@ async def get_reports(
     name_filter: str | None = None,
     group_id: int | None = None,
     report_type: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List reports from LogicMonitor.
 
@@ -27,24 +29,35 @@ async def get_reports(
         name_filter: Filter by report name (supports wildcards).
         group_id: Filter by report group ID.
         report_type: Filter by report type (e.g., 'Alert', 'Host metric').
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "name~monthly,type~Alert"
         limit: Maximum number of reports to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with report data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        filters = []
-        if name_filter:
-            filters.append(f"name~{name_filter}")
-        if group_id is not None:
-            filters.append(f"groupId:{group_id}")
-        if report_type:
-            filters.append(f"type~{report_type}")
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if name_filter:
+                filters.append(f"name~{name_filter}")
+            if group_id is not None:
+                filters.append(f"groupId:{group_id}")
+            if report_type:
+                filters.append(f"type~{report_type}")
 
-        if filters:
-            params["filter"] = ",".join(filters)
+            if filters:
+                params["filter"] = ",".join(filters)
 
         result = await client.get("/report/reports", params=params)
 
@@ -64,10 +77,15 @@ async def get_reports(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(reports)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(reports),
+                "offset": offset,
+                "has_more": has_more,
                 "reports": reports,
             }
         )

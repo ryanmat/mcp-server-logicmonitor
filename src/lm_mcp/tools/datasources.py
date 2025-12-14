@@ -17,7 +17,9 @@ async def get_datasources(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
     applies_to_filter: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List DataSources (LogicModules) from LogicMonitor.
 
@@ -25,22 +27,33 @@ async def get_datasources(
         client: LogicMonitor API client.
         name_filter: Filter by DataSource name (supports wildcards).
         applies_to_filter: Filter by appliesTo expression.
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "name~CPU,group:Core"
         limit: Maximum number of DataSources to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with DataSource data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        filters = []
-        if name_filter:
-            filters.append(f"name~{name_filter}")
-        if applies_to_filter:
-            filters.append(f"appliesTo~{applies_to_filter}")
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if name_filter:
+                filters.append(f"name~{name_filter}")
+            if applies_to_filter:
+                filters.append(f"appliesTo~{applies_to_filter}")
 
-        if filters:
-            params["filter"] = ",".join(filters)
+            if filters:
+                params["filter"] = ",".join(filters)
 
         result = await client.get("/setting/datasources", params=params)
 
@@ -59,10 +72,15 @@ async def get_datasources(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(datasources)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(datasources),
+                "offset": offset,
+                "has_more": has_more,
                 "datasources": datasources,
             }
         )

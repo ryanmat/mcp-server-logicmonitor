@@ -16,19 +16,52 @@ if TYPE_CHECKING:
 
 async def list_sdts(
     client: "LogicMonitorClient",
+    device_id: int | None = None,
+    device_group_id: int | None = None,
+    sdt_type: str | None = None,
+    admin: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
     """List scheduled downtimes from LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
+        device_id: Filter by device ID.
+        device_group_id: Filter by device group ID.
+        sdt_type: Filter by SDT type (DeviceSDT, DeviceGroupSDT, etc.).
+        admin: Filter by admin/creator username (supports wildcards).
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "type:DeviceSDT,admin~john"
         limit: Maximum number of SDTs to return.
 
     Returns:
         List of TextContent with SDT data or error.
     """
     try:
-        params = {"size": limit}
+        params: dict = {"size": limit}
+
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if device_id is not None:
+                filters.append(f"deviceId:{device_id}")
+            if device_group_id is not None:
+                filters.append(f"deviceGroupId:{device_group_id}")
+            if sdt_type:
+                filters.append(f"type:{sdt_type}")
+            if admin:
+                filters.append(f"admin~{admin}")
+
+            if filters:
+                params["filter"] = ",".join(filters)
+
         result = await client.get("/sdt/sdts", params=params)
 
         sdts = []
@@ -96,6 +129,19 @@ async def create_sdt(
             body["deviceGroupId"] = device_group_id
 
         result = await client.post("/sdt/sdts", json_body=body)
+
+        # Check for API error in response (LogicMonitor returns 200 with error body)
+        if "errorMessage" in result or "errorCode" in result:
+            return format_response(
+                {
+                    "success": False,
+                    "error": True,
+                    "code": result.get("errorCode", "API_ERROR"),
+                    "message": result.get("errorMessage", "Unknown API error"),
+                    "suggestion": "Check SDT type and parameters. "
+                    "Valid types: DeviceSDT, DeviceGroupSDT",
+                }
+            )
 
         return format_response(
             {

@@ -13,10 +13,22 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+# Device status mapping for LogicMonitor
+DEVICE_STATUS_MAP = {
+    "normal": 0,
+    "dead": 1,
+    "dead-collector": 2,
+    "unmonitored": 3,
+    "disabled": 4,
+}
+
+
 async def get_devices(
     client: "LogicMonitorClient",
     group_id: int | None = None,
     name_filter: str | None = None,
+    status: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[TextContent]:
@@ -26,6 +38,13 @@ async def get_devices(
         client: LogicMonitor API client.
         group_id: Filter by device group ID.
         name_filter: Filter by device name (supports wildcards).
+        status: Filter by device status (normal, dead, dead-collector, unmonitored, disabled).
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "systemProperties.name:system.hostname",
+            "customProperties.name:env,customProperties.value:prod"
         limit: Maximum number of devices to return (max 1000).
         offset: Number of results to skip for pagination.
 
@@ -35,14 +54,21 @@ async def get_devices(
     try:
         params: dict = {"size": min(limit, 1000), "offset": offset}
 
-        filters = []
-        if group_id:
-            filters.append(f"hostGroupIds~{group_id}")
-        if name_filter:
-            filters.append(f"displayName~{name_filter}")
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if group_id:
+                filters.append(f"hostGroupIds~{group_id}")
+            if name_filter:
+                filters.append(f"displayName~{name_filter}")
+            if status and status.lower() in DEVICE_STATUS_MAP:
+                filters.append(f"hostStatus:{DEVICE_STATUS_MAP[status.lower()]}")
 
-        if filters:
-            params["filter"] = ",".join(filters)
+            if filters:
+                params["filter"] = ",".join(filters)
 
         result = await client.get("/device/devices", params=params)
 

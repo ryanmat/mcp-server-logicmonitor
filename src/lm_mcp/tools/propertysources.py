@@ -16,23 +16,44 @@ if TYPE_CHECKING:
 async def get_propertysources(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
+    applies_to_filter: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List PropertySources from LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
         name_filter: Filter by name (supports wildcards).
+        applies_to_filter: Filter by appliesTo expression.
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "name~Linux,technology:script"
         limit: Maximum number of PropertySources to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with PropertySource data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        if name_filter:
-            params["filter"] = f"name~{name_filter}"
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if name_filter:
+                filters.append(f"name~{name_filter}")
+            if applies_to_filter:
+                filters.append(f"appliesTo~{applies_to_filter}")
+
+            if filters:
+                params["filter"] = ",".join(filters)
 
         result = await client.get("/setting/propertyrules", params=params)
 
@@ -51,10 +72,15 @@ async def get_propertysources(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(sources)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(sources),
+                "offset": offset,
+                "has_more": has_more,
                 "propertysources": sources,
             }
         )

@@ -103,6 +103,84 @@ class TestGetAlerts:
         assert len(result) == 1
         assert "Error:" in result[0].text
 
+    @respx.mock
+    async def test_get_alerts_with_raw_filter(self, client):
+        """get_alerts passes raw filter expression to API."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, filter="resourceTemplateName:CPU,severity>:3")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "resourceTemplateName" in params["filter"]
+
+    @respx.mock
+    async def test_get_alerts_with_time_range(self, client):
+        """get_alerts filters by time range."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, start_epoch=1700000000, end_epoch=1700100000)
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "startEpoch" in params["filter"]
+        assert "endEpoch" in params["filter"]
+
+    @respx.mock
+    async def test_get_alerts_with_cleared_filter(self, client):
+        """get_alerts filters by cleared status."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, cleared=True)
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "cleared:true" in params["filter"]
+
+    @respx.mock
+    async def test_get_alerts_with_datapoint_filter(self, client):
+        """get_alerts filters by datapoint name."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, datapoint="CPUBusyPercent")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "dataPointName" in params["filter"]
+
+    @respx.mock
+    async def test_get_alerts_combined_filters(self, client):
+        """get_alerts combines multiple filter parameters."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, severity="critical", cleared=False, datapoint="CPU")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "severity" in params["filter"]
+        assert "cleared" in params["filter"]
+        assert "dataPointName" in params["filter"]
+
 
 class TestGetAlertDetails:
     """Tests for get_alert_details tool."""

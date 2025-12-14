@@ -219,3 +219,59 @@ class TestGetDatasource:
         assert data["id"] == 101
         assert len(data["datapoints"]) == 0
         assert len(data["graphs"]) == 0
+
+
+class TestGetDatasourcesFilters:
+    """Tests for get_datasources filter parameters."""
+
+    @respx.mock
+    async def test_get_datasources_with_raw_filter(self, client):
+        """get_datasources passes raw filter expression to API."""
+        from lm_mcp.tools.datasources import get_datasources
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_datasources(client, filter="name~CPU,group:Core")
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "name~CPU,group:Core"
+
+    @respx.mock
+    async def test_get_datasources_with_offset(self, client):
+        """get_datasources passes offset for pagination."""
+        from lm_mcp.tools.datasources import get_datasources
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_datasources(client, offset=100)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["offset"] == "100"
+
+    @respx.mock
+    async def test_get_datasources_pagination_info(self, client):
+        """get_datasources returns pagination info."""
+        from lm_mcp.tools.datasources import get_datasources
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [{"id": 1, "name": "CPU"}],
+                    "total": 500,
+                },
+            )
+        )
+
+        result = await get_datasources(client, limit=50, offset=0)
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 500
+        assert data["has_more"] is True
+        assert data["offset"] == 0

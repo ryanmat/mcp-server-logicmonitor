@@ -17,7 +17,9 @@ async def get_dashboards(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
     group_id: int | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List dashboards from LogicMonitor.
 
@@ -25,22 +27,33 @@ async def get_dashboards(
         client: LogicMonitor API client.
         name_filter: Filter by dashboard name (supports wildcards).
         group_id: Filter by dashboard group ID.
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "name~prod,owner:admin"
         limit: Maximum number of dashboards to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with dashboard data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        filters = []
-        if name_filter:
-            filters.append(f"name~{name_filter}")
-        if group_id is not None:
-            filters.append(f"groupId:{group_id}")
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if name_filter:
+                filters.append(f"name~{name_filter}")
+            if group_id is not None:
+                filters.append(f"groupId:{group_id}")
 
-        if filters:
-            params["filter"] = ",".join(filters)
+            if filters:
+                params["filter"] = ",".join(filters)
 
         result = await client.get("/dashboard/dashboards", params=params)
 
@@ -60,10 +73,15 @@ async def get_dashboards(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(dashboards)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(dashboards),
+                "offset": offset,
+                "has_more": has_more,
                 "dashboards": dashboards,
             }
         )

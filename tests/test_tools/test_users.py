@@ -140,3 +140,91 @@ class TestGetRole:
         data = json.loads(result[0].text)
         assert data["name"] == "administrator"
         assert len(data["privileges"]) == 1
+
+
+class TestGetUsersFilters:
+    """Tests for get_users filter parameters."""
+
+    @respx.mock
+    async def test_get_users_with_raw_filter(self, client):
+        """get_users passes raw filter expression to API."""
+        from lm_mcp.tools.users import get_users
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/admins"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_users(client, filter="username~admin,status:active")
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "username~admin,status:active"
+
+    @respx.mock
+    async def test_get_users_with_offset(self, client):
+        """get_users passes offset for pagination."""
+        from lm_mcp.tools.users import get_users
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/admins"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_users(client, offset=25)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["offset"] == "25"
+
+    @respx.mock
+    async def test_get_users_pagination_info(self, client):
+        """get_users returns pagination info."""
+        from lm_mcp.tools.users import get_users
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/admins"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [{"id": 1, "username": "admin"}],
+                    "total": 100,
+                },
+            )
+        )
+
+        result = await get_users(client, limit=10, offset=0)
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 100
+        assert data["has_more"] is True
+        assert data["offset"] == 0
+
+
+class TestGetRolesFilters:
+    """Tests for get_roles filter parameters."""
+
+    @respx.mock
+    async def test_get_roles_with_raw_filter(self, client):
+        """get_roles passes raw filter expression to API."""
+        from lm_mcp.tools.users import get_roles
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/roles"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_roles(client, filter="name~admin,twoFARequired:true")
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "name~admin,twoFARequired:true"
+
+    @respx.mock
+    async def test_get_roles_with_offset(self, client):
+        """get_roles passes offset for pagination."""
+        from lm_mcp.tools.users import get_roles
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/roles"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_roles(client, offset=10)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["offset"] == "10"

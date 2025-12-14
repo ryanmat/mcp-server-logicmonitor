@@ -24,6 +24,16 @@ TOOLS.extend(
                         "type": "string",
                         "description": "Filter by device name (supports wildcards)",
                     },
+                    "status": {
+                        "type": "string",
+                        "enum": ["normal", "dead", "dead-collector", "unmonitored", "disabled"],
+                        "description": "Filter by device status",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Syntax: field:value, field~value. Example: systemProperties.name:val",
+                    },
                     "limit": {
                         "type": "integer",
                         "default": 50,
@@ -184,6 +194,38 @@ TOOLS.extend(
                         "enum": ["active", "acknowledged"],
                         "description": "Filter by status",
                     },
+                    "cleared": {"type": "boolean", "description": "Filter by cleared status"},
+                    "acked": {"type": "boolean", "description": "Filter by acknowledged status"},
+                    "sdted": {"type": "boolean", "description": "Filter by SDT status"},
+                    "start_epoch": {
+                        "type": "integer",
+                        "description": "Filter alerts started after this epoch timestamp",
+                    },
+                    "end_epoch": {
+                        "type": "integer",
+                        "description": "Filter alerts started before this epoch timestamp",
+                    },
+                    "datapoint": {
+                        "type": "string",
+                        "description": "Filter by datapoint name (supports wildcards)",
+                    },
+                    "instance": {
+                        "type": "string",
+                        "description": "Filter by instance name (supports wildcards)",
+                    },
+                    "datasource": {
+                        "type": "string",
+                        "description": "Filter by datasource/template name (supports wildcards)",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Filter by device name (supports wildcards)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: severity:4,cleared:false",
+                    },
                     "limit": {
                         "type": "integer",
                         "default": 50,
@@ -265,6 +307,28 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "device_id": {
+                        "type": "integer",
+                        "description": "Filter by device ID",
+                    },
+                    "device_group_id": {
+                        "type": "integer",
+                        "description": "Filter by device group ID",
+                    },
+                    "sdt_type": {
+                        "type": "string",
+                        "enum": ["DeviceSDT", "DeviceGroupSDT", "DeviceDataSourceSDT"],
+                        "description": "Filter by SDT type",
+                    },
+                    "admin": {
+                        "type": "string",
+                        "description": "Filter by admin username (wildcards)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: type:DeviceSDT,admin~john",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -381,7 +445,21 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "hostname_filter": {
+                        "type": "string",
+                        "description": "Filter by hostname (supports wildcards)",
+                    },
+                    "collector_group_id": {
+                        "type": "integer",
+                        "description": "Filter by collector group ID",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: hostname~prod,collectorGroupId:1",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -402,7 +480,17 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by name (supports wildcards)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides name_filter). "
+                        "Example: name~prod,autoBalance:true",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -500,7 +588,13 @@ TOOLS.extend(
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
                     "group_id": {"type": "integer", "description": "Filter by group ID"},
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~prod,owner:admin",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -683,7 +777,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "group_id": {"type": "integer", "description": "Filter by website group ID"},
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~prod,type:webcheck",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -741,7 +842,13 @@ TOOLS.extend(
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
                     "group_id": {"type": "integer", "description": "Filter by group ID"},
                     "report_type": {"type": "string", "description": "Filter by type"},
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~monthly,type~Alert",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -934,7 +1041,17 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by username (supports wildcards)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides name_filter). "
+                        "Example: username~admin,status:active",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -955,7 +1072,17 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by role name (supports wildcards)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides name_filter). "
+                        "Example: name~admin,twoFARequired:true",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1084,7 +1211,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "applies_to_filter": {
+                        "type": "string",
+                        "description": "Filter by appliesTo expression",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~CPU,group:Core",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1112,7 +1249,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "applies_to_filter": {
+                        "type": "string",
+                        "description": "Filter by appliesTo expression",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~Cisco,technology:snmp",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1134,7 +1281,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "applies_to_filter": {
+                        "type": "string",
+                        "description": "Filter by appliesTo expression",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~Windows,group:Events",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1156,7 +1313,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "applies_to_filter": {
+                        "type": "string",
+                        "description": "Filter by appliesTo expression",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~Linux,technology:script",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1178,7 +1345,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "applies_to_filter": {
+                        "type": "string",
+                        "description": "Filter by appliesTo expression",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~Network,technology:snmp",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1200,7 +1377,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "applies_to_filter": {
+                        "type": "string",
+                        "description": "Filter by appliesTo expression",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": "Raw filter expression (overrides other filters). "
+                        "Example: name~syslog,logType:EventLog",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),

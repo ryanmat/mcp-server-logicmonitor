@@ -15,19 +15,46 @@ if TYPE_CHECKING:
 
 async def get_collectors(
     client: "LogicMonitorClient",
+    hostname_filter: str | None = None,
+    collector_group_id: int | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List collectors from LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
+        hostname_filter: Filter by hostname (supports wildcards).
+        collector_group_id: Filter by collector group ID.
+        filter: Raw filter expression for advanced queries (overrides other filters).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "hostname~prod,collectorGroupId:1"
         limit: Maximum number of collectors to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with collector data or error.
     """
     try:
-        params = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
+
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        else:
+            # Build filter from named parameters
+            filters = []
+            if hostname_filter:
+                filters.append(f"hostname~{hostname_filter}")
+            if collector_group_id is not None:
+                filters.append(f"collectorGroupId:{collector_group_id}")
+
+            if filters:
+                params["filter"] = ",".join(filters)
+
         result = await client.get("/setting/collector/collectors", params=params)
 
         collectors = []
@@ -41,10 +68,15 @@ async def get_collectors(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(collectors)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(collectors),
+                "offset": offset,
+                "has_more": has_more,
                 "collectors": collectors,
             }
         )
@@ -75,22 +107,33 @@ async def get_collector(
 async def get_collector_groups(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List collector groups from LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
         name_filter: Filter by group name (supports wildcards).
+        filter: Raw filter expression for advanced queries (overrides name_filter).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "name~prod,autoBalance:true"
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with collector group data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        if name_filter:
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        elif name_filter:
             params["filter"] = f"name~{name_filter}"
 
         result = await client.get("/setting/collector/groups", params=params)

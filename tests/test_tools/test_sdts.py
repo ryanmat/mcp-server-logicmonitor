@@ -75,6 +75,51 @@ class TestListSdts:
 
         assert route.calls[0].request.url.params.get("size") == "10"
 
+    @respx.mock
+    async def test_list_sdts_with_raw_filter(self, client):
+        """list_sdts passes raw filter expression to API."""
+        from lm_mcp.tools.sdts import list_sdts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await list_sdts(client, filter="type:DeviceSDT,admin~john")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "type:DeviceSDT" in params["filter"]
+
+    @respx.mock
+    async def test_list_sdts_with_device_filter(self, client):
+        """list_sdts filters by device ID."""
+        from lm_mcp.tools.sdts import list_sdts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await list_sdts(client, device_id=123)
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "deviceId" in params["filter"]
+
+    @respx.mock
+    async def test_list_sdts_with_type_filter(self, client):
+        """list_sdts filters by SDT type."""
+        from lm_mcp.tools.sdts import list_sdts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await list_sdts(client, sdt_type="DeviceGroupSDT")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "type" in params["filter"]
+
 
 class TestCreateSdt:
     """Tests for create_sdt tool."""
@@ -138,6 +183,39 @@ class TestCreateSdt:
         assert "Error:" not in result[0].text
         data = json.loads(result[0].text)
         assert data["success"] is True
+
+    @respx.mock
+    async def test_create_sdt_handles_api_error(self, client, monkeypatch):
+        """create_sdt properly handles API error responses."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import create_sdt
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={"errorMessage": "Invalid type", "errorCode": 1400},
+            )
+        )
+
+        result = await create_sdt(
+            client,
+            sdt_type="InvalidType",
+            device_id=123,
+            duration_minutes=60,
+        )
+
+        # Error responses are formatted as text, not JSON
+        assert "Error:" in result[0].text
+        assert "Invalid type" in result[0].text
 
 
 class TestDeleteSdt:

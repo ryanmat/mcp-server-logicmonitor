@@ -616,3 +616,59 @@ class TestDeleteWidget:
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert "deleted" in data["message"].lower()
+
+
+class TestGetDashboardsFilters:
+    """Tests for get_dashboards filter parameters."""
+
+    @respx.mock
+    async def test_get_dashboards_with_raw_filter(self, client):
+        """get_dashboards passes raw filter expression to API."""
+        from lm_mcp.tools.dashboards import get_dashboards
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_dashboards(client, filter="name~prod,owner:admin")
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "name~prod,owner:admin"
+
+    @respx.mock
+    async def test_get_dashboards_with_offset(self, client):
+        """get_dashboards passes offset for pagination."""
+        from lm_mcp.tools.dashboards import get_dashboards
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_dashboards(client, offset=25)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["offset"] == "25"
+
+    @respx.mock
+    async def test_get_dashboards_pagination_info(self, client):
+        """get_dashboards returns pagination info."""
+        from lm_mcp.tools.dashboards import get_dashboards
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [{"id": 1, "name": "Dashboard 1"}],
+                    "total": 100,
+                },
+            )
+        )
+
+        result = await get_dashboards(client, limit=10, offset=0)
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 100
+        assert data["has_more"] is True
+        assert data["offset"] == 0

@@ -16,22 +16,33 @@ if TYPE_CHECKING:
 async def get_users(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List users from LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
         name_filter: Filter by username (supports wildcards).
+        filter: Raw filter expression for advanced queries (overrides name_filter).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "username~admin,status:active"
         limit: Maximum number of users to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with user data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        if name_filter:
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        elif name_filter:
             params["filter"] = f"username~{name_filter}"
 
         result = await client.get("/setting/admins", params=params)
@@ -52,10 +63,15 @@ async def get_users(
                 }
             )
 
+        total = result.get("total", 0)
+        has_more = (offset + len(users)) < total
+
         return format_response(
             {
-                "total": result.get("total", 0),
+                "total": total,
                 "count": len(users),
+                "offset": offset,
+                "has_more": has_more,
                 "users": users,
             }
         )
@@ -104,22 +120,33 @@ async def get_user(
 async def get_roles(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
+    filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List roles from LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
         name_filter: Filter by role name (supports wildcards).
+        filter: Raw filter expression for advanced queries (overrides name_filter).
+            Supports LogicMonitor filter syntax with operators:
+            : (equal), !: (not equal), > < >: <: (comparisons),
+            ~ (contains), !~ (not contains).
+            Examples: "name~admin,twoFARequired:true"
         limit: Maximum number of roles to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with role data or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
 
-        if name_filter:
+        # If raw filter is provided, use it directly (power user mode)
+        if filter:
+            params["filter"] = filter
+        elif name_filter:
             params["filter"] = f"name~{name_filter}"
 
         result = await client.get("/setting/roles", params=params)
