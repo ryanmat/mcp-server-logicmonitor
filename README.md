@@ -10,6 +10,7 @@ Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. En
 - **Dashboard Management**: List dashboards, view widgets, create dashboards
 - **SDT Management**: List, create, and delete Scheduled Downtime
 - **Collector Management**: List and view collector details
+- **Website Monitoring**: List websites, get synthetic check details and data
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 
@@ -159,6 +160,15 @@ Then set environment variables in your shell or `.env` file.
 | `get_collectors` | List all collectors | No |
 | `get_collector` | Get detailed information about a specific collector | No |
 
+### Website Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_websites` | List websites/synthetic checks with optional filters | No |
+| `get_website` | Get detailed information about a specific website | No |
+| `get_website_groups` | List website groups | No |
+| `get_website_data` | Get monitoring data for a website checkpoint | No |
+
 ## Example Usage
 
 Once configured, you can ask Claude:
@@ -172,6 +182,8 @@ Once configured, you can ask Claude:
 - "What datasources are monitoring server prod-web-01?"
 - "List all dashboards"
 - "Show me the widgets on the Production Overview dashboard"
+- "List all website checks"
+- "Show me the response times for website ID 100"
 
 ## Development
 
@@ -210,7 +222,8 @@ src/lm_mcp/
     ├── datasources.py # DataSource tools
     ├── devices.py     # Device management tools
     ├── metrics.py     # Metrics and data tools
-    └── sdts.py        # SDT management tools
+    ├── sdts.py        # SDT management tools
+    └── websites.py    # Website/synthetic monitoring tools
 ```
 
 ## Troubleshooting

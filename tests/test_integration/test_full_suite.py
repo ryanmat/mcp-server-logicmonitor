@@ -29,6 +29,12 @@ from lm_mcp.tools.metrics import (
     get_graph_data,
 )
 from lm_mcp.tools.sdts import create_sdt, delete_sdt, list_sdts
+from lm_mcp.tools.websites import (
+    get_website,
+    get_website_data,
+    get_website_groups,
+    get_websites,
+)
 
 
 @pytest.fixture
@@ -849,3 +855,142 @@ class TestDatasourceExplorationFlow:
         assert "CPUBusyPercent" in ds_detail[0].text
         assert "CPUIdlePercent" in ds_detail[0].text
         assert "CPU Usage" in ds_detail[0].text
+
+
+class TestWebsiteMonitoringFlow:
+    """Test website/synthetic monitoring workflow."""
+
+    @respx.mock
+    async def test_website_exploration(self, client):
+        """
+        Workflow: List websites → Get details → Get groups → Get data.
+
+        This simulates exploring synthetic monitoring checks.
+        """
+        # Mock: List websites
+        respx.get("https://test.logicmonitor.com/santaba/rest/website/websites").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 100,
+                            "name": "Production Site",
+                            "type": "webcheck",
+                            "description": "Main website",
+                            "groupId": 1,
+                            "status": "active",
+                            "alertStatus": "none",
+                            "overallAlertLevel": "none",
+                            "pollingInterval": 5,
+                            "host": "www.example.com",
+                        },
+                        {
+                            "id": 101,
+                            "name": "API Health",
+                            "type": "pingcheck",
+                            "description": "API endpoint check",
+                            "groupId": 1,
+                            "status": "active",
+                            "alertStatus": "none",
+                            "overallAlertLevel": "none",
+                            "pollingInterval": 1,
+                            "host": "api.example.com",
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get website details
+        respx.get("https://test.logicmonitor.com/santaba/rest/website/websites/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "Production Site",
+                    "type": "webcheck",
+                    "description": "Main website",
+                    "groupId": 1,
+                    "status": "active",
+                    "host": "www.example.com",
+                    "pollingInterval": 5,
+                    "useDefaultAlertSetting": True,
+                    "useDefaultLocationSetting": True,
+                    "checkpoints": [
+                        {"id": 1, "geoInfo": "US - Los Angeles", "smgId": 1},
+                        {"id": 2, "geoInfo": "EU - London", "smgId": 2},
+                    ],
+                    "steps": [
+                        {
+                            "url": "https://www.example.com",
+                            "HTTPMethod": "GET",
+                            "statusCode": "200",
+                            "timeout": 30,
+                        }
+                    ],
+                },
+            )
+        )
+
+        # Mock: Get website groups
+        respx.get("https://test.logicmonitor.com/santaba/rest/website/groups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Production",
+                            "description": "Production websites",
+                            "parentId": 0,
+                            "fullPath": "Production",
+                            "numOfWebsites": 10,
+                            "hasWebsitesDisabled": False,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get website data
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/website/websites/100/checkpoints/1/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["ResponseTime", "StatusCode"],
+                    "values": {
+                        "ResponseTime": [150, 145, 160, 155],
+                        "StatusCode": [200, 200, 200, 200],
+                    },
+                    "time": [1702500000, 1702500300, 1702500600, 1702500900],
+                },
+            )
+        )
+
+        # Step 1: List all websites
+        websites_result = await get_websites(client)
+        assert len(websites_result) == 1
+        assert "Production Site" in websites_result[0].text
+        assert "API Health" in websites_result[0].text
+
+        # Step 2: Get specific website details
+        website_result = await get_website(client, website_id=100)
+        assert len(website_result) == 1
+        assert "Production Site" in website_result[0].text
+        assert "US - Los Angeles" in website_result[0].text
+
+        # Step 3: Get website groups
+        groups_result = await get_website_groups(client)
+        assert len(groups_result) == 1
+        assert "Production" in groups_result[0].text
+
+        # Step 4: Get monitoring data from checkpoint
+        data_result = await get_website_data(client, website_id=100, checkpoint_id=1)
+        assert len(data_result) == 1
+        assert "ResponseTime" in data_result[0].text
+        assert "StatusCode" in data_result[0].text
