@@ -22,6 +22,12 @@ from lm_mcp.tools.dashboards import (
 )
 from lm_mcp.tools.datasources import get_datasource, get_datasources
 from lm_mcp.tools.devices import get_device, get_device_groups, get_devices
+from lm_mcp.tools.escalations import (
+    get_escalation_chain,
+    get_escalation_chains,
+    get_recipient_group,
+    get_recipient_groups,
+)
 from lm_mcp.tools.metrics import (
     get_device_data,
     get_device_datasources,
@@ -1209,3 +1215,124 @@ class TestReportManagementFlow:
         assert len(run_result) == 1
         assert "success" in run_result[0].text.lower()
         assert "task-12345" in run_result[0].text
+
+
+class TestEscalationWorkflow:
+    """Test escalation chain and recipient group workflow."""
+
+    @respx.mock
+    async def test_escalation_exploration(self, client):
+        """
+        Workflow: List chains → Get details → List recipients → Get recipient details.
+
+        This simulates exploring alert notification configuration.
+        """
+        # Mock: List escalation chains
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/chains").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 100,
+                            "name": "Primary On-Call",
+                            "description": "Primary escalation",
+                            "enableThrottling": True,
+                            "throttlingPeriod": 10,
+                            "throttlingAlerts": 5,
+                            "inAlerting": False,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get escalation chain details
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "Primary On-Call",
+                    "description": "Primary escalation",
+                    "enableThrottling": True,
+                    "throttlingPeriod": 10,
+                    "throttlingAlerts": 5,
+                    "inAlerting": False,
+                    "destinations": [
+                        {
+                            "type": "single",
+                            "period": 15,
+                            "stages": [
+                                {
+                                    "type": "admin",
+                                    "addr": "oncall@example.com",
+                                    "contact": "On-Call",
+                                }
+                            ],
+                        }
+                    ],
+                    "ccDestinations": [],
+                },
+            )
+        )
+
+        # Mock: List recipient groups
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 200,
+                            "name": "DevOps Team",
+                            "description": "DevOps notifications",
+                            "groupType": "email",
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get recipient group details
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups/200").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 200,
+                    "name": "DevOps Team",
+                    "description": "DevOps notifications",
+                    "groupType": "email",
+                    "recipients": [
+                        {
+                            "type": "admin",
+                            "method": "email",
+                            "addr": "devops@example.com",
+                            "contact": "DevOps",
+                        }
+                    ],
+                },
+            )
+        )
+
+        # Step 1: List escalation chains
+        chains_result = await get_escalation_chains(client)
+        assert len(chains_result) == 1
+        assert "Primary On-Call" in chains_result[0].text
+
+        # Step 2: Get chain details
+        chain_result = await get_escalation_chain(client, chain_id=100)
+        assert len(chain_result) == 1
+        assert "oncall@example.com" in chain_result[0].text
+
+        # Step 3: List recipient groups
+        groups_result = await get_recipient_groups(client)
+        assert len(groups_result) == 1
+        assert "DevOps Team" in groups_result[0].text
+
+        # Step 4: Get recipient group details
+        group_result = await get_recipient_group(client, group_id=200)
+        assert len(group_result) == 1
+        assert "devops@example.com" in group_result[0].text

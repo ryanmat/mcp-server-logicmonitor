@@ -15,6 +15,7 @@ Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, a
 - **Website Monitoring**: List websites, get synthetic check details and data
 - **Resource Management**: Get and update device properties
 - **Report Management**: List, view, and run reports
+- **Escalation Management**: View escalation chains and recipient groups
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 
@@ -232,6 +233,15 @@ LM_BEARER_TOKEN = "your-bearer-token"
 | `get_report_groups` | List report groups | No |
 | `run_report` | Execute/run a report | Yes |
 
+### Escalation Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_escalation_chains` | List escalation chains | No |
+| `get_escalation_chain` | Get detailed escalation chain info with destinations | No |
+| `get_recipient_groups` | List recipient groups | No |
+| `get_recipient_group` | Get detailed recipient group info with members | No |
+
 ## Example Usage
 
 Once configured, you can ask your AI assistant:
@@ -251,6 +261,8 @@ Once configured, you can ask your AI assistant:
 - "Update the location property on device 100 to US-West"
 - "List all reports"
 - "Run the Daily Alert Summary report"
+- "Show me the escalation chains"
+- "Who is in the DevOps recipient group?"
 
 ## Development
 
@@ -288,6 +300,7 @@ src/lm_mcp/
     ├── dashboards.py  # Dashboard tools
     ├── datasources.py # DataSource tools
     ├── devices.py     # Device management tools
+    ├── escalations.py # Escalation chain and recipient tools
     ├── metrics.py     # Metrics and data tools
     ├── reports.py     # Report management tools
     ├── resources.py   # Resource/property management tools
