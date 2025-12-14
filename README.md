@@ -105,6 +105,48 @@ claude mcp add logicmonitor -- uvx --from lm-mcp lm-mcp-server
 
 Then set environment variables in your shell or `.env` file.
 
+### Cursor
+
+Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token"
+      }
+    }
+  }
+}
+```
+
+Then enable the server in Cursor Settings > MCP.
+
+### OpenAI Codex CLI
+
+```bash
+codex mcp add logicmonitor \
+  --env LM_PORTAL=yourcompany.logicmonitor.com \
+  --env LM_BEARER_TOKEN=your-bearer-token \
+  -- uvx --from lm-mcp lm-mcp-server
+```
+
+Or add directly to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.logicmonitor]
+command = "uvx"
+args = ["--from", "lm-mcp", "lm-mcp-server"]
+
+[mcp_servers.logicmonitor.env]
+LM_PORTAL = "yourcompany.logicmonitor.com"
+LM_BEARER_TOKEN = "your-bearer-token"
+```
+
 ## Available Tools
 
 ### Alert Tools
