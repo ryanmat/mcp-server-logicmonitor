@@ -430,31 +430,50 @@ Gemini CLI supports MCP servers. Configure in `~/.gemini/settings.json`:
 
 Once configured, you can ask your AI assistant:
 
+**Alerts & Incidents:**
 - "Show me all critical alerts"
-- "What alert rules route to the Primary On-Call chain?"
-- "What devices are in the Production group?"
 - "Acknowledge alert LMA12345 with note 'Investigating'"
-- "Create a 1-hour maintenance window for device ID 100"
-- "Add device 10.0.0.1 to the Production group using collector 5"
+- "What alert rules route to the Primary On-Call escalation chain?"
+
+**Device Management:**
+- "What devices are in the Production group?"
+- "Add device 10.0.0.1 called 'web-server-03' to Production using collector 5"
 - "Create a device group called 'Staging' under Production"
-- "Update device ID 100 description to 'Primary web server'"
-- "Delete device ID 150"
+- "Update the description on prod-web-01 to 'Primary web server'"
+- "Delete the old-test-server device"
+
+**Monitoring & Metrics:**
+- "What datasources are monitoring prod-web-01?"
+- "Show me CPU metrics for prod-db-01"
 - "List all collectors and their status"
-- "Show me the CPU metrics for device ID 100"
-- "What datasources are monitoring server prod-web-01?"
+
+**Dashboards:**
 - "List all dashboards"
-- "Show me the widgets on the Production Overview dashboard"
+- "Show me the widgets on the NOC Overview dashboard"
+
+**Scheduled Downtime:**
+- "Create a 1-hour maintenance window for prod-web-01"
+
+**Websites & Synthetics:**
 - "List all website checks"
-- "Show me the response times for website ID 100"
-- "What properties does device ID 100 have?"
-- "Update the location property on device 100 to US-West"
+- "Show me response times for the API Health Check"
+
+**Properties:**
+- "What properties does prod-web-01 have?"
+- "Set the location property on prod-web-01 to 'US-West'"
+
+**Reports:**
 - "List all reports"
 - "Run the Daily Alert Summary report"
+
+**Users & Escalations:**
 - "Show me the escalation chains"
 - "Who is in the DevOps recipient group?"
+
+**Operations:**
 - "Show me recent audit log entries"
-- "List all ops notes with the maintenance tag"
-- "Add an ops note for the deployment"
+- "List all ops notes tagged 'maintenance'"
+- "Add an ops note: 'Starting v2.5 deployment'"
 
 ## Development
 
