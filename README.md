@@ -2,7 +2,52 @@
 
 Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through structured tools.
 
-Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, and more.
+Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
+
+## Quick Start
+
+**1. Get your LogicMonitor Bearer Token:**
+- Log into your LogicMonitor portal
+- Go to **Settings** → **Users and Roles** → **API Tokens**
+- Create a new API-only user or add a token to an existing user
+- Copy the Bearer token
+
+**2. Configure your MCP client:**
+
+For **Claude Code** (CLI):
+```bash
+claude mcp add logicmonitor -- uvx --from lm-mcp lm-mcp-server
+```
+
+Then add environment variables to `~/.claude.json`:
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token"
+      }
+    }
+  }
+}
+```
+
+For **Claude Desktop**, add to your config file (see [MCP Client Configuration](#mcp-client-configuration) below).
+
+**3. Verify it's working:**
+```
+claude mcp list
+```
+
+You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
+
+**4. Test with a prompt:**
+```
+"Show me all critical alerts in LogicMonitor"
+```
 
 ## Features
 
@@ -428,52 +473,100 @@ Gemini CLI supports MCP servers. Configure in `~/.gemini/settings.json`:
 
 ## Example Usage
 
-Once configured, you can ask your AI assistant:
+Once configured, you can ask your AI assistant natural language questions. Here are prompts to test different capabilities:
 
-**Alerts & Incidents:**
+### Quick Verification Prompts
+Start with these to verify the connection is working:
+- "List the first 5 devices in LogicMonitor"
+- "How many collectors do I have?"
+- "Show me active alerts"
+
+### Alert Management
 - "Show me all critical alerts"
-- "Acknowledge alert LMA12345 with note 'Investigating'"
+- "What alerts fired in the last hour?"
+- "Get details on alert LMA12345"
+- "Acknowledge alert LMA12345 with note 'Investigating disk issue'"
+- "Add a note to alert LMA67890: 'Escalated to storage team'"
 - "What alert rules route to the Primary On-Call escalation chain?"
+- "Show me alerts for devices in the Production group"
 
-**Device Management:**
+### Device Operations
 - "What devices are in the Production group?"
-- "Add device 10.0.0.1 called 'web-server-03' to Production using collector 5"
-- "Create a device group called 'Staging' under Production"
-- "Update the description on prod-web-01 to 'Primary web server'"
-- "Delete the old-test-server device"
+- "Find all devices with 'web' in the name"
+- "Show me details for device ID 123"
+- "What device groups exist under the root?"
+- "Add device 10.0.0.1 called 'web-server-03' to group ID 5 using collector 2"
+- "Create a device group called 'Staging' under the Production group"
+- "Update the description on device 456 to 'Primary web server'"
+- "Delete device ID 789"
 
-**Monitoring & Metrics:**
-- "What datasources are monitoring prod-web-01?"
-- "Show me CPU metrics for prod-db-01"
+### Monitoring & Metrics
+- "What datasources are applied to device 123?"
+- "Show me the instances for datasource 456 on device 123"
+- "Get CPU metrics for the last hour on device 123"
 - "List all collectors and their status"
+- "What devices are using collector 5?"
 
-**Dashboards:**
+### Dashboards & Visualization
 - "List all dashboards"
-- "Show me the widgets on the NOC Overview dashboard"
+- "Show me dashboards with 'NOC' in the name"
+- "What widgets are on dashboard 123?"
+- "Create a new dashboard called 'API Health'"
 
-**Scheduled Downtime:**
-- "Create a 1-hour maintenance window for prod-web-01"
+### Scheduled Downtime (SDT)
+- "List all active SDTs"
+- "What SDTs are coming up in the next 24 hours?"
+- "Create a 2-hour maintenance window for device 123"
+- "Schedule downtime for device group 456 for 1 hour"
+- "Delete SDT abc123"
 
-**Websites & Synthetics:**
+### Website & Synthetic Monitoring
 - "List all website checks"
-- "Show me response times for the API Health Check"
+- "Show me details for website 123"
+- "What website groups exist?"
+- "Get performance data for website 123"
 
-**Properties:**
-- "What properties does prod-web-01 have?"
-- "Set the location property on prod-web-01 to 'US-West'"
+### Properties & Configuration
+- "What properties does device 123 have?"
+- "Show me custom properties for device 456"
+- "Set the 'location' property on device 123 to 'US-West-2'"
 
-**Reports:**
+### Reports
 - "List all reports"
+- "Show reports with 'weekly' in the name"
+- "Get details for report 123"
 - "Run the Daily Alert Summary report"
+- "What reports are scheduled to run?"
 
-**Users & Escalations:**
-- "Show me the escalation chains"
-- "Who is in the DevOps recipient group?"
+### Users & Access
+- "List all users"
+- "Show me details for user 123"
+- "What roles exist in the system?"
+- "What permissions does the 'Administrator' role have?"
 
-**Operations:**
+### Escalations & Notifications
+- "Show me all escalation chains"
+- "What are the destinations in escalation chain 123?"
+- "List recipient groups"
+- "Who is in the 'DevOps On-Call' recipient group?"
+
+### Operations & Audit
 - "Show me recent audit log entries"
-- "List all ops notes tagged 'maintenance'"
-- "Add an ops note: 'Starting v2.5 deployment'"
+- "What configuration changes were made in the last 24 hours?"
+- "List ops notes tagged 'maintenance'"
+- "Add an ops note: 'Starting v2.5 deployment' with tag 'deployment'"
+
+### LogicModules
+- "List all datasources with 'SNMP' in the name"
+- "Show me ConfigSources that apply to Linux devices"
+- "What EventSources are available?"
+- "List PropertySources"
+
+### Advanced Filtering
+The server supports LogicMonitor's filter syntax for power users:
+- "Get devices where filter is 'displayName~prod,hostStatus:alive'"
+- "List alerts with filter 'severity>2,cleared:false'"
+- "Find datasources matching 'appliesTo~isWindows()'"
 
 ## Development
 
