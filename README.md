@@ -16,6 +16,7 @@ Works with any MCP-compatible client: Claude Desktop, Cursor, Continue, Cline, a
 - **Resource Management**: Get and update device properties
 - **Report Management**: List, view, and run reports
 - **Escalation Management**: View escalation chains and recipient groups
+- **Ops Management**: Get audit logs and manage ops notes
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff
 
@@ -242,6 +243,15 @@ LM_BEARER_TOKEN = "your-bearer-token"
 | `get_recipient_groups` | List recipient groups | No |
 | `get_recipient_group` | Get detailed recipient group info with members | No |
 
+### Ops Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_audit_logs` | Get audit log entries with optional filters | No |
+| `get_ops_notes` | List ops notes with optional tag filter | No |
+| `get_ops_note` | Get detailed information about a specific ops note | No |
+| `add_ops_note` | Add a new ops note with optional tags and scopes | Yes |
+
 ## Example Usage
 
 Once configured, you can ask your AI assistant:
@@ -263,6 +273,9 @@ Once configured, you can ask your AI assistant:
 - "Run the Daily Alert Summary report"
 - "Show me the escalation chains"
 - "Who is in the DevOps recipient group?"
+- "Show me recent audit log entries"
+- "List all ops notes with the maintenance tag"
+- "Add an ops note for the deployment"
 
 ## Development
 
@@ -302,6 +315,7 @@ src/lm_mcp/
     ├── devices.py     # Device management tools
     ├── escalations.py # Escalation chain and recipient tools
     ├── metrics.py     # Metrics and data tools
+    ├── ops.py         # Audit log and ops notes tools
     ├── reports.py     # Report management tools
     ├── resources.py   # Resource/property management tools
     ├── sdts.py        # SDT management tools

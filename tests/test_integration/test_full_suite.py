@@ -34,6 +34,12 @@ from lm_mcp.tools.metrics import (
     get_device_instances,
     get_graph_data,
 )
+from lm_mcp.tools.ops import (
+    add_ops_note,
+    get_audit_logs,
+    get_ops_note,
+    get_ops_notes,
+)
 from lm_mcp.tools.reports import (
     get_report,
     get_report_groups,
@@ -1336,3 +1342,103 @@ class TestEscalationWorkflow:
         group_result = await get_recipient_group(client, group_id=200)
         assert len(group_result) == 1
         assert "devops@example.com" in group_result[0].text
+
+
+class TestOpsManagementFlow:
+    """Test ops notes and audit log workflow."""
+
+    @respx.mock
+    async def test_ops_workflow(self, client, enable_writes):
+        """
+        Workflow: Get audit logs → List ops notes → Get note details → Add note.
+
+        This simulates reviewing activity and documenting changes.
+        """
+        # Mock: Get audit logs
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "log1",
+                            "username": "admin@company.com",
+                            "description": "User logged in",
+                            "happenedOn": 1702500000000,
+                            "happenedOnLocal": "2023-12-14 10:00:00",
+                            "ip": "192.168.1.100",
+                            "sessionId": "sess123",
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: List ops notes
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/opsnotes").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "note1",
+                            "note": "Scheduled maintenance",
+                            "tags": [{"name": "maintenance"}],
+                            "happenedOnInSec": 1702500000,
+                            "createdBy": "admin",
+                            "scopes": [],
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get ops note details
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/opsnotes/note1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "note1",
+                    "note": "Scheduled maintenance",
+                    "tags": [{"name": "maintenance"}],
+                    "happenedOnInSec": 1702500000,
+                    "createdBy": "admin",
+                    "scopes": [{"type": "device", "deviceId": 100, "groupId": None}],
+                },
+            )
+        )
+
+        # Mock: Add ops note
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/opsnotes").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "newnote",
+                    "note": "Deployment completed",
+                    "tags": [{"name": "deployment"}],
+                },
+            )
+        )
+
+        # Step 1: Review recent audit logs
+        logs_result = await get_audit_logs(client)
+        assert len(logs_result) == 1
+        assert "admin@company.com" in logs_result[0].text
+        assert "User logged in" in logs_result[0].text
+
+        # Step 2: List existing ops notes
+        notes_result = await get_ops_notes(client)
+        assert len(notes_result) == 1
+        assert "Scheduled maintenance" in notes_result[0].text
+
+        # Step 3: Get details on specific note
+        note_result = await get_ops_note(client, note_id="note1")
+        assert len(note_result) == 1
+        assert "maintenance" in note_result[0].text
+
+        # Step 4: Add new ops note for deployment
+        add_result = await add_ops_note(client, note="Deployment completed", tags=["deployment"])
+        assert len(add_result) == 1
+        assert "success" in add_result[0].text.lower()
