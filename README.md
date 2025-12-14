@@ -153,6 +153,79 @@ LM_PORTAL = "yourcompany.logicmonitor.com"
 LM_BEARER_TOKEN = "your-bearer-token"
 ```
 
+### Cline (VS Code Extension)
+
+Add to Cline's MCP settings file:
+
+**macOS**: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+**Windows**: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+
+**Linux**: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token"
+      }
+    }
+  }
+}
+```
+
+### GitHub Copilot (VS Code 1.99+)
+
+Add to your VS Code settings (`settings.json`) or project-level `.vscode/mcp.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "logicmonitor": {
+        "command": "uvx",
+        "args": ["--from", "lm-mcp", "lm-mcp-server"],
+        "env": {
+          "LM_PORTAL": "yourcompany.logicmonitor.com",
+          "LM_BEARER_TOKEN": "your-bearer-token"
+        }
+      }
+    }
+  }
+}
+```
+
+Enable MCP in VS Code settings: `"chat.mcp.enabled": true`
+
+### Gemini CLI
+
+Gemini CLI supports MCP servers. Configure in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token"
+      }
+    }
+  }
+}
+```
+
+### Other Clients
+
+**Aider**: Does not currently have native MCP support. Track progress at [aider issue #3314](https://github.com/Aider-AI/aider/issues/3314).
+
+**Continue**: Uses similar JSON configuration. See [Continue MCP docs](https://docs.continue.dev/customize/model-providers/mcp).
+
 ## Available Tools
 
 ### Alert Tools
