@@ -1,0 +1,433 @@
+# Description: Full integration tests for LogicMonitor MCP server.
+# Description: Tests realistic workflows across multiple tools.
+
+import httpx
+import pytest
+import respx
+
+from lm_mcp.auth.bearer import BearerAuth
+from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools.alerts import (
+    acknowledge_alert,
+    add_alert_note,
+    get_alert_details,
+    get_alerts,
+)
+from lm_mcp.tools.collectors import get_collector, get_collectors
+from lm_mcp.tools.devices import get_device, get_device_groups, get_devices
+from lm_mcp.tools.sdts import create_sdt, delete_sdt, list_sdts
+
+
+@pytest.fixture
+def auth():
+    """Create a BearerAuth instance for testing."""
+    return BearerAuth("test-token")
+
+
+@pytest.fixture
+def client(auth):
+    """Create test client."""
+    return LogicMonitorClient(
+        base_url="https://test.logicmonitor.com/santaba/rest",
+        auth=auth,
+        timeout=30,
+        api_version=3,
+    )
+
+
+@pytest.fixture
+def enable_writes(monkeypatch):
+    """Enable write operations for testing."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+    from importlib import reload
+
+    import lm_mcp.config
+
+    reload(lm_mcp.config)
+
+
+@pytest.fixture
+def disable_writes(monkeypatch):
+    """Disable write operations for testing."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+    from importlib import reload
+
+    import lm_mcp.config
+
+    reload(lm_mcp.config)
+
+
+class TestIncidentResponseFlow:
+    """Test realistic incident response workflow."""
+
+    @respx.mock
+    async def test_full_incident_response(self, client, enable_writes):
+        """
+        Workflow: Alert fires → Get details → Find device → Ack alert → Add note.
+
+        This simulates an operator responding to a critical alert.
+        """
+        # Mock: Get active critical alerts
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "LMA12345",
+                            "severity": 4,
+                            "type": "alert",
+                            "monitorObjectName": "prod-web-01",
+                            "resourceId": 100,
+                            "alertValue": "CPU at 95%",
+                            "startEpoch": 1702500000,
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Get alert details
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts/12345").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "LMA12345",
+                    "severity": 4,
+                    "type": "alert",
+                    "monitorObjectName": "prod-web-01",
+                    "resourceId": 100,
+                    "alertValue": "CPU at 95%",
+                    "startEpoch": 1702500000,
+                    "acked": False,
+                    "ackedBy": "",
+                    "rule": "High CPU Usage",
+                    "chain": "CPU > 90%",
+                },
+            )
+        )
+
+        # Mock: Get device details
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "displayName": "prod-web-01",
+                    "hostGroupIds": "1,2,3",
+                    "preferredCollectorId": 1,
+                    "systemProperties": [
+                        {"name": "system.hostname", "value": "prod-web-01.example.com"}
+                    ],
+                },
+            )
+        )
+
+        # Mock: Acknowledge alert
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/alert/alerts/12345/ack"
+        ).mock(return_value=httpx.Response(200, json={"id": "LMA12345", "acked": True}))
+
+        # Mock: Add note
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/alert/alerts/12345/note"
+        ).mock(
+            return_value=httpx.Response(
+                200, json={"id": "LMA12345", "note": "Investigating high CPU"}
+            )
+        )
+
+        # Step 1: Get critical alerts
+        alerts_result = await get_alerts(client, severity="critical", status="active")
+        assert len(alerts_result) == 1
+        assert "LMA12345" in alerts_result[0].text
+
+        # Step 2: Get alert details
+        details_result = await get_alert_details(client, "LMA12345")
+        assert len(details_result) == 1
+        assert "prod-web-01" in details_result[0].text
+        assert "CPU at 95%" in details_result[0].text
+
+        # Step 3: Get device details
+        device_result = await get_device(client, 100)
+        assert len(device_result) == 1
+        assert "prod-web-01" in device_result[0].text
+
+        # Step 4: Acknowledge alert
+        ack_result = await acknowledge_alert(client, "LMA12345")
+        assert len(ack_result) == 1
+
+        # Step 5: Add investigation note
+        note_result = await add_alert_note(client, "LMA12345", "Investigating high CPU")
+        assert len(note_result) == 1
+
+
+class TestMaintenanceWindowFlow:
+    """Test maintenance window (SDT) workflow."""
+
+    @respx.mock
+    async def test_scheduled_maintenance(self, client, enable_writes):
+        """
+        Workflow: Find device → Create SDT → Verify → Delete SDT.
+
+        This simulates scheduling maintenance on a device.
+        """
+        # Mock: Search for device
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 200,
+                            "displayName": "db-server-01",
+                            "hostGroupIds": "5",
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Create SDT
+        respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "SDT_500",
+                    "type": "DeviceSDT",
+                    "deviceId": 200,
+                    "comment": "Database maintenance",
+                    "startDateTime": 1702500000,
+                    "endDateTime": 1702503600,
+                },
+            )
+        )
+
+        # Mock: List SDTs to verify
+        respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "SDT_500",
+                            "type": "DeviceSDT",
+                            "deviceId": 200,
+                            "comment": "Database maintenance",
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        # Mock: Delete SDT
+        respx.delete(
+            "https://test.logicmonitor.com/santaba/rest/sdt/sdts/SDT_500"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        # Step 1: Find the device
+        devices_result = await get_devices(client, name_filter="db-server")
+        assert len(devices_result) == 1
+        assert "db-server-01" in devices_result[0].text
+
+        # Step 2: Create SDT for maintenance
+        sdt_result = await create_sdt(
+            client,
+            sdt_type="device",
+            device_id=200,
+            duration_minutes=60,
+            comment="Database maintenance",
+        )
+        assert len(sdt_result) == 1
+
+        # Step 3: Verify SDT exists
+        list_result = await list_sdts(client)
+        assert len(list_result) == 1
+        assert "SDT_500" in list_result[0].text
+
+        # Step 4: Delete SDT after maintenance
+        delete_result = await delete_sdt(client, "SDT_500")
+        assert len(delete_result) == 1
+
+
+class TestHealthCheckFlow:
+    """Test infrastructure health check workflow."""
+
+    @respx.mock
+    async def test_infrastructure_health_check(self, client):
+        """
+        Workflow: Check collectors → Check devices → Review device groups.
+
+        This simulates a daily health check routine.
+        """
+        # Mock: Get collectors
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "hostname": "collector-01",
+                            "status": 0,
+                            "numberOfHosts": 50,
+                        },
+                        {
+                            "id": 2,
+                            "hostname": "collector-02",
+                            "status": 0,
+                            "numberOfHosts": 45,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get specific collector
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/1"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 1,
+                    "hostname": "collector-01",
+                    "status": 0,
+                    "numberOfHosts": 50,
+                    "build": "34000",
+                    "platform": "linux",
+                },
+            )
+        )
+
+        # Mock: Get devices
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {"id": 1, "displayName": "server-01", "hostGroupIds": "1"},
+                        {"id": 2, "displayName": "server-02", "hostGroupIds": "1"},
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Mock: Get device groups
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Production",
+                            "numOfHosts": 25,
+                            "parentId": 0,
+                        },
+                        {
+                            "id": 2,
+                            "name": "Development",
+                            "numOfHosts": 10,
+                            "parentId": 0,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        # Step 1: Check all collectors are healthy
+        collectors_result = await get_collectors(client)
+        assert len(collectors_result) == 1
+        assert "collector-01" in collectors_result[0].text
+        assert "collector-02" in collectors_result[0].text
+
+        # Step 2: Get details on primary collector
+        collector_result = await get_collector(client, 1)
+        assert len(collector_result) == 1
+        assert "collector-01" in collector_result[0].text
+
+        # Step 3: Check device count
+        devices_result = await get_devices(client)
+        assert len(devices_result) == 1
+        assert "server-01" in devices_result[0].text
+
+        # Step 4: Review device groups
+        groups_result = await get_device_groups(client)
+        assert len(groups_result) == 1
+        assert "Production" in groups_result[0].text
+
+
+class TestReadOnlyEnforcement:
+    """Test that read-only mode blocks write operations."""
+
+    @respx.mock
+    async def test_write_operations_blocked(self, client, disable_writes):
+        """Verify all write operations return error in read-only mode."""
+        # Try to acknowledge alert - should be blocked
+        ack_result = await acknowledge_alert(client, "LMA12345")
+        assert len(ack_result) == 1
+        assert "error" in ack_result[0].text.lower()
+        assert "write" in ack_result[0].text.lower()
+
+        # Try to create SDT - should be blocked
+        sdt_result = await create_sdt(
+            client,
+            sdt_type="device",
+            device_id=100,
+            duration_minutes=60,
+        )
+        assert len(sdt_result) == 1
+        assert "error" in sdt_result[0].text.lower()
+
+        # Try to add note - should be blocked
+        note_result = await add_alert_note(client, "LMA12345", "Test note")
+        assert len(note_result) == 1
+        assert "error" in note_result[0].text.lower()
+
+
+class TestErrorRecovery:
+    """Test error handling across tools."""
+
+    @respx.mock
+    async def test_not_found_handling(self, client):
+        """Verify 404 errors are handled gracefully."""
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/alert/alerts/99999"
+        ).mock(
+            return_value=httpx.Response(
+                404, json={"errorMessage": "Alert not found", "errorCode": 1404}
+            )
+        )
+
+        result = await get_alert_details(client, "99999")
+        assert len(result) == 1
+        text_lower = result[0].text.lower()
+        assert "error" in text_lower or "not found" in text_lower
+
+    @respx.mock
+    async def test_permission_denied_handling(self, client):
+        """Verify 403 errors are handled gracefully."""
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(
+                403, json={"errorMessage": "Permission denied", "errorCode": 1403}
+            )
+        )
+
+        result = await get_devices(client)
+        assert len(result) == 1
+        assert "error" in result[0].text.lower()

@@ -1,97 +1,146 @@
 # LogicMonitor MCP Server
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through structured tools.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants like Claude to interact with LogicMonitor monitoring data through structured tools.
 
-## Architecture
+## Features
 
-```
-src/lm_mcp/
-├── __init__.py      # Package exports
-├── config.py        # Environment-based configuration (Pydantic)
-├── exceptions.py    # Exception hierarchy with error codes
-├── auth/
-│   ├── __init__.py  # AuthProvider ABC and factory
-│   └── bearer.py    # Bearer token implementation
-└── client/
-    ├── __init__.py  # Client exports
-    └── api.py       # Async HTTP client (httpx)
-```
+- **Alert Management**: Get alerts, view details, acknowledge alerts, add notes
+- **Device Management**: List devices, get device details, browse device groups
+- **SDT Management**: List, create, and delete Scheduled Downtime
+- **Collector Management**: List and view collector details
+- **Security-First**: Read-only by default, write operations require explicit opt-in
+- **Rate Limit Handling**: Automatic retry with exponential backoff
 
 ## Installation
 
-Requires Python 3.11+ and uv package manager.
+### Via PyPI (Recommended)
 
 ```bash
-# Clone repository
+# Using uvx (no install needed)
+uvx --from lm-mcp lm-mcp-server
+
+# Using pip
+pip install lm-mcp
+```
+
+### From Source
+
+```bash
 git clone https://github.com/ryanmat/mcp-server-logicmonitor.git
 cd mcp-server-logicmonitor
-
-# Install dependencies
 uv sync
 ```
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure:
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LM_PORTAL` | Yes | - | LogicMonitor portal (e.g., `company.logicmonitor.com`) |
+| `LM_BEARER_TOKEN` | Yes | - | API Bearer token |
+| `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | Enable write operations (ack alerts, create SDTs) |
+| `LM_API_VERSION` | No | `3` | API version |
+| `LM_TIMEOUT` | No | `30` | Request timeout in seconds |
+| `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited requests |
+
+### Getting a Bearer Token
+
+1. Log into your LogicMonitor portal
+2. Go to **Settings** → **Users and Roles** → **API Tokens**
+3. Create a new API-only user or add a token to an existing user
+4. Copy the Bearer token
+
+## MCP Client Configuration
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token"
+      }
+    }
+  }
+}
+```
+
+To enable write operations (acknowledge alerts, create SDTs):
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token",
+        "LM_ENABLE_WRITE_OPERATIONS": "true"
+      }
+    }
+  }
+}
+```
+
+### Claude Code
 
 ```bash
-LM_PORTAL=yourcompany.logicmonitor.com
-LM_BEARER_TOKEN=your_bearer_token_here
-LM_API_VERSION=3
-LM_TIMEOUT=30
+claude mcp add logicmonitor -- uvx --from lm-mcp lm-mcp-server
 ```
 
-Configuration is loaded via Pydantic settings. All `LM_` prefixed environment variables are automatically mapped.
+Then set environment variables in your shell or `.env` file.
 
-## Usage
+## Available Tools
 
-### API Client
+### Alert Tools
 
-```python
-import asyncio
-from lm_mcp.config import LMConfig
-from lm_mcp.auth import create_auth_provider
-from lm_mcp.client import LogicMonitorClient
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_alerts` | List alerts with optional severity/status filters | No |
+| `get_alert_details` | Get detailed information about a specific alert | No |
+| `acknowledge_alert` | Acknowledge an alert with optional note | Yes |
+| `add_alert_note` | Add a note to an alert | Yes |
 
-async def main():
-    config = LMConfig()
-    auth = create_auth_provider(config)
+### Device Tools
 
-    async with LogicMonitorClient(
-        base_url=config.base_url,
-        auth=auth,
-        timeout=config.timeout,
-        api_version=config.api_version,
-    ) as client:
-        # Get alerts
-        alerts = await client.get("/alert/alerts", params={"size": 10})
-        print(f"Total alerts: {alerts['total']}")
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_devices` | List devices with optional group/name filters | No |
+| `get_device` | Get detailed information about a specific device | No |
+| `get_device_groups` | List device groups | No |
 
-        # Get devices
-        devices = await client.get("/device/devices", params={"size": 5})
-        print(f"Total devices: {devices['total']}")
+### SDT Tools
 
-asyncio.run(main())
-```
+| Tool | Description | Write |
+|------|-------------|-------|
+| `list_sdts` | List Scheduled Downtime entries | No |
+| `create_sdt` | Create a new SDT for a device or group | Yes |
+| `delete_sdt` | Delete an existing SDT | Yes |
 
-### Exception Handling
+### Collector Tools
 
-```python
-from lm_mcp.exceptions import (
-    AuthenticationError,
-    RateLimitError,
-    NotFoundError,
-)
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_collectors` | List all collectors | No |
+| `get_collector` | Get detailed information about a specific collector | No |
 
-try:
-    result = await client.get("/device/devices/999")
-except NotFoundError as e:
-    print(f"Device not found: {e}")
-except RateLimitError as e:
-    print(f"Rate limited. Retry after: {e.retry_after} seconds")
-except AuthenticationError as e:
-    print(f"Auth failed: {e}")
-```
+## Example Usage
+
+Once configured, you can ask Claude:
+
+- "Show me all critical alerts"
+- "What devices are in the Production group?"
+- "Acknowledge alert LMA12345 with note 'Investigating'"
+- "Create a 1-hour maintenance window for device ID 100"
+- "List all collectors and their status"
 
 ## Development
 
@@ -110,37 +159,53 @@ uv run ruff format src tests
 
 ### Project Structure
 
-- `src/lm_mcp/` - Source code
-- `tests/` - Unit and integration tests
-- `docs/` - Implementation plans and specifications
+```
+src/lm_mcp/
+├── __init__.py       # Package exports
+├── config.py         # Environment-based configuration
+├── exceptions.py     # Exception hierarchy
+├── server.py         # MCP server entry point
+├── auth/
+│   ├── __init__.py   # Auth provider factory
+│   └── bearer.py     # Bearer token auth
+├── client/
+│   ├── __init__.py   # Client exports
+│   └── api.py        # Async HTTP client
+└── tools/
+    ├── __init__.py   # Tool utilities
+    ├── alerts.py     # Alert management tools
+    ├── devices.py    # Device management tools
+    ├── collectors.py # Collector tools
+    └── sdts.py       # SDT management tools
+```
 
-## API Reference
+## Troubleshooting
 
-### LogicMonitorClient
+### "Write operations are disabled"
 
-Async HTTP client supporting GET, POST, PUT, PATCH, DELETE methods.
+Write operations (acknowledge, create SDT, etc.) are disabled by default. Set `LM_ENABLE_WRITE_OPERATIONS=true` in your environment.
 
-| Method | Description |
-|--------|-------------|
-| `get(path, params)` | GET request with optional query params |
-| `post(path, json_body)` | POST request with JSON body |
-| `put(path, json_body)` | PUT request with JSON body |
-| `patch(path, json_body)` | PATCH request with JSON body |
-| `delete(path, params)` | DELETE request with optional params |
+### "spawn uvx ENOENT" in Claude Desktop
 
-### Exception Hierarchy
+Claude Desktop can't find `uvx`. Use the full path:
 
-| Exception | HTTP Status | Code |
-|-----------|-------------|------|
-| `LMError` | Base class | `LM_ERROR` |
-| `ConfigurationError` | N/A | `CONFIGURATION_ERROR` |
-| `AuthenticationError` | 401 | `AUTHENTICATION_ERROR` |
-| `LMPermissionError` | 403 | `PERMISSION_ERROR` |
-| `NotFoundError` | 404 | `NOT_FOUND_ERROR` |
-| `RateLimitError` | 429 | `RATE_LIMIT_ERROR` |
-| `ServerError` | 5xx | `SERVER_ERROR` |
-| `LMConnectionError` | N/A | `CONNECTION_ERROR` |
+```json
+{
+  "command": "/Users/yourname/.local/bin/uvx",
+  "args": ["--from", "lm-mcp", "lm-mcp-server"]
+}
+```
+
+Find your uvx path with: `which uvx`
+
+### Rate Limit Errors
+
+The server automatically retries rate-limited requests with exponential backoff. If you're consistently hitting limits, reduce request frequency or contact LogicMonitor support.
+
+### Authentication Errors
+
+Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## License
 
-See LICENSE file.
+MIT License - see LICENSE file.
