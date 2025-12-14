@@ -84,3 +84,6 @@ docs/
 
 # uv cache
 .uv/
+
+# MCP Registry tokens
+.mcpregistry_*

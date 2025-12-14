@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "io.github.ryanmat/logicmonitor",
+  "description": "LogicMonitor API integration with 120 tools for alerts, devices, metrics, and SDTs.",
+  "repository": {
+    "url": "https://github.com/ryanmat/mcp-server-logicmonitor",
+    "source": "github"
+  },
+  "version": "0.5.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "lm-mcp",
+      "version": "0.5.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "LogicMonitor portal hostname (e.g., company.logicmonitor.com)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false,
+          "name": "LM_PORTAL"
+        },
+        {
+          "description": "LogicMonitor API Bearer token",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true,
+          "name": "LM_BEARER_TOKEN"
+        }
+      ]
+    }
+  ]
+}

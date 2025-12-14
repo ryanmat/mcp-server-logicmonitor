@@ -1,6 +1,6 @@
 [project]
 name = "lm-mcp"
-version = "0.5.0"
+version = "0.5.1"
 description = "MCP server for LogicMonitor platform API integration"
 readme = "README.md"
 license = { text = "MIT" }
