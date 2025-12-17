@@ -23,23 +23,10 @@ Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Conti
 
 For **Claude Code** (CLI):
 ```bash
-claude mcp add logicmonitor -- uvx --from lm-mcp lm-mcp-server
-```
-
-Then add environment variables to `~/.claude.json`:
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token"
-      }
-    }
-  }
-}
+claude mcp add logicmonitor \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=your-bearer-token \
+  -- uvx --from lm-mcp lm-mcp-server
 ```
 
 For **Claude Desktop**, add to your config file (see [MCP Client Configuration](#mcp-client-configuration) below).
@@ -160,10 +147,25 @@ To enable write operations (acknowledge alerts, create SDTs):
 ### Claude Code
 
 ```bash
-claude mcp add logicmonitor -- uvx --from lm-mcp lm-mcp-server
+claude mcp add logicmonitor \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e LM_ENABLE_WRITE_OPERATIONS=true \
+  -- uvx --from lm-mcp lm-mcp-server
 ```
 
-Then set environment variables in your shell or `.env` file.
+> **Note:** Remove `-e LM_ENABLE_WRITE_OPERATIONS=true` if you want read-only access.
+
+Verify the connection:
+```bash
+claude mcp list
+```
+
+To update an existing configuration, remove and re-add:
+```bash
+claude mcp remove logicmonitor
+claude mcp add logicmonitor -e LM_PORTAL=... -e LM_BEARER_TOKEN=... -- uvx --from lm-mcp lm-mcp-server
+```
 
 ### Cursor
 
@@ -279,6 +281,20 @@ Gemini CLI supports MCP servers. Configure in `~/.gemini/settings.json`:
 **Aider**: Does not currently have native MCP support. Track progress at [aider issue #3314](https://github.com/Aider-AI/aider/issues/3314).
 
 **Continue**: Uses similar JSON configuration. See [Continue MCP docs](https://docs.continue.dev/customize/model-providers/mcp).
+
+### Enabling Write Operations
+
+For any JSON-based configuration, add `LM_ENABLE_WRITE_OPERATIONS` to the `env` section:
+
+```json
+"env": {
+  "LM_PORTAL": "yourcompany.logicmonitor.com",
+  "LM_BEARER_TOKEN": "your-bearer-token",
+  "LM_ENABLE_WRITE_OPERATIONS": "true"
+}
+```
+
+This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 
 ## Available Tools
 
@@ -633,6 +649,23 @@ src/lm_mcp/
 ```
 
 ## Troubleshooting
+
+### "Failed to connect" in Claude Code
+
+If `claude mcp list` shows `✗ Failed to connect`, the server is missing environment variables. The `-e` flags must be included when adding the server:
+
+```bash
+# Remove the broken config
+claude mcp remove logicmonitor
+
+# Re-add with environment variables
+claude mcp add logicmonitor \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=your-bearer-token \
+  -- uvx --from lm-mcp lm-mcp-server
+```
+
+> **Note:** Setting environment variables in your shell or `.env` file won't work—Claude Code spawns the MCP server as a subprocess with its own environment.
 
 ### "Write operations are disabled"
 
