@@ -1,13 +1,16 @@
 [project]
 name = "lm-mcp"
-version = "0.5.1"
+version = "1.0.0"
 description = "MCP server for LogicMonitor platform API integration"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [
+    { name = "Ryan Matuszewski", email = "ryan.matuszewski@logicmonitor.com" }
+]
 keywords = ["logicmonitor", "mcp", "model-context-protocol", "monitoring", "api"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
