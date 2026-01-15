@@ -827,6 +827,95 @@ TOOLS.extend(
                 "required": ["website_id"],
             },
         ),
+        Tool(
+            name="create_website",
+            description="Create a website check in LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the website check"},
+                    "website_type": {
+                        "type": "string",
+                        "enum": ["webcheck", "pingcheck"],
+                        "description": "Type of check",
+                    },
+                    "domain": {"type": "string", "description": "Domain or host to check"},
+                    "description": {"type": "string", "description": "Optional description"},
+                    "group_id": {"type": "integer", "description": "Website group ID"},
+                    "polling_interval": {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Check interval in minutes",
+                    },
+                    "is_internal": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Whether this is an internal website",
+                    },
+                },
+                "required": ["name", "website_type", "domain"],
+            },
+        ),
+        Tool(
+            name="update_website",
+            description="Update a website check in LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "website_id": {"type": "integer", "description": "Website ID to update"},
+                    "name": {"type": "string", "description": "Updated name"},
+                    "description": {"type": "string", "description": "Updated description"},
+                    "polling_interval": {
+                        "type": "integer",
+                        "description": "Updated polling interval in minutes",
+                    },
+                    "is_internal": {
+                        "type": "boolean",
+                        "description": "Updated internal website flag",
+                    },
+                    "disable_alerting": {
+                        "type": "boolean",
+                        "description": "Whether to disable alerting",
+                    },
+                },
+                "required": ["website_id"],
+            },
+        ),
+        Tool(
+            name="delete_website",
+            description="Delete a website check from LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "website_id": {"type": "integer", "description": "Website ID to delete"},
+                },
+                "required": ["website_id"],
+            },
+        ),
+        Tool(
+            name="create_website_group",
+            description="Create a website group in LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the website group"},
+                    "parent_id": {"type": "integer", "description": "Parent group ID (optional)"},
+                    "description": {"type": "string", "description": "Optional description"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="delete_website_group",
+            description="Delete a website group from LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Group ID to delete"},
+                },
+                "required": ["group_id"],
+            },
+        ),
     ]
 )
 
@@ -1002,6 +1091,95 @@ TOOLS.extend(
                 "required": ["group_id"],
             },
         ),
+        Tool(
+            name="create_escalation_chain",
+            description="Create an escalation chain (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the escalation chain"},
+                    "description": {"type": "string", "description": "Optional description"},
+                    "enable_throttling": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Enable alert throttling",
+                    },
+                    "throttling_period": {
+                        "type": "integer",
+                        "description": "Throttling period in minutes",
+                    },
+                    "throttling_alerts": {
+                        "type": "integer",
+                        "description": "Number of alerts before throttling",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="update_escalation_chain",
+            description="Update an escalation chain (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Escalation chain ID"},
+                    "name": {"type": "string", "description": "Updated name"},
+                    "description": {"type": "string", "description": "Updated description"},
+                    "enable_throttling": {
+                        "type": "boolean",
+                        "description": "Updated throttling setting",
+                    },
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="delete_escalation_chain",
+            description="Delete an escalation chain (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Escalation chain ID"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="create_recipient_group",
+            description="Create a recipient group (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the recipient group"},
+                    "description": {"type": "string", "description": "Optional description"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="update_recipient_group",
+            description="Update a recipient group (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Recipient group ID"},
+                    "name": {"type": "string", "description": "Updated name"},
+                    "description": {"type": "string", "description": "Updated description"},
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="delete_recipient_group",
+            description="Delete a recipient group (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Recipient group ID"},
+                },
+                "required": ["group_id"],
+            },
+        ),
     ]
 )
 
@@ -1025,6 +1203,79 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "rule_id": {"type": "integer", "description": "Alert rule ID"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="create_alert_rule",
+            description="Create an alert rule in LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the alert rule"},
+                    "priority": {
+                        "type": "integer",
+                        "description": "Priority level (lower = higher priority)",
+                    },
+                    "escalation_chain_id": {
+                        "type": "integer",
+                        "description": "Escalation chain ID for the rule",
+                    },
+                    "level_str": {
+                        "type": "string",
+                        "enum": ["Critical", "Error", "Warning", "All"],
+                        "description": "Alert level filter",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of device patterns to match",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of device group patterns to match",
+                    },
+                    "datasource": {"type": "string", "description": "DataSource pattern to match"},
+                    "suppress_alert_clear": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Suppress alert clear notifications",
+                    },
+                },
+                "required": ["name", "priority", "escalation_chain_id"],
+            },
+        ),
+        Tool(
+            name="update_alert_rule",
+            description="Update an alert rule in LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Alert rule ID to update"},
+                    "name": {"type": "string", "description": "Updated name"},
+                    "priority": {"type": "integer", "description": "Updated priority level"},
+                    "escalation_chain_id": {
+                        "type": "integer",
+                        "description": "Updated escalation chain ID",
+                    },
+                    "level_str": {"type": "string", "description": "Updated alert level filter"},
+                    "suppress_alert_clear": {
+                        "type": "boolean",
+                        "description": "Updated suppress alert clear setting",
+                    },
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="delete_alert_rule",
+            description="Delete an alert rule from LogicMonitor (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Alert rule ID to delete"},
                 },
                 "required": ["rule_id"],
             },
@@ -2217,6 +2468,11 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_website": websites.get_website,
         "get_website_groups": websites.get_website_groups,
         "get_website_data": websites.get_website_data,
+        "create_website": websites.create_website,
+        "update_website": websites.update_website,
+        "delete_website": websites.delete_website,
+        "create_website_group": websites.create_website_group,
+        "delete_website_group": websites.delete_website_group,
         # Reports
         "get_reports": reports.get_reports,
         "get_report": reports.get_report,
@@ -2231,9 +2487,18 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_escalation_chain": escalations.get_escalation_chain,
         "get_recipient_groups": escalations.get_recipient_groups,
         "get_recipient_group": escalations.get_recipient_group,
+        "create_escalation_chain": escalations.create_escalation_chain,
+        "update_escalation_chain": escalations.update_escalation_chain,
+        "delete_escalation_chain": escalations.delete_escalation_chain,
+        "create_recipient_group": escalations.create_recipient_group,
+        "update_recipient_group": escalations.update_recipient_group,
+        "delete_recipient_group": escalations.delete_recipient_group,
         # Alert Rules
         "get_alert_rules": alert_rules.get_alert_rules,
         "get_alert_rule": alert_rules.get_alert_rule,
+        "create_alert_rule": alert_rules.create_alert_rule,
+        "update_alert_rule": alert_rules.update_alert_rule,
+        "delete_alert_rule": alert_rules.delete_alert_rule,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,

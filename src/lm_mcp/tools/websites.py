@@ -1,5 +1,5 @@
 # Description: Website/Synthetic monitoring tools for LogicMonitor MCP server.
-# Description: Provides get_websites, get_website, get_website_groups, get_website_data.
+# Description: Provides CRUD operations for websites and website groups.
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, require_write_permission
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -237,6 +237,214 @@ async def get_website_data(
                 "datapoints": result.get("dataPoints", []),
                 "values": result.get("values", {}),
                 "time": result.get("time", []),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_website(
+    client: "LogicMonitorClient",
+    name: str,
+    website_type: str,
+    domain: str,
+    description: str | None = None,
+    group_id: int | None = None,
+    polling_interval: int = 5,
+    is_internal: bool = False,
+) -> list[TextContent]:
+    """Create a website check in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the website check.
+        website_type: Type of check (webcheck, pingcheck).
+        domain: Domain or host to check.
+        description: Optional description.
+        group_id: Website group ID to place website in.
+        polling_interval: Check interval in minutes (default 5).
+        is_internal: Whether this is an internal website.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {
+            "name": name,
+            "type": website_type,
+            "host": domain,
+            "pollingInterval": polling_interval,
+            "isInternal": is_internal,
+        }
+
+        if description:
+            body["description"] = description
+        if group_id is not None:
+            body["groupId"] = group_id
+
+        result = await client.post("/website/websites", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Website '{name}' created",
+                "website_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_website(
+    client: "LogicMonitorClient",
+    website_id: int,
+    name: str | None = None,
+    description: str | None = None,
+    polling_interval: int | None = None,
+    is_internal: bool | None = None,
+    disable_alerting: bool | None = None,
+) -> list[TextContent]:
+    """Update a website check in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        website_id: ID of the website to update.
+        name: Updated name.
+        description: Updated description.
+        polling_interval: Updated polling interval in minutes.
+        is_internal: Updated internal website flag.
+        disable_alerting: Whether to disable alerting.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+        if polling_interval is not None:
+            body["pollingInterval"] = polling_interval
+        if is_internal is not None:
+            body["isInternal"] = is_internal
+        if disable_alerting is not None:
+            body["disableAlerting"] = disable_alerting
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "VALIDATION_ERROR",
+                    "message": "No fields provided to update",
+                }
+            )
+
+        result = await client.patch(f"/website/websites/{website_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Website {website_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_website(
+    client: "LogicMonitorClient",
+    website_id: int,
+) -> list[TextContent]:
+    """Delete a website check from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        website_id: ID of the website to delete.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        await client.delete(f"/website/websites/{website_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Website {website_id} deleted",
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_website_group(
+    client: "LogicMonitorClient",
+    name: str,
+    parent_id: int | None = None,
+    description: str | None = None,
+) -> list[TextContent]:
+    """Create a website group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the website group.
+        parent_id: Parent group ID (optional).
+        description: Optional description.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {"name": name}
+
+        if parent_id is not None:
+            body["parentId"] = parent_id
+        if description:
+            body["description"] = description
+
+        result = await client.post("/website/groups", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Website group '{name}' created",
+                "group_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_website_group(
+    client: "LogicMonitorClient",
+    group_id: int,
+) -> list[TextContent]:
+    """Delete a website group from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: ID of the group to delete.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        await client.delete(f"/website/groups/{group_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Website group {group_id} deleted",
             }
         )
     except Exception as e:
