@@ -104,7 +104,7 @@ async def push_metrics(
                 )
             ]
 
-        result = await client.ingest_post("/rest/v2/metric/ingest", json_body=metrics)
+        result = await client.ingest_post("/rest/metric/ingest?create=true", json_body=metrics)
         return format_response(result)
     except Exception as e:
         return handle_error(e)

@@ -130,7 +130,7 @@ class TestPushMetrics:
     @pytest.mark.asyncio
     async def test_push_metrics_success(self, lmv1_client):
         """push_metrics sends metrics to ingestion endpoint."""
-        respx.post("https://test.logicmonitor.com/rest/v2/metric/ingest").mock(
+        respx.post("https://test.logicmonitor.com/rest/metric/ingest?create=true").mock(
             return_value=Response(202, json={"success": True, "message": "Accepted"})
         )
 
@@ -155,7 +155,7 @@ class TestPushMetrics:
     @pytest.mark.asyncio
     async def test_push_metrics_uses_lmv1_auth(self, lmv1_client):
         """push_metrics uses LMv1 authentication headers."""
-        route = respx.post("https://test.logicmonitor.com/rest/v2/metric/ingest").mock(
+        route = respx.post("https://test.logicmonitor.com/rest/metric/ingest?create=true").mock(
             return_value=Response(202, json={"success": True})
         )
 
