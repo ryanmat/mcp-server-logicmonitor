@@ -1,4 +1,5 @@
 # Description: Tests for service MCP tools.
+# Description: Covers list and get operations for service monitoring resources.
 
 import json
 

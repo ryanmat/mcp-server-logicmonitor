@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, require_write_permission
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -234,6 +234,215 @@ async def export_escalation_chain(
                 "name": result.get("name"),
                 "format": "json",
                 "definition": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_datasource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import a DataSource from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: DataSource JSON definition to import.
+
+    Returns:
+        List of TextContent with imported DataSource info or error.
+    """
+    try:
+        result = await client.post("/setting/datasources/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+                "display_name": result.get("displayName"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_configsource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import a ConfigSource from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: ConfigSource JSON definition to import.
+
+    Returns:
+        List of TextContent with imported ConfigSource info or error.
+    """
+    try:
+        result = await client.post("/setting/configsources/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_eventsource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import an EventSource from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: EventSource JSON definition to import.
+
+    Returns:
+        List of TextContent with imported EventSource info or error.
+    """
+    try:
+        result = await client.post("/setting/eventsources/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_propertysource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import a PropertySource from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: PropertySource JSON definition to import.
+
+    Returns:
+        List of TextContent with imported PropertySource info or error.
+    """
+    try:
+        result = await client.post("/setting/propertyrules/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_logsource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import a LogSource from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: LogSource JSON definition to import.
+
+    Returns:
+        List of TextContent with imported LogSource info or error.
+    """
+    try:
+        result = await client.post("/setting/logsources/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_topologysource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import a TopologySource from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: TopologySource JSON definition to import.
+
+    Returns:
+        List of TextContent with imported TopologySource info or error.
+    """
+    try:
+        result = await client.post("/setting/topologysources/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_jobmonitor(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import a JobMonitor from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: JobMonitor JSON definition to import.
+
+    Returns:
+        List of TextContent with imported JobMonitor info or error.
+    """
+    try:
+        result = await client.post("/setting/batchjobs/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_appliesto_function(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Import an AppliesTo function from JSON definition (v228 API).
+
+    Args:
+        client: LogicMonitor API client.
+        definition: AppliesTo function JSON definition to import.
+
+    Returns:
+        List of TextContent with imported function info or error.
+    """
+    try:
+        result = await client.post("/setting/functions/importjson", json_body=definition)
+        return format_response(
+            {
+                "imported_id": result.get("id"),
+                "name": result.get("name"),
             }
         )
     except Exception as e:

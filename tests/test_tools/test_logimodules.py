@@ -1,4 +1,5 @@
 # Description: Tests for LogicModule MCP tools (ConfigSources, EventSources, etc.).
+# Description: Covers list, get, and audit operations across all LogicModule types.
 
 import json
 

@@ -241,3 +241,77 @@ async def get_idle_resources(
         )
     except Exception as e:
         return handle_error(e)
+
+
+async def get_cost_recommendation_categories(
+    client: "LogicMonitorClient",
+) -> list[TextContent]:
+    """Get cost recommendation categories (v224 Cost Optimization API).
+
+    Returns list of recommendation categories with counts and potential savings.
+
+    Args:
+        client: LogicMonitor API client.
+
+    Returns:
+        List of TextContent with recommendation categories or error.
+    """
+    try:
+        result = await client.get("/cost-optimization/recommendations/categories")
+
+        categories = []
+        for item in result.get("items", []):
+            categories.append(
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "description": item.get("description"),
+                    "count": item.get("count"),
+                    "potential_savings": item.get("potentialSavings"),
+                }
+            )
+
+        return format_response(
+            {
+                "total": result.get("total", 0),
+                "categories": categories,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_cost_recommendation(
+    client: "LogicMonitorClient",
+    recommendation_id: int,
+) -> list[TextContent]:
+    """Get a specific cost recommendation by ID (v224 Cost Optimization API).
+
+    Args:
+        client: LogicMonitor API client.
+        recommendation_id: ID of the recommendation to retrieve.
+
+    Returns:
+        List of TextContent with recommendation details or error.
+    """
+    try:
+        result = await client.get(f"/cost-optimization/recommendations/{recommendation_id}")
+
+        return format_response(
+            {
+                "id": result.get("id"),
+                "category": result.get("category"),
+                "resource_name": result.get("resourceName"),
+                "resource_type": result.get("resourceType"),
+                "current_configuration": result.get("currentConfiguration"),
+                "recommended_configuration": result.get("recommendedConfiguration"),
+                "current_cost": result.get("currentCost"),
+                "projected_cost": result.get("projectedCost"),
+                "projected_savings": result.get("projectedSavings"),
+                "confidence": result.get("confidence"),
+                "status": result.get("status"),
+                "details": result.get("details"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)

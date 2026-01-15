@@ -4,10 +4,13 @@
 import asyncio
 
 from mcp.server import Server
-from mcp.types import TextContent
+from mcp.types import CompleteResult, GetPromptResult, TextContent
 
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.completions import get_completions
+from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import TOOLS, get_tool_handler
+from lm_mcp.resources import RESOURCES, get_resource_content
 
 # Create server instance
 server = Server("logicmonitor-platform")
@@ -56,6 +59,75 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         return [TextContent(type="text", text=f"Error: {e}")]
     except Exception as e:
         return [TextContent(type="text", text=f"Error executing {name}: {e}")]
+
+
+@server.list_resources()
+async def list_resources():
+    """Return all available LogicMonitor schema resources.
+
+    Resources expose API field definitions, valid enum values, and filter
+    syntax to help AI agents construct valid API queries.
+    """
+    return RESOURCES
+
+
+@server.read_resource()
+async def read_resource(uri: str) -> str:
+    """Read the content of a LogicMonitor schema resource.
+
+    Args:
+        uri: Resource URI (e.g., 'lm://schema/alerts').
+
+    Returns:
+        JSON string containing the resource content.
+    """
+    try:
+        content = get_resource_content(uri)
+        return content
+    except ValueError as e:
+        raise ValueError(f"Resource not found: {uri}") from e
+
+
+@server.completion()
+async def complete(ref, argument) -> CompleteResult:
+    """Provide auto-complete suggestions for argument values.
+
+    Supports completions for common LogicMonitor argument names like
+    severity, status, and sdt_type.
+
+    Args:
+        ref: Reference to the prompt or resource template.
+        argument: The argument being completed (name and partial value).
+
+    Returns:
+        CompleteResult with matching completion values.
+    """
+    completion = get_completions(argument.name, argument.value)
+    return CompleteResult(completion=completion)
+
+
+@server.list_prompts()
+async def list_prompts():
+    """Return all available LogicMonitor workflow prompts.
+
+    Prompts provide pre-built templates for common monitoring operations
+    like incident triage, capacity review, and health checks.
+    """
+    return PROMPTS
+
+
+@server.get_prompt()
+async def get_prompt(name: str, arguments: dict | None = None) -> GetPromptResult:
+    """Get the messages for a LogicMonitor workflow prompt.
+
+    Args:
+        name: Prompt name (e.g., 'incident_triage', 'health_check').
+        arguments: Optional prompt arguments.
+
+    Returns:
+        GetPromptResult with workflow messages.
+    """
+    return get_prompt_messages(name, arguments or {})
 
 
 async def run_server() -> None:

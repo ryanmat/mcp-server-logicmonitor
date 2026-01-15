@@ -174,3 +174,322 @@ class TestExportEscalationChain:
         data = json.loads(result[0].text)
         assert data["escalation_chain_id"] == 101
         assert data["name"] == "On-Call Team"
+
+
+class TestImportDatasource:
+    """Tests for import_datasource tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_datasource_success(self, client, monkeypatch):
+        """import_datasource successfully imports a DataSource."""
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 1001,
+                    "name": "ImportedDataSource",
+                    "displayName": "Imported DataSource",
+                },
+            )
+        )
+
+        definition = {
+            "name": "ImportedDataSource",
+            "displayName": "Imported DataSource",
+            "appliesTo": "isLinux()",
+            "collectMethod": "script",
+        }
+
+        result = await import_datasource(client, definition=definition)
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 1001
+        assert data["name"] == "ImportedDataSource"
+
+    async def test_import_datasource_requires_write_permission(self, client, monkeypatch):
+        """import_datasource requires write permission."""
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await import_datasource(client, definition={"name": "test"})
+
+        assert len(result) == 1
+        assert "Write operations are disabled" in result[0].text
+
+
+class TestImportConfigsource:
+    """Tests for import_configsource tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_configsource_success(self, client, monkeypatch):
+        """import_configsource successfully imports a ConfigSource."""
+        from lm_mcp.tools.imports import import_configsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/configsources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 2001,
+                    "name": "ImportedConfigSource",
+                },
+            )
+        )
+
+        result = await import_configsource(client, definition={"name": "ImportedConfigSource"})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 2001
+
+
+class TestImportEventsource:
+    """Tests for import_eventsource tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_eventsource_success(self, client, monkeypatch):
+        """import_eventsource successfully imports an EventSource."""
+        from lm_mcp.tools.imports import import_eventsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 3001,
+                    "name": "ImportedEventSource",
+                },
+            )
+        )
+
+        result = await import_eventsource(client, definition={"name": "ImportedEventSource"})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 3001
+
+
+class TestImportPropertysource:
+    """Tests for import_propertysource tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_propertysource_success(self, client, monkeypatch):
+        """import_propertysource successfully imports a PropertySource."""
+        from lm_mcp.tools.imports import import_propertysource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/propertyrules/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 4001,
+                    "name": "ImportedPropertySource",
+                },
+            )
+        )
+
+        result = await import_propertysource(client, definition={"name": "ImportedPropertySource"})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 4001
+
+
+class TestImportLogsource:
+    """Tests for import_logsource tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_logsource_success(self, client, monkeypatch):
+        """import_logsource successfully imports a LogSource."""
+        from lm_mcp.tools.imports import import_logsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/logsources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 5001,
+                    "name": "ImportedLogSource",
+                },
+            )
+        )
+
+        result = await import_logsource(client, definition={"name": "ImportedLogSource"})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 5001
+
+
+class TestImportTopologysource:
+    """Tests for import_topologysource tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_topologysource_success(self, client, monkeypatch):
+        """import_topologysource successfully imports a TopologySource."""
+        from lm_mcp.tools.imports import import_topologysource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/topologysources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 6001,
+                    "name": "ImportedTopologySource",
+                },
+            )
+        )
+
+        result = await import_topologysource(
+            client, definition={"name": "ImportedTopologySource"}
+        )
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 6001
+
+
+class TestImportJobmonitor:
+    """Tests for import_jobmonitor tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_jobmonitor_success(self, client, monkeypatch):
+        """import_jobmonitor successfully imports a JobMonitor."""
+        from lm_mcp.tools.imports import import_jobmonitor
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/batchjobs/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 7001,
+                    "name": "ImportedJobMonitor",
+                },
+            )
+        )
+
+        result = await import_jobmonitor(client, definition={"name": "ImportedJobMonitor"})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 7001
+
+
+class TestImportAppliestoFunction:
+    """Tests for import_appliesto_function tool (v228 JSON import API)."""
+
+    @respx.mock
+    async def test_import_appliesto_function_success(self, client, monkeypatch):
+        """import_appliesto_function successfully imports a function."""
+        from lm_mcp.tools.imports import import_appliesto_function
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/functions/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 8001,
+                    "name": "ImportedFunction",
+                },
+            )
+        )
+
+        result = await import_appliesto_function(
+            client, definition={"name": "ImportedFunction"}
+        )
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 8001

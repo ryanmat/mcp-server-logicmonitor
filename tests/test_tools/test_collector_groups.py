@@ -1,4 +1,5 @@
 # Description: Tests for collector group MCP tools.
+# Description: Covers list and get operations for collector group resources.
 
 import json
 

@@ -1,4 +1,5 @@
 # Description: Tests for admin MCP tools (Dashboard Groups, API Tokens, Access Groups, OIDs).
+# Description: Covers CRUD operations and error handling for administrative resources.
 
 import json
 

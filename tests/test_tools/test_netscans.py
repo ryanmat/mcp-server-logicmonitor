@@ -1,4 +1,5 @@
 # Description: Tests for netscan MCP tools.
+# Description: Covers list and get operations for network scan resources.
 
 import json
 

@@ -1841,6 +1841,28 @@ TOOLS.extend(
                 },
             },
         ),
+        Tool(
+            name="get_cost_recommendation_categories",
+            description="Get cost recommendation categories with counts and savings",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="get_cost_recommendation",
+            description="Get a specific cost recommendation by ID (v224 API)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "recommendation_id": {
+                        "type": "integer",
+                        "description": "ID of the recommendation to retrieve",
+                    },
+                },
+                "required": ["recommendation_id"],
+            },
+        ),
     ]
 )
 
@@ -1933,6 +1955,94 @@ TOOLS.extend(
                     "logsource_id": {"type": "integer", "description": "LogSource ID"},
                 },
                 "required": ["logsource_id"],
+            },
+        ),
+        Tool(
+            name="import_datasource",
+            description="Import a DataSource from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "DataSource JSON definition"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_configsource",
+            description="Import a ConfigSource from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "ConfigSource JSON definition"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_eventsource",
+            description="Import an EventSource from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "EventSource JSON definition"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_propertysource",
+            description="Import a PropertySource from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "PropertySource JSON"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_logsource",
+            description="Import a LogSource from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "LogSource JSON definition"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_topologysource",
+            description="Import a TopologySource from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "TopologySource JSON"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_jobmonitor",
+            description="Import a JobMonitor from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "JobMonitor JSON definition"},
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_appliesto_function",
+            description="Import an AppliesTo function from JSON (requires write permission)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {"type": "object", "description": "AppliesTo function JSON"},
+                },
+                "required": ["definition"],
             },
         ),
     ]
@@ -2127,6 +2237,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_cost_recommendations": cost.get_cost_recommendations,
         "get_idle_resources": cost.get_idle_resources,
         "get_cloud_cost_accounts": cost.get_cloud_cost_accounts,
+        "get_cost_recommendation_categories": cost.get_cost_recommendation_categories,
+        "get_cost_recommendation": cost.get_cost_recommendation,
         # Imports/Exports
         "export_datasource": imports.export_datasource,
         "export_dashboard": imports.export_dashboard,
@@ -2136,6 +2248,14 @@ def get_tool_handler(tool_name: str) -> Any:
         "export_eventsource": imports.export_eventsource,
         "export_propertysource": imports.export_propertysource,
         "export_logsource": imports.export_logsource,
+        "import_datasource": imports.import_datasource,
+        "import_configsource": imports.import_configsource,
+        "import_eventsource": imports.import_eventsource,
+        "import_propertysource": imports.import_propertysource,
+        "import_logsource": imports.import_logsource,
+        "import_topologysource": imports.import_topologysource,
+        "import_jobmonitor": imports.import_jobmonitor,
+        "import_appliesto_function": imports.import_appliesto_function,
     }
 
     if tool_name not in handlers:
