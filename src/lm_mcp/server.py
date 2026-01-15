@@ -72,17 +72,19 @@ async def list_resources():
 
 
 @server.read_resource()
-async def read_resource(uri: str) -> str:
+async def read_resource(uri) -> str:
     """Read the content of a LogicMonitor schema resource.
 
     Args:
-        uri: Resource URI (e.g., 'lm://schema/alerts').
+        uri: Resource URI (e.g., 'lm://schema/alerts'). May be AnyUrl or str.
 
     Returns:
         JSON string containing the resource content.
     """
     try:
-        content = get_resource_content(uri)
+        # Convert AnyUrl to string if needed
+        uri_str = str(uri)
+        content = get_resource_content(uri_str)
         return content
     except ValueError as e:
         raise ValueError(f"Resource not found: {uri}") from e
