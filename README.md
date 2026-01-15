@@ -232,7 +232,27 @@ Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
 }
 ```
 
-Then enable the server in Cursor Settings > MCP.
+To enable write operations and ingestion APIs:
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token",
+        "LM_ACCESS_ID": "your-access-id",
+        "LM_ACCESS_KEY": "your-access-key",
+        "LM_ENABLE_WRITE_OPERATIONS": "true"
+      }
+    }
+  }
+}
+```
+
+Then restart Cursor or enable the server in **Cursor Settings** → **MCP**.
 
 ### OpenAI Codex CLI
 
