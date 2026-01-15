@@ -1,5 +1,5 @@
 # Description: Escalation chain and recipient group tools for LogicMonitor MCP server.
-# Description: Provides escalation chain and recipient group query functions.
+# Description: Provides CRUD operations for escalation chains and recipient groups.
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, require_write_permission
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -208,5 +208,252 @@ async def get_recipient_group(
         }
 
         return format_response(group)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_escalation_chain(
+    client: "LogicMonitorClient",
+    name: str,
+    description: str | None = None,
+    enable_throttling: bool = False,
+    throttling_period: int | None = None,
+    throttling_alerts: int | None = None,
+) -> list[TextContent]:
+    """Create an escalation chain in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the escalation chain.
+        description: Optional description.
+        enable_throttling: Whether to enable alert throttling.
+        throttling_period: Throttling period in minutes.
+        throttling_alerts: Number of alerts before throttling.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {
+            "name": name,
+            "enableThrottling": enable_throttling,
+        }
+
+        if description:
+            body["description"] = description
+        if throttling_period is not None:
+            body["throttlingPeriod"] = throttling_period
+        if throttling_alerts is not None:
+            body["throttlingAlerts"] = throttling_alerts
+
+        result = await client.post("/setting/alert/chains", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Escalation chain '{name}' created",
+                "chain_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_escalation_chain(
+    client: "LogicMonitorClient",
+    chain_id: int,
+    name: str | None = None,
+    description: str | None = None,
+    enable_throttling: bool | None = None,
+    throttling_period: int | None = None,
+    throttling_alerts: int | None = None,
+) -> list[TextContent]:
+    """Update an escalation chain in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        chain_id: ID of the escalation chain to update.
+        name: Updated name.
+        description: Updated description.
+        enable_throttling: Updated throttling setting.
+        throttling_period: Updated throttling period.
+        throttling_alerts: Updated throttling alert count.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+        if enable_throttling is not None:
+            body["enableThrottling"] = enable_throttling
+        if throttling_period is not None:
+            body["throttlingPeriod"] = throttling_period
+        if throttling_alerts is not None:
+            body["throttlingAlerts"] = throttling_alerts
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "VALIDATION_ERROR",
+                    "message": "No fields provided to update",
+                }
+            )
+
+        result = await client.patch(f"/setting/alert/chains/{chain_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Escalation chain {chain_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_escalation_chain(
+    client: "LogicMonitorClient",
+    chain_id: int,
+) -> list[TextContent]:
+    """Delete an escalation chain from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        chain_id: ID of the escalation chain to delete.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        await client.delete(f"/setting/alert/chains/{chain_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Escalation chain {chain_id} deleted",
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_recipient_group(
+    client: "LogicMonitorClient",
+    name: str,
+    description: str | None = None,
+) -> list[TextContent]:
+    """Create a recipient group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the recipient group.
+        description: Optional description.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {"name": name}
+
+        if description:
+            body["description"] = description
+
+        result = await client.post("/setting/recipientgroups", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Recipient group '{name}' created",
+                "group_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_recipient_group(
+    client: "LogicMonitorClient",
+    group_id: int,
+    name: str | None = None,
+    description: str | None = None,
+) -> list[TextContent]:
+    """Update a recipient group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: ID of the recipient group to update.
+        name: Updated name.
+        description: Updated description.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "VALIDATION_ERROR",
+                    "message": "No fields provided to update",
+                }
+            )
+
+        result = await client.patch(f"/setting/recipientgroups/{group_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Recipient group {group_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_recipient_group(
+    client: "LogicMonitorClient",
+    group_id: int,
+) -> list[TextContent]:
+    """Delete a recipient group from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: ID of the recipient group to delete.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        await client.delete(f"/setting/recipientgroups/{group_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Recipient group {group_id} deleted",
+            }
+        )
     except Exception as e:
         return handle_error(e)

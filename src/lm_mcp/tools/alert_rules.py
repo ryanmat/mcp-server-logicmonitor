@@ -1,5 +1,5 @@
 # Description: Alert rule tools for LogicMonitor MCP server.
-# Description: Provides alert rule query functions.
+# Description: Provides alert rule CRUD operations.
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, require_write_permission
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -111,5 +111,166 @@ async def get_alert_rule(
         }
 
         return format_response(rule)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_alert_rule(
+    client: "LogicMonitorClient",
+    name: str,
+    priority: int,
+    escalation_chain_id: int,
+    level_str: str | None = None,
+    devices: list[str] | None = None,
+    device_groups: list[str] | None = None,
+    datasource: str | None = None,
+    datapoint: str | None = None,
+    instance: str | None = None,
+    suppress_alert_clear: bool = False,
+    suppress_alert_ack_sdt: bool = False,
+) -> list[TextContent]:
+    """Create an alert rule in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the alert rule.
+        priority: Priority level (lower = higher priority).
+        escalation_chain_id: Escalation chain ID for the rule.
+        level_str: Alert level filter (Critical, Error, Warning, All).
+        devices: List of device patterns to match.
+        device_groups: List of device group patterns to match.
+        datasource: DataSource pattern to match.
+        datapoint: DataPoint pattern to match.
+        instance: Instance pattern to match.
+        suppress_alert_clear: Whether to suppress alert clear notifications.
+        suppress_alert_ack_sdt: Whether to suppress ack/SDT notifications.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {
+            "name": name,
+            "priority": priority,
+            "escalatingChainId": escalation_chain_id,
+            "suppressAlertClear": suppress_alert_clear,
+            "suppressAlertAckSdt": suppress_alert_ack_sdt,
+        }
+
+        if level_str:
+            body["levelStr"] = level_str
+        if devices:
+            body["devices"] = devices
+        if device_groups:
+            body["deviceGroups"] = device_groups
+        if datasource:
+            body["datasource"] = datasource
+        if datapoint:
+            body["datapoint"] = datapoint
+        if instance:
+            body["instance"] = instance
+
+        result = await client.post("/setting/alert/rules", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Alert rule '{name}' created",
+                "rule_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_alert_rule(
+    client: "LogicMonitorClient",
+    rule_id: int,
+    name: str | None = None,
+    priority: int | None = None,
+    escalation_chain_id: int | None = None,
+    level_str: str | None = None,
+    suppress_alert_clear: bool | None = None,
+    suppress_alert_ack_sdt: bool | None = None,
+) -> list[TextContent]:
+    """Update an alert rule in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        rule_id: ID of the alert rule to update.
+        name: Updated name.
+        priority: Updated priority level.
+        escalation_chain_id: Updated escalation chain ID.
+        level_str: Updated alert level filter.
+        suppress_alert_clear: Updated suppress alert clear setting.
+        suppress_alert_ack_sdt: Updated suppress ack/SDT setting.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if priority is not None:
+            body["priority"] = priority
+        if escalation_chain_id is not None:
+            body["escalatingChainId"] = escalation_chain_id
+        if level_str is not None:
+            body["levelStr"] = level_str
+        if suppress_alert_clear is not None:
+            body["suppressAlertClear"] = suppress_alert_clear
+        if suppress_alert_ack_sdt is not None:
+            body["suppressAlertAckSdt"] = suppress_alert_ack_sdt
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "VALIDATION_ERROR",
+                    "message": "No fields provided to update",
+                }
+            )
+
+        result = await client.patch(f"/setting/alert/rules/{rule_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Alert rule {rule_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_alert_rule(
+    client: "LogicMonitorClient",
+    rule_id: int,
+) -> list[TextContent]:
+    """Delete an alert rule from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        rule_id: ID of the alert rule to delete.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        await client.delete(f"/setting/alert/rules/{rule_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Alert rule {rule_id} deleted",
+            }
+        )
     except Exception as e:
         return handle_error(e)
