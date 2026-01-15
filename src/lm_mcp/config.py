@@ -11,19 +11,27 @@ class LMConfig(BaseSettings):
     """Configuration for LogicMonitor MCP Server.
 
     Loads configuration from environment variables with LM_ prefix.
-    Uses Bearer token authentication.
+    Supports both Bearer token and LMv1 HMAC authentication.
 
     Environment Variables:
         LM_PORTAL: LogicMonitor portal hostname (e.g., company.logicmonitor.com)
-        LM_BEARER_TOKEN: API Bearer token for authentication
+        LM_BEARER_TOKEN: API Bearer token for authentication (preferred)
+        LM_ACCESS_ID: LMv1 access ID for HMAC authentication
+        LM_ACCESS_KEY: LMv1 access key for HMAC authentication
         LM_API_VERSION: API version (default: 3)
         LM_TIMEOUT: Request timeout in seconds (default: 30, range: 5-300)
         LM_ENABLE_WRITE_OPERATIONS: Enable write operations (default: false)
         LM_MAX_RETRIES: Max retry attempts for rate limits (default: 3, range: 0-10)
+
+    Authentication:
+        Either bearer_token OR both (access_id AND access_key) must be provided.
+        Bearer token is preferred when both are configured.
     """
 
     portal: str
     bearer_token: str | None = None
+    access_id: str | None = None
+    access_key: str | None = None
     api_version: int = 3
     timeout: int = 30
     enable_write_operations: bool = False
@@ -76,15 +84,46 @@ class LMConfig(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def validate_bearer_token(self) -> "LMConfig":
-        """Validate that bearer token is present and has minimum length."""
-        if not self.bearer_token:
-            raise ValueError("bearer_token is required")
-        if len(self.bearer_token) < 10:
-            raise ValueError("bearer_token appears invalid (too short)")
-        return self
+    def validate_authentication(self) -> "LMConfig":
+        """Validate that at least one authentication method is configured.
+
+        Either bearer_token OR both (access_id AND access_key) must be provided.
+        """
+        has_bearer = bool(self.bearer_token)
+        has_lmv1 = bool(self.access_id) or bool(self.access_key)
+
+        if has_bearer:
+            if len(self.bearer_token) < 10:
+                raise ValueError("bearer_token appears invalid (too short)")
+            return self
+
+        if has_lmv1:
+            if not self.access_id:
+                raise ValueError("access_id is required when using LMv1 authentication")
+            if not self.access_key:
+                raise ValueError("access_key is required when using LMv1 authentication")
+            return self
+
+        raise ValueError(
+            "Authentication required: set either LM_BEARER_TOKEN or "
+            "both LM_ACCESS_ID and LM_ACCESS_KEY"
+        )
+
+    @property
+    def has_lmv1_auth(self) -> bool:
+        """Check if LMv1 credentials are configured."""
+        return bool(self.access_id and self.access_key)
 
     @property
     def base_url(self) -> str:
         """Return the base URL for LogicMonitor REST API."""
         return f"https://{self.portal}/santaba/rest"
+
+    @property
+    def ingest_url(self) -> str:
+        """Return the base URL for LogicMonitor ingestion APIs.
+
+        Ingestion APIs (logs, metrics) use a different path structure
+        than the standard REST API.
+        """
+        return f"https://{self.portal}"

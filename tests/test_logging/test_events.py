@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from lm_mcp.logging import (
     LogEvent,
     LogLevel,

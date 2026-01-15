@@ -229,9 +229,9 @@ class TestGetDatasourcesFilters:
         """get_datasources passes raw filter expression to API."""
         from lm_mcp.tools.datasources import get_datasources
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_datasources(client, filter="name~CPU,group:Core")
 
@@ -243,9 +243,9 @@ class TestGetDatasourcesFilters:
         """get_datasources passes offset for pagination."""
         from lm_mcp.tools.datasources import get_datasources
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_datasources(client, offset=100)
 
@@ -257,9 +257,7 @@ class TestGetDatasourcesFilters:
         """get_datasources returns pagination info."""
         from lm_mcp.tools.datasources import get_datasources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
             return_value=httpx.Response(
                 200,
                 json={

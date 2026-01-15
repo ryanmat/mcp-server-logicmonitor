@@ -111,8 +111,10 @@ class TestFoundationIntegration:
         """Config validation errors are ValueError not our custom exceptions."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+        monkeypatch.delenv("LM_ACCESS_ID", raising=False)
+        monkeypatch.delenv("LM_ACCESS_KEY", raising=False)
 
         from lm_mcp import LMConfig
 
-        with pytest.raises(ValueError, match="bearer_token.*required"):
+        with pytest.raises(ValueError, match="Authentication required"):
             LMConfig()

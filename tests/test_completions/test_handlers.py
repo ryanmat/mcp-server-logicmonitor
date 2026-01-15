@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from lm_mcp.completions import get_completions
 from lm_mcp.completions.registry import (
     COMPLETION_SOURCES,
@@ -28,9 +26,7 @@ class TestCompletionRegistry:
 
     def test_severity_source_exists(self):
         """Severity completion source is defined."""
-        severity = next(
-            (s for s in COMPLETION_SOURCES if s["argument_name"] == "severity"), None
-        )
+        severity = next((s for s in COMPLETION_SOURCES if s["argument_name"] == "severity"), None)
         assert severity is not None
         assert "critical" in severity["values"]
         assert "error" in severity["values"]
@@ -39,18 +35,14 @@ class TestCompletionRegistry:
 
     def test_status_source_exists(self):
         """Device status completion source is defined."""
-        status = next(
-            (s for s in COMPLETION_SOURCES if s["argument_name"] == "status"), None
-        )
+        status = next((s for s in COMPLETION_SOURCES if s["argument_name"] == "status"), None)
         assert status is not None
         assert "normal" in status["values"]
         assert "dead" in status["values"]
 
     def test_sdt_type_source_exists(self):
         """SDT type completion source is defined."""
-        sdt_type = next(
-            (s for s in COMPLETION_SOURCES if s["argument_name"] == "sdt_type"), None
-        )
+        sdt_type = next((s for s in COMPLETION_SOURCES if s["argument_name"] == "sdt_type"), None)
         assert sdt_type is not None
         assert "DeviceSDT" in sdt_type["values"]
         assert "DeviceGroupSDT" in sdt_type["values"]

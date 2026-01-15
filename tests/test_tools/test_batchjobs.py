@@ -146,9 +146,7 @@ class TestGetDeviceBatchjobs:
         """get_device_batchjobs returns batch jobs for device."""
         from lm_mcp.tools.batchjobs import get_device_batchjobs
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/456/batchjobs"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/456/batchjobs").mock(
             return_value=httpx.Response(
                 200,
                 json={

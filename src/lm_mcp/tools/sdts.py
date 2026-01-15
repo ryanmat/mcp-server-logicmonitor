@@ -253,9 +253,7 @@ async def bulk_create_device_sdt(
                 body["comment"] = comment
 
             result = await client.post("/sdt/sdts", json_body=body)
-            results["success"].append(
-                {"device_id": device_id, "sdt_id": result.get("id")}
-            )
+            results["success"].append({"device_id": device_id, "sdt_id": result.get("id")})
         except Exception as e:
             results["failed"].append({"device_id": device_id, "error": str(e)})
 

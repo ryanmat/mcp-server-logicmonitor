@@ -364,9 +364,7 @@ class TestImportLogsource:
 
         reload(lm_mcp.config)
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/logsources/importjson"
-        ).mock(
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/logsources/importjson").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -412,9 +410,7 @@ class TestImportTopologysource:
             )
         )
 
-        result = await import_topologysource(
-            client, definition={"name": "ImportedTopologySource"}
-        )
+        result = await import_topologysource(client, definition={"name": "ImportedTopologySource"})
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -438,9 +434,7 @@ class TestImportJobmonitor:
 
         reload(lm_mcp.config)
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/batchjobs/importjson"
-        ).mock(
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/batchjobs/importjson").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -474,9 +468,7 @@ class TestImportAppliestoFunction:
 
         reload(lm_mcp.config)
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/functions/importjson"
-        ).mock(
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/functions/importjson").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -486,9 +478,7 @@ class TestImportAppliestoFunction:
             )
         )
 
-        result = await import_appliesto_function(
-            client, definition={"name": "ImportedFunction"}
-        )
+        result = await import_appliesto_function(client, definition={"name": "ImportedFunction"})
 
         assert len(result) == 1
         data = json.loads(result[0].text)
