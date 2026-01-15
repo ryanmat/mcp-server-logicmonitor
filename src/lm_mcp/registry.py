@@ -2048,6 +2048,74 @@ TOOLS.extend(
     ]
 )
 
+# Ingestion APIs (require LMv1 authentication)
+TOOLS.extend(
+    [
+        Tool(
+            name="ingest_logs",
+            description="Ingest log entries into LogicMonitor (requires LMv1 auth)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "logs": {
+                        "type": "array",
+                        "description": "Array of log entries to ingest",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message": {"type": "string", "description": "Log message"},
+                                "_lm.resourceId": {
+                                    "type": "object",
+                                    "description": "Resource mapping (e.g., system.hostname)",
+                                },
+                                "timestamp": {
+                                    "type": "integer",
+                                    "description": "Epoch milliseconds (optional)",
+                                },
+                            },
+                            "required": ["message"],
+                        },
+                    },
+                },
+                "required": ["logs"],
+            },
+        ),
+        Tool(
+            name="push_metrics",
+            description="Push custom metrics into LogicMonitor (requires LMv1 auth)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "metrics": {
+                        "type": "object",
+                        "description": "Metric payload with resource mapping and datapoints",
+                        "properties": {
+                            "resourceIds": {
+                                "type": "object",
+                                "description": "Resource mapping (e.g., system.hostname)",
+                            },
+                            "dataSource": {
+                                "type": "string",
+                                "description": "Datasource name for metrics",
+                            },
+                            "dataSourceGroup": {
+                                "type": "string",
+                                "description": "Datasource group name (optional)",
+                            },
+                            "instances": {
+                                "type": "array",
+                                "description": "Instance data with datapoints",
+                            },
+                        },
+                        "required": ["resourceIds", "dataSource"],
+                    },
+                },
+                "required": ["metrics"],
+            },
+        ),
+    ]
+)
+
 
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
@@ -2079,6 +2147,7 @@ def get_tool_handler(tool_name: str) -> Any:
         escalations,
         eventsources,
         imports,
+        ingestion,
         logsources,
         metrics,
         netscans,
@@ -2256,6 +2325,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "import_topologysource": imports.import_topologysource,
         "import_jobmonitor": imports.import_jobmonitor,
         "import_appliesto_function": imports.import_appliesto_function,
+        # Ingestion
+        "ingest_logs": ingestion.ingest_logs,
+        "push_metrics": ingestion.push_metrics,
     }
 
     if tool_name not in handlers:

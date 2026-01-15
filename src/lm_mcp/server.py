@@ -147,6 +147,7 @@ async def run_server() -> None:
         auth=auth,
         timeout=config.timeout,
         api_version=config.api_version,
+        ingest_url=config.ingest_url,
     )
 
     try:

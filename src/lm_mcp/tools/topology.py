@@ -125,18 +125,13 @@ async def get_device_interfaces(
     try:
         params: dict = {"size": limit}
 
-        result = await client.get(
-            f"/device/devices/{device_id}/devicedatasources", params=params
-        )
+        result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
 
         # Filter to interface-related datasources
         interfaces = []
         for item in result.get("items", []):
             ds_name = item.get("dataSourceName", "").lower()
-            if any(
-                keyword in ds_name
-                for keyword in ["interface", "port", "ethernet", "network"]
-            ):
+            if any(keyword in ds_name for keyword in ["interface", "port", "ethernet", "network"]):
                 interfaces.append(
                     {
                         "id": item.get("id"),

@@ -181,9 +181,7 @@ class TestGetCollectorsFilters:
         """get_collectors returns pagination info."""
         from lm_mcp.tools.collectors import get_collectors
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
             return_value=httpx.Response(
                 200,
                 json={

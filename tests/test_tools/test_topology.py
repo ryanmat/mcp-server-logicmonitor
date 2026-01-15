@@ -71,9 +71,7 @@ class TestGetDeviceNeighbors:
         """get_device_neighbors returns neighboring devices."""
         from lm_mcp.tools.topology import get_device_neighbors
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/123/neighbors"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/123/neighbors").mock(
             return_value=httpx.Response(
                 200,
                 json={

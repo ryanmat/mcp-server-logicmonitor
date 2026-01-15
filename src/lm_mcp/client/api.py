@@ -32,6 +32,7 @@ class LogicMonitorClient:
         timeout: int = 30,
         api_version: int = 3,
         max_retries: int = 3,
+        ingest_url: str | None = None,
     ):
         """Initialize the client.
 
@@ -41,12 +42,14 @@ class LogicMonitorClient:
             timeout: Request timeout in seconds.
             api_version: LogicMonitor API version.
             max_retries: Maximum retry attempts for rate-limited requests.
+            ingest_url: Base URL for ingestion APIs (e.g., https://company.logicmonitor.com).
         """
         self.base_url = base_url.rstrip("/")
         self.auth = auth
         self.api_version = api_version
         self.max_retries = max_retries
         self._client = httpx.AsyncClient(timeout=timeout)
+        self.ingest_url = ingest_url.rstrip("/") if ingest_url else None
 
     async def close(self) -> None:
         """Close the HTTP client."""
@@ -262,3 +265,83 @@ class LogicMonitorClient:
             Parsed JSON response.
         """
         return await self.request("DELETE", path, params=params)
+
+    async def ingest_post(
+        self,
+        path: str,
+        json_body: list | dict | None = None,
+    ) -> dict:
+        """Make a POST request to ingestion API.
+
+        Uses the ingest_url base instead of the standard base_url.
+        Ingestion APIs use paths like /rest/log/ingest.
+
+        Args:
+            path: Ingestion API path (e.g., /rest/log/ingest).
+            json_body: JSON body (list of log entries or metric payload).
+
+        Returns:
+            Parsed JSON response.
+
+        Raises:
+            ConfigurationError: If ingest_url is not configured.
+        """
+        from lm_mcp.exceptions import ConfigurationError
+
+        if not self.ingest_url:
+            raise ConfigurationError(
+                "Ingestion URL not configured. Set ingest_url when creating client."
+            )
+
+        url = f"{self.ingest_url}{path}"
+        body_str = json.dumps(json_body) if json_body else ""
+
+        # Build headers with auth for the ingest path
+        headers = {
+            "Content-Type": "application/json",
+        }
+        headers.update(self.auth.get_auth_headers("POST", path, body_str))
+
+        last_retry_after: int | None = None
+        last_message = "Rate limited"
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = await self._client.request(
+                    method="POST",
+                    url=url,
+                    json=json_body,
+                    headers=headers,
+                )
+            except httpx.ConnectError as e:
+                raise LMConnectionError(f"Failed to connect to {self.ingest_url}: {e}")
+
+            # Retry on rate limit (429) or server errors (5xx)
+            if response.status_code == 429 or response.status_code >= 500:
+                message, retry_after = self._parse_error_response(response)
+                last_message = message
+                last_retry_after = retry_after
+
+                if attempt < self.max_retries:
+                    base_backoff = 2**attempt
+                    jitter = random.uniform(0, 0.5 * base_backoff)
+                    wait_time = base_backoff + jitter
+                    if retry_after is not None:
+                        wait_time = min(retry_after, wait_time)
+                    await asyncio.sleep(wait_time)
+                    continue
+
+            # Handle 202 Accepted (success for ingestion)
+            if response.status_code == 202:
+                try:
+                    return response.json()
+                except (json.JSONDecodeError, ValueError):
+                    return {"success": True, "message": "Accepted"}
+
+            if response.status_code >= 400:
+                message, retry_after = self._parse_error_response(response)
+                self._raise_for_status(response, message, retry_after)
+
+            return response.json()
+
+        raise RateLimitError(last_message, retry_after=last_retry_after)

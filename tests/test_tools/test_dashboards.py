@@ -459,9 +459,7 @@ class TestAddWidget:
 
         from lm_mcp.tools.dashboards import add_widget
 
-        result = await add_widget(
-            client, dashboard_id=123, name="Test Widget", widget_type="text"
-        )
+        result = await add_widget(client, dashboard_id=123, name="Test Widget", widget_type="text")
 
         assert len(result) == 1
         assert "error" in result[0].text.lower()
@@ -521,9 +519,7 @@ class TestUpdateWidget:
 
         from lm_mcp.tools.dashboards import update_widget
 
-        result = await update_widget(
-            client, dashboard_id=123, widget_id=456, name="Updated Widget"
-        )
+        result = await update_widget(client, dashboard_id=123, widget_id=456, name="Updated Widget")
 
         assert len(result) == 1
         assert "error" in result[0].text.lower()
@@ -567,9 +563,7 @@ class TestUpdateWidget:
             )
         )
 
-        result = await update_widget(
-            client, dashboard_id=123, widget_id=456, name="Updated Widget"
-        )
+        result = await update_widget(client, dashboard_id=123, widget_id=456, name="Updated Widget")
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -626,9 +620,9 @@ class TestGetDashboardsFilters:
         """get_dashboards passes raw filter expression to API."""
         from lm_mcp.tools.dashboards import get_dashboards
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_dashboards(client, filter="name~prod,owner:admin")
 
@@ -640,9 +634,9 @@ class TestGetDashboardsFilters:
         """get_dashboards passes offset for pagination."""
         from lm_mcp.tools.dashboards import get_dashboards
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_dashboards(client, offset=25)
 
@@ -654,9 +648,7 @@ class TestGetDashboardsFilters:
         """get_dashboards returns pagination info."""
         from lm_mcp.tools.dashboards import get_dashboards
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
             return_value=httpx.Response(
                 200,
                 json={

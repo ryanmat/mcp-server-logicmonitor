@@ -23,23 +23,27 @@ class TestLMConfigBearer:
         assert config.timeout == 30
 
     def test_bearer_missing_token_raises_error(self, monkeypatch):
-        """Missing bearer token raises ValidationError."""
+        """Missing bearer token raises ValidationError when no LMv1 auth."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+        monkeypatch.delenv("LM_ACCESS_ID", raising=False)
+        monkeypatch.delenv("LM_ACCESS_KEY", raising=False)
 
         from lm_mcp.config import LMConfig
 
-        with pytest.raises(ValueError, match="bearer_token.*required"):
+        with pytest.raises(ValueError, match="Authentication required"):
             LMConfig()
 
     def test_bearer_empty_token_raises_error(self, monkeypatch):
-        """Empty bearer token raises ValidationError."""
+        """Empty bearer token raises ValidationError when no LMv1 auth."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "")
+        monkeypatch.delenv("LM_ACCESS_ID", raising=False)
+        monkeypatch.delenv("LM_ACCESS_KEY", raising=False)
 
         from lm_mcp.config import LMConfig
 
-        with pytest.raises(ValueError, match="bearer_token.*required"):
+        with pytest.raises(ValueError, match="Authentication required"):
             LMConfig()
 
 
