@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-01-15
+
+### Changed
+- Comprehensive README update with all 146 tools documented
+- Fixed installation command: `uvx --from lm-mcp lm-mcp-server`
+- Added MCP Resources and Prompts documentation
+- Added LMv1 authentication configuration instructions
+
+## [1.0.0] - 2025-01-15
+
+### Added
+- **MCP Resources**: 15 schema/enum/filter resources for API reference
+  - Schema resources: alerts, devices, sdts, dashboards, collectors
+  - Enum resources: severity, device-status, sdt-type, alert-cleared, alert-acked, collector-build
+  - Filter resources: alerts, devices, sdts, operators
+- **MCP Prompts**: 5 workflow templates
+  - incident_triage, capacity_review, health_check, alert_summary, sdt_planning
+- **MCP Completions**: Auto-complete for tool arguments (severity, status, sdt_type, etc.)
+- **LMv1 HMAC Authentication**: Support for Access ID/Key authentication
+- **Ingestion APIs**: ingest_logs and push_metrics tools (requires LMv1 auth)
+- **Cost Optimization Tools**: 7 tools for LM Envision cost analysis
+  - get_cost_summary, get_resource_cost, get_cost_recommendations
+  - get_cost_recommendation_categories, get_cost_recommendation
+  - get_idle_resources, get_cloud_cost_accounts
+- **LogicModule Import Tools**: 8 import tools for JSON definitions
+  - import_datasource, import_configsource, import_eventsource
+  - import_propertysource, import_logsource, import_topologysource
+  - import_jobmonitor, import_appliesto_function
+- **Website CRUD**: create_website, update_website, delete_website, create_website_group, delete_website_group
+- **Alert Rule CRUD**: create_alert_rule, update_alert_rule, delete_alert_rule
+- **Escalation CRUD**: create_escalation_chain, update_escalation_chain, delete_escalation_chain
+- **Recipient Group CRUD**: create_recipient_group, update_recipient_group, delete_recipient_group
+- **Structured Logging**: Event-based logging for API operations
+
+### Changed
+- Total tool count increased from ~120 to 146
+- Development status changed to Production/Stable
+- Improved metrics ingestion endpoint (changed to /rest/metric/ingest with create=true)
+
+### Fixed
+- MCP resource reading: Convert AnyUrl to string in read handler
+
 ## [0.5.1] - 2024-12-14
 
 ### Added
@@ -83,6 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.5.1...v1.0.0
+[0.5.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.2.0...v0.3.0
