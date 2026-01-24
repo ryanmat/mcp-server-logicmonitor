@@ -1,34 +1,55 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.ryanmat/logicmonitor",
-  "description": "LogicMonitor API integration with 120 tools for alerts, devices, metrics, and SDTs.",
+  "description": "LogicMonitor API integration with 152 tools for monitoring management: alerts, devices, dashboards, SDTs, collectors, websites, reports, escalations, LogicModules, cost optimization, and more.",
   "repository": {
     "url": "https://github.com/ryanmat/mcp-server-logicmonitor",
     "source": "github"
   },
-  "version": "0.5.1",
+  "version": "1.1.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "lm-mcp",
-      "version": "0.5.1",
+      "version": "1.1.0",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
+          "name": "LM_PORTAL",
           "description": "LogicMonitor portal hostname (e.g., company.logicmonitor.com)",
           "isRequired": true,
           "format": "string",
-          "isSecret": false,
-          "name": "LM_PORTAL"
+          "isSecret": false
         },
         {
+          "name": "LM_BEARER_TOKEN",
           "description": "LogicMonitor API Bearer token",
           "isRequired": true,
           "format": "string",
-          "isSecret": true,
-          "name": "LM_BEARER_TOKEN"
+          "isSecret": true
+        },
+        {
+          "name": "LM_ENABLE_WRITE_OPERATIONS",
+          "description": "Enable write operations (create, update, delete)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "LM_ACCESS_ID",
+          "description": "LMv1 API access ID (required for log/metric ingestion)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "LM_ACCESS_KEY",
+          "description": "LMv1 API access key (required for log/metric ingestion)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
         }
       ]
     }
