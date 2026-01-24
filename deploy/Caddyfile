@@ -1,0 +1,21 @@
+# Description: Caddy configuration for TLS termination.
+# Description: Proxies HTTPS requests to the LM MCP server.
+
+{$DOMAIN:localhost} {
+    reverse_proxy lm-mcp:8080
+
+    # Enable compression
+    encode gzip
+
+    # Add security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # Health check passthrough
+    handle /health* {
+        reverse_proxy lm-mcp:8080
+    }
+}

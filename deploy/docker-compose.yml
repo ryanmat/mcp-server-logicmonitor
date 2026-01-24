@@ -1,0 +1,63 @@
+# Description: Docker Compose configuration for LogicMonitor MCP server.
+# Description: Includes optional Caddy reverse proxy for TLS termination.
+
+services:
+  lm-mcp:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: lm-mcp-server:latest
+    container_name: lm-mcp
+    ports:
+      - "${LM_HTTP_PORT:-8080}:8080"
+    environment:
+      - LM_PORTAL=${LM_PORTAL}
+      - LM_BEARER_TOKEN=${LM_BEARER_TOKEN}
+      - LM_ACCESS_ID=${LM_ACCESS_ID:-}
+      - LM_ACCESS_KEY=${LM_ACCESS_KEY:-}
+      - LM_TRANSPORT=http
+      - LM_HTTP_HOST=0.0.0.0
+      - LM_HTTP_PORT=8080
+      - LM_ENABLE_WRITE_OPERATIONS=${LM_ENABLE_WRITE_OPERATIONS:-false}
+      - LM_CORS_ORIGINS=${LM_CORS_ORIGINS:-*}
+      - LM_SESSION_ENABLED=${LM_SESSION_ENABLED:-true}
+      - LM_FIELD_VALIDATION=${LM_FIELD_VALIDATION:-warn}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - lm-mcp-net
+
+  # Optional: TLS termination with Caddy
+  # Enable with: docker compose --profile tls up
+  caddy:
+    image: caddy:2-alpine
+    container_name: lm-mcp-proxy
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      lm-mcp:
+        condition: service_healthy
+    profiles:
+      - tls
+    networks:
+      - lm-mcp-net
+
+networks:
+  lm-mcp-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

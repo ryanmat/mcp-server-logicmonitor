@@ -33,10 +33,33 @@ def get_client() -> LogicMonitorClient:
     return _client
 
 
+def _set_client(client: LogicMonitorClient) -> None:
+    """Set the global LogicMonitor client.
+
+    Called by transport runners during initialization.
+
+    Args:
+        client: The LogicMonitor API client instance.
+    """
+    global _client
+    _client = client
+
+
 @server.list_tools()
 async def list_tools():
     """Return all available LogicMonitor tools."""
     return TOOLS
+
+
+# Session tools that don't require the LM client
+SESSION_TOOLS = {
+    "get_session_context",
+    "set_session_variable",
+    "get_session_variable",
+    "delete_session_variable",
+    "clear_session_context",
+    "list_session_history",
+}
 
 
 @server.call_tool()
@@ -50,10 +73,104 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     Returns:
         List of TextContent with the tool result.
     """
+    import json
+    import logging
+
+    from lm_mcp.config import LMConfig
+    from lm_mcp.session import get_session
+    from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
+
+    logger = logging.getLogger(__name__)
+    config = LMConfig()
+
     try:
         handler = get_tool_handler(name)
-        client = get_client()
-        result = await handler(client, **arguments)
+
+        # Field validation (if enabled and not a session tool)
+        if config.field_validation != "off" and name not in SESSION_TOOLS:
+            resource_type = infer_resource_type(name)
+            if resource_type:
+                # Validate 'fields' argument if present
+                if "fields" in arguments and arguments["fields"]:
+                    validation = validate_fields(resource_type, arguments["fields"])
+                    if not validation.valid:
+                        msg = f"Invalid fields: {validation.invalid_fields}"
+                        if validation.suggestions:
+                            suggestions = ", ".join(
+                                f"{k} -> {v}" for k, v in validation.suggestions.items()
+                            )
+                            msg += f". Did you mean: {suggestions}?"
+
+                        if config.field_validation == "error":
+                            return [
+                                TextContent(
+                                    type="text",
+                                    text=json.dumps(
+                                        {
+                                            "error": True,
+                                            "code": "INVALID_FIELDS",
+                                            "message": msg,
+                                            "invalid_fields": validation.invalid_fields,
+                                            "suggestions": validation.suggestions,
+                                            "valid_fields": validation.valid_field_names[:20],
+                                        },
+                                        indent=2,
+                                    ),
+                                )
+                            ]
+                        else:
+                            logger.warning(f"Field validation warning for {name}: {msg}")
+
+                # Validate 'filter' argument if present
+                if "filter" in arguments and arguments["filter"]:
+                    validation = validate_filter_fields(resource_type, arguments["filter"])
+                    if not validation.valid:
+                        msg = f"Invalid filter fields: {validation.invalid_fields}"
+                        if validation.suggestions:
+                            suggestions = ", ".join(
+                                f"{k} -> {v}" for k, v in validation.suggestions.items()
+                            )
+                            msg += f". Did you mean: {suggestions}?"
+
+                        if config.field_validation == "error":
+                            return [
+                                TextContent(
+                                    type="text",
+                                    text=json.dumps(
+                                        {
+                                            "error": True,
+                                            "code": "INVALID_FILTER_FIELDS",
+                                            "message": msg,
+                                            "invalid_fields": validation.invalid_fields,
+                                            "suggestions": validation.suggestions,
+                                        },
+                                        indent=2,
+                                    ),
+                                )
+                            ]
+                        else:
+                            logger.warning(f"Filter validation warning for {name}: {msg}")
+
+        # Session tools don't need the LM client
+        if name in SESSION_TOOLS:
+            result = await handler(**arguments)
+        else:
+            client = get_client()
+            result = await handler(client, **arguments)
+
+        # Record result in session if enabled
+        if config.session_enabled and name not in SESSION_TOOLS:
+            session = get_session()
+            # Try to parse the result for session storage
+            if result and len(result) > 0:
+                try:
+                    text = result[0].text
+                    data = json.loads(text)
+                    session.record_result(name, arguments, data, success=True)
+                except (json.JSONDecodeError, AttributeError):
+                    # Non-JSON result, just record with minimal info
+                    session.record_result(name, arguments, {}, success=True)
+
         return result
     except ValueError as e:
         return [TextContent(type="text", text=f"Error: {e}")]
@@ -133,35 +250,18 @@ async def get_prompt(name: str, arguments: dict | None = None) -> GetPromptResul
 
 
 async def run_server() -> None:
-    """Run the MCP server with stdio transport."""
-    global _client
+    """Run the MCP server with configured transport.
 
-    from mcp import stdio_server
-
-    from lm_mcp.auth import create_auth_provider
+    The transport is selected based on the LM_TRANSPORT environment variable:
+    - "stdio" (default): Standard input/output for local AI assistants
+    - "http": HTTP transport for remote/shared deployments
+    """
     from lm_mcp.config import LMConfig
+    from lm_mcp.transport import get_transport_runner
 
-    # Load config and create client
     config = LMConfig()
-    auth = create_auth_provider(config)
-    _client = LogicMonitorClient(
-        base_url=config.base_url,
-        auth=auth,
-        timeout=config.timeout,
-        api_version=config.api_version,
-        ingest_url=config.ingest_url,
-    )
-
-    try:
-        async with stdio_server() as (read_stream, write_stream):
-            await server.run(
-                read_stream,
-                write_stream,
-                server.create_initialization_options(),
-            )
-    finally:
-        if _client:
-            await _client.close()
+    runner = get_transport_runner(config)
+    await runner()
 
 
 def main() -> None:

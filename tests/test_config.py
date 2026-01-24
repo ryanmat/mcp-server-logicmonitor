@@ -117,3 +117,143 @@ class TestLMConfigMissingPortal:
 
         with pytest.raises(ValidationError):
             LMConfig()
+
+
+class TestLMConfigSession:
+    """Tests for session configuration options."""
+
+    def test_session_enabled_default(self, monkeypatch):
+        """Session is enabled by default."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.session_enabled is True
+
+    def test_session_disabled_from_env(self, monkeypatch):
+        """Session can be disabled via environment."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_SESSION_ENABLED", "false")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.session_enabled is False
+
+    def test_session_history_size_default(self, monkeypatch):
+        """Session history size has default value."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.session_history_size == 50
+
+    def test_session_history_size_from_env(self, monkeypatch):
+        """Session history size can be set via environment."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "100")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.session_history_size == 100
+
+    def test_session_history_size_validation_min(self, monkeypatch):
+        """Session history size below minimum (negative) raises error."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "-1")
+
+        from lm_mcp.config import LMConfig
+
+        with pytest.raises(ValueError):
+            LMConfig()
+
+    def test_session_history_size_validation_max(self, monkeypatch):
+        """Session history size above maximum raises error."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "1001")
+
+        from lm_mcp.config import LMConfig
+
+        with pytest.raises(ValueError):
+            LMConfig()
+
+
+class TestLMConfigValidation:
+    """Tests for field validation configuration options."""
+
+    def test_field_validation_default(self, monkeypatch):
+        """Field validation defaults to warn."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.field_validation == "warn"
+
+    def test_field_validation_off(self, monkeypatch):
+        """Field validation can be turned off."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_FIELD_VALIDATION", "off")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.field_validation == "off"
+
+    def test_field_validation_error(self, monkeypatch):
+        """Field validation can be set to error mode."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_FIELD_VALIDATION", "error")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.field_validation == "error"
+
+    def test_field_validation_invalid_value(self, monkeypatch):
+        """Invalid field validation value raises error."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_FIELD_VALIDATION", "invalid")
+
+        from lm_mcp.config import LMConfig
+
+        with pytest.raises(Exception):
+            LMConfig()
+
+
+class TestLMConfigHealth:
+    """Tests for health check configuration options."""
+
+    def test_health_check_connectivity_default(self, monkeypatch):
+        """Health check connectivity is disabled by default."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.health_check_connectivity is False
+
+    def test_health_check_connectivity_enabled(self, monkeypatch):
+        """Health check connectivity can be enabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_HEALTH_CHECK_CONNECTIVITY", "true")
+
+        from lm_mcp.config import LMConfig
+
+        config = LMConfig()
+        assert config.health_check_connectivity is True

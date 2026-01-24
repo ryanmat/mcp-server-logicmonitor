@@ -1,6 +1,6 @@
 [project]
 name = "lm-mcp"
-version = "1.0.2"
+version = "1.1.0"
 description = "MCP server for LogicMonitor platform API integration"
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,6 +29,12 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+http = [
+    "starlette>=0.40.0",
+    "uvicorn[standard]>=0.30.0",
 ]
 
 [project.urls]

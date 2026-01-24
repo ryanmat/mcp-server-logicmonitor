@@ -2367,6 +2367,78 @@ TOOLS.extend(
     ]
 )
 
+# Session Management
+TOOLS.extend(
+    [
+        Tool(
+            name="get_session_context",
+            description="Get current session context (last results, variables, history)",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="set_session_variable",
+            description="Set a user-defined session variable for use across tool calls",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Variable name"},
+                    "value": {
+                        "description": "Variable value (string, number, boolean, array, or object)",
+                    },
+                },
+                "required": ["name", "value"],
+            },
+        ),
+        Tool(
+            name="get_session_variable",
+            description="Get a user-defined session variable",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Variable name to retrieve"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="delete_session_variable",
+            description="Delete a user-defined session variable",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Variable name to delete"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="clear_session_context",
+            description="Clear all session context (last results, variables, and history)",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="list_session_history",
+            description="List recent tool call history",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Maximum entries to return (max 50)",
+                    },
+                },
+            },
+        ),
+    ]
+)
+
 
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
@@ -2409,6 +2481,7 @@ def get_tool_handler(tool_name: str) -> Any:
         resources,
         sdts,
         services,
+        session,
         topology,
         topologysources,
         users,
@@ -2593,6 +2666,13 @@ def get_tool_handler(tool_name: str) -> Any:
         # Ingestion
         "ingest_logs": ingestion.ingest_logs,
         "push_metrics": ingestion.push_metrics,
+        # Session
+        "get_session_context": session.get_session_context,
+        "set_session_variable": session.set_session_variable,
+        "get_session_variable": session.get_session_variable,
+        "delete_session_variable": session.delete_session_variable,
+        "clear_session_context": session.clear_session_context,
+        "list_session_history": session.list_session_history,
     }
 
     if tool_name not in handlers:

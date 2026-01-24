@@ -2,6 +2,7 @@
 # Description: Handles environment variable loading and validation for LM API credentials.
 
 import re
+from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
@@ -22,12 +23,21 @@ class LMConfig(BaseSettings):
         LM_TIMEOUT: Request timeout in seconds (default: 30, range: 5-300)
         LM_ENABLE_WRITE_OPERATIONS: Enable write operations (default: false)
         LM_MAX_RETRIES: Max retry attempts for rate limits (default: 3, range: 0-10)
+        LM_TRANSPORT: Transport mode - stdio or http (default: stdio)
+        LM_HTTP_HOST: HTTP server bind address (default: 0.0.0.0)
+        LM_HTTP_PORT: HTTP server port (default: 8080)
+        LM_CORS_ORIGINS: Comma-separated CORS origins (default: *)
+        LM_SESSION_ENABLED: Enable session context tracking (default: true)
+        LM_SESSION_HISTORY_SIZE: Number of tool calls to keep in history (default: 50)
+        LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
+        LM_HEALTH_CHECK_CONNECTIVITY: Include LM API ping in health checks (default: false)
 
     Authentication:
         Either bearer_token OR both (access_id AND access_key) must be provided.
         Bearer token is preferred when both are configured.
     """
 
+    # Core settings
     portal: str
     bearer_token: str | None = None
     access_id: str | None = None
@@ -36,6 +46,22 @@ class LMConfig(BaseSettings):
     timeout: int = 30
     enable_write_operations: bool = False
     max_retries: int = 3
+
+    # Transport settings
+    transport: Literal["stdio", "http"] = "stdio"
+    http_host: str = "0.0.0.0"
+    http_port: int = 8080
+    cors_origins: str = "*"
+
+    # Session settings
+    session_enabled: bool = True
+    session_history_size: int = 50
+
+    # Validation settings
+    field_validation: Literal["off", "warn", "error"] = "warn"
+
+    # Health check settings
+    health_check_connectivity: bool = False
 
     model_config = {
         "env_prefix": "LM_",
@@ -83,6 +109,24 @@ class LMConfig(BaseSettings):
             raise ValueError("max_retries must not exceed 10")
         return v
 
+    @field_validator("http_port", mode="after")
+    @classmethod
+    def validate_http_port(cls, v: int) -> int:
+        """Validate HTTP port is within acceptable range."""
+        if v < 1 or v > 65535:
+            raise ValueError("http_port must be between 1 and 65535")
+        return v
+
+    @field_validator("session_history_size", mode="after")
+    @classmethod
+    def validate_session_history_size(cls, v: int) -> int:
+        """Validate session history size is within acceptable range."""
+        if v < 0:
+            raise ValueError("session_history_size must be non-negative")
+        if v > 1000:
+            raise ValueError("session_history_size must not exceed 1000")
+        return v
+
     @model_validator(mode="after")
     def validate_authentication(self) -> "LMConfig":
         """Validate that at least one authentication method is configured.
@@ -127,3 +171,14 @@ class LMConfig(BaseSettings):
         than the standard REST API.
         """
         return f"https://{self.portal}"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS origins from comma-separated string to list.
+
+        Returns ["*"] if cors_origins is "*" (allow all).
+        Otherwise splits by comma and strips whitespace.
+        """
+        if self.cors_origins == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
