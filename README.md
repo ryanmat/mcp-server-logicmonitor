@@ -44,7 +44,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**146 Tools** across comprehensive LogicMonitor API coverage:
+**152 Tools** across comprehensive LogicMonitor API coverage:
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -88,6 +88,14 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **Server Error Recovery**: Automatic retry on 5xx server errors
 - **Pagination Support**: Handle large result sets with offset-based pagination
 
+### v1.1.0 Features
+- **HTTP Transport**: Remote deployments via Starlette/Uvicorn with CORS support
+- **Session Context**: Track operation results for conversational workflows
+- **Session Tools**: 6 tools to manage variables and view history
+- **Health Endpoints**: `/health`, `/healthz`, `/readyz` for container orchestration
+- **Field Validation**: Validate field names with typo suggestions
+- **Docker Support**: Production-ready Dockerfile and docker-compose with optional TLS
+
 ## Installation
 
 ### Via PyPI (Recommended)
@@ -108,6 +116,27 @@ cd mcp-server-logicmonitor
 uv sync
 ```
 
+### Docker Deployment
+
+For remote/shared deployments using HTTP transport:
+
+```bash
+cd deploy
+cp .env.example .env
+# Edit .env with your credentials
+
+# Run with docker-compose
+docker compose up -d
+
+# With TLS via Caddy
+docker compose --profile tls up -d
+```
+
+The server exposes health endpoints for container orchestration:
+- `GET /health` - Detailed health check with all component statuses
+- `GET /healthz` - Liveness probe (200 OK or 503)
+- `GET /readyz` - Readiness probe (includes connectivity check if enabled)
+
 ## Configuration
 
 ### Environment Variables
@@ -122,6 +151,14 @@ uv sync
 | `LM_API_VERSION` | No | `3` | API version |
 | `LM_TIMEOUT` | No | `30` | Request timeout in seconds (range: 5-300) |
 | `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited/server error requests (range: 0-10) |
+| `LM_TRANSPORT` | No | `stdio` | Transport mode: `stdio` (local) or `http` (remote) |
+| `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address |
+| `LM_HTTP_PORT` | No | `8080` | HTTP server port |
+| `LM_CORS_ORIGINS` | No | `*` | Comma-separated CORS origins |
+| `LM_SESSION_ENABLED` | No | `true` | Enable session context tracking |
+| `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
+| `LM_FIELD_VALIDATION` | No | `warn` | Field validation: `off`, `warn`, or `error` |
+| `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -620,6 +657,17 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_oids` | List SNMP OIDs | No |
 | `get_oid` | Get detailed OID information | No |
 
+### Session Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_session_context` | Get current session state (last results, variables, history) | No |
+| `set_session_variable` | Store a named variable in the session | No |
+| `get_session_variable` | Retrieve a session variable | No |
+| `delete_session_variable` | Delete a session variable | No |
+| `clear_session_context` | Reset all session state | No |
+| `list_session_history` | List recent tool call history | No |
+
 ## MCP Resources
 
 The server exposes 15 resources for API reference:
@@ -773,9 +821,12 @@ src/lm_mcp/
 ├── __init__.py           # Package exports
 ├── config.py             # Environment-based configuration
 ├── exceptions.py         # Exception hierarchy
+├── health.py             # Health check endpoints
 ├── logging.py            # Structured logging
 ├── server.py             # MCP server entry point
+├── session.py            # Session context management
 ├── registry.py           # Tool definitions and handlers
+├── validation.py         # Field validation with suggestions
 ├── auth/
 │   ├── __init__.py       # Auth provider factory
 │   ├── bearer.py         # Bearer token auth
@@ -792,6 +843,9 @@ src/lm_mcp/
 │   ├── schemas.py        # Schema content
 │   ├── enums.py          # Enum content
 │   └── filters.py        # Filter content
+├── transport/
+│   ├── __init__.py       # Transport abstraction
+│   └── http.py           # HTTP/SSE transport
 └── tools/
     ├── __init__.py       # Tool utilities
     ├── alerts.py         # Alert management
@@ -805,8 +859,15 @@ src/lm_mcp/
     ├── ingestion.py      # Log/metric ingestion
     ├── metrics.py        # Metrics and data
     ├── sdts.py           # SDT management
+    ├── session.py        # Session management tools
     ├── websites.py       # Website CRUD
     └── ...               # Additional tool modules
+
+deploy/
+├── Dockerfile            # Production Docker image
+├── docker-compose.yml    # Full stack deployment
+├── Caddyfile             # TLS proxy configuration
+└── .env.example          # Environment template
 ```
 
 ## Troubleshooting
