@@ -4,6 +4,7 @@
 import asyncio
 import json
 import random
+import time
 
 import httpx
 
@@ -16,6 +17,7 @@ from lm_mcp.exceptions import (
     RateLimitError,
     ServerError,
 )
+from lm_mcp.logging import log_api_request, log_api_response
 
 
 class LogicMonitorClient:
@@ -167,10 +169,13 @@ class LogicMonitorClient:
         body_str = json.dumps(json_body) if json_body else ""
         headers = self._get_headers(method, path, body_str)
 
+        log_api_request(method, path, params)
+
         last_retry_after: int | None = None
         last_message = "Rate limited"
 
         for attempt in range(self.max_retries + 1):
+            request_start = time.monotonic()
             try:
                 response = await self._client.request(
                     method=method,
@@ -202,6 +207,8 @@ class LogicMonitorClient:
                 message, retry_after = self._parse_error_response(response)
                 self._raise_for_status(response, message, retry_after)
 
+            elapsed = time.monotonic() - request_start
+            log_api_response(response.status_code, elapsed, path)
             return response.json()
 
         raise RateLimitError(last_message, retry_after=last_retry_after)

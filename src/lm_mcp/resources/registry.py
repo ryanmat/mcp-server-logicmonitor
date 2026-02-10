@@ -9,6 +9,7 @@ from mcp.types import Resource
 
 from lm_mcp.resources.enums import get_enum_content
 from lm_mcp.resources.filters import get_filter_content
+from lm_mcp.resources.guides import get_guide_content
 from lm_mcp.resources.schemas import get_schema_content
 
 # MCP Resource definitions for LogicMonitor API schemas
@@ -42,6 +43,42 @@ RESOURCES: list[Resource] = [
         uri="lm://schema/collectors",
         name="Collector Schema",
         description="LogicMonitor collector object fields",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://schema/escalations",
+        name="Escalation Chain Schema",
+        description="LogicMonitor escalation chain object fields",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://schema/reports",
+        name="Report Schema",
+        description="LogicMonitor report object fields",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://schema/websites",
+        name="Website Schema",
+        description="LogicMonitor website check object fields",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://schema/datasources",
+        name="DataSource Schema",
+        description="LogicMonitor DataSource definition fields",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://schema/users",
+        name="User Schema",
+        description="LogicMonitor user object fields",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://schema/audit",
+        name="Audit Log Schema",
+        description="LogicMonitor audit log entry fields",
         mimeType="application/json",
     ),
     # Enum resources - valid values for specific fields
@@ -106,6 +143,19 @@ RESOURCES: list[Resource] = [
         description="LogicMonitor API filter operators: :, ~, >, <, !:, !~, >:, <:",
         mimeType="application/json",
     ),
+    # Guide resources - help AI agents pick tools and construct queries
+    Resource(
+        uri="lm://guide/tool-categories",
+        name="Tool Categories",
+        description="All 152 LogicMonitor MCP tools organized by domain category",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://guide/examples",
+        name="Common Query Examples",
+        description="Common filter patterns and query examples for LogicMonitor API",
+        mimeType="application/json",
+    ),
 ]
 
 
@@ -144,6 +194,8 @@ def get_resource_content(uri: str) -> str:
     elif resource_type == "syntax":
         if resource_name == "operators":
             content = get_filter_content("operators")
+    elif resource_type == "guide":
+        content = get_guide_content(resource_name)
 
     if content is None:
         raise ValueError(f"Resource not found: {uri}")

@@ -1527,3 +1527,32 @@ class TestAlertRulesWorkflow:
         assert len(rule_result) == 1
         assert "Primary On-Call" in rule_result[0].text
         assert "production" in rule_result[0].text
+
+
+class TestServerCallToolFlow:
+    """Test the server call_tool dispatch: list_tools -> call_tool -> response."""
+
+    def test_list_tools_returns_all_registered(self):
+        """list_tools returns the full set of registered tools."""
+        from lm_mcp.registry import TOOLS
+
+        assert len(TOOLS) == 152
+        tool_names = {t.name for t in TOOLS}
+        assert "get_devices" in tool_names
+        assert "get_alerts" in tool_names
+        assert "create_device" in tool_names
+
+    def test_get_tool_handler_valid_tool(self):
+        """get_tool_handler returns a callable for a valid tool name."""
+        from lm_mcp.registry import get_tool_handler
+
+        handler = get_tool_handler("get_devices")
+        assert callable(handler)
+        assert handler.__name__ == "get_devices"
+
+    def test_get_tool_handler_invalid_tool(self):
+        """get_tool_handler raises ValueError for unknown tool."""
+        from lm_mcp.registry import get_tool_handler
+
+        with pytest.raises(ValueError, match="Unknown tool"):
+            get_tool_handler("nonexistent_tool")

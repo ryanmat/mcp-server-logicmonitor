@@ -33,6 +33,7 @@ class LMConfig(BaseSettings):
         LM_ENABLED_TOOLS: Comma-separated tool names or glob patterns to enable (default: all)
         LM_DISABLED_TOOLS: Comma-separated tool names or glob patterns to disable (default: none)
         LM_HEALTH_CHECK_CONNECTIVITY: Include LM API ping in health checks (default: false)
+        LM_LOG_LEVEL: Logging level - debug, info, warning, or error (default: warning)
 
     Authentication:
         Either bearer_token OR both (access_id AND access_key) must be provided.
@@ -68,6 +69,9 @@ class LMConfig(BaseSettings):
 
     # Health check settings
     health_check_connectivity: bool = False
+
+    # Logging settings
+    log_level: Literal["debug", "info", "warning", "error"] = "warning"
 
     model_config = {
         "env_prefix": "LM_",

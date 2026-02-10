@@ -46,7 +46,9 @@ async def get_batchjobs(
             wildcards_stripped = wildcards_stripped or was_modified
             filters.append(f'name~{quote_filter_value(clean_name)}')
         if status:
-            filters.append(f'status:{quote_filter_value(status)}')
+            clean_status, was_modified = sanitize_filter_value(status)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'status:{quote_filter_value(clean_status)}')
 
         if filters:
             params["filter"] = ",".join(filters)

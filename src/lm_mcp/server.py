@@ -104,6 +104,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     import logging
 
     from lm_mcp.config import LMConfig
+    from lm_mcp.logging import is_write_tool, log_write_operation
     from lm_mcp.session import get_session
     from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
 
@@ -207,6 +208,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             client = get_client()
             result = await handler(client, **arguments)
 
+        # Audit trail for write operations
+        if is_write_tool(name):
+            log_write_operation(name, arguments, success=True)
+
         # Record result in session if enabled
         if config.session_enabled and name not in SESSION_TOOLS:
             session = get_session()
@@ -222,8 +227,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         return result
     except ValueError as e:
+        if is_write_tool(name):
+            log_write_operation(name, arguments, success=False)
         return [TextContent(type="text", text=f"Error: {e}")]
     except Exception as e:
+        if is_write_tool(name):
+            log_write_operation(name, arguments, success=False)
         return [TextContent(type="text", text=f"Error executing {name}: {e}")]
 
 
