@@ -87,7 +87,8 @@ class TestGetBatchjobs:
         await get_batchjobs(client, name_filter="Backup*")
 
         assert "filter" in route.calls[0].request.url.params
-        assert "name~Backup*" in route.calls[0].request.url.params.get("filter", "")
+        # Wildcards are stripped by sanitize_filter_value
+        assert "name~Backup" in route.calls[0].request.url.params.get("filter", "")
 
 
 class TestGetBatchjob:

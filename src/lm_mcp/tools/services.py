@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -30,9 +30,12 @@ async def get_services(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if name_filter:
-            params["filter"] = f"name~{name_filter}"
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"name~{clean_name}"
 
         result = await client.get("/service/services", params=params)
 
@@ -50,13 +53,14 @@ async def get_services(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(services),
-                "services": services,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(services),
+            "services": services,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -111,9 +115,12 @@ async def get_service_groups(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if name_filter:
-            params["filter"] = f"name~{name_filter}"
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"name~{clean_name}"
 
         result = await client.get("/service/groups", params=params)
 
@@ -130,12 +137,13 @@ async def get_service_groups(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(groups),
-                "service_groups": groups,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(groups),
+            "service_groups": groups,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

@@ -11,9 +11,36 @@ from mcp.types import TextContent
 
 from lm_mcp.exceptions import LMError
 
-__all__ = ["format_response", "handle_error", "require_write_permission"]
+__all__ = ["format_response", "handle_error", "require_write_permission", "sanitize_filter_value"]
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+# Wildcard note appended to response when filter values are sanitized
+WILDCARD_STRIP_NOTE = (
+    "Wildcard characters were removed from filter value. "
+    "The ~ operator performs substring matching automatically — no wildcards needed."
+)
+
+
+def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]:
+    """Strip wildcard characters (* and ?) from a filter value.
+
+    The LogicMonitor ~ operator already performs substring matching,
+    so wildcards are unnecessary and cause issues when URL-encoded.
+
+    Args:
+        value: The filter value to sanitize. May be None.
+
+    Returns:
+        Tuple of (cleaned_value, was_modified). was_modified is True
+        if any wildcard characters were removed.
+    """
+    if value is None:
+        return None, False
+
+    cleaned = value.replace("*", "").replace("?", "")
+    was_modified = cleaned != value
+    return cleaned, was_modified
 
 
 def format_response(data: Any) -> list[TextContent]:

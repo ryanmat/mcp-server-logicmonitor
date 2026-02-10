@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    require_write_permission,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -32,10 +38,13 @@ async def get_alert_rules(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         filters = []
         if name_filter:
-            filters.append(f"name~{name_filter}")
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"name~{clean_name}")
         if priority_filter is not None:
             filters.append(f"priority:{priority_filter}")
 
@@ -62,13 +71,14 @@ async def get_alert_rules(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(rules),
-                "alert_rules": rules,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(rules),
+            "alert_rules": rules,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

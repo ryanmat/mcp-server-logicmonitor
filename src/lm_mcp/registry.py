@@ -22,7 +22,7 @@ TOOLS.extend(
                     "group_id": {"type": "integer", "description": "Filter by device group ID"},
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by device name (supports wildcards)",
+                        "description": "Filter by device name (substring match)",
                     },
                     "status": {
                         "type": "string",
@@ -63,7 +63,7 @@ TOOLS.extend(
                     "parent_id": {"type": "integer", "description": "Filter by parent group ID"},
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by group name (wildcards)",
+                        "description": "Filter by group name (substring match)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
@@ -207,19 +207,19 @@ TOOLS.extend(
                     },
                     "datapoint": {
                         "type": "string",
-                        "description": "Filter by datapoint name (supports wildcards)",
+                        "description": "Filter by datapoint name (substring match)",
                     },
                     "instance": {
                         "type": "string",
-                        "description": "Filter by instance name (supports wildcards)",
+                        "description": "Filter by instance name (substring match)",
                     },
                     "datasource": {
                         "type": "string",
-                        "description": "Filter by datasource/template name (supports wildcards)",
+                        "description": "Filter by datasource/template name (substring match)",
                     },
                     "device": {
                         "type": "string",
-                        "description": "Filter by device name (supports wildcards)",
+                        "description": "Filter by device name (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -322,7 +322,7 @@ TOOLS.extend(
                     },
                     "admin": {
                         "type": "string",
-                        "description": "Filter by admin username (wildcards)",
+                        "description": "Filter by admin username (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -447,7 +447,7 @@ TOOLS.extend(
                 "properties": {
                     "hostname_filter": {
                         "type": "string",
-                        "description": "Filter by hostname (supports wildcards)",
+                        "description": "Filter by hostname (substring match)",
                     },
                     "collector_group_id": {
                         "type": "integer",
@@ -482,7 +482,7 @@ TOOLS.extend(
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by name (supports wildcards)",
+                        "description": "Filter by name (substring)",
                     },
                     "filter": {
                         "type": "string",
@@ -586,7 +586,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "group_id": {"type": "integer", "description": "Filter by group ID"},
                     "filter": {
                         "type": "string",
@@ -776,7 +776,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "group_id": {"type": "integer", "description": "Filter by website group ID"},
                     "filter": {
                         "type": "string",
@@ -928,7 +928,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "group_id": {"type": "integer", "description": "Filter by group ID"},
                     "report_type": {"type": "string", "description": "Filter by type"},
                     "filter": {
@@ -958,7 +958,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -1294,7 +1294,7 @@ TOOLS.extend(
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by username (supports wildcards)",
+                        "description": "Filter by username (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -1325,7 +1325,7 @@ TOOLS.extend(
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by role name (supports wildcards)",
+                        "description": "Filter by role name (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -1461,7 +1461,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1499,7 +1499,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1531,7 +1531,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1563,7 +1563,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1595,7 +1595,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1627,7 +1627,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1715,7 +1715,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },

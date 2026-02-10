@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    require_write_permission,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -43,6 +49,7 @@ async def list_sdts(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
         if filter:
@@ -57,7 +64,9 @@ async def list_sdts(
             if sdt_type:
                 filters.append(f"type:{sdt_type}")
             if admin:
-                filters.append(f"admin~{admin}")
+                clean_admin, was_modified = sanitize_filter_value(admin)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"admin~{clean_admin}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -77,13 +86,14 @@ async def list_sdts(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(sdts),
-                "sdts": sdts,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(sdts),
+            "sdts": sdts,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    require_write_permission,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -32,12 +38,17 @@ async def get_audit_logs(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         filters = []
         if username_filter:
-            filters.append(f"username~{username_filter}")
+            clean_username, was_modified = sanitize_filter_value(username_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"username~{clean_username}")
         if keyword_filter:
-            filters.append(f"_all~*{keyword_filter}*")
+            clean_keyword, was_modified = sanitize_filter_value(keyword_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"_all~{clean_keyword}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -58,13 +69,14 @@ async def get_audit_logs(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(entries),
-                "audit_logs": entries,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(entries),
+            "audit_logs": entries,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -86,9 +98,12 @@ async def get_ops_notes(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if tag_filter:
-            params["filter"] = f"tags~{tag_filter}"
+            clean_tag, was_modified = sanitize_filter_value(tag_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"tags~{clean_tag}"
 
         result = await client.get("/setting/opsnotes", params=params)
 
@@ -105,13 +120,14 @@ async def get_ops_notes(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(notes),
-                "ops_notes": notes,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(notes),
+            "ops_notes": notes,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -40,6 +40,7 @@ async def get_collectors(
     """
     try:
         params: dict = {"size": limit, "offset": offset}
+        wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
         if filter:
@@ -48,7 +49,9 @@ async def get_collectors(
             # Build filter from named parameters
             filters = []
             if hostname_filter:
-                filters.append(f"hostname~{hostname_filter}")
+                clean_hostname, was_modified = sanitize_filter_value(hostname_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"hostname~{clean_hostname}")
             if collector_group_id is not None:
                 filters.append(f"collectorGroupId:{collector_group_id}")
 
@@ -71,15 +74,16 @@ async def get_collectors(
         total = result.get("total", 0)
         has_more = (offset + len(collectors)) < total
 
-        return format_response(
-            {
-                "total": total,
-                "count": len(collectors),
-                "offset": offset,
-                "has_more": has_more,
-                "collectors": collectors,
-            }
-        )
+        response = {
+            "total": total,
+            "count": len(collectors),
+            "offset": offset,
+            "has_more": has_more,
+            "collectors": collectors,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -129,12 +133,15 @@ async def get_collector_groups(
     """
     try:
         params: dict = {"size": limit, "offset": offset}
+        wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
         if filter:
             params["filter"] = filter
         elif name_filter:
-            params["filter"] = f"name~{name_filter}"
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"name~{clean_name}"
 
         result = await client.get("/setting/collector/groups", params=params)
 
@@ -151,13 +158,14 @@ async def get_collector_groups(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(groups),
-                "collector_groups": groups,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(groups),
+            "collector_groups": groups,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
