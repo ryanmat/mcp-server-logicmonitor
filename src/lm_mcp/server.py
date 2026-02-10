@@ -2,6 +2,7 @@
 # Description: Provides stdio transport for AI assistant integration.
 
 import asyncio
+from fnmatch import fnmatch
 
 from mcp.server import Server
 from mcp.types import CompleteResult, GetPromptResult, TextContent
@@ -45,10 +46,36 @@ def _set_client(client: LogicMonitorClient) -> None:
     _client = client
 
 
+def _filter_tools(tools: list, config) -> list:
+    """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
+
+    Supports comma-separated tool names and glob patterns (e.g., "get_*", "delete_*").
+
+    Args:
+        tools: Full list of Tool objects.
+        config: LMConfig instance with enabled_tools/disabled_tools.
+
+    Returns:
+        Filtered list of Tool objects.
+    """
+    if config.enabled_tools:
+        patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
+        return [t for t in tools if any(fnmatch(t.name, pat) for pat in patterns)]
+
+    if config.disabled_tools:
+        patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
+        return [t for t in tools if not any(fnmatch(t.name, pat) for pat in patterns)]
+
+    return tools
+
+
 @server.list_tools()
 async def list_tools():
-    """Return all available LogicMonitor tools."""
-    return TOOLS
+    """Return available LogicMonitor tools, filtered by config."""
+    from lm_mcp.config import LMConfig
+
+    config = LMConfig()
+    return _filter_tools(TOOLS, config)
 
 
 # Session tools that don't require the LM client
@@ -85,6 +112,28 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     try:
         handler = get_tool_handler(name)
+
+        # Reject calls to filtered-out tools
+        if config.enabled_tools:
+            patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
+            if not any(fnmatch(name, pat) for pat in patterns):
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Error: Tool '{name}' is not enabled. "
+                        f"Enabled tools: {config.enabled_tools}",
+                    )
+                ]
+        elif config.disabled_tools:
+            patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
+            if any(fnmatch(name, pat) for pat in patterns):
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Error: Tool '{name}' is disabled. "
+                        f"Disabled tools: {config.disabled_tools}",
+                    )
+                ]
 
         # Field validation (if enabled and not a session tool)
         if config.field_validation != "off" and name not in SESSION_TOOLS:

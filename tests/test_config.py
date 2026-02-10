@@ -4,6 +4,8 @@
 import pytest
 from pydantic import ValidationError
 
+from lm_mcp.config import LMConfig
+
 
 class TestLMConfigBearer:
     """Tests for Bearer token configuration."""
@@ -257,3 +259,44 @@ class TestLMConfigHealth:
 
         config = LMConfig()
         assert config.health_check_connectivity is True
+
+
+class TestToolFilterConfig:
+    """Tests for tool filtering configuration."""
+
+    def test_enabled_tools_accepted(self, monkeypatch):
+        """LM_ENABLED_TOOLS config is accepted."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-value")
+        monkeypatch.setenv("LM_ENABLED_TOOLS", "get_devices,get_alerts")
+
+        config = LMConfig()
+        assert config.enabled_tools == "get_devices,get_alerts"
+
+    def test_disabled_tools_accepted(self, monkeypatch):
+        """LM_DISABLED_TOOLS config is accepted."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-value")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "delete_*")
+
+        config = LMConfig()
+        assert config.disabled_tools == "delete_*"
+
+    def test_mutual_exclusion_error(self, monkeypatch):
+        """Setting both enabled and disabled tools raises error."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-value")
+        monkeypatch.setenv("LM_ENABLED_TOOLS", "get_*")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "delete_*")
+
+        with pytest.raises(ValueError, match="Cannot set both"):
+            LMConfig()
+
+    def test_defaults_to_none(self, monkeypatch):
+        """Tool filters default to None (all tools enabled)."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-value")
+
+        config = LMConfig()
+        assert config.enabled_tools is None
+        assert config.disabled_tools is None
