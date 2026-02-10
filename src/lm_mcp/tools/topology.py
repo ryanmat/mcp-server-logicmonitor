@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, quote_filter_value
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    quote_filter_value,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -175,14 +181,19 @@ async def get_network_flows(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         filters = []
         if device_id:
             filters.append(f"exporterDeviceId:{device_id}")
         if source_ip:
-            filters.append(f'srcIP:{quote_filter_value(source_ip)}')
+            clean_ip, was_modified = sanitize_filter_value(source_ip)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'srcIP:{quote_filter_value(clean_ip)}')
         if dest_ip:
-            filters.append(f'dstIP:{quote_filter_value(dest_ip)}')
+            clean_ip, was_modified = sanitize_filter_value(dest_ip)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'dstIP:{quote_filter_value(clean_ip)}')
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -205,13 +216,14 @@ async def get_network_flows(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(flows),
-                "flows": flows,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(flows),
+            "flows": flows,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, quote_filter_value
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    quote_filter_value,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -30,9 +36,12 @@ async def get_cloud_cost_accounts(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if provider:
-            params["filter"] = f"provider:{quote_filter_value(provider)}"
+            clean_provider, was_modified = sanitize_filter_value(provider)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"provider:{quote_filter_value(clean_provider)}"
 
         result = await client.get("/cost/cloudaccounts", params=params)
 
@@ -49,13 +58,14 @@ async def get_cloud_cost_accounts(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(accounts),
-                "cloud_accounts": accounts,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(accounts),
+            "cloud_accounts": accounts,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -79,12 +89,15 @@ async def get_cost_recommendations(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         filters = []
         if cloud_account_id:
             filters.append(f"cloudAccountId:{cloud_account_id}")
         if recommendation_type:
-            filters.append(f"type:{quote_filter_value(recommendation_type)}")
+            clean_type, was_modified = sanitize_filter_value(recommendation_type)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"type:{quote_filter_value(clean_type)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -107,13 +120,14 @@ async def get_cost_recommendations(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(recommendations),
-                "recommendations": recommendations,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(recommendations),
+            "recommendations": recommendations,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -206,12 +220,15 @@ async def get_idle_resources(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         filters = [f"status:{quote_filter_value('idle')}"]
         if cloud_account_id:
             filters.append(f"cloudAccountId:{cloud_account_id}")
         if resource_type:
-            filters.append(f"resourceType:{quote_filter_value(resource_type)}")
+            clean_type, was_modified = sanitize_filter_value(resource_type)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"resourceType:{quote_filter_value(clean_type)}")
 
         params["filter"] = ",".join(filters)
 
@@ -232,13 +249,14 @@ async def get_idle_resources(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(resources),
-                "idle_resources": resources,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(resources),
+            "idle_resources": resources,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

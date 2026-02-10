@@ -50,9 +50,13 @@ async def get_audit_logs(
 
         filters = []
         if username:
-            filters.append(f'username:{quote_filter_value(username)}')
+            clean_username, was_modified = sanitize_filter_value(username)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'username:{quote_filter_value(clean_username)}')
         if action:
-            filters.append(f'happenedOn:{quote_filter_value(action)}')
+            clean_action, was_modified = sanitize_filter_value(action)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'happenedOn:{quote_filter_value(clean_action)}')
         if resource_type:
             clean_type, was_modified = sanitize_filter_value(resource_type)
             wildcards_stripped = wildcards_stripped or was_modified
@@ -170,9 +174,13 @@ async def get_login_audit(
     try:
         params: dict = {"size": limit}
 
+        wildcards_stripped = False
+
         filters = [f'happenedOn:{quote_filter_value("login")}']
         if username:
-            filters.append(f'username:{quote_filter_value(username)}')
+            clean_username, was_modified = sanitize_filter_value(username)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'username:{quote_filter_value(clean_username)}')
 
         params["filter"] = ",".join(filters)
 
@@ -200,13 +208,14 @@ async def get_login_audit(
                 }
             )
 
-        return format_response(
-            {
-                "total": len(logs),
-                "count": len(logs),
-                "login_logs": logs,
-            }
-        )
+        response = {
+            "total": len(logs),
+            "count": len(logs),
+            "login_logs": logs,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -234,7 +243,9 @@ async def get_change_audit(
 
         filters = []
         if change_type:
-            filters.append(f'happenedOn:{quote_filter_value(change_type)}')
+            clean_type, was_modified = sanitize_filter_value(change_type)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f'happenedOn:{quote_filter_value(clean_type)}')
         if resource_type:
             clean_type, was_modified = sanitize_filter_value(resource_type)
             wildcards_stripped = wildcards_stripped or was_modified

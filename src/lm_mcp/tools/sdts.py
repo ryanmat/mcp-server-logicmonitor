@@ -63,7 +63,9 @@ async def list_sdts(
             if device_group_id is not None:
                 filters.append(f"deviceGroupId:{device_group_id}")
             if sdt_type:
-                filters.append(f'type:{quote_filter_value(sdt_type)}')
+                clean_type, was_modified = sanitize_filter_value(sdt_type)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f'type:{quote_filter_value(clean_type)}')
             if admin:
                 clean_admin, was_modified = sanitize_filter_value(admin)
                 wildcards_stripped = wildcards_stripped or was_modified
