@@ -97,7 +97,7 @@ class TestGetAlertRules:
 
         assert "filter" in route.calls[0].request.url.params
         # Wildcards are stripped by sanitize_filter_value
-        assert "name~Critical" in route.calls[0].request.url.params["filter"]
+        assert 'name~"Critical"' in route.calls[0].request.url.params["filter"]
 
     @respx.mock
     async def test_get_alert_rules_with_priority_filter(self, client):

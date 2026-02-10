@@ -112,7 +112,7 @@ class TestWildcardNoteInResponse:
         assert "wildcard" in data["note"].lower() or "Wildcard" in data["note"]
         # Verify the actual filter sent to API has no wildcard
         params = dict(route.calls[0].request.url.params)
-        assert "displayName~prod" == params["filter"]
+        assert 'displayName~"prod"' == params["filter"]
 
     @respx.mock
     async def test_clean_input_no_note(self, client):
@@ -142,7 +142,7 @@ class TestWildcardNoteInResponse:
         data = json.loads(result[0].text)
         assert "note" in data
         params = dict(route.calls[0].request.url.params)
-        assert "name~CPU" == params["filter"]
+        assert 'name~"CPU"' == params["filter"]
 
     @respx.mock
     async def test_alerts_device_wildcard_note(self, client):
@@ -158,7 +158,7 @@ class TestWildcardNoteInResponse:
         data = json.loads(result[0].text)
         assert "note" in data
         params = dict(route.calls[0].request.url.params)
-        assert "monitorObjectName~server" == params["filter"]
+        assert 'monitorObjectName~"server"' == params["filter"]
 
     @respx.mock
     async def test_collectors_wildcard_note(self, client):
@@ -174,7 +174,7 @@ class TestWildcardNoteInResponse:
         data = json.loads(result[0].text)
         assert "note" in data
         params = dict(route.calls[0].request.url.params)
-        assert "hostname~coll" == params["filter"]
+        assert 'hostname~"coll"' == params["filter"]
 
 
 class TestFilterValueSentToApi:
@@ -192,7 +192,7 @@ class TestFilterValueSentToApi:
         await get_devices(client, name_filter="production")
 
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "displayName~production"
+        assert params["filter"] == 'displayName~"production"'
 
     @respx.mock
     async def test_device_groups_name_filter_value(self, client):
@@ -206,7 +206,7 @@ class TestFilterValueSentToApi:
         await get_device_groups(client, name_filter="Production")
 
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "name~Production"
+        assert params["filter"] == 'name~"Production"'
 
     @respx.mock
     async def test_logsources_name_filter_value(self, client):
@@ -220,7 +220,7 @@ class TestFilterValueSentToApi:
         await get_logsources(client, name_filter="syslog")
 
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "name~syslog"
+        assert params["filter"] == 'name~"syslog"'
 
     @respx.mock
     async def test_dashboards_name_filter_value(self, client):
@@ -234,7 +234,7 @@ class TestFilterValueSentToApi:
         await get_dashboards(client, name_filter="overview")
 
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "name~overview"
+        assert params["filter"] == 'name~"overview"'
 
     @respx.mock
     async def test_websites_name_filter_value(self, client):
@@ -248,4 +248,4 @@ class TestFilterValueSentToApi:
         await get_websites(client, name_filter="portal")
 
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "name~portal"
+        assert params["filter"] == 'name~"portal"'

@@ -85,7 +85,7 @@ class TestGetAuditLogs:
         await get_audit_logs(client, username="admin")
 
         assert "filter" in route.calls[0].request.url.params
-        assert "username:admin" in route.calls[0].request.url.params.get("filter", "")
+        assert 'username:"admin"' in route.calls[0].request.url.params.get("filter", "")
 
     @respx.mock
     async def test_get_audit_logs_pagination(self, client):

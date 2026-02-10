@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
 )
@@ -57,7 +58,7 @@ async def get_websites(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{clean_name}")
+                filters.append(f'name~{quote_filter_value(clean_name)}')
             if group_id is not None:
                 filters.append(f"groupId:{group_id}")
 
@@ -179,7 +180,7 @@ async def get_website_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"name~{clean_name}")
+            filters.append(f'name~{quote_filter_value(clean_name)}')
 
         if filters:
             params["filter"] = ",".join(filters)

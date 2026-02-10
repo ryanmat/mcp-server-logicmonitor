@@ -89,7 +89,7 @@ class TestGetLogsources:
 
         assert "filter" in route.calls[0].request.url.params
         # Wildcards are stripped by sanitize_filter_value
-        assert "name~Linux" in route.calls[0].request.url.params.get("filter", "")
+        assert 'name~"Linux"' in route.calls[0].request.url.params.get("filter", "")
 
     @respx.mock
     async def test_get_logsources_handles_error(self, client):

@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
 )
@@ -44,11 +45,11 @@ async def get_audit_logs(
         if username_filter:
             clean_username, was_modified = sanitize_filter_value(username_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"username~{clean_username}")
+            filters.append(f'username~{quote_filter_value(clean_username)}')
         if keyword_filter:
             clean_keyword, was_modified = sanitize_filter_value(keyword_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"_all~{clean_keyword}")
+            filters.append(f'_all~{quote_filter_value(clean_keyword)}')
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -103,7 +104,7 @@ async def get_ops_notes(
         if tag_filter:
             clean_tag, was_modified = sanitize_filter_value(tag_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"tags~{clean_tag}"
+            params["filter"] = f'tags~{quote_filter_value(clean_tag)}'
 
         result = await client.get("/setting/opsnotes", params=params)
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, quote_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -180,9 +180,9 @@ async def get_network_flows(
         if device_id:
             filters.append(f"exporterDeviceId:{device_id}")
         if source_ip:
-            filters.append(f"srcIP:{source_ip}")
+            filters.append(f'srcIP:{quote_filter_value(source_ip)}')
         if dest_ip:
-            filters.append(f"dstIP:{dest_ip}")
+            filters.append(f'dstIP:{quote_filter_value(dest_ip)}')
 
         if filters:
             params["filter"] = ",".join(filters)

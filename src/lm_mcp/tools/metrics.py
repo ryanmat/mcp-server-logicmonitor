@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    quote_filter_value,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -37,7 +43,7 @@ async def get_device_datasources(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"dataSourceName~{clean_name}"
+            params["filter"] = f'dataSourceName~{quote_filter_value(clean_name)}'
 
         result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
 
@@ -92,7 +98,7 @@ async def get_device_instances(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"displayName~{clean_name}"
+            params["filter"] = f'displayName~{quote_filter_value(clean_name)}'
 
         result = await client.get(
             f"/device/devices/{device_id}/devicedatasources/{device_datasource_id}/instances",

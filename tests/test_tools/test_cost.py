@@ -83,7 +83,7 @@ class TestGetCloudCostAccounts:
         await get_cloud_cost_accounts(client, provider="aws")
 
         assert "filter" in route.calls[0].request.url.params
-        assert "provider:aws" in route.calls[0].request.url.params.get("filter", "")
+        assert 'provider:"aws"' in route.calls[0].request.url.params.get("filter", "")
 
 
 class TestGetCostRecommendations:
