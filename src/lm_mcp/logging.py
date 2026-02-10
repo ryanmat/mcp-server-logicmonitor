@@ -7,8 +7,9 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 
-# Module-level logger for API client operations
+# Module-level loggers
 _client_logger = logging.getLogger("lm_mcp.client")
+_audit_logger = logging.getLogger("lm_mcp.audit")
 
 
 class LogLevel(str, Enum):
@@ -272,3 +273,59 @@ def create_write_operation_event(
         "arguments": arguments,
         "success": success,
     }
+
+
+# Prefixes that identify write operations
+WRITE_TOOL_PREFIXES = (
+    "create_",
+    "update_",
+    "delete_",
+    "acknowledge_",
+    "add_",
+    "run_",
+    "bulk_",
+    "import_",
+    "ingest_",
+    "push_",
+)
+
+
+def is_write_tool(tool_name: str) -> bool:
+    """Check if a tool name indicates a write operation.
+
+    Args:
+        tool_name: MCP tool name to check.
+
+    Returns:
+        True if the tool performs write/modify operations.
+    """
+    return any(tool_name.startswith(prefix) for prefix in WRITE_TOOL_PREFIXES)
+
+
+def log_write_operation(
+    tool_name: str,
+    arguments: dict,
+    success: bool,
+) -> None:
+    """Log a write operation for audit trail purposes.
+
+    Successful operations are logged at INFO level.
+    Failed operations are logged at WARNING level.
+
+    Args:
+        tool_name: Name of the MCP tool.
+        arguments: Arguments passed to the tool.
+        success: Whether the operation succeeded.
+    """
+    if success:
+        _audit_logger.info(
+            "Write operation: %s args=%s",
+            tool_name,
+            arguments,
+        )
+    else:
+        _audit_logger.warning(
+            "Write operation failed: %s args=%s",
+            tool_name,
+            arguments,
+        )
