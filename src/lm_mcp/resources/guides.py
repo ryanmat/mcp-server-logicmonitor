@@ -1,0 +1,402 @@
+# Description: Guide resources for LogicMonitor MCP server.
+# Description: Provides tool category index and common query examples for AI agents.
+
+from __future__ import annotations
+
+# All 152 tools organized by domain category.
+# Helps AI agents pick the right tool from a large set.
+TOOL_CATEGORIES = {
+    "name": "tool-categories",
+    "description": "All LogicMonitor MCP tools organized by domain",
+    "categories": {
+        "devices": {
+            "description": "Device/resource management",
+            "tools": [
+                "get_devices",
+                "get_device",
+                "get_device_groups",
+                "create_device",
+                "update_device",
+                "delete_device",
+                "create_device_group",
+                "delete_device_group",
+                "get_device_properties",
+                "get_device_property",
+                "update_device_property",
+            ],
+        },
+        "alerts": {
+            "description": "Alert monitoring and management",
+            "tools": [
+                "get_alerts",
+                "get_alert_details",
+                "acknowledge_alert",
+                "add_alert_note",
+                "bulk_acknowledge_alerts",
+            ],
+        },
+        "alert_rules": {
+            "description": "Alert rule configuration",
+            "tools": [
+                "get_alert_rules",
+                "get_alert_rule",
+                "create_alert_rule",
+                "update_alert_rule",
+                "delete_alert_rule",
+            ],
+        },
+        "sdts": {
+            "description": "Scheduled downtime management",
+            "tools": [
+                "list_sdts",
+                "create_sdt",
+                "delete_sdt",
+                "bulk_create_device_sdt",
+                "bulk_delete_sdt",
+                "get_active_sdts",
+                "get_upcoming_sdts",
+            ],
+        },
+        "collectors": {
+            "description": "Collector status and management",
+            "tools": [
+                "get_collectors",
+                "get_collector",
+                "get_collector_groups",
+                "get_collector_group",
+            ],
+        },
+        "datasources": {
+            "description": "DataSource and instance monitoring",
+            "tools": [
+                "get_device_datasources",
+                "get_device_instances",
+                "get_device_data",
+                "get_graph_data",
+                "get_datasources",
+                "get_datasource",
+            ],
+        },
+        "dashboards": {
+            "description": "Dashboard and widget management",
+            "tools": [
+                "get_dashboards",
+                "get_dashboard",
+                "get_dashboard_widgets",
+                "get_widget",
+                "create_dashboard",
+                "update_dashboard",
+                "delete_dashboard",
+                "add_widget",
+                "update_widget",
+                "delete_widget",
+                "get_dashboard_groups",
+                "get_dashboard_group",
+            ],
+        },
+        "websites": {
+            "description": "Website monitoring",
+            "tools": [
+                "get_websites",
+                "get_website",
+                "get_website_groups",
+                "get_website_data",
+                "create_website",
+                "update_website",
+                "delete_website",
+                "create_website_group",
+                "delete_website_group",
+            ],
+        },
+        "reports": {
+            "description": "Report management and execution",
+            "tools": [
+                "get_reports",
+                "get_report",
+                "get_report_groups",
+                "get_scheduled_reports",
+                "run_report",
+                "create_report",
+                "update_report_schedule",
+                "delete_report",
+            ],
+        },
+        "escalations": {
+            "description": "Escalation chain and recipient management",
+            "tools": [
+                "get_escalation_chains",
+                "get_escalation_chain",
+                "get_recipient_groups",
+                "get_recipient_group",
+                "create_escalation_chain",
+                "update_escalation_chain",
+                "delete_escalation_chain",
+                "create_recipient_group",
+                "update_recipient_group",
+                "delete_recipient_group",
+            ],
+        },
+        "users": {
+            "description": "User, role, and access management",
+            "tools": [
+                "get_users",
+                "get_user",
+                "get_roles",
+                "get_role",
+                "get_access_groups",
+                "get_access_group",
+                "get_api_tokens",
+                "get_api_token",
+            ],
+        },
+        "topology": {
+            "description": "Network topology and connectivity",
+            "tools": [
+                "get_topology_map",
+                "get_device_neighbors",
+                "get_device_interfaces",
+                "get_network_flows",
+                "get_device_connections",
+            ],
+        },
+        "audit": {
+            "description": "Audit logs and activity tracking",
+            "tools": [
+                "get_audit_logs",
+                "get_api_token_audit",
+                "get_login_audit",
+                "get_change_audit",
+            ],
+        },
+        "cost": {
+            "description": "Cloud cost analysis and optimization",
+            "tools": [
+                "get_cost_summary",
+                "get_resource_cost",
+                "get_cost_recommendations",
+                "get_idle_resources",
+                "get_cloud_cost_accounts",
+                "get_cost_recommendation_categories",
+                "get_cost_recommendation",
+            ],
+        },
+        "logimodules": {
+            "description": "LogicModule definitions (ConfigSource, EventSource, etc.)",
+            "tools": [
+                "get_configsources",
+                "get_configsource",
+                "get_eventsources",
+                "get_eventsource",
+                "get_propertysources",
+                "get_propertysource",
+                "get_topologysources",
+                "get_topologysource",
+                "get_logsources",
+                "get_logsource",
+                "get_device_logsources",
+            ],
+        },
+        "netscans": {
+            "description": "Network scan management",
+            "tools": [
+                "get_netscans",
+                "get_netscan",
+                "run_netscan",
+            ],
+        },
+        "ops": {
+            "description": "Operations notes, OIDs, and services",
+            "tools": [
+                "get_oids",
+                "get_oid",
+                "get_services",
+                "get_service",
+                "get_service_groups",
+                "get_ops_notes",
+                "get_ops_note",
+                "add_ops_note",
+            ],
+        },
+        "batchjobs": {
+            "description": "Batch job monitoring",
+            "tools": [
+                "get_batchjobs",
+                "get_batchjob",
+                "get_batchjob_history",
+                "get_device_batchjobs",
+                "get_scheduled_downtime_jobs",
+            ],
+        },
+        "exports": {
+            "description": "Export LogicModule definitions as JSON",
+            "tools": [
+                "export_datasource",
+                "export_dashboard",
+                "export_alert_rule",
+                "export_escalation_chain",
+                "export_configsource",
+                "export_eventsource",
+                "export_propertysource",
+                "export_logsource",
+            ],
+        },
+        "imports": {
+            "description": "Import LogicModule definitions from JSON",
+            "tools": [
+                "import_datasource",
+                "import_configsource",
+                "import_eventsource",
+                "import_propertysource",
+                "import_logsource",
+                "import_topologysource",
+                "import_jobmonitor",
+                "import_appliesto_function",
+            ],
+        },
+        "ingestion": {
+            "description": "Push custom logs and metrics",
+            "tools": [
+                "ingest_logs",
+                "push_metrics",
+            ],
+        },
+        "session": {
+            "description": "Session context and variable management",
+            "tools": [
+                "get_session_context",
+                "set_session_variable",
+                "get_session_variable",
+                "delete_session_variable",
+                "clear_session_context",
+                "list_session_history",
+            ],
+        },
+    },
+}
+
+# Common filter patterns and query examples.
+# Helps AI agents construct correct API filters.
+COMMON_QUERY_EXAMPLES = {
+    "name": "examples",
+    "description": "Common LogicMonitor API filter patterns and query examples",
+    "examples": [
+        {
+            "description": "Find active critical alerts",
+            "tool": "get_alerts",
+            "filter": "severity:4,cleared:false",
+            "notes": "Severity 4 = critical. Boolean values do not need quotes.",
+        },
+        {
+            "description": "Find dead devices",
+            "tool": "get_devices",
+            "filter": 'hostStatus:1',
+            "notes": "hostStatus 1 = dead. Use get_devices with status='dead'.",
+        },
+        {
+            "description": "Find alerts for a specific device by name",
+            "tool": "get_alerts",
+            "filter": 'monitorObjectName:"server-01.example.com"',
+            "notes": "String values MUST be double-quoted in filters.",
+        },
+        {
+            "description": "Find devices by display name substring",
+            "tool": "get_devices",
+            "filter": 'displayName~"production"',
+            "notes": "The ~ operator performs substring matching. No wildcards needed.",
+        },
+        {
+            "description": "Find unacknowledged error alerts",
+            "tool": "get_alerts",
+            "filter": "severity:3,acked:false,cleared:false",
+            "notes": "Severity 3 = error. Combine multiple filters with commas.",
+        },
+        {
+            "description": "Find alerts started in last hour",
+            "tool": "get_alerts",
+            "filter": "startEpoch>:{epoch_ms}",
+            "notes": "Replace {epoch_ms} with epoch milliseconds. Use >: for greater-or-equal.",
+        },
+        {
+            "description": "Find devices in a specific group",
+            "tool": "get_devices",
+            "filter": "hostGroupIds~5",
+            "notes": "Use ~ for contains since hostGroupIds is a comma-separated list.",
+        },
+        {
+            "description": "Find active SDTs for a device",
+            "tool": "get_active_sdts",
+            "args": {"device_id": 123},
+            "notes": "get_active_sdts already filters to currently active SDTs.",
+        },
+        {
+            "description": "Find collectors by hostname",
+            "tool": "get_collectors",
+            "filter": 'hostname~"prod-collector"',
+            "notes": "Use hostname_filter parameter for substring matching.",
+        },
+        {
+            "description": "Find websites by name",
+            "tool": "get_websites",
+            "filter": 'name~"api-health"',
+            "notes": "Use name_filter parameter for substring matching.",
+        },
+        {
+            "description": "Find dashboards by owner",
+            "tool": "get_dashboards",
+            "filter": 'owner:"admin"',
+            "notes": "Exact match with : operator. String values need quotes.",
+        },
+        {
+            "description": "Get failed login attempts",
+            "tool": "get_login_audit",
+            "args": {"failed_only": True},
+            "notes": "Use failed_only=True for security review.",
+        },
+        {
+            "description": "Get idle cloud resources",
+            "tool": "get_idle_resources",
+            "args": {"resource_type": "ec2"},
+            "notes": "Filter by resource type for targeted cost review.",
+        },
+        {
+            "description": "Check device neighbors for topology context",
+            "tool": "get_device_neighbors",
+            "args": {"device_id": 123, "depth": 2},
+            "notes": "Depth 1-3 controls how many hops to traverse.",
+        },
+    ],
+    "filter_syntax": {
+        "operators": {
+            ":": "Exact match (equal)",
+            "!:": "Not equal",
+            "~": "Contains (substring match)",
+            "!~": "Not contains",
+            ">": "Greater than",
+            "<": "Less than",
+            ">:": "Greater than or equal",
+            "<:": "Less than or equal",
+        },
+        "rules": [
+            "String values MUST be wrapped in double quotes",
+            "Numeric and boolean values work without quotes",
+            "Combine filters with commas (logical AND)",
+            "The ~ operator performs substring matching; wildcards (* ?) are stripped",
+        ],
+    },
+}
+
+
+def get_guide_content(guide_name: str) -> dict | None:
+    """Get guide content by name.
+
+    Args:
+        guide_name: The guide identifier ('tool-categories' or 'examples').
+
+    Returns:
+        Guide content dict or None if not found.
+    """
+    guides = {
+        "tool-categories": TOOL_CATEGORIES,
+        "examples": COMMON_QUERY_EXAMPLES,
+    }
+    return guides.get(guide_name)

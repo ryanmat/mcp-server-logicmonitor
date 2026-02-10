@@ -199,3 +199,147 @@ class TestResourceContentStructure:
         for field_name, field_def in data["fields"].items():
             assert "operators" in field_def, f"Field {field_name} missing operators"
             assert len(field_def["operators"]) > 0
+
+
+class TestNewSchemas:
+    """Tests for the 6 new schema resources added in v1.3.0."""
+
+    def test_escalation_schema_exists(self):
+        """Escalation schema is retrievable."""
+        content = get_resource_content("lm://schema/escalations")
+        data = json.loads(content)
+        assert data["name"] == "escalations"
+        assert "fields" in data
+        assert "name" in data["fields"]
+        assert "enableThrottling" in data["fields"]
+
+    def test_report_schema_exists(self):
+        """Report schema is retrievable."""
+        content = get_resource_content("lm://schema/reports")
+        data = json.loads(content)
+        assert data["name"] == "reports"
+        assert "fields" in data
+        assert "type" in data["fields"]
+        assert "format" in data["fields"]
+
+    def test_website_schema_exists(self):
+        """Website schema is retrievable."""
+        content = get_resource_content("lm://schema/websites")
+        data = json.loads(content)
+        assert data["name"] == "websites"
+        assert "fields" in data
+        assert "domain" in data["fields"]
+        assert "pollingInterval" in data["fields"]
+
+    def test_datasource_schema_exists(self):
+        """DataSource schema is retrievable."""
+        content = get_resource_content("lm://schema/datasources")
+        data = json.loads(content)
+        assert data["name"] == "datasources"
+        assert "fields" in data
+        assert "appliesTo" in data["fields"]
+        assert "collectMethod" in data["fields"]
+
+    def test_user_schema_exists(self):
+        """User schema is retrievable."""
+        content = get_resource_content("lm://schema/users")
+        data = json.loads(content)
+        assert data["name"] == "users"
+        assert "fields" in data
+        assert "username" in data["fields"]
+        assert "email" in data["fields"]
+
+    def test_audit_schema_exists(self):
+        """Audit schema is retrievable."""
+        content = get_resource_content("lm://schema/audit")
+        data = json.loads(content)
+        assert data["name"] == "audit"
+        assert "fields" in data
+        assert "username" in data["fields"]
+        assert "happenedOn" in data["fields"]
+
+    def test_all_11_schemas_in_registry(self):
+        """All 11 schemas are registered as resources."""
+        schema_uris = [str(r.uri) for r in RESOURCES if "/schema/" in str(r.uri)]
+        assert len(schema_uris) == 11
+
+
+class TestGuideResources:
+    """Tests for guide resources (tool categories and examples)."""
+
+    def test_tool_categories_resource_exists(self):
+        """Tool categories guide resource is registered."""
+        from lm_mcp.resources.registry import get_resource_by_uri
+
+        resource = get_resource_by_uri("lm://guide/tool-categories")
+        assert resource is not None
+
+    def test_tool_categories_content(self):
+        """Tool categories content has categories with tools."""
+        content = get_resource_content("lm://guide/tool-categories")
+        data = json.loads(content)
+        assert data["name"] == "tool-categories"
+        assert "categories" in data
+        assert len(data["categories"]) > 10
+
+    def test_tool_categories_covers_all_152_tools(self):
+        """Tool categories index accounts for all 152 registered tools."""
+        from lm_mcp.registry import TOOLS
+
+        content = get_resource_content("lm://guide/tool-categories")
+        data = json.loads(content)
+
+        # Collect all tools mentioned in categories
+        categorized_tools = set()
+        for category in data["categories"].values():
+            categorized_tools.update(category["tools"])
+
+        # Collect all registered tool names
+        registered_tools = {t.name for t in TOOLS}
+
+        # Every registered tool should be in some category
+        missing = registered_tools - categorized_tools
+        assert not missing, f"Tools not in any category: {missing}"
+
+        # Every categorized tool should be a real tool
+        extra = categorized_tools - registered_tools
+        assert not extra, f"Categorized tools not in registry: {extra}"
+
+    def test_examples_resource_exists(self):
+        """Common query examples resource is registered."""
+        from lm_mcp.resources.registry import get_resource_by_uri
+
+        resource = get_resource_by_uri("lm://guide/examples")
+        assert resource is not None
+
+    def test_examples_content(self):
+        """Examples content has examples and filter syntax."""
+        content = get_resource_content("lm://guide/examples")
+        data = json.loads(content)
+        assert data["name"] == "examples"
+        assert "examples" in data
+        assert len(data["examples"]) >= 10
+        assert "filter_syntax" in data
+
+    def test_examples_have_descriptions(self):
+        """Each example has description, tool, and notes."""
+        content = get_resource_content("lm://guide/examples")
+        data = json.loads(content)
+        for example in data["examples"]:
+            assert "description" in example, f"Example missing description: {example}"
+            assert "tool" in example, f"Example missing tool: {example}"
+            assert "notes" in example, f"Example missing notes: {example}"
+
+    def test_guide_unknown_returns_not_found(self):
+        """Unknown guide raises ValueError."""
+        with pytest.raises(ValueError, match="Resource not found"):
+            get_resource_content("lm://guide/nonexistent")
+
+    def test_all_guide_resources_loadable(self):
+        """All guide resources return valid JSON."""
+        guide_uris = [str(r.uri) for r in RESOURCES if "/guide/" in str(r.uri)]
+        assert len(guide_uris) == 2
+        for uri in guide_uris:
+            content = get_resource_content(uri)
+            data = json.loads(content)
+            assert "name" in data

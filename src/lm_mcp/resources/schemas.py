@@ -451,6 +451,311 @@ COLLECTOR_SCHEMA = {
     },
 }
 
+# Escalation chain schema
+ESCALATION_SCHEMA = {
+    "name": "escalations",
+    "description": "LogicMonitor escalation chain object schema",
+    "api_endpoint": "/setting/alert/chains",
+    "fields": {
+        "id": {
+            "type": "integer",
+            "description": "Unique escalation chain identifier",
+            "filterable": True,
+        },
+        "name": {
+            "type": "string",
+            "description": "Escalation chain name",
+            "filterable": True,
+            "operators": [":", "~", "!:", "!~"],
+        },
+        "description": {
+            "type": "string",
+            "description": "Escalation chain description",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "enableThrottling": {
+            "type": "boolean",
+            "description": "Whether alert throttling is enabled",
+            "filterable": True,
+        },
+        "throttlingPeriod": {
+            "type": "integer",
+            "description": "Throttling period in minutes",
+            "filterable": False,
+        },
+        "throttlingAlerts": {
+            "type": "integer",
+            "description": "Number of alerts before throttling activates",
+            "filterable": False,
+        },
+        "inAlerting": {
+            "type": "boolean",
+            "description": "Whether chain is actively used in alerting",
+            "filterable": True,
+        },
+    },
+}
+
+# Report schema
+REPORT_SCHEMA = {
+    "name": "reports",
+    "description": "LogicMonitor report object schema",
+    "api_endpoint": "/report/reports",
+    "fields": {
+        "id": {
+            "type": "integer",
+            "description": "Unique report identifier",
+            "filterable": True,
+        },
+        "name": {
+            "type": "string",
+            "description": "Report name",
+            "filterable": True,
+            "operators": [":", "~", "!:", "!~"],
+        },
+        "type": {
+            "type": "string",
+            "description": "Report type (Alert, Host inventory, etc.)",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "groupId": {
+            "type": "integer",
+            "description": "Report group ID",
+            "filterable": True,
+        },
+        "format": {
+            "type": "string",
+            "description": "Output format (PDF, CSV, HTML)",
+            "filterable": True,
+        },
+        "description": {
+            "type": "string",
+            "description": "Report description",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "lastGenerateOn": {
+            "type": "integer",
+            "description": "Last generation timestamp (epoch seconds)",
+            "filterable": True,
+            "operators": [">", "<", ">:", "<:"],
+        },
+    },
+}
+
+# Website schema
+WEBSITE_SCHEMA = {
+    "name": "websites",
+    "description": "LogicMonitor website check object schema",
+    "api_endpoint": "/website/websites",
+    "fields": {
+        "id": {
+            "type": "integer",
+            "description": "Unique website check identifier",
+            "filterable": True,
+        },
+        "name": {
+            "type": "string",
+            "description": "Website check name",
+            "filterable": True,
+            "operators": [":", "~", "!:", "!~"],
+        },
+        "type": {
+            "type": "string",
+            "description": "Check type (webcheck, pingcheck)",
+            "filterable": True,
+        },
+        "domain": {
+            "type": "string",
+            "description": "Domain or host being monitored",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "status": {
+            "type": "string",
+            "description": "Website status (alive, dead)",
+            "filterable": True,
+        },
+        "pollingInterval": {
+            "type": "integer",
+            "description": "Check interval in minutes",
+            "filterable": True,
+        },
+        "groupId": {
+            "type": "integer",
+            "description": "Website group ID",
+            "filterable": True,
+        },
+        "isInternal": {
+            "type": "boolean",
+            "description": "Whether monitored via internal collector",
+            "filterable": True,
+        },
+        "disableAlerting": {
+            "type": "boolean",
+            "description": "Whether alerting is disabled",
+            "filterable": True,
+        },
+    },
+}
+
+# DataSource schema
+DATASOURCE_SCHEMA = {
+    "name": "datasources",
+    "description": "LogicMonitor DataSource definition schema",
+    "api_endpoint": "/setting/datasources",
+    "fields": {
+        "id": {
+            "type": "integer",
+            "description": "Unique DataSource identifier",
+            "filterable": True,
+        },
+        "name": {
+            "type": "string",
+            "description": "DataSource internal name",
+            "filterable": True,
+            "operators": [":", "~", "!:", "!~"],
+        },
+        "displayName": {
+            "type": "string",
+            "description": "DataSource display name",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "appliesTo": {
+            "type": "string",
+            "description": "AppliesTo expression controlling which devices get this DataSource",
+            "filterable": True,
+            "operators": ["~"],
+        },
+        "collectMethod": {
+            "type": "string",
+            "description": "Collection method (snmp, script, jdbc, etc.)",
+            "filterable": True,
+        },
+        "group": {
+            "type": "string",
+            "description": "DataSource group name",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "technology": {
+            "type": "string",
+            "description": "Technology category",
+            "filterable": True,
+        },
+        "hasMultiInstances": {
+            "type": "boolean",
+            "description": "Whether DataSource supports multiple instances",
+            "filterable": True,
+        },
+    },
+}
+
+# User schema
+USER_SCHEMA = {
+    "name": "users",
+    "description": "LogicMonitor user object schema",
+    "api_endpoint": "/setting/admins",
+    "fields": {
+        "id": {
+            "type": "integer",
+            "description": "Unique user identifier",
+            "filterable": True,
+        },
+        "username": {
+            "type": "string",
+            "description": "Login username",
+            "filterable": True,
+            "operators": [":", "~", "!:", "!~"],
+        },
+        "email": {
+            "type": "string",
+            "description": "User email address",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "status": {
+            "type": "string",
+            "description": "Account status (active, suspended)",
+            "filterable": True,
+        },
+        "firstName": {
+            "type": "string",
+            "description": "User first name",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "lastName": {
+            "type": "string",
+            "description": "User last name",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "roles": {
+            "type": "array",
+            "description": "Assigned role IDs and names",
+            "filterable": False,
+        },
+        "twoFAEnabled": {
+            "type": "boolean",
+            "description": "Whether two-factor authentication is enabled",
+            "filterable": True,
+        },
+    },
+}
+
+# Audit log schema
+AUDIT_SCHEMA = {
+    "name": "audit",
+    "description": "LogicMonitor audit log entry schema",
+    "api_endpoint": "/setting/accesslogs",
+    "fields": {
+        "id": {
+            "type": "integer",
+            "description": "Unique audit log entry ID",
+            "filterable": True,
+        },
+        "username": {
+            "type": "string",
+            "description": "Username who performed the action",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "ip": {
+            "type": "string",
+            "description": "Source IP address",
+            "filterable": True,
+            "operators": [":", "~"],
+        },
+        "happenedOn": {
+            "type": "string",
+            "description": "Action type (login, create, update, delete, etc.)",
+            "filterable": True,
+            "operators": [":"],
+        },
+        "happenedOnLocal": {
+            "type": "integer",
+            "description": "Timestamp of the action (epoch seconds)",
+            "filterable": True,
+            "operators": [">", "<", ">:", "<:"],
+        },
+        "description": {
+            "type": "string",
+            "description": "Human-readable description of the action",
+            "filterable": True,
+            "operators": ["~"],
+        },
+        "sessionId": {
+            "type": "string",
+            "description": "Session identifier",
+            "filterable": False,
+        },
+    },
+}
+
 # All schemas for easy iteration
 ALL_SCHEMAS = {
     "alerts": ALERT_SCHEMA,
@@ -458,6 +763,12 @@ ALL_SCHEMAS = {
     "sdts": SDT_SCHEMA,
     "dashboards": DASHBOARD_SCHEMA,
     "collectors": COLLECTOR_SCHEMA,
+    "escalations": ESCALATION_SCHEMA,
+    "reports": REPORT_SCHEMA,
+    "websites": WEBSITE_SCHEMA,
+    "datasources": DATASOURCE_SCHEMA,
+    "users": USER_SCHEMA,
+    "audit": AUDIT_SCHEMA,
 }
 
 
