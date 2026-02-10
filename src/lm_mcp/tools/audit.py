@@ -256,11 +256,14 @@ async def get_change_audit(
 
         result = await client.get("/setting/accesslogs", params=params)
 
+        # Change action keywords to match in the description field
+        change_keywords = ["create", "add", "update", "delete", "remove", "modify"]
+
         logs = []
         for item in result.get("items", []):
-            action = item.get("happenedOn", "").lower()
-            # Filter to actual changes (not logins, views, etc.)
-            if action in ["create", "add", "update", "delete", "remove", "modify"]:
+            desc = str(item.get("description", "")).lower()
+            # Filter to actual changes by checking description for action keywords
+            if any(kw in desc for kw in change_keywords):
                 logs.append(
                     {
                         "id": item.get("id"),

@@ -1,5 +1,5 @@
 # Description: Error handling tests for undertested tool modules.
-# Description: Validates 404, 500, and 403 responses for cost, topology, and batchjob tools.
+# Description: Validates error responses for cost, topology, batchjob, and audit tools.
 
 import httpx
 import pytest
@@ -133,3 +133,58 @@ class TestBatchjobToolErrors:
 
         result = await get_device_batchjobs(client, device_id=9999)
         assert "Error" in result[0].text or "error" in result[0].text.lower()
+
+
+class TestAuditToolErrors:
+    """Tests for audit tool bug fix where happenedOn is epoch int, not string."""
+
+    @respx.mock
+    async def test_get_change_audit_handles_int_happenedOn(self, client):
+        """get_change_audit handles happenedOn as epoch integer."""
+        from lm_mcp.tools.audit import get_change_audit
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "log1",
+                            "username": "admin",
+                            "happenedOn": 1702500000,
+                            "happenedOnLocal": "2023-12-14 10:00:00",
+                            "description": '"Action=Update"; "Type=Device"',
+                            "ip": "192.168.1.1",
+                        },
+                        {
+                            "id": "log2",
+                            "username": "admin",
+                            "happenedOn": 1702500060,
+                            "happenedOnLocal": "2023-12-14 10:01:00",
+                            "description": "User logged in",
+                            "ip": "192.168.1.1",
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        result = await get_change_audit(client)
+        assert len(result) == 1
+        # Only the Update entry should be included, not the login
+        assert "Update" in result[0].text
+        assert "logged in" not in result[0].text
+
+    @respx.mock
+    async def test_get_change_audit_empty_items(self, client):
+        """get_change_audit handles empty results gracefully."""
+        from lm_mcp.tools.audit import get_change_audit
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        result = await get_change_audit(client)
+        assert len(result) == 1
+        assert "0" in result[0].text
