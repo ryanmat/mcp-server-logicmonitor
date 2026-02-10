@@ -11,7 +11,13 @@ from mcp.types import TextContent
 
 from lm_mcp.exceptions import LMError
 
-__all__ = ["format_response", "handle_error", "require_write_permission", "sanitize_filter_value"]
+__all__ = [
+    "format_response",
+    "handle_error",
+    "quote_filter_value",
+    "require_write_permission",
+    "sanitize_filter_value",
+]
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -20,6 +26,22 @@ WILDCARD_STRIP_NOTE = (
     "Wildcard characters were removed from filter value. "
     "The ~ operator performs substring matching automatically — no wildcards needed."
 )
+
+
+def quote_filter_value(value: str) -> str:
+    """Wrap a string value in double quotes for LM API v3 filter compatibility.
+
+    The LogicMonitor REST API v3 requires string filter values to be enclosed
+    in double quotes. Numeric and boolean values work without quotes, but
+    string values silently return zero results when unquoted.
+
+    Args:
+        value: The string value to quote.
+
+    Returns:
+        The value wrapped in double quotes.
+    """
+    return f'"{value}"'
 
 
 def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]:

@@ -88,7 +88,7 @@ class TestGetBatchjobs:
 
         assert "filter" in route.calls[0].request.url.params
         # Wildcards are stripped by sanitize_filter_value
-        assert "name~Backup" in route.calls[0].request.url.params.get("filter", "")
+        assert 'name~"Backup"' in route.calls[0].request.url.params.get("filter", "")
 
 
 class TestGetBatchjob:

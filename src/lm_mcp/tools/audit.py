@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    quote_filter_value,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -44,13 +50,13 @@ async def get_audit_logs(
 
         filters = []
         if username:
-            filters.append(f"username:{username}")
+            filters.append(f'username:{quote_filter_value(username)}')
         if action:
-            filters.append(f"happenedOn:{action}")
+            filters.append(f'happenedOn:{quote_filter_value(action)}')
         if resource_type:
             clean_type, was_modified = sanitize_filter_value(resource_type)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"description~{clean_type}")
+            filters.append(f'description~{quote_filter_value(clean_type)}')
         if start_time:
             filters.append(f"happenedOnLocal>:{start_time}")
         if end_time:
@@ -164,9 +170,9 @@ async def get_login_audit(
     try:
         params: dict = {"size": limit}
 
-        filters = ["happenedOn:login"]
+        filters = [f'happenedOn:{quote_filter_value("login")}']
         if username:
-            filters.append(f"username:{username}")
+            filters.append(f'username:{quote_filter_value(username)}')
 
         params["filter"] = ",".join(filters)
 
@@ -228,11 +234,11 @@ async def get_change_audit(
 
         filters = []
         if change_type:
-            filters.append(f"happenedOn:{change_type}")
+            filters.append(f'happenedOn:{quote_filter_value(change_type)}')
         if resource_type:
             clean_type, was_modified = sanitize_filter_value(resource_type)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"description~{clean_type}")
+            filters.append(f'description~{quote_filter_value(clean_type)}')
 
         if filters:
             params["filter"] = ",".join(filters)

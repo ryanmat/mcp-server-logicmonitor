@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
 )
@@ -62,11 +63,11 @@ async def list_sdts(
             if device_group_id is not None:
                 filters.append(f"deviceGroupId:{device_group_id}")
             if sdt_type:
-                filters.append(f"type:{sdt_type}")
+                filters.append(f'type:{quote_filter_value(sdt_type)}')
             if admin:
                 clean_admin, was_modified = sanitize_filter_value(admin)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"admin~{clean_admin}")
+                filters.append(f'admin~{quote_filter_value(clean_admin)}')
 
             if filters:
                 params["filter"] = ",".join(filters)

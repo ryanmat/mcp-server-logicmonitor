@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, quote_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -32,7 +32,7 @@ async def get_cloud_cost_accounts(
         params: dict = {"size": limit}
 
         if provider:
-            params["filter"] = f"provider:{provider}"
+            params["filter"] = f"provider:{quote_filter_value(provider)}"
 
         result = await client.get("/cost/cloudaccounts", params=params)
 
@@ -84,7 +84,7 @@ async def get_cost_recommendations(
         if cloud_account_id:
             filters.append(f"cloudAccountId:{cloud_account_id}")
         if recommendation_type:
-            filters.append(f"type:{recommendation_type}")
+            filters.append(f"type:{quote_filter_value(recommendation_type)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -207,11 +207,11 @@ async def get_idle_resources(
     try:
         params: dict = {"size": limit}
 
-        filters = ["status:idle"]
+        filters = [f"status:{quote_filter_value('idle')}"]
         if cloud_account_id:
             filters.append(f"cloudAccountId:{cloud_account_id}")
         if resource_type:
-            filters.append(f"resourceType:{resource_type}")
+            filters.append(f"resourceType:{quote_filter_value(resource_type)}")
 
         params["filter"] = ",".join(filters)
 

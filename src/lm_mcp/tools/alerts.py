@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
 )
@@ -116,19 +117,19 @@ async def get_alerts(
             if datapoint:
                 clean_val, was_modified = sanitize_filter_value(datapoint)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"dataPointName~{clean_val}")
+                filters.append(f'dataPointName~{quote_filter_value(clean_val)}')
             if instance:
                 clean_val, was_modified = sanitize_filter_value(instance)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"instanceName~{clean_val}")
+                filters.append(f'instanceName~{quote_filter_value(clean_val)}')
             if datasource:
                 clean_val, was_modified = sanitize_filter_value(datasource)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"resourceTemplateName~{clean_val}")
+                filters.append(f'resourceTemplateName~{quote_filter_value(clean_val)}')
             if device:
                 clean_val, was_modified = sanitize_filter_value(device)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"monitorObjectName~{clean_val}")
+                filters.append(f'monitorObjectName~{quote_filter_value(clean_val)}')
 
             if filters:
                 params["filter"] = ",".join(filters)

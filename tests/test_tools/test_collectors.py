@@ -131,7 +131,7 @@ class TestGetCollectorsFilters:
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
-        assert "hostname~prod" in params["filter"]
+        assert 'hostname~"prod"' in params["filter"]
 
     @respx.mock
     async def test_get_collectors_with_group_id(self, client):
