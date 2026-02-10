@@ -15,7 +15,7 @@ TOOLS.extend(
     [
         Tool(
             name="get_devices",
-            description="List devices from LogicMonitor with optional filtering",
+            description="List devices (resources) from LogicMonitor with optional filtering",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -45,7 +45,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device",
-            description="Get detailed information about a specific device",
+            description="Get detailed information about a specific device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -56,7 +56,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_groups",
-            description="List device groups from LogicMonitor",
+            description="List device/resource groups from LogicMonitor",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -71,7 +71,7 @@ TOOLS.extend(
         ),
         Tool(
             name="create_device",
-            description="Create a new device (requires write permission)",
+            description="Create a new device/resource (requires write permission)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -91,7 +91,7 @@ TOOLS.extend(
         ),
         Tool(
             name="update_device",
-            description="Update an existing device (requires write permission)",
+            description="Update an existing device/resource (requires write permission)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -115,7 +115,9 @@ TOOLS.extend(
         ),
         Tool(
             name="delete_device",
-            description="Delete a device (requires write permission). Uses soft delete by default.",
+            description=(
+                "Delete a device/resource (requires write permission). Soft delete by default."
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -131,7 +133,7 @@ TOOLS.extend(
         ),
         Tool(
             name="create_device_group",
-            description="Create a new device group (requires write permission)",
+            description="Create a new device/resource group (requires write permission)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -153,7 +155,7 @@ TOOLS.extend(
         ),
         Tool(
             name="delete_device_group",
-            description="Delete a device group (requires write permission). Shows impact.",
+            description="Delete a device/resource group (requires write permission). Shows impact.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -372,7 +374,9 @@ TOOLS.extend(
         ),
         Tool(
             name="bulk_create_device_sdt",
-            description="Create SDT for multiple devices (max 100, requires write permission)",
+            description=(
+                "Create SDT for multiple devices/resources (max 100, requires write permission)"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -513,7 +517,7 @@ TOOLS.extend(
     [
         Tool(
             name="get_device_datasources",
-            description="Get datasources applied to a device",
+            description="Get datasources applied to a device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -525,7 +529,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_instances",
-            description="Get instances of a datasource on a device",
+            description="Get instances of a datasource on a device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -538,7 +542,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_data",
-            description="Get metric data for a device datasource instance",
+            description="Get metric data for a device/resource datasource instance",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1410,7 +1414,7 @@ TOOLS.extend(
     [
         Tool(
             name="get_device_properties",
-            description="Get all properties of a device",
+            description="Get all properties of a device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1426,7 +1430,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_property",
-            description="Get a specific property of a device",
+            description="Get a specific property of a device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1438,7 +1442,7 @@ TOOLS.extend(
         ),
         Tool(
             name="update_device_property",
-            description="Update or create a device property (requires write permission)",
+            description="Update or create a device/resource property (requires write permission)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1655,7 +1659,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_logsources",
-            description="Get LogSources applied to a device",
+            description="Get LogSources applied to a device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1912,7 +1916,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_neighbors",
-            description="Get neighboring devices based on topology",
+            description="Get neighboring devices/resources based on topology",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1928,7 +1932,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_interfaces",
-            description="Get network interfaces for a device",
+            description="Get network interfaces for a device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1955,7 +1959,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_connections",
-            description="Get device relationships/connections",
+            description="Get device/resource relationships and connections",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2005,7 +2009,7 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_batchjobs",
-            description="Get batch jobs for a specific device",
+            description="Get batch jobs for a specific device (resource)",
             inputSchema={
                 "type": "object",
                 "properties": {

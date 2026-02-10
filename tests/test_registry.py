@@ -79,3 +79,34 @@ class TestRegistry:
             tool = next((t for t in TOOLS if t.name == tool_name), None)
             assert tool is not None, f"Tool {tool_name} not found"
             assert "100" in tool.description or "max" in tool.description.lower()
+
+    def test_device_tools_mention_resource(self):
+        """Device tools include 'resource' in description for LM UI alignment."""
+        device_tools = [
+            "get_devices",
+            "get_device",
+            "create_device",
+            "update_device",
+            "delete_device",
+            "get_device_groups",
+            "create_device_group",
+            "delete_device_group",
+            "get_device_datasources",
+            "get_device_instances",
+            "get_device_data",
+            "get_device_properties",
+            "get_device_property",
+            "update_device_property",
+            "get_device_logsources",
+            "get_device_neighbors",
+            "get_device_interfaces",
+            "get_device_connections",
+            "get_device_batchjobs",
+            "bulk_create_device_sdt",
+        ]
+        for tool_name in device_tools:
+            tool = next((t for t in TOOLS if t.name == tool_name), None)
+            assert tool is not None, f"Tool {tool_name} not found"
+            assert "resource" in tool.description.lower(), (
+                f"Tool {tool_name} description should mention 'resource': {tool.description}"
+            )
