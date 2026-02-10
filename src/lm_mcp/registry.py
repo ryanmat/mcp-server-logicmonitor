@@ -5,7 +5,30 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp.types import Tool
+from mcp.types import Tool, ToolAnnotations
+
+# Annotation presets for tool categorization
+_READ_ONLY = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+)
+_WRITE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+)
+_DELETE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
+)
+_EXPORT = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
+)
+_IMPORT = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
+)
+_SESSION_READ = ToolAnnotations(
+    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
+_SESSION_WRITE = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+)
 
 # Tool definitions organized by category
 TOOLS: list[Tool] = []
@@ -15,14 +38,15 @@ TOOLS.extend(
     [
         Tool(
             name="get_devices",
-            description="List devices from LogicMonitor with optional filtering",
+            description="List devices (resources) from LogicMonitor with optional filtering",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "group_id": {"type": "integer", "description": "Filter by device group ID"},
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by device name (supports wildcards)",
+                        "description": "Filter by device name (substring match)",
                     },
                     "status": {
                         "type": "string",
@@ -45,7 +69,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device",
-            description="Get detailed information about a specific device",
+            description="Get detailed information about a specific device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -56,14 +81,15 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_groups",
-            description="List device groups from LogicMonitor",
+            description="List device/resource groups from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "parent_id": {"type": "integer", "description": "Filter by parent group ID"},
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by group name (wildcards)",
+                        "description": "Filter by group name (substring match)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
@@ -71,7 +97,8 @@ TOOLS.extend(
         ),
         Tool(
             name="create_device",
-            description="Create a new device (requires write permission)",
+            description="Create a new device/resource (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -91,7 +118,8 @@ TOOLS.extend(
         ),
         Tool(
             name="update_device",
-            description="Update an existing device (requires write permission)",
+            description="Update an existing device/resource (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -115,7 +143,10 @@ TOOLS.extend(
         ),
         Tool(
             name="delete_device",
-            description="Delete a device (requires write permission). Uses soft delete by default.",
+            description=(
+                "Delete a device/resource (requires write permission). Soft delete by default."
+            ),
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -131,7 +162,8 @@ TOOLS.extend(
         ),
         Tool(
             name="create_device_group",
-            description="Create a new device group (requires write permission)",
+            description="Create a new device/resource group (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -153,7 +185,8 @@ TOOLS.extend(
         ),
         Tool(
             name="delete_device_group",
-            description="Delete a device group (requires write permission). Shows impact.",
+            description="Delete a device/resource group (requires write permission). Shows impact.",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -181,6 +214,7 @@ TOOLS.extend(
         Tool(
             name="get_alerts",
             description="Get alerts from LogicMonitor with optional filtering",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -207,19 +241,19 @@ TOOLS.extend(
                     },
                     "datapoint": {
                         "type": "string",
-                        "description": "Filter by datapoint name (supports wildcards)",
+                        "description": "Filter by datapoint name (substring match)",
                     },
                     "instance": {
                         "type": "string",
-                        "description": "Filter by instance name (supports wildcards)",
+                        "description": "Filter by instance name (substring match)",
                     },
                     "datasource": {
                         "type": "string",
-                        "description": "Filter by datasource/template name (supports wildcards)",
+                        "description": "Filter by datasource/template name (substring match)",
                     },
                     "device": {
                         "type": "string",
-                        "description": "Filter by device name (supports wildcards)",
+                        "description": "Filter by device name (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -238,6 +272,7 @@ TOOLS.extend(
         Tool(
             name="get_alert_details",
             description="Get detailed information about a specific alert",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -252,6 +287,7 @@ TOOLS.extend(
         Tool(
             name="acknowledge_alert",
             description="Acknowledge an alert (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -267,6 +303,7 @@ TOOLS.extend(
         Tool(
             name="add_alert_note",
             description="Add a note to an alert without acknowledging (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -282,6 +319,7 @@ TOOLS.extend(
         Tool(
             name="bulk_acknowledge_alerts",
             description="Acknowledge multiple alerts at once (max 100, requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -304,6 +342,7 @@ TOOLS.extend(
         Tool(
             name="list_sdts",
             description="List scheduled downtimes from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -322,7 +361,7 @@ TOOLS.extend(
                     },
                     "admin": {
                         "type": "string",
-                        "description": "Filter by admin username (wildcards)",
+                        "description": "Filter by admin username (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -336,6 +375,7 @@ TOOLS.extend(
         Tool(
             name="create_sdt",
             description="Create a scheduled downtime (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -362,6 +402,7 @@ TOOLS.extend(
         Tool(
             name="delete_sdt",
             description="Delete a scheduled downtime (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -372,7 +413,10 @@ TOOLS.extend(
         ),
         Tool(
             name="bulk_create_device_sdt",
-            description="Create SDT for multiple devices (max 100, requires write permission)",
+            description=(
+                "Create SDT for multiple devices/resources (max 100, requires write permission)"
+            ),
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -394,6 +438,7 @@ TOOLS.extend(
         Tool(
             name="bulk_delete_sdt",
             description="Delete multiple SDTs at once (max 100, requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -409,6 +454,7 @@ TOOLS.extend(
         Tool(
             name="get_active_sdts",
             description="Get currently active SDTs",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -421,6 +467,7 @@ TOOLS.extend(
         Tool(
             name="get_upcoming_sdts",
             description="Get SDTs scheduled to start within a time window",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -442,12 +489,13 @@ TOOLS.extend(
         Tool(
             name="get_collectors",
             description="List collectors from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "hostname_filter": {
                         "type": "string",
-                        "description": "Filter by hostname (supports wildcards)",
+                        "description": "Filter by hostname (substring match)",
                     },
                     "collector_group_id": {
                         "type": "integer",
@@ -466,6 +514,7 @@ TOOLS.extend(
         Tool(
             name="get_collector",
             description="Get detailed information about a specific collector",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -477,12 +526,13 @@ TOOLS.extend(
         Tool(
             name="get_collector_groups",
             description="List collector groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by name (supports wildcards)",
+                        "description": "Filter by name (substring)",
                     },
                     "filter": {
                         "type": "string",
@@ -497,6 +547,7 @@ TOOLS.extend(
         Tool(
             name="get_collector_group",
             description="Get details about a specific collector group",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -513,7 +564,8 @@ TOOLS.extend(
     [
         Tool(
             name="get_device_datasources",
-            description="Get datasources applied to a device",
+            description="Get datasources applied to a device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -525,7 +577,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_instances",
-            description="Get instances of a datasource on a device",
+            description="Get instances of a datasource on a device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -538,7 +591,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_data",
-            description="Get metric data for a device datasource instance",
+            description="Get metric data for a device/resource datasource instance",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -558,6 +612,7 @@ TOOLS.extend(
         Tool(
             name="get_graph_data",
             description="Get graph image data for visualization",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -583,10 +638,11 @@ TOOLS.extend(
         Tool(
             name="get_dashboards",
             description="List dashboards from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "group_id": {"type": "integer", "description": "Filter by group ID"},
                     "filter": {
                         "type": "string",
@@ -601,6 +657,7 @@ TOOLS.extend(
         Tool(
             name="get_dashboard",
             description="Get detailed information about a specific dashboard",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -612,6 +669,7 @@ TOOLS.extend(
         Tool(
             name="get_dashboard_widgets",
             description="Get widgets configured on a dashboard",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -623,6 +681,7 @@ TOOLS.extend(
         Tool(
             name="get_widget",
             description="Get details about a specific widget",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -635,6 +694,7 @@ TOOLS.extend(
         Tool(
             name="create_dashboard",
             description="Create a new dashboard (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -657,6 +717,7 @@ TOOLS.extend(
         Tool(
             name="update_dashboard",
             description="Update an existing dashboard (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -672,6 +733,7 @@ TOOLS.extend(
         Tool(
             name="delete_dashboard",
             description="Delete a dashboard (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -683,6 +745,7 @@ TOOLS.extend(
         Tool(
             name="add_widget",
             description="Add a widget to a dashboard (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -712,6 +775,7 @@ TOOLS.extend(
         Tool(
             name="update_widget",
             description="Update a widget (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -727,6 +791,7 @@ TOOLS.extend(
         Tool(
             name="delete_widget",
             description="Delete a widget from a dashboard (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -745,6 +810,7 @@ TOOLS.extend(
         Tool(
             name="get_dashboard_groups",
             description="List dashboard groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -756,6 +822,7 @@ TOOLS.extend(
         Tool(
             name="get_dashboard_group",
             description="Get details about a specific dashboard group",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -773,10 +840,11 @@ TOOLS.extend(
         Tool(
             name="get_websites",
             description="List websites from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "group_id": {"type": "integer", "description": "Filter by website group ID"},
                     "filter": {
                         "type": "string",
@@ -791,6 +859,7 @@ TOOLS.extend(
         Tool(
             name="get_website",
             description="Get detailed information about a specific website",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -802,6 +871,7 @@ TOOLS.extend(
         Tool(
             name="get_website_groups",
             description="List website groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -813,6 +883,7 @@ TOOLS.extend(
         Tool(
             name="get_website_data",
             description="Get synthetic check data for a website",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -830,6 +901,7 @@ TOOLS.extend(
         Tool(
             name="create_website",
             description="Create a website check in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -859,6 +931,7 @@ TOOLS.extend(
         Tool(
             name="update_website",
             description="Update a website check in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -884,6 +957,7 @@ TOOLS.extend(
         Tool(
             name="delete_website",
             description="Delete a website check from LogicMonitor (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -895,6 +969,7 @@ TOOLS.extend(
         Tool(
             name="create_website_group",
             description="Create a website group in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -908,6 +983,7 @@ TOOLS.extend(
         Tool(
             name="delete_website_group",
             description="Delete a website group from LogicMonitor (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -925,10 +1001,11 @@ TOOLS.extend(
         Tool(
             name="get_reports",
             description="List reports from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "group_id": {"type": "integer", "description": "Filter by group ID"},
                     "report_type": {"type": "string", "description": "Filter by type"},
                     "filter": {
@@ -944,6 +1021,7 @@ TOOLS.extend(
         Tool(
             name="get_report",
             description="Get detailed information about a specific report",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -955,10 +1033,11 @@ TOOLS.extend(
         Tool(
             name="get_report_groups",
             description="List report groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -966,6 +1045,7 @@ TOOLS.extend(
         Tool(
             name="get_scheduled_reports",
             description="Get reports with schedules configured",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -981,6 +1061,7 @@ TOOLS.extend(
         Tool(
             name="run_report",
             description="Run/execute a report (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -996,6 +1077,7 @@ TOOLS.extend(
         Tool(
             name="create_report",
             description="Create a new report (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1020,6 +1102,7 @@ TOOLS.extend(
         Tool(
             name="update_report_schedule",
             description="Update a report's schedule (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1035,6 +1118,7 @@ TOOLS.extend(
         Tool(
             name="delete_report",
             description="Delete a report (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1052,6 +1136,7 @@ TOOLS.extend(
         Tool(
             name="get_escalation_chains",
             description="List escalation chains",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1062,6 +1147,7 @@ TOOLS.extend(
         Tool(
             name="get_escalation_chain",
             description="Get details about a specific escalation chain",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1073,6 +1159,7 @@ TOOLS.extend(
         Tool(
             name="get_recipient_groups",
             description="List recipient groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1083,6 +1170,7 @@ TOOLS.extend(
         Tool(
             name="get_recipient_group",
             description="Get details about a specific recipient group",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1094,6 +1182,7 @@ TOOLS.extend(
         Tool(
             name="create_escalation_chain",
             description="Create an escalation chain (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1119,6 +1208,7 @@ TOOLS.extend(
         Tool(
             name="update_escalation_chain",
             description="Update an escalation chain (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1136,6 +1226,7 @@ TOOLS.extend(
         Tool(
             name="delete_escalation_chain",
             description="Delete an escalation chain (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1147,6 +1238,7 @@ TOOLS.extend(
         Tool(
             name="create_recipient_group",
             description="Create a recipient group (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1159,6 +1251,7 @@ TOOLS.extend(
         Tool(
             name="update_recipient_group",
             description="Update a recipient group (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1172,6 +1265,7 @@ TOOLS.extend(
         Tool(
             name="delete_recipient_group",
             description="Delete a recipient group (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1189,6 +1283,7 @@ TOOLS.extend(
         Tool(
             name="get_alert_rules",
             description="List alert rules",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1199,6 +1294,7 @@ TOOLS.extend(
         Tool(
             name="get_alert_rule",
             description="Get details about a specific alert rule",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1210,6 +1306,7 @@ TOOLS.extend(
         Tool(
             name="create_alert_rule",
             description="Create an alert rule in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1250,6 +1347,7 @@ TOOLS.extend(
         Tool(
             name="update_alert_rule",
             description="Update an alert rule in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1272,6 +1370,7 @@ TOOLS.extend(
         Tool(
             name="delete_alert_rule",
             description="Delete an alert rule from LogicMonitor (requires write permission)",
+            annotations=_DELETE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1289,12 +1388,13 @@ TOOLS.extend(
         Tool(
             name="get_users",
             description="List users from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by username (supports wildcards)",
+                        "description": "Filter by username (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -1309,6 +1409,7 @@ TOOLS.extend(
         Tool(
             name="get_user",
             description="Get details about a specific user",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1320,12 +1421,13 @@ TOOLS.extend(
         Tool(
             name="get_roles",
             description="List roles",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by role name (supports wildcards)",
+                        "description": "Filter by role name (substring match)",
                     },
                     "filter": {
                         "type": "string",
@@ -1340,6 +1442,7 @@ TOOLS.extend(
         Tool(
             name="get_role",
             description="Get details about a specific role",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1357,6 +1460,7 @@ TOOLS.extend(
         Tool(
             name="get_access_groups",
             description="List access groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1367,6 +1471,7 @@ TOOLS.extend(
         Tool(
             name="get_access_group",
             description="Get details about a specific access group",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1384,6 +1489,7 @@ TOOLS.extend(
         Tool(
             name="get_api_tokens",
             description="List API tokens",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1394,6 +1500,7 @@ TOOLS.extend(
         Tool(
             name="get_api_token",
             description="Get details about a specific API token",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1410,7 +1517,8 @@ TOOLS.extend(
     [
         Tool(
             name="get_device_properties",
-            description="Get all properties of a device",
+            description="Get all properties of a device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1426,7 +1534,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_property",
-            description="Get a specific property of a device",
+            description="Get a specific property of a device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1438,7 +1547,8 @@ TOOLS.extend(
         ),
         Tool(
             name="update_device_property",
-            description="Update or create a device property (requires write permission)",
+            description="Update or create a device/resource property (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1458,10 +1568,11 @@ TOOLS.extend(
         Tool(
             name="get_datasources",
             description="List datasources from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1479,6 +1590,7 @@ TOOLS.extend(
         Tool(
             name="get_datasource",
             description="Get details about a specific datasource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1496,10 +1608,11 @@ TOOLS.extend(
         Tool(
             name="get_configsources",
             description="List ConfigSources",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1517,6 +1630,7 @@ TOOLS.extend(
         Tool(
             name="get_configsource",
             description="Get details about a specific ConfigSource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1528,10 +1642,11 @@ TOOLS.extend(
         Tool(
             name="get_eventsources",
             description="List EventSources",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1549,6 +1664,7 @@ TOOLS.extend(
         Tool(
             name="get_eventsource",
             description="Get details about a specific EventSource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1560,10 +1676,11 @@ TOOLS.extend(
         Tool(
             name="get_propertysources",
             description="List PropertySources",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1581,6 +1698,7 @@ TOOLS.extend(
         Tool(
             name="get_propertysource",
             description="Get details about a specific PropertySource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1592,10 +1710,11 @@ TOOLS.extend(
         Tool(
             name="get_topologysources",
             description="List TopologySources",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1613,6 +1732,7 @@ TOOLS.extend(
         Tool(
             name="get_topologysource",
             description="Get details about a specific TopologySource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1624,10 +1744,11 @@ TOOLS.extend(
         Tool(
             name="get_logsources",
             description="List LogSources",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "applies_to_filter": {
                         "type": "string",
                         "description": "Filter by appliesTo expression",
@@ -1645,6 +1766,7 @@ TOOLS.extend(
         Tool(
             name="get_logsource",
             description="Get details about a specific LogSource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1655,7 +1777,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_logsources",
-            description="Get LogSources applied to a device",
+            description="Get LogSources applied to a device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1674,6 +1797,7 @@ TOOLS.extend(
         Tool(
             name="get_netscans",
             description="List network scans",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1684,6 +1808,7 @@ TOOLS.extend(
         Tool(
             name="get_netscan",
             description="Get details about a specific network scan",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1695,6 +1820,7 @@ TOOLS.extend(
         Tool(
             name="run_netscan",
             description="Execute a network scan (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1712,10 +1838,11 @@ TOOLS.extend(
         Tool(
             name="get_oids",
             description="List OID definitions",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (wildcards)"},
+                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -1723,6 +1850,7 @@ TOOLS.extend(
         Tool(
             name="get_oid",
             description="Get details about a specific OID",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1740,6 +1868,7 @@ TOOLS.extend(
         Tool(
             name="get_services",
             description="List services from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1750,6 +1879,7 @@ TOOLS.extend(
         Tool(
             name="get_service",
             description="Get details about a specific service",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1761,6 +1891,7 @@ TOOLS.extend(
         Tool(
             name="get_service_groups",
             description="List service groups",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1777,6 +1908,7 @@ TOOLS.extend(
         Tool(
             name="get_ops_notes",
             description="List ops notes",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1787,6 +1919,7 @@ TOOLS.extend(
         Tool(
             name="get_ops_note",
             description="Get details about a specific ops note",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1798,6 +1931,7 @@ TOOLS.extend(
         Tool(
             name="add_ops_note",
             description="Add an ops note (requires write permission)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1818,6 +1952,7 @@ TOOLS.extend(
         Tool(
             name="get_audit_logs",
             description="Get audit logs from LogicMonitor",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1835,6 +1970,7 @@ TOOLS.extend(
         Tool(
             name="get_api_token_audit",
             description="Get API token usage audit logs",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1850,6 +1986,7 @@ TOOLS.extend(
         Tool(
             name="get_login_audit",
             description="Get login/authentication audit logs",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1875,6 +2012,7 @@ TOOLS.extend(
         Tool(
             name="get_change_audit",
             description="Get configuration change audit logs",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1897,6 +2035,7 @@ TOOLS.extend(
         Tool(
             name="get_topology_map",
             description="Get network topology map data",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1912,7 +2051,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_neighbors",
-            description="Get neighboring devices based on topology",
+            description="Get neighboring devices/resources based on topology",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1928,7 +2068,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_interfaces",
-            description="Get network interfaces for a device",
+            description="Get network interfaces for a device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1940,6 +2081,7 @@ TOOLS.extend(
         Tool(
             name="get_network_flows",
             description="Get network flow data (NetFlow/sFlow)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1955,7 +2097,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_connections",
-            description="Get device relationships/connections",
+            description="Get device/resource relationships and connections",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1973,6 +2116,7 @@ TOOLS.extend(
         Tool(
             name="get_batchjobs",
             description="List batch jobs",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1983,6 +2127,7 @@ TOOLS.extend(
         Tool(
             name="get_batchjob",
             description="Get details about a specific batch job",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1994,6 +2139,7 @@ TOOLS.extend(
         Tool(
             name="get_batchjob_history",
             description="Get execution history for a batch job",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2005,7 +2151,8 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_batchjobs",
-            description="Get batch jobs for a specific device",
+            description="Get batch jobs for a specific device (resource)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2017,6 +2164,7 @@ TOOLS.extend(
         Tool(
             name="get_scheduled_downtime_jobs",
             description="Get batch jobs related to SDT automation",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2033,6 +2181,7 @@ TOOLS.extend(
         Tool(
             name="get_cost_summary",
             description="Get cloud cost summary",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2047,6 +2196,7 @@ TOOLS.extend(
         Tool(
             name="get_resource_cost",
             description="Get cost data for a specific resource",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2059,6 +2209,7 @@ TOOLS.extend(
         Tool(
             name="get_cost_recommendations",
             description="Get cost optimization recommendations",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2070,6 +2221,7 @@ TOOLS.extend(
         Tool(
             name="get_idle_resources",
             description="Get idle/underutilized resources",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2085,6 +2237,7 @@ TOOLS.extend(
         Tool(
             name="get_cloud_cost_accounts",
             description="Get cloud accounts with cost data",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2095,6 +2248,7 @@ TOOLS.extend(
         Tool(
             name="get_cost_recommendation_categories",
             description="Get cost recommendation categories with counts and savings",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -2103,6 +2257,7 @@ TOOLS.extend(
         Tool(
             name="get_cost_recommendation",
             description="Get a specific cost recommendation by ID (v224 API)",
+            annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2123,6 +2278,7 @@ TOOLS.extend(
         Tool(
             name="export_datasource",
             description="Export a datasource definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2134,6 +2290,7 @@ TOOLS.extend(
         Tool(
             name="export_dashboard",
             description="Export a dashboard definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2145,6 +2302,7 @@ TOOLS.extend(
         Tool(
             name="export_alert_rule",
             description="Export an alert rule definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2156,6 +2314,7 @@ TOOLS.extend(
         Tool(
             name="export_escalation_chain",
             description="Export an escalation chain definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2167,6 +2326,7 @@ TOOLS.extend(
         Tool(
             name="export_configsource",
             description="Export a ConfigSource definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2178,6 +2338,7 @@ TOOLS.extend(
         Tool(
             name="export_eventsource",
             description="Export an EventSource definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2189,6 +2350,7 @@ TOOLS.extend(
         Tool(
             name="export_propertysource",
             description="Export a PropertySource definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2200,6 +2362,7 @@ TOOLS.extend(
         Tool(
             name="export_logsource",
             description="Export a LogSource definition",
+            annotations=_EXPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2211,6 +2374,7 @@ TOOLS.extend(
         Tool(
             name="import_datasource",
             description="Import a DataSource from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2222,6 +2386,7 @@ TOOLS.extend(
         Tool(
             name="import_configsource",
             description="Import a ConfigSource from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2233,6 +2398,7 @@ TOOLS.extend(
         Tool(
             name="import_eventsource",
             description="Import an EventSource from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2244,6 +2410,7 @@ TOOLS.extend(
         Tool(
             name="import_propertysource",
             description="Import a PropertySource from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2255,6 +2422,7 @@ TOOLS.extend(
         Tool(
             name="import_logsource",
             description="Import a LogSource from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2266,6 +2434,7 @@ TOOLS.extend(
         Tool(
             name="import_topologysource",
             description="Import a TopologySource from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2277,6 +2446,7 @@ TOOLS.extend(
         Tool(
             name="import_jobmonitor",
             description="Import a JobMonitor from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2288,6 +2458,7 @@ TOOLS.extend(
         Tool(
             name="import_appliesto_function",
             description="Import an AppliesTo function from JSON (requires write permission)",
+            annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2305,6 +2476,7 @@ TOOLS.extend(
         Tool(
             name="ingest_logs",
             description="Ingest log entries into LogicMonitor (requires LMv1 auth)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2334,6 +2506,7 @@ TOOLS.extend(
         Tool(
             name="push_metrics",
             description="Push custom metrics into LogicMonitor (requires LMv1 auth)",
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2373,6 +2546,7 @@ TOOLS.extend(
         Tool(
             name="get_session_context",
             description="Get current session context (last results, variables, history)",
+            annotations=_SESSION_READ,
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -2381,6 +2555,7 @@ TOOLS.extend(
         Tool(
             name="set_session_variable",
             description="Set a user-defined session variable for use across tool calls",
+            annotations=_SESSION_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2395,6 +2570,7 @@ TOOLS.extend(
         Tool(
             name="get_session_variable",
             description="Get a user-defined session variable",
+            annotations=_SESSION_READ,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2406,6 +2582,7 @@ TOOLS.extend(
         Tool(
             name="delete_session_variable",
             description="Delete a user-defined session variable",
+            annotations=_SESSION_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2417,6 +2594,7 @@ TOOLS.extend(
         Tool(
             name="clear_session_context",
             description="Clear all session context (last results, variables, and history)",
+            annotations=_SESSION_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {},
@@ -2425,6 +2603,7 @@ TOOLS.extend(
         Tool(
             name="list_session_history",
             description="List recent tool call history",
+            annotations=_SESSION_READ,
             inputSchema={
                 "type": "object",
                 "properties": {

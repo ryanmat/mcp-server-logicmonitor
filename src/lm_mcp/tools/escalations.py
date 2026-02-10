@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    require_write_permission,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -30,9 +36,12 @@ async def get_escalation_chains(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if name_filter:
-            params["filter"] = f"name~{name_filter}"
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"name~{clean_name}"
 
         result = await client.get("/setting/alert/chains", params=params)
 
@@ -50,13 +59,14 @@ async def get_escalation_chains(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(chains),
-                "escalation_chains": chains,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(chains),
+            "escalation_chains": chains,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -143,9 +153,12 @@ async def get_recipient_groups(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if name_filter:
-            params["filter"] = f"name~{name_filter}"
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"name~{clean_name}"
 
         result = await client.get("/setting/recipientgroups", params=params)
 
@@ -160,13 +173,14 @@ async def get_recipient_groups(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(groups),
-                "recipient_groups": groups,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(groups),
+            "recipient_groups": groups,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

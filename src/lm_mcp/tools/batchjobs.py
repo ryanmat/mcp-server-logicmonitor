@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -32,10 +32,13 @@ async def get_batchjobs(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         filters = []
         if name_filter:
-            filters.append(f"name~{name_filter}")
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"name~{clean_name}")
         if status:
             filters.append(f"status:{status}")
 
@@ -59,13 +62,14 @@ async def get_batchjobs(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(jobs),
-                "batchjobs": jobs,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(jobs),
+            "batchjobs": jobs,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

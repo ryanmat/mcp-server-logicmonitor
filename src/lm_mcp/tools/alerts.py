@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    require_write_permission,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -81,6 +87,7 @@ async def get_alerts(
     """
     try:
         params: dict = {"size": min(limit, 1000), "offset": offset}
+        wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
         if filter:
@@ -107,13 +114,21 @@ async def get_alerts(
             if end_epoch is not None:
                 filters.append(f"endEpoch<:{end_epoch}")
             if datapoint:
-                filters.append(f"dataPointName~{datapoint}")
+                clean_val, was_modified = sanitize_filter_value(datapoint)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"dataPointName~{clean_val}")
             if instance:
-                filters.append(f"instanceName~{instance}")
+                clean_val, was_modified = sanitize_filter_value(instance)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"instanceName~{clean_val}")
             if datasource:
-                filters.append(f"resourceTemplateName~{datasource}")
+                clean_val, was_modified = sanitize_filter_value(datasource)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"resourceTemplateName~{clean_val}")
             if device:
-                filters.append(f"monitorObjectName~{device}")
+                clean_val, was_modified = sanitize_filter_value(device)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"monitorObjectName~{clean_val}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -135,15 +150,18 @@ async def get_alerts(
         total = result.get("total", 0)
         has_more = (offset + len(alerts)) < total
 
-        return format_response(
-            {
-                "total": total,
-                "count": len(alerts),
-                "offset": offset,
-                "has_more": has_more,
-                "alerts": alerts,
-            }
-        )
+        response = {
+            "total": total,
+            "count": len(alerts),
+            "offset": offset,
+            "has_more": has_more,
+            "alerts": alerts,
+        }
+
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

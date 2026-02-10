@@ -22,7 +22,8 @@ FILTER_OPERATORS = {
         },
         "~": {
             "name": "contains",
-            "description": "Substring/wildcard match (case-insensitive)",
+            "description": "Substring match (case-insensitive). No wildcards needed — "
+            "the ~ operator automatically matches any substring.",
             "examples": ["displayName~prod", "monitorObjectName~server"],
             "supports_types": ["string"],
         },

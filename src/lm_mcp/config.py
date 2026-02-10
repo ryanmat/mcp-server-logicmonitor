@@ -30,6 +30,8 @@ class LMConfig(BaseSettings):
         LM_SESSION_ENABLED: Enable session context tracking (default: true)
         LM_SESSION_HISTORY_SIZE: Number of tool calls to keep in history (default: 50)
         LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
+        LM_ENABLED_TOOLS: Comma-separated tool names or glob patterns to enable (default: all)
+        LM_DISABLED_TOOLS: Comma-separated tool names or glob patterns to disable (default: none)
         LM_HEALTH_CHECK_CONNECTIVITY: Include LM API ping in health checks (default: false)
 
     Authentication:
@@ -59,6 +61,10 @@ class LMConfig(BaseSettings):
 
     # Validation settings
     field_validation: Literal["off", "warn", "error"] = "warn"
+
+    # Tool filtering
+    enabled_tools: str | None = None
+    disabled_tools: str | None = None
 
     # Health check settings
     health_check_connectivity: bool = False
@@ -152,6 +158,16 @@ class LMConfig(BaseSettings):
             "Authentication required: set either LM_BEARER_TOKEN or "
             "both LM_ACCESS_ID and LM_ACCESS_KEY"
         )
+
+    @model_validator(mode="after")
+    def validate_tool_filters(self) -> "LMConfig":
+        """Validate that enabled_tools and disabled_tools are not both set."""
+        if self.enabled_tools and self.disabled_tools:
+            raise ValueError(
+                "Cannot set both LM_ENABLED_TOOLS and LM_DISABLED_TOOLS. "
+                "Use one or the other."
+            )
+        return self
 
     @property
     def has_lmv1_auth(self) -> bool:

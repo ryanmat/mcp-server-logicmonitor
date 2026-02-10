@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -40,6 +40,7 @@ async def get_datasources(
     """
     try:
         params: dict = {"size": limit, "offset": offset}
+        wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
         if filter:
@@ -48,9 +49,13 @@ async def get_datasources(
             # Build filter from named parameters
             filters = []
             if name_filter:
-                filters.append(f"name~{name_filter}")
+                clean_name, was_modified = sanitize_filter_value(name_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"name~{clean_name}")
             if applies_to_filter:
-                filters.append(f"appliesTo~{applies_to_filter}")
+                clean_val, was_modified = sanitize_filter_value(applies_to_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"appliesTo~{clean_val}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -75,15 +80,16 @@ async def get_datasources(
         total = result.get("total", 0)
         has_more = (offset + len(datasources)) < total
 
-        return format_response(
-            {
-                "total": total,
-                "count": len(datasources),
-                "offset": offset,
-                "has_more": has_more,
-                "datasources": datasources,
-            }
-        )
+        response = {
+            "total": total,
+            "count": len(datasources),
+            "offset": offset,
+            "has_more": has_more,
+            "datasources": datasources,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

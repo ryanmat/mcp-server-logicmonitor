@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import WILDCARD_STRIP_NOTE, format_response, handle_error, sanitize_filter_value
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -30,9 +30,12 @@ async def get_oids(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if oid_filter:
-            params["filter"] = f"oid~{oid_filter}"
+            clean_oid, was_modified = sanitize_filter_value(oid_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"oid~{clean_oid}"
 
         result = await client.get("/setting/oids", params=params)
 
@@ -49,13 +52,14 @@ async def get_oids(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(oids),
-                "oids": oids,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(oids),
+            "oids": oids,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

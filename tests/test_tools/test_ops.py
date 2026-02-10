@@ -86,7 +86,8 @@ class TestGetAuditLogs:
         await get_audit_logs(client, username_filter="admin*")
 
         assert "filter" in route.calls[0].request.url.params
-        assert "username~admin*" in route.calls[0].request.url.params["filter"]
+        # Wildcards are stripped by sanitize_filter_value
+        assert "username~admin" in route.calls[0].request.url.params["filter"]
 
     @respx.mock
     async def test_get_audit_logs_with_keyword_filter(self, client):
@@ -100,7 +101,8 @@ class TestGetAuditLogs:
         await get_audit_logs(client, keyword_filter="login")
 
         assert "filter" in route.calls[0].request.url.params
-        assert "_all~*login*" in route.calls[0].request.url.params["filter"]
+        # Wildcards are stripped by sanitize_filter_value
+        assert "_all~login" in route.calls[0].request.url.params["filter"]
 
 
 class TestGetOpsNotes:
@@ -159,7 +161,8 @@ class TestGetOpsNotes:
         await get_ops_notes(client, tag_filter="maintenance*")
 
         assert "filter" in route.calls[0].request.url.params
-        assert "tags~maintenance*" in route.calls[0].request.url.params["filter"]
+        # Wildcards are stripped by sanitize_filter_value
+        assert "tags~maintenance" in route.calls[0].request.url.params["filter"]
 
 
 class TestGetOpsNote:

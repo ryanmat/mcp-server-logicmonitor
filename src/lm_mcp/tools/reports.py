@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    require_write_permission,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -42,6 +48,7 @@ async def get_reports(
     """
     try:
         params: dict = {"size": limit, "offset": offset}
+        wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
         if filter:
@@ -50,11 +57,15 @@ async def get_reports(
             # Build filter from named parameters
             filters = []
             if name_filter:
-                filters.append(f"name~{name_filter}")
+                clean_name, was_modified = sanitize_filter_value(name_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"name~{clean_name}")
             if group_id is not None:
                 filters.append(f"groupId:{group_id}")
             if report_type:
-                filters.append(f"type~{report_type}")
+                clean_type, was_modified = sanitize_filter_value(report_type)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"type~{clean_type}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -80,15 +91,16 @@ async def get_reports(
         total = result.get("total", 0)
         has_more = (offset + len(reports)) < total
 
-        return format_response(
-            {
-                "total": total,
-                "count": len(reports),
-                "offset": offset,
-                "has_more": has_more,
-                "reports": reports,
-            }
-        )
+        response = {
+            "total": total,
+            "count": len(reports),
+            "offset": offset,
+            "has_more": has_more,
+            "reports": reports,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -156,9 +168,12 @@ async def get_report_groups(
     """
     try:
         params: dict = {"size": limit}
+        wildcards_stripped = False
 
         if name_filter:
-            params["filter"] = f"name~{name_filter}"
+            clean_name, was_modified = sanitize_filter_value(name_filter)
+            wildcards_stripped = wildcards_stripped or was_modified
+            params["filter"] = f"name~{clean_name}"
 
         result = await client.get("/report/groups", params=params)
 
@@ -173,13 +188,14 @@ async def get_report_groups(
                 }
             )
 
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(groups),
-                "groups": groups,
-            }
-        )
+        response = {
+            "total": result.get("total", 0),
+            "count": len(groups),
+            "groups": groups,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
