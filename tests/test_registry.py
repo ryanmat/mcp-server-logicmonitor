@@ -110,3 +110,45 @@ class TestRegistry:
             assert "resource" in tool.description.lower(), (
                 f"Tool {tool_name} description should mention 'resource': {tool.description}"
             )
+
+    def test_all_tools_have_annotations(self):
+        """All tools have ToolAnnotations defined."""
+        for tool in TOOLS:
+            assert tool.annotations is not None, f"Tool {tool.name} missing annotations"
+
+    def test_read_tools_marked_readonly(self):
+        """Read-only tools have readOnlyHint=True."""
+        read_prefixes = ("get_", "list_")
+        session_reads = {"get_session_context", "get_session_variable", "list_session_history"}
+        for tool in TOOLS:
+            if tool.name.startswith(read_prefixes) and tool.name not in session_reads:
+                assert tool.annotations.readOnlyHint is True, (
+                    f"Tool {tool.name} should be readOnlyHint=True"
+                )
+
+    def test_delete_tools_marked_destructive(self):
+        """Delete tools have destructiveHint=True."""
+        # Session deletes are not destructive in the monitoring sense
+        session_tools = {"delete_session_variable", "clear_session_context"}
+        for tool in TOOLS:
+            if tool.name.startswith("delete_") and tool.name not in session_tools:
+                assert tool.annotations.destructiveHint is True, (
+                    f"Tool {tool.name} should be destructiveHint=True"
+                )
+            if tool.name.startswith("bulk_delete_"):
+                assert tool.annotations.destructiveHint is True, (
+                    f"Tool {tool.name} should be destructiveHint=True"
+                )
+
+    def test_session_tools_not_open_world(self):
+        """Session tools have openWorldHint=False."""
+        session_tools = {
+            "get_session_context", "set_session_variable",
+            "get_session_variable", "delete_session_variable",
+            "clear_session_context", "list_session_history",
+        }
+        for tool in TOOLS:
+            if tool.name in session_tools:
+                assert tool.annotations.openWorldHint is False, (
+                    f"Session tool {tool.name} should be openWorldHint=False"
+                )
