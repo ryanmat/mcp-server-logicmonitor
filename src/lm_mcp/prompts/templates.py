@@ -172,3 +172,165 @@ Provide a plan with:
 - Risk assessment for the maintenance window
 
 Note: Creating SDTs requires write permissions (LM_ENABLE_WRITE_OPERATIONS=true)"""
+
+
+def cost_optimization_template(arguments: dict) -> str:
+    """Generate cost optimization review prompt content.
+
+    Args:
+        arguments: Prompt arguments (cloud_account_id, time_range).
+
+    Returns:
+        Prompt text for cost optimization workflow.
+    """
+    account = arguments.get("cloud_account_id", "all accounts")
+    time_range = arguments.get("time_range", "30d")
+
+    return f"""Review cloud cost optimization opportunities in LogicMonitor.
+
+Parameters:
+- Cloud account: {account}
+- Time range: {time_range}
+
+Steps to follow:
+1. Use get_cost_summary to review current spending trends
+2. Use get_cost_recommendations to identify optimization opportunities
+3. Use get_idle_resources to find underutilized or idle resources
+4. Prioritize recommendations by potential savings
+5. Cross-reference with active alerts for at-risk resources
+
+Provide a report with:
+- Current cost summary and trends
+- Top cost optimization recommendations
+- Idle resources that could be terminated or downsized
+- Estimated monthly savings if recommendations are applied
+- Risk assessment for each recommendation"""
+
+
+def audit_review_template(arguments: dict) -> str:
+    """Generate audit review prompt content.
+
+    Args:
+        arguments: Prompt arguments (hours_back, username).
+
+    Returns:
+        Prompt text for audit review workflow.
+    """
+    hours_back = arguments.get("hours_back", "24")
+    username = arguments.get("username", "all users")
+
+    return f"""Review recent activity and security events in LogicMonitor.
+
+Parameters:
+- Time window: Last {hours_back} hours
+- Username filter: {username}
+
+Steps to follow:
+1. Use get_audit_logs to retrieve recent activity
+2. Use get_login_audit with failed_only=true to identify failed login attempts
+3. Use get_change_audit to review configuration changes
+4. Look for unusual patterns: off-hours access, bulk changes, new users
+
+Provide a report with:
+- Summary of recent activity
+- Failed login attempts and source IPs
+- Configuration changes by user
+- Any suspicious or unusual activity
+- Recommendations for security improvements"""
+
+
+def alert_correlation_template(arguments: dict) -> str:
+    """Generate alert correlation analysis prompt content.
+
+    Args:
+        arguments: Prompt arguments (hours_back, severity).
+
+    Returns:
+        Prompt text for alert correlation workflow.
+    """
+    hours_back = arguments.get("hours_back", "4")
+    severity = arguments.get("severity", "all severities")
+
+    return f"""Analyze and correlate active alerts in LogicMonitor.
+
+Parameters:
+- Time window: Last {hours_back} hours
+- Severity filter: {severity}
+
+Steps to follow:
+1. Use get_alerts to retrieve recent alerts matching criteria
+2. Group alerts by device and datasource to find clusters
+3. Use get_device_neighbors to identify network proximity patterns
+4. Look for temporal correlation (alerts starting within minutes of each other)
+5. Identify potential root cause devices or network segments
+
+Provide a report with:
+- Alert clusters grouped by device and time
+- Network topology context for correlated alerts
+- Potential root cause analysis
+- Impact assessment (how many devices/services affected)
+- Recommended investigation order"""
+
+
+def collector_health_template(arguments: dict) -> str:
+    """Generate collector health review prompt content.
+
+    Args:
+        arguments: Prompt arguments (collector_group_id).
+
+    Returns:
+        Prompt text for collector health workflow.
+    """
+    group_id = arguments.get("collector_group_id", "all groups")
+
+    return f"""Review LogicMonitor collector health and status.
+
+Parameters:
+- Collector group: {group_id}
+
+Steps to follow:
+1. Use get_collectors to list all collectors and their status
+2. Check for down collectors (isDown=true)
+3. Compare collector build versions to identify outdated collectors
+4. Review collector group assignments for load balancing
+5. Check for collectors with high device counts
+
+Provide a report with:
+- Collector status summary (up/down counts)
+- Collectors running outdated versions
+- Collector group distribution and balance
+- Collectors needing attention (down, outdated, overloaded)
+- Recommended actions for collector maintenance"""
+
+
+def troubleshoot_device_template(arguments: dict) -> str:
+    """Generate device troubleshooting prompt content.
+
+    Args:
+        arguments: Prompt arguments (device_id required, hours_back).
+
+    Returns:
+        Prompt text for device troubleshooting workflow.
+    """
+    device_id = arguments.get("device_id", "unknown")
+    hours_back = arguments.get("hours_back", "24")
+
+    return f"""Troubleshoot a specific device in LogicMonitor.
+
+Parameters:
+- Device ID: {device_id}
+- Time window: Last {hours_back} hours
+
+Steps to follow:
+1. Use get_device to retrieve device details and current status
+2. Use get_alerts filtered to this device for recent alert history
+3. Use get_device_datasources to check applied monitoring
+4. Use get_device_properties to review configuration properties
+5. Check for active SDTs that might mask issues
+
+Provide a report with:
+- Device status and basic information
+- Active and recent alerts for the device
+- Datasource health and data collection status
+- Any configuration issues identified
+- Recommended troubleshooting steps"""

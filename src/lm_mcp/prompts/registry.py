@@ -12,11 +12,16 @@ from mcp.types import (
 )
 
 from lm_mcp.prompts.templates import (
+    alert_correlation_template,
     alert_summary_template,
+    audit_review_template,
     capacity_review_template,
+    collector_health_template,
+    cost_optimization_template,
     health_check_template,
     incident_triage_template,
     sdt_planning_template,
+    troubleshoot_device_template,
 )
 
 # MCP Prompt definitions for LogicMonitor workflows
@@ -96,6 +101,81 @@ PROMPTS: list[Prompt] = [
             ),
         ],
     ),
+    Prompt(
+        name="cost_optimization",
+        description="Review cloud costs, identify idle resources, and find savings opportunities",
+        arguments=[
+            PromptArgument(
+                name="cloud_account_id",
+                description="Cloud account ID to review",
+                required=False,
+            ),
+            PromptArgument(
+                name="time_range",
+                description="Time range for analysis (default: 30d)",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="audit_review",
+        description="Review recent activity, failed logins, and configuration changes",
+        arguments=[
+            PromptArgument(
+                name="hours_back",
+                description="Hours to look back (default: 24)",
+                required=False,
+            ),
+            PromptArgument(
+                name="username",
+                description="Filter by specific username",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="alert_correlation",
+        description="Correlate alerts by device, time, and network topology",
+        arguments=[
+            PromptArgument(
+                name="hours_back",
+                description="Hours to look back (default: 4)",
+                required=False,
+            ),
+            PromptArgument(
+                name="severity",
+                description="Filter by severity (critical, error, warning, info)",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="collector_health",
+        description="Review collector status, versions, and group distribution",
+        arguments=[
+            PromptArgument(
+                name="collector_group_id",
+                description="Collector group ID to review",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="troubleshoot_device",
+        description="Investigate a specific device with alerts, properties, and datasource status",
+        arguments=[
+            PromptArgument(
+                name="device_id",
+                description="Device ID to troubleshoot",
+                required=True,
+            ),
+            PromptArgument(
+                name="hours_back",
+                description="Hours to look back for alerts (default: 24)",
+                required=False,
+            ),
+        ],
+    ),
 ]
 
 
@@ -118,6 +198,11 @@ def get_prompt_messages(name: str, arguments: dict) -> GetPromptResult:
         "health_check": health_check_template,
         "alert_summary": alert_summary_template,
         "sdt_planning": sdt_planning_template,
+        "cost_optimization": cost_optimization_template,
+        "audit_review": audit_review_template,
+        "alert_correlation": alert_correlation_template,
+        "collector_health": collector_health_template,
+        "troubleshoot_device": troubleshoot_device_template,
     }
 
     if name not in templates:
