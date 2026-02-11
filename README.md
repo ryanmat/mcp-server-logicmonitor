@@ -78,8 +78,8 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **Log/Metric Ingestion**: Push logs and metrics via LMv1 authentication
 
 ### MCP Protocol Features
-- **Resources**: 15 schema/enum/filter resources for API reference
-- **Prompts**: 5 workflow templates (incident triage, health check, etc.)
+- **Resources**: 23 schema/enum/filter/guide resources for API reference
+- **Prompts**: 10 workflow templates (incident triage, cost optimization, troubleshooting, etc.)
 - **Completions**: Auto-complete for tool arguments
 
 ### Operational Features
@@ -157,6 +157,7 @@ The server exposes health endpoints for container orchestration:
 | `LM_CORS_ORIGINS` | No | `*` | Comma-separated CORS origins |
 | `LM_SESSION_ENABLED` | No | `true` | Enable session context tracking |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
+| `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error` |
 | `LM_FIELD_VALIDATION` | No | `warn` | Field validation: `off`, `warn`, or `error` |
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
 
@@ -670,7 +671,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 
 ## MCP Resources
 
-The server exposes 15 resources for API reference:
+The server exposes 23 resources for API reference:
 
 ### Schema Resources
 | URI | Description |
@@ -680,6 +681,12 @@ The server exposes 15 resources for API reference:
 | `lm://schema/sdts` | SDT (Scheduled Downtime) object fields |
 | `lm://schema/dashboards` | Dashboard object fields |
 | `lm://schema/collectors` | Collector object fields |
+| `lm://schema/escalations` | Escalation chain object fields |
+| `lm://schema/reports` | Report object fields |
+| `lm://schema/websites` | Website check object fields |
+| `lm://schema/datasources` | DataSource definition fields |
+| `lm://schema/users` | User object fields |
+| `lm://schema/audit` | Audit log entry fields |
 
 ### Enum Resources
 | URI | Description |
@@ -699,6 +706,12 @@ The server exposes 15 resources for API reference:
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
 
+### Guide Resources
+| URI | Description |
+|-----|-------------|
+| `lm://guide/tool-categories` | All 152 tools organized by domain category |
+| `lm://guide/examples` | Common filter patterns and query examples |
+
 ## MCP Prompts
 
 Pre-built workflow templates for common tasks:
@@ -710,6 +723,11 @@ Pre-built workflow templates for common tasks:
 | `health_check` | Generate environment health summary with key metrics | `include_collectors` |
 | `alert_summary` | Generate alert digest grouped by severity or resource | `group_by`, `hours_back` |
 | `sdt_planning` | Plan scheduled downtime for maintenance windows | `device_ids`, `group_id` |
+| `cost_optimization` | Analyze cloud costs, find savings opportunities | `provider`, `threshold_percent` |
+| `audit_review` | Review recent changes, logins, and security events | `hours_back`, `username` |
+| `alert_correlation` | Correlate alerts across devices to find common root causes | `severity`, `hours_back` |
+| `collector_health` | Assess collector load balancing, versions, and failover readiness | `group_id` |
+| `troubleshoot_device` | Guided troubleshooting for a specific device | `device_id` |
 
 ## Example Usage
 
@@ -837,12 +855,14 @@ src/lm_mcp/
 ├── completions/
 │   └── registry.py       # Auto-complete definitions
 ├── prompts/
-│   └── registry.py       # Workflow templates
+│   ├── registry.py       # Prompt definitions
+│   └── templates.py      # Workflow template content
 ├── resources/
 │   ├── registry.py       # Resource definitions
 │   ├── schemas.py        # Schema content
 │   ├── enums.py          # Enum content
-│   └── filters.py        # Filter content
+│   ├── filters.py        # Filter content
+│   └── guides.py         # Tool categories and query examples
 ├── transport/
 │   ├── __init__.py       # Transport abstraction
 │   └── http.py           # HTTP/SSE transport
@@ -917,6 +937,43 @@ The server automatically retries rate-limited requests with exponential backoff.
 ### Authentication Errors
 
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
+
+## Changelog
+
+### v1.3.1
+- **Fix**: `get_change_audit` no longer crashes when the API returns `happenedOn` as an epoch integer
+
+### v1.3.0
+- **New**: 5 MCP prompts: `cost_optimization`, `audit_review`, `alert_correlation`, `collector_health`, `troubleshoot_device`
+- **New**: 6 resource schemas: escalations, reports, websites, datasources, users, audit
+- **New**: 2 guide resources: tool categories index (all 152 tools) and common query examples
+- **New**: `LM_LOG_LEVEL` config for API request/response debug logging
+- **New**: Write operation audit trail (INFO-level logging for create/update/delete actions)
+- **Fix**: Wildcard sanitization applied to all 11 remaining string filter parameters across audit, cost, batchjobs, SDTs, and topology tools
+
+### v1.2.1
+- Patch release with minor fixes
+
+### v1.2.0
+- Tool filtering with `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` glob patterns
+- Export/import support for all LogicModule types
+- Cost optimization recommendation categories and detail endpoints
+
+### v1.1.0
+- HTTP transport for remote deployments via Starlette/Uvicorn
+- Session context tracking for conversational workflows
+- 6 session management tools
+- Health check endpoints for container orchestration
+- Field validation with typo suggestions
+- Docker support with optional TLS via Caddy
+
+### v1.0.0
+- Initial release with 152 tools across 22 domains
+- Bearer token and LMv1 HMAC authentication
+- Read-only by default with opt-in write operations
+- Rate limit handling with exponential backoff
+- 15 MCP resources for API reference
+- 5 MCP prompts for common workflows
 
 ## License
 
