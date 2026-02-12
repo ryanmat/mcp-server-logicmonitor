@@ -1,6 +1,8 @@
 # Description: Tests for MCP tool registry.
 # Description: Validates tool definitions and handlers.
 
+import inspect
+
 import pytest
 
 from lm_mcp.registry import TOOLS, get_tool_handler
@@ -152,3 +154,40 @@ class TestRegistry:
                 assert tool.annotations.openWorldHint is False, (
                     f"Session tool {tool.name} should be openWorldHint=False"
                 )
+
+    def test_schema_params_match_function_params(self):
+        """Schema property names must match handler function parameter names.
+
+        The MCP server dispatches tool calls as handler(client, **arguments)
+        where arguments come from the schema property names. If a schema
+        property name doesn't match the function parameter name, the call
+        fails with 'unexpected keyword argument'.
+        """
+        # Session tools don't receive a client param
+        session_tools = {
+            "get_session_context", "set_session_variable",
+            "get_session_variable", "delete_session_variable",
+            "clear_session_context", "list_session_history",
+        }
+
+        for tool in TOOLS:
+            handler = get_tool_handler(tool.name)
+            sig = inspect.signature(handler)
+            func_params = set(sig.parameters.keys())
+
+            # Remove 'client' param (injected by server, not from schema)
+            if tool.name not in session_tools:
+                func_params.discard("client")
+
+            schema_props = set(
+                tool.inputSchema.get("properties", {}).keys()
+            )
+
+            # Every schema property must be a valid function parameter
+            unexpected = schema_props - func_params
+            assert not unexpected, (
+                f"Tool '{tool.name}' schema has properties {unexpected} "
+                f"that don't match function params. "
+                f"Schema: {sorted(schema_props)}, "
+                f"Function: {sorted(func_params)}"
+            )

@@ -88,6 +88,10 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **Server Error Recovery**: Automatic retry on 5xx server errors
 - **Pagination Support**: Handle large result sets with offset-based pagination
 
+### v1.3.2 Features
+- **Tool Schema Fix**: Fixed 20 broken tools where MCP schema parameter names did not match handler function signatures, causing "unexpected keyword argument" errors at runtime
+- **Regression Test**: Schema-to-function parameter validation test prevents future mismatches
+
 ### v1.1.0 Features
 - **HTTP Transport**: Remote deployments via Starlette/Uvicorn with CORS support
 - **Session Context**: Track operation results for conversational workflows
@@ -939,6 +943,10 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.3.2
+- **Fix**: 20 MCP tools had schema parameter names that did not match their handler function signatures, causing every call via the MCP protocol to fail with "unexpected keyword argument". Affected tools: `get_device_instances`, `get_device_data`, `get_graph_data`, `get_website_data`, `get_device_properties`, `get_dashboard_groups`, `get_oids`, `add_ops_note`, `get_audit_logs`, `get_api_token_audit`, `get_login_audit`, `get_change_audit`, `get_topology_map`, `get_network_flows`, `get_batchjob`, `get_batchjob_history`, `get_cost_summary`, `get_resource_cost`, `get_cost_recommendations`, `get_idle_resources`, `export_alert_rule`, `export_escalation_chain`
+- **New**: Registry test that validates all schema property names match handler function parameter names, preventing future mismatches
 
 ### v1.3.1
 - **Fix**: `get_change_audit` no longer crashes when the API returns `happenedOn` as an epoch integer

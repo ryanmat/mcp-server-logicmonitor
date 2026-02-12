@@ -583,10 +583,13 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
-                    "datasource_id": {"type": "integer", "description": "Datasource ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID (from get_device_datasources)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
-                "required": ["device_id", "datasource_id"],
+                "required": ["device_id", "device_datasource_id"],
             },
         ),
         Tool(
@@ -597,16 +600,25 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
-                    "datasource_id": {"type": "integer", "description": "Datasource ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID (from get_device_datasources)",
+                    },
                     "instance_id": {"type": "integer", "description": "Instance ID"},
-                    "datapoint": {"type": "string", "description": "Specific datapoint name"},
-                    "period": {
-                        "type": "number",
-                        "default": 1,
-                        "description": "Time period in hours",
+                    "datapoints": {
+                        "type": "string",
+                        "description": "Comma-separated datapoint names (optional, all if omitted)",
+                    },
+                    "start_time": {
+                        "type": "integer",
+                        "description": "Start time in epoch seconds (optional)",
+                    },
+                    "end_time": {
+                        "type": "integer",
+                        "description": "End time in epoch seconds (optional)",
                     },
                 },
-                "required": ["device_id", "datasource_id", "instance_id"],
+                "required": ["device_id", "device_datasource_id", "instance_id"],
             },
         ),
         Tool(
@@ -617,16 +629,22 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
-                    "datasource_id": {"type": "integer", "description": "Datasource ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID (from get_device_datasources)",
+                    },
                     "instance_id": {"type": "integer", "description": "Instance ID"},
                     "graph_id": {"type": "integer", "description": "Graph ID"},
-                    "period": {
-                        "type": "number",
-                        "default": 24,
-                        "description": "Time period in hours",
+                    "start_time": {
+                        "type": "integer",
+                        "description": "Start time in epoch seconds (optional)",
+                    },
+                    "end_time": {
+                        "type": "integer",
+                        "description": "End time in epoch seconds (optional)",
                     },
                 },
-                "required": ["device_id", "datasource_id", "instance_id", "graph_id"],
+                "required": ["device_id", "device_datasource_id", "instance_id", "graph_id"],
             },
         ),
     ]
@@ -814,7 +832,6 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "parent_id": {"type": "integer", "description": "Filter by parent group ID"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -889,10 +906,13 @@ TOOLS.extend(
                 "properties": {
                     "website_id": {"type": "integer", "description": "Website ID"},
                     "checkpoint_id": {"type": "integer", "description": "Checkpoint ID"},
-                    "period": {
-                        "type": "number",
-                        "default": 1,
-                        "description": "Time period in hours",
+                    "start_time": {
+                        "type": "integer",
+                        "description": "Start time in epoch seconds (optional)",
+                    },
+                    "end_time": {
+                        "type": "integer",
+                        "description": "End time in epoch seconds (optional)",
                     },
                 },
                 "required": ["website_id"],
@@ -1523,10 +1543,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
-                    "property_type": {
+                    "name_filter": {
                         "type": "string",
-                        "enum": ["custom", "system", "auto", "inherit"],
-                        "description": "Filter by property type",
+                        "description": "Filter by property name (substring match)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Max results",
                     },
                 },
                 "required": ["device_id"],
@@ -1842,7 +1866,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {"type": "string", "description": "Filter by name (substring)"},
+                    "oid_filter": {"type": "string", "description": "Filter by OID (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -1936,9 +1960,17 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "note": {"type": "string", "description": "Note text"},
-                    "scope": {"type": "string", "default": "global", "description": "Note scope"},
-                    "scope_id": {"type": "integer", "description": "Scope ID (device/group ID)"},
                     "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags"},
+                    "device_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Device IDs to scope the note to",
+                    },
+                    "group_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Device group IDs to scope the note to",
+                    },
                 },
                 "required": ["note"],
             },
@@ -1956,14 +1988,22 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "username_filter": {"type": "string", "description": "Filter by username"},
-                    "action_filter": {"type": "string", "description": "Filter by action type"},
-                    "hours_back": {
+                    "username": {"type": "string", "description": "Filter by username"},
+                    "action": {"type": "string", "description": "Filter by action type"},
+                    "resource_type": {
+                        "type": "string",
+                        "description": "Filter by resource type",
+                    },
+                    "start_time": {
                         "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back",
+                        "description": "Start time in epoch seconds (optional)",
+                    },
+                    "end_time": {
+                        "type": "integer",
+                        "description": "End time in epoch seconds (optional)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1974,10 +2014,9 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "hours_back": {
+                    "token_id": {
                         "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back",
+                        "description": "Filter by API token ID",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
@@ -1990,6 +2029,7 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "username": {"type": "string", "description": "Filter by username"},
                     "success_only": {
                         "type": "boolean",
                         "default": False,
@@ -1999,11 +2039,6 @@ TOOLS.extend(
                         "type": "boolean",
                         "default": False,
                         "description": "Only failed logins",
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
@@ -2017,11 +2052,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "resource_type": {"type": "string", "description": "Filter by resource type"},
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back",
-                    },
+                    "change_type": {"type": "string", "description": "Filter by change type"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -2039,13 +2070,16 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "device_id": {"type": "integer", "description": "Center device ID"},
-                    "group_id": {"type": "integer", "description": "Filter by group ID"},
-                    "algorithm": {
-                        "type": "string",
-                        "default": "IP_ADDRESS",
-                        "description": "Layout algorithm",
+                    "device_group_id": {
+                        "type": "integer",
+                        "description": "Filter by device group ID",
                     },
+                    "include_connections": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Include connection data",
+                    },
+                    "limit": {"type": "integer", "default": 100, "description": "Max results"},
                 },
             },
         ),
@@ -2086,13 +2120,10 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
-                    "period_hours": {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Time period in hours",
-                    },
+                    "source_ip": {"type": "string", "description": "Filter by source IP"},
+                    "dest_ip": {"type": "string", "description": "Filter by destination IP"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
-                "required": ["device_id"],
             },
         ),
         Tool(
@@ -2131,9 +2162,9 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "job_id": {"type": "integer", "description": "Batch job ID"},
+                    "batchjob_id": {"type": "integer", "description": "Batch job ID"},
                 },
-                "required": ["job_id"],
+                "required": ["batchjob_id"],
             },
         ),
         Tool(
@@ -2143,10 +2174,11 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "job_id": {"type": "integer", "description": "Batch job ID"},
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "batchjob_id": {"type": "integer", "description": "Batch job ID"},
                     "limit": {"type": "integer", "default": 20, "description": "Max results"},
                 },
-                "required": ["job_id"],
+                "required": ["device_id", "batchjob_id"],
             },
         ),
         Tool(
@@ -2185,10 +2217,14 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "period": {
+                    "cloud_account_id": {
+                        "type": "integer",
+                        "description": "Filter by cloud account ID",
+                    },
+                    "time_range": {
                         "type": "string",
-                        "default": "month",
-                        "description": "Time period (day, week, month)",
+                        "default": "last30days",
+                        "description": "Time range (e.g. last7days, last30days, last90days)",
                     },
                 },
             },
@@ -2200,10 +2236,14 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "resource_id": {"type": "integer", "description": "Resource ID"},
-                    "period": {"type": "string", "default": "month", "description": "Time period"},
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "time_range": {
+                        "type": "string",
+                        "default": "last30days",
+                        "description": "Time range (e.g. last7days, last30days, last90days)",
+                    },
                 },
-                "required": ["resource_id"],
+                "required": ["device_id"],
             },
         ),
         Tool(
@@ -2213,7 +2253,14 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "category": {"type": "string", "description": "Filter by category"},
+                    "cloud_account_id": {
+                        "type": "integer",
+                        "description": "Filter by cloud account ID",
+                    },
+                    "recommendation_type": {
+                        "type": "string",
+                        "description": "Filter by recommendation type",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -2225,10 +2272,13 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "threshold": {
-                        "type": "number",
-                        "default": 10,
-                        "description": "Utilization threshold (%)",
+                    "cloud_account_id": {
+                        "type": "integer",
+                        "description": "Filter by cloud account ID",
+                    },
+                    "resource_type": {
+                        "type": "string",
+                        "description": "Filter by resource type",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
@@ -2306,9 +2356,9 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "rule_id": {"type": "integer", "description": "Alert rule ID"},
+                    "alert_rule_id": {"type": "integer", "description": "Alert rule ID"},
                 },
-                "required": ["rule_id"],
+                "required": ["alert_rule_id"],
             },
         ),
         Tool(
@@ -2318,9 +2368,12 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "chain_id": {"type": "integer", "description": "Escalation chain ID"},
+                    "escalation_chain_id": {
+                        "type": "integer",
+                        "description": "Escalation chain ID",
+                    },
                 },
-                "required": ["chain_id"],
+                "required": ["escalation_chain_id"],
             },
         ),
         Tool(
