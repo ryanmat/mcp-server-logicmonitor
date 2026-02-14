@@ -423,14 +423,26 @@ async def get_metric_anomalies(
         )
         result = await client.get(path, params=params)
 
-        dp_names = result.get("dataPoints", [])
-        all_values = result.get("values", {})
-        timestamps = result.get("time", [])
+        dp_names = result.get("datapoints", result.get("dataPoints", []))
+        value_rows = result.get("values", [])
+        # Timestamps come as epoch milliseconds from the API
+        raw_timestamps = result.get("time", [])
+        timestamps = [int(t / 1000) if t > 1e12 else int(t) for t in raw_timestamps]
 
+        # Transpose: rows-of-values into per-datapoint columns
         all_anomalies: list[dict] = []
-        for dp_name in dp_names:
-            dp_values = all_values.get(dp_name, [])
-            anomalies = _detect_anomalies(dp_name, dp_values, timestamps, threshold)
+        for dp_idx, dp_name in enumerate(dp_names):
+            dp_values = [
+                row[dp_idx] for row in value_rows
+                if dp_idx < len(row) and row[dp_idx] != "No Data"
+            ]
+            dp_timestamps = [
+                timestamps[i] for i, row in enumerate(value_rows)
+                if dp_idx < len(row) and row[dp_idx] != "No Data"
+            ]
+            anomalies = _detect_anomalies(
+                dp_name, dp_values, dp_timestamps, threshold,
+            )
             all_anomalies.extend(anomalies)
 
         return format_response({

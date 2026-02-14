@@ -59,7 +59,7 @@ class TestSaveBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0, 60.0, 40.0, 50.0]},
+                    "values": [[50.0], [60.0], [40.0], [50.0]],
                     "time": [BASE_EPOCH + i * 300 for i in range(4)],
                 },
             )
@@ -94,7 +94,7 @@ class TestSaveBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0, 50.0]},
+                    "values": [[50.0], [50.0]],
                     "time": [BASE_EPOCH, BASE_EPOCH + 300],
                 },
             )
@@ -125,7 +125,7 @@ class TestSaveBaseline:
         ).mock(
             return_value=httpx.Response(
                 200,
-                json={"dataPoints": [], "values": {}, "time": []},
+                json={"dataPoints": [], "values": [], "time": []},
             )
         )
 
@@ -176,10 +176,9 @@ class TestSaveBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu", "memory"],
-                    "values": {
-                        "cpu": [50.0, 60.0],
-                        "memory": [70.0, 80.0],
-                    },
+                    "values": [
+                        [50.0, 70.0], [60.0, 80.0],
+                    ],
                     "time": [BASE_EPOCH, BASE_EPOCH + 300],
                 },
             )
@@ -226,7 +225,7 @@ class TestCompareToBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [52.0, 48.0, 51.0]},
+                    "values": [[52.0], [48.0], [51.0]],
                     "time": [BASE_EPOCH + i * 300 for i in range(3)],
                 },
             )
@@ -262,7 +261,7 @@ class TestCompareToBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [67.0, 68.0, 67.5]},
+                    "values": [[67.0], [68.0], [67.5]],
                     "time": [BASE_EPOCH + i * 300 for i in range(3)],
                 },
             )
@@ -298,7 +297,7 @@ class TestCompareToBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [95.0, 98.0, 100.0]},
+                    "values": [[95.0], [98.0], [100.0]],
                     "time": [BASE_EPOCH + i * 300 for i in range(3)],
                 },
             )
@@ -346,7 +345,7 @@ class TestCompareToBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0]},
+                    "values": [[50.0]],
                     "time": [BASE_EPOCH],
                 },
             )
@@ -380,7 +379,7 @@ class TestCompareToBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0]},
+                    "values": [[50.0]],
                     "time": [BASE_EPOCH],
                 },
             )
@@ -447,7 +446,7 @@ class TestCompareToBaseline:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [55.0, 55.0, 55.0]},
+                    "values": [[55.0], [55.0], [55.0]],
                     "time": [BASE_EPOCH + i * 300 for i in range(3)],
                 },
             )

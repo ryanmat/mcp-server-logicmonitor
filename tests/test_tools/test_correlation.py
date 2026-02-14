@@ -456,7 +456,7 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0, 51.0, 49.0, 50.5, 50.2]},
+                    "values": [[50.0], [51.0], [49.0], [50.5], [50.2]],
                     "time": [BASE_EPOCH + i * 300 for i in range(5)],
                 },
             )
@@ -484,10 +484,10 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [
-                        50.0, 51.0, 49.0, 50.0, 50.5,
-                        49.5, 50.2, 50.1, 49.8, 200.0,
-                    ]},
+                    "values": [
+                        [50.0], [51.0], [49.0], [50.0], [50.5],
+                        [49.5], [50.2], [50.1], [49.8], [200.0],
+                    ],
                     "time": [BASE_EPOCH + i * 300 for i in range(10)],
                 },
             )
@@ -515,7 +515,7 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0, 51.0, 49.0, 50.0, 55.0]},
+                    "values": [[50.0], [51.0], [49.0], [50.0], [55.0]],
                     "time": [BASE_EPOCH + i * 300 for i in range(5)],
                 },
             )
@@ -546,10 +546,10 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu", "memory"],
-                    "values": {
-                        "cpu": [50.0, 51.0, 49.0, 50.0, 50.5],
-                        "memory": [70.0, 71.0, 69.0, 70.0, 70.5],
-                    },
+                    "values": [
+                        [50.0, 70.0], [51.0, 71.0], [49.0, 69.0],
+                        [50.0, 70.0], [50.5, 70.5],
+                    ],
                     "time": [BASE_EPOCH + i * 300 for i in range(5)],
                 },
             )
@@ -575,7 +575,7 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": [],
-                    "values": {},
+                    "values": [],
                     "time": [],
                 },
             )
@@ -602,7 +602,7 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0, 50.0, 50.0, 50.0, 50.0]},
+                    "values": [[50.0], [50.0], [50.0], [50.0], [50.0]],
                     "time": [BASE_EPOCH + i * 300 for i in range(5)],
                 },
             )
@@ -628,7 +628,7 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [50.0]},
+                    "values": [[50.0]],
                     "time": [BASE_EPOCH],
                 },
             )
@@ -670,7 +670,7 @@ class TestGetMetricAnomalies:
         ).mock(
             return_value=httpx.Response(
                 200,
-                json={"dataPoints": [], "values": {}, "time": []},
+                json={"dataPoints": [], "values": [], "time": []},
             )
         )
 
@@ -696,7 +696,7 @@ class TestGetMetricAnomalies:
         ).mock(
             return_value=httpx.Response(
                 200,
-                json={"dataPoints": [], "values": {}, "time": []},
+                json={"dataPoints": [], "values": [], "time": []},
             )
         )
 
@@ -720,10 +720,10 @@ class TestGetMetricAnomalies:
                 200,
                 json={
                     "dataPoints": ["cpu"],
-                    "values": {"cpu": [
-                        50.0, 50.0, 50.0, 50.0, 50.0,
-                        50.0, 50.0, 50.0, 50.0, 200.0,
-                    ]},
+                    "values": [
+                        [50.0], [50.0], [50.0], [50.0], [50.0],
+                        [50.0], [50.0], [50.0], [50.0], [200.0],
+                    ],
                     "time": [BASE_EPOCH + i * 300 for i in range(10)],
                 },
             )

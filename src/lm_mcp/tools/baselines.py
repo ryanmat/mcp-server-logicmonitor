@@ -58,12 +58,15 @@ async def save_baseline(
         if isinstance(resp, dict) and "errorMessage" in resp:
             return handle_error(resp)
 
-        dp_names = resp.get("dataPoints", [])
-        values_map = resp.get("values", {})
+        dp_names = resp.get("datapoints", resp.get("dataPoints", []))
+        value_rows = resp.get("values", [])
 
         baseline_data: dict = {}
-        for dp_name in dp_names:
-            raw_values = values_map.get(dp_name, [])
+        for dp_idx, dp_name in enumerate(dp_names):
+            raw_values = [
+                row[dp_idx] for row in value_rows
+                if dp_idx < len(row) and row[dp_idx] != "No Data"
+            ]
             nums = [v for v in raw_values if v is not None]
             if not nums:
                 baseline_data[dp_name] = {
@@ -177,12 +180,12 @@ async def compare_to_baseline(
         if isinstance(resp, dict) and "errorMessage" in resp:
             return handle_error(resp)
 
-        dp_names = resp.get("dataPoints", [])
-        values_map = resp.get("values", {})
+        dp_names = resp.get("datapoints", resp.get("dataPoints", []))
+        value_rows = resp.get("values", [])
         baseline_dps = baseline.get("datapoints", {})
 
         comparisons: dict = {}
-        for dp_name in dp_names:
+        for dp_idx, dp_name in enumerate(dp_names):
             if dp_name not in baseline_dps:
                 continue
 
@@ -191,7 +194,10 @@ async def compare_to_baseline(
             if bl_mean is None:
                 continue
 
-            raw_values = values_map.get(dp_name, [])
+            raw_values = [
+                row[dp_idx] for row in value_rows
+                if dp_idx < len(row) and row[dp_idx] != "No Data"
+            ]
             nums = [v for v in raw_values if v is not None]
             if not nums:
                 comparisons[dp_name] = {
