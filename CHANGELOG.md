@@ -5,6 +5,66 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-02-14
+
+### Added
+- ML tool usage guide with detailed examples for capacity forecasting, metric correlation, change point detection, noise scoring, health scoring, and availability calculation
+- ML Analysis & Forecasting example prompts section (10 natural language examples)
+- Updated project structure with new tool files
+
+## [1.5.0] - 2026-02-14
+
+### Added
+
+10 ML/statistical analysis tools using pure-Python implementations (no numpy/scipy dependencies).
+
+- **`forecast_metric`** — Predicts when a metric will breach a threshold. Uses linear regression on historical data to calculate trend direction, slope, and estimated days until breach. Useful for capacity planning — point it at CPU, memory, or disk and set a threshold to get an early warning.
+- **`correlate_metrics`** — Computes a Pearson correlation matrix across up to 10 metric series. Helps answer "are these metrics related?" — for example, does CPU spike when memory does? Highlights strong correlations (|r| > 0.7) automatically. Each source can be from a different device.
+- **`detect_change_points`** — Finds moments where metric behavior shifted using the CUSUM algorithm. Instead of just looking at whether a value is high or low, it detects when the pattern changed — a sudden jump, a drop to a new baseline, or a regime shift. Sensitivity is configurable.
+- **`score_alert_noise`** — Scores how noisy your alert environment is on a 0-100 scale. Combines Shannon entropy (how spread out alerts are across sources), flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Returns the top noisy devices and datasources with tuning recommendations.
+- **`detect_seasonality`** — Checks whether a metric has a repeating pattern using autocorrelation. Tests standard intervals (1h, 4h, 6h, 8h, 12h, 24h, 7d) and reports which periods show strong periodicity. Useful for distinguishing "this spikes every day at 2pm" from "this is random."
+- **`calculate_availability`** — Computes SLA-style uptime percentage from alert history. Merges overlapping alert windows and returns availability %, MTTR, incident count, longest incident duration, and a per-device breakdown. Filterable by severity threshold and time range.
+- **`analyze_blast_radius`** — Scores the downstream impact if a device goes down. Walks the topology map to find dependent devices and produces an impact score. Useful for change management — check the blast radius before taking a device offline for maintenance.
+- **`correlate_changes`** — Cross-references alert activity with audit/change logs to find correlations. Identifies config changes, device updates, or user actions that occurred within a configurable window before alert spikes. Each correlation gets a confidence score based on time proximity.
+- **`classify_trend`** — Categorizes a metric's recent behavior into one of five patterns: stable, increasing, decreasing, cyclic, or volatile. A quick way to triage a metric without staring at a graph — run it across multiple datapoints to see what's moving.
+- **`score_device_health`** — Produces a composite health score from 0-100 by computing z-scores for each datapoint's latest value against its historical window. Weights are configurable. Returns an overall status (healthy/degraded/critical) and identifies the top contributing factors dragging the score down.
+
+2 analysis workflows:
+- `capacity_forecast` — runs forecast_metric + classify_trend
+- `device_health_assessment` — runs score_device_health + analyze_blast_radius + get_metric_anomalies
+
+Shared statistical helpers module (`stats_helpers.py`) for reusable math utilities.
+
+## [1.4.1] - 2026-02-14
+
+### Fixed
+- Metric data API returns values as list-of-lists, not dict
+
+## [1.4.0] - 2026-02-14
+
+### Added
+
+5 AI analysis tools for server-side intelligence on monitoring data.
+
+- **`correlate_alerts`** — Groups related alerts together by device, datasource, and time proximity. Instead of looking at alerts one by one, it clusters them to show which alerts are part of the same incident. Helps cut through a noisy alert storm to see "these 15 alerts are actually 3 distinct issues."
+- **`get_alert_statistics`** — Aggregates alert counts across severity, device, datasource, and time buckets. Returns a statistical summary over a configurable time window — think of it as a quick dashboard view of alert volume and distribution without needing to open the portal.
+- **`get_metric_anomalies`** — Detects datapoints that are deviating significantly from their historical mean using z-score analysis. Point it at a device and it flags which metrics are behaving abnormally right now. Useful for triage — instead of checking every graph, let it tell you what looks off.
+- **`save_baseline`** — Snapshots a metric's historical behavior — mean, min, max, and standard deviation per datapoint — and stores it in the session. Use this to capture what "normal" looks like before a maintenance window, deployment, or any planned change.
+- **`compare_to_baseline`** — Compares current metric values against a previously saved baseline. Reports deviation percentage and status (normal, elevated, critical) for each datapoint. The companion to `save_baseline` — run it after a change to see if anything drifted from where it was.
+
+3 workflow prompts:
+- `top_talkers` — Identify the noisiest devices and datasources generating the most alerts
+- `rca_workflow` — Guided root cause analysis combining alert correlation, topology, and change history
+- `capacity_forecast` — Forecast capacity trends and predict days-until-threshold-breach
+
+Enhanced `alert_correlation` prompt with `device_id`/`group_id` scoping and correlation tool integration.
+
+MCP orchestration guide resource (`lm://guide/mcp-orchestration`) documenting multi-MCP-server patterns.
+
+Session persistence via `LM_SESSION_PERSIST_PATH` — session variables survive restarts.
+
+HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /api/v1/webhooks/alert` for scheduled and webhook-triggered analysis workflows.
+
 ## [1.3.3] - 2026-02-13
 
 ### Fixed
@@ -183,6 +243,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.5.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.5.0...v1.5.1
+[1.5.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.4.1...v1.5.0
+[1.4.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.0...v1.3.1
