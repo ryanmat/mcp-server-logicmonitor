@@ -15,12 +15,15 @@ from lm_mcp.prompts.templates import (
     alert_correlation_template,
     alert_summary_template,
     audit_review_template,
+    capacity_forecast_template,
     capacity_review_template,
     collector_health_template,
     cost_optimization_template,
     health_check_template,
     incident_triage_template,
+    rca_workflow_template,
     sdt_planning_template,
+    top_talkers_template,
     troubleshoot_device_template,
 )
 
@@ -147,6 +150,16 @@ PROMPTS: list[Prompt] = [
                 description="Filter by severity (critical, error, warning, info)",
                 required=False,
             ),
+            PromptArgument(
+                name="device_id",
+                description="Scope to a specific device ID",
+                required=False,
+            ),
+            PromptArgument(
+                name="group_id",
+                description="Scope to a specific device group ID",
+                required=False,
+            ),
         ],
     ),
     Prompt(
@@ -172,6 +185,79 @@ PROMPTS: list[Prompt] = [
             PromptArgument(
                 name="hours_back",
                 description="Hours to look back for alerts (default: 24)",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="top_talkers",
+        description="Identify noisiest devices or datasources by alert volume",
+        arguments=[
+            PromptArgument(
+                name="hours_back",
+                description="Hours to look back (default: 24)",
+                required=False,
+            ),
+            PromptArgument(
+                name="limit",
+                description="Number of top talkers to return (default: 10)",
+                required=False,
+            ),
+            PromptArgument(
+                name="group_by",
+                description="Group by: device or datasource (default: device)",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="rca_workflow",
+        description="Root cause analysis workflow with correlation, topology, and timeline",
+        arguments=[
+            PromptArgument(
+                name="device_id",
+                description="Starting device ID for investigation",
+                required=False,
+            ),
+            PromptArgument(
+                name="alert_id",
+                description="Starting alert ID for investigation",
+                required=False,
+            ),
+            PromptArgument(
+                name="hours_back",
+                description="Hours to look back (default: 4)",
+                required=False,
+            ),
+        ],
+    ),
+    Prompt(
+        name="capacity_forecast",
+        description="Resource utilization trending and capacity planning",
+        arguments=[
+            PromptArgument(
+                name="device_id",
+                description="Target device ID",
+                required=False,
+            ),
+            PromptArgument(
+                name="group_id",
+                description="Target device group ID",
+                required=False,
+            ),
+            PromptArgument(
+                name="datasource",
+                description="Datasource to analyze (default: CPU)",
+                required=False,
+            ),
+            PromptArgument(
+                name="hours_back",
+                description="Analysis window in hours (default: 168 = 1 week)",
+                required=False,
+            ),
+            PromptArgument(
+                name="threshold",
+                description="Warning threshold percent (default: 80)",
                 required=False,
             ),
         ],
@@ -203,6 +289,9 @@ def get_prompt_messages(name: str, arguments: dict) -> GetPromptResult:
         "alert_correlation": alert_correlation_template,
         "collector_health": collector_health_template,
         "troubleshoot_device": troubleshoot_device_template,
+        "top_talkers": top_talkers_template,
+        "rca_workflow": rca_workflow_template,
+        "capacity_forecast": capacity_forecast_template,
     }
 
     if name not in templates:

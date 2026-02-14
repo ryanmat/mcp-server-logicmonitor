@@ -243,33 +243,52 @@ def alert_correlation_template(arguments: dict) -> str:
     """Generate alert correlation analysis prompt content.
 
     Args:
-        arguments: Prompt arguments (hours_back, severity).
+        arguments: Prompt arguments (hours_back, severity, device_id, group_id).
 
     Returns:
         Prompt text for alert correlation workflow.
     """
     hours_back = arguments.get("hours_back", "4")
     severity = arguments.get("severity", "all severities")
+    device_id = arguments.get("device_id", "")
+    group_id = arguments.get("group_id", "")
+
+    scope_section = ""
+    if device_id:
+        scope_section = f"\n- Scope: Device ID {device_id}"
+    elif group_id:
+        scope_section = f"\n- Scope: Device Group ID {group_id}"
 
     return f"""Analyze and correlate active alerts in LogicMonitor.
 
 Parameters:
 - Time window: Last {hours_back} hours
-- Severity filter: {severity}
+- Severity filter: {severity}{scope_section}
 
 Steps to follow:
-1. Use get_alerts to retrieve recent alerts matching criteria
-2. Group alerts by device and datasource to find clusters
-3. Use get_device_neighbors to identify network proximity patterns
-4. Look for temporal correlation (alerts starting within minutes of each other)
-5. Identify potential root cause devices or network segments
+1. Use correlate_alerts with hours_back={hours_back} to get alert clusters
+   grouped by device, datasource, and temporal proximity
+2. Use get_alert_statistics with hours_back={hours_back} to get severity
+   distribution and time-bucket trends
+3. For each device cluster, use get_device_neighbors to map topology context
+4. Use get_change_audit to check for configuration changes in the time window
+5. Build a correlation matrix: which alerts share devices, datasources, or timing
+
+Decision branches:
+- If a single device has many alerts: deep-dive with get_device_datasources
+  and get_device_data to check for underlying resource exhaustion
+- If a datasource cluster spans multiple devices: likely a systemic issue
+  (e.g., network segment, shared dependency, monitoring template problem)
+- If temporal cluster aligns with a config change: correlate cause and effect
+- If topology neighbors share alerts: investigate upstream network devices
 
 Provide a report with:
-- Alert clusters grouped by device and time
+- Alert clusters grouped by device, datasource, and time
 - Network topology context for correlated alerts
-- Potential root cause analysis
-- Impact assessment (how many devices/services affected)
-- Recommended investigation order"""
+- Correlation with recent configuration changes
+- Root cause hypothesis with confidence assessment
+- Impact assessment (devices, services, business impact)
+- Prioritized investigation order and recommended actions"""
 
 
 def collector_health_template(arguments: dict) -> str:
@@ -334,3 +353,181 @@ Provide a report with:
 - Datasource health and data collection status
 - Any configuration issues identified
 - Recommended troubleshooting steps"""
+
+
+def top_talkers_template(arguments: dict) -> str:
+    """Generate top alert talkers analysis prompt content.
+
+    Args:
+        arguments: Prompt arguments (hours_back, limit, group_by).
+
+    Returns:
+        Prompt text for top talkers analysis workflow.
+    """
+    hours_back = arguments.get("hours_back", "24")
+    limit = arguments.get("limit", "10")
+    group_by = arguments.get("group_by", "device")
+
+    return f"""Identify the noisiest alert sources in LogicMonitor.
+
+Parameters:
+- Time window: Last {hours_back} hours
+- Top N results: {limit}
+- Group by: {group_by}
+
+Steps to follow:
+1. Use get_alert_statistics with hours_back={hours_back} to get aggregated
+   alert counts by severity, device, and datasource
+2. Sort results by {group_by} alert count (descending) to find top {limit}
+3. For each top talker:
+   a. If grouping by device: use get_device to get device details (type,
+      groups, properties) for context
+   b. If grouping by datasource: identify which devices are affected
+4. Use get_active_sdts to check if any top talkers are already in SDT
+5. Use get_alert_rules to check if noisy sources have appropriate thresholds
+
+Provide a ranked report with:
+- Top {limit} alert sources ranked by volume
+- Alert count breakdown by severity for each source
+- Device or datasource details for context
+- Active SDTs that may be masking additional noise
+- Recommendations for each top talker:
+  - Threshold tuning (raise thresholds to reduce noise)
+  - SDT scheduling (recurring maintenance windows)
+  - Alert rule changes (escalation chain adjustments)
+  - Investigation needed (genuine issues requiring attention)"""
+
+
+def rca_workflow_template(arguments: dict) -> str:
+    """Generate root cause analysis workflow prompt content.
+
+    Args:
+        arguments: Prompt arguments (device_id, alert_id, hours_back).
+
+    Returns:
+        Prompt text for RCA workflow.
+    """
+    device_id = arguments.get("device_id", "")
+    alert_id = arguments.get("alert_id", "")
+    hours_back = arguments.get("hours_back", "4")
+
+    starting_point = "Start by identifying the scope of the issue."
+    if alert_id:
+        starting_point = (
+            f"Start with alert {alert_id} using get_alert_details "
+            "to understand the triggering condition."
+        )
+    elif device_id:
+        starting_point = (
+            f"Start with device {device_id} using get_device and "
+            "get_alerts to understand the current state."
+        )
+
+    return f"""Perform a root cause analysis for a LogicMonitor incident.
+
+Parameters:
+- Starting alert: {alert_id or 'not specified'}
+- Starting device: {device_id or 'not specified'}
+- Time window: Last {hours_back} hours
+
+Phase 1 - Gather Context:
+{starting_point}
+
+Phase 2 - Correlate:
+1. Use correlate_alerts with hours_back={hours_back} to find related
+   alert clusters (device, datasource, and temporal groupings)
+2. For impacted devices, use get_device_neighbors to map the network
+   topology and identify upstream/downstream dependencies
+
+Phase 3 - Build Timeline:
+3. Sort correlated alerts by start time to see propagation pattern
+4. Use get_change_audit to check for configuration changes in the
+   time window that may have triggered the incident
+
+Phase 4 - Investigate (Decision Branches):
+- If topology cluster found: investigate the upstream device first,
+  as it may be the root cause propagating downstream
+- If configuration change correlates: assess whether rollback is needed
+  and use get_audit_logs for the specific change details
+- If metric anomaly suspected: use get_metric_anomalies on the primary
+  device to identify resource exhaustion or unusual patterns
+- If datasource cluster spans devices: likely a systemic issue such as
+  a network segment failure or shared infrastructure problem
+
+Phase 5 - Synthesize:
+5. Formulate root cause hypothesis with supporting evidence
+6. Assess confidence level (high/medium/low) based on evidence strength
+7. Map blast radius: all affected devices, services, and business impact
+
+Provide a structured RCA report with:
+- Root cause hypothesis and confidence level
+- Evidence chain (timeline of events leading to the issue)
+- Topology and dependency context
+- Blast radius assessment
+- Recommended remediation actions (immediate and long-term)
+- Prevention recommendations"""
+
+
+def capacity_forecast_template(arguments: dict) -> str:
+    """Generate capacity forecast and planning prompt content.
+
+    Args:
+        arguments: Prompt arguments (device_id, group_id, datasource,
+                   hours_back, threshold).
+
+    Returns:
+        Prompt text for capacity forecast workflow.
+    """
+    device_id = arguments.get("device_id", "")
+    group_id = arguments.get("group_id", "")
+    datasource = arguments.get("datasource", "CPU")
+    hours_back = arguments.get("hours_back", "168")
+    threshold = arguments.get("threshold", "80")
+
+    target = "all monitored devices"
+    if device_id:
+        target = f"device {device_id}"
+    elif group_id:
+        target = f"device group {group_id}"
+
+    return f"""Analyze resource utilization and forecast capacity for LogicMonitor devices.
+
+Parameters:
+- Target: {target}
+- Datasource focus: {datasource}
+- Analysis window: Last {hours_back} hours
+- Warning threshold: {threshold}%
+
+Phase 1 - Identify Targets:
+1. Use get_devices to identify target devices
+   (filter by group if group_id specified)
+2. For each device, use get_device_datasources to find the {datasource}
+   datasource and its instances
+
+Phase 2 - Collect Metrics:
+3. Use get_device_instances to list instances for the datasource
+4. Use get_device_data to retrieve metric data over the analysis window
+
+Phase 3 - Analyze:
+5. Use get_metric_anomalies to detect unusual spikes or patterns in
+   the collected data
+6. Use get_alerts with datasource filter to find historical threshold
+   breaches that indicate capacity pressure
+
+Phase 4 - Forecast:
+7. Calculate current average utilization for each target
+8. Identify trend direction (growing, stable, declining) based on
+   comparing first-half vs second-half of the analysis window
+9. Estimate days until {threshold}% threshold breach if trend continues
+
+Provide a capacity report with:
+- Current utilization summary for each target device
+- Trend analysis (growing, stable, or declining)
+- Anomaly detection results (unusual spikes or drops)
+- Historical threshold breach frequency
+- Forecast: estimated days until capacity threshold breach
+- Prioritized recommendations:
+  - Immediate action needed (already above {threshold}%)
+  - Near-term risk (trending toward breach within 30 days)
+  - Monitor closely (growing but sufficient headroom)
+  - No action needed (stable or declining utilization)"""

@@ -150,6 +150,96 @@ def create_asgi_app() -> "Starlette":
                 status_code=500,
             )
 
+    # Analysis store (shared across requests within the ASGI app)
+    from lm_mcp.analysis import AnalysisStore, run_analysis, validate_workflow
+
+    analysis_store = AnalysisStore(ttl_minutes=60)
+
+    async def post_analyze(request: Request) -> Response:
+        """Start an analysis workflow.
+
+        Accepts JSON body with 'workflow' and 'arguments' fields.
+        Returns 202 with analysis_id for async polling.
+        """
+        import asyncio
+
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, Exception):
+            return JSONResponse(
+                {"error": "Invalid JSON body"}, status_code=400
+            )
+
+        workflow = body.get("workflow")
+        if not workflow:
+            return JSONResponse(
+                {"error": "Missing 'workflow' field"}, status_code=400
+            )
+
+        try:
+            validate_workflow(workflow)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+        arguments = body.get("arguments", {})
+        req = analysis_store.create(workflow, arguments)
+
+        # Run analysis in background
+        asyncio.create_task(run_analysis(analysis_store, req.id))
+
+        return JSONResponse(
+            {"analysis_id": req.id, "status": "pending"},
+            status_code=202,
+        )
+
+    async def get_analysis(request: Request) -> Response:
+        """Poll analysis status and results.
+
+        Returns the current state of an analysis request.
+        """
+        analysis_id = request.path_params["analysis_id"]
+        req = analysis_store.get(analysis_id)
+
+        if req is None:
+            return JSONResponse(
+                {"error": "Analysis not found"}, status_code=404
+            )
+
+        return JSONResponse(req.to_dict())
+
+    async def webhook_alert(request: Request) -> Response:
+        """Receive LM alert webhook and trigger RCA workflow.
+
+        Accepts alert payload and starts an automatic RCA analysis.
+        """
+        import asyncio
+
+        try:
+            body = await request.json()
+        except (json.JSONDecodeError, Exception):
+            return JSONResponse(
+                {"error": "Invalid JSON body"}, status_code=400
+            )
+
+        # Extract alert context for RCA
+        device_id = body.get("deviceId")
+        alert_id = body.get("alertId")
+        arguments = {
+            "hours_back": 4,
+        }
+        if device_id:
+            arguments["device_id"] = device_id
+        if alert_id:
+            arguments["alert_id"] = alert_id
+
+        req = analysis_store.create("rca_workflow", arguments)
+        asyncio.create_task(run_analysis(analysis_store, req.id))
+
+        return JSONResponse(
+            {"analysis_id": req.id, "status": "pending"},
+            status_code=202,
+        )
+
     async def root(request: Request) -> Response:
         """Root endpoint with server info."""
         from lm_mcp import __version__
@@ -164,6 +254,9 @@ def create_asgi_app() -> "Starlette":
                     "health": "/health",
                     "healthz": "/healthz",
                     "readyz": "/readyz",
+                    "analyze": "/api/v1/analyze",
+                    "analysis": "/api/v1/analysis/{id}",
+                    "webhook_alert": "/api/v1/webhooks/alert",
                 },
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
@@ -175,6 +268,9 @@ def create_asgi_app() -> "Starlette":
         Route("/health", health, methods=["GET"]),
         Route("/healthz", healthz, methods=["GET"]),
         Route("/readyz", readyz, methods=["GET"]),
+        Route("/api/v1/analyze", post_analyze, methods=["POST"]),
+        Route("/api/v1/analysis/{analysis_id}", get_analysis, methods=["GET"]),
+        Route("/api/v1/webhooks/alert", webhook_alert, methods=["POST"]),
     ]
 
     # Configure CORS middleware

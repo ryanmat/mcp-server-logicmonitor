@@ -282,8 +282,8 @@ class TestGuideResources:
         assert "categories" in data
         assert len(data["categories"]) > 10
 
-    def test_tool_categories_covers_all_152_tools(self):
-        """Tool categories index accounts for all 152 registered tools."""
+    def test_tool_categories_covers_all_157_tools(self):
+        """Tool categories index accounts for all 157 registered tools."""
         from lm_mcp.registry import TOOLS
 
         content = get_resource_content("lm://guide/tool-categories")
@@ -338,8 +338,65 @@ class TestGuideResources:
     def test_all_guide_resources_loadable(self):
         """All guide resources return valid JSON."""
         guide_uris = [str(r.uri) for r in RESOURCES if "/guide/" in str(r.uri)]
-        assert len(guide_uris) == 2
+        assert len(guide_uris) == 3
         for uri in guide_uris:
             content = get_resource_content(uri)
             data = json.loads(content)
             assert "name" in data
+
+
+class TestOrchestrationGuide:
+    """Tests for the MCP orchestration guide resource."""
+
+    def test_orchestration_guide_resource_exists(self):
+        """Orchestration guide resource is registered."""
+        from lm_mcp.resources.registry import get_resource_by_uri
+
+        resource = get_resource_by_uri("lm://guide/mcp-orchestration")
+        assert resource is not None
+        assert resource.name == "MCP Server Orchestration Guide"
+
+    def test_orchestration_guide_content_is_valid_json(self):
+        """Orchestration guide returns valid JSON with required keys."""
+        content = get_resource_content("lm://guide/mcp-orchestration")
+        data = json.loads(content)
+        assert data["name"] == "mcp-orchestration"
+        assert "scenarios" in data
+        assert "best_practices" in data
+        assert "configuration_example" in data
+
+    def test_orchestration_guide_has_scenarios(self):
+        """Guide includes multi-server workflow scenarios."""
+        content = get_resource_content("lm://guide/mcp-orchestration")
+        data = json.loads(content)
+        assert len(data["scenarios"]) >= 3
+
+    def test_orchestration_guide_scenarios_have_steps(self):
+        """Each scenario has name, description, and steps with server/tool."""
+        content = get_resource_content("lm://guide/mcp-orchestration")
+        data = json.loads(content)
+        for scenario in data["scenarios"]:
+            assert "name" in scenario, "Scenario missing name"
+            assert "description" in scenario, "Scenario missing description"
+            assert "steps" in scenario, "Scenario missing steps"
+            for step in scenario["steps"]:
+                assert "server" in step, "Step missing server"
+                assert "tool" in step, "Step missing tool"
+
+    def test_orchestration_guide_has_best_practices(self):
+        """Guide includes best practices list."""
+        content = get_resource_content("lm://guide/mcp-orchestration")
+        data = json.loads(content)
+        assert len(data["best_practices"]) >= 3
+
+    def test_orchestration_guide_has_config_example(self):
+        """Guide includes MCP client configuration example."""
+        content = get_resource_content("lm://guide/mcp-orchestration")
+        data = json.loads(content)
+        config = data["configuration_example"]
+        assert "mcpServers" in config
+        assert "logicmonitor" in config["mcpServers"]
+
+    def test_orchestration_guide_total_resource_count(self):
+        """Total resource count is 24 after adding orchestration guide."""
+        assert len(RESOURCES) == 24

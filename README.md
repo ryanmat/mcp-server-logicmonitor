@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through structured tools.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 157 structured tools, 13 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,17 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**152 Tools** across comprehensive LogicMonitor API coverage:
+**157 Tools** across comprehensive LogicMonitor API coverage:
+
+### AI Analysis Tools
+
+Server-side intelligence that transforms raw monitoring data into actionable insights:
+
+- **Alert Correlation**: Automatically clusters related alerts by device, datasource, and temporal proximity — replaces dozens of manual API calls with a single aggregated view
+- **Alert Statistics**: Aggregated alert counts by severity, top-10 devices and datasources, time-bucketed distributions for trend analysis
+- **Metric Anomaly Detection**: Z-score based anomaly detection on any metric datapoint with configurable thresholds and IQR fallback
+- **Metric Baselines**: Save baseline snapshots of metric behavior, then compare current performance against the baseline to detect drift
+- **Scheduled Analysis**: HTTP API endpoints for triggering analysis workflows (alert correlation, RCA, top talkers, health checks) from external schedulers and webhooks
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -78,8 +88,8 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **Log/Metric Ingestion**: Push logs and metrics via LMv1 authentication
 
 ### MCP Protocol Features
-- **Resources**: 23 schema/enum/filter/guide resources for API reference
-- **Prompts**: 10 workflow templates (incident triage, cost optimization, troubleshooting, etc.)
+- **Resources**: 24 schema/enum/filter/guide resources for API reference
+- **Prompts**: 13 workflow templates (incident triage, RCA, capacity forecasting, top talkers, etc.)
 - **Completions**: Auto-complete for tool arguments
 
 ### Operational Features
@@ -87,23 +97,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **Rate Limit Handling**: Automatic retry with exponential backoff and jitter
 - **Server Error Recovery**: Automatic retry on 5xx server errors
 - **Pagination Support**: Handle large result sets with offset-based pagination
-
-### v1.3.3 Features
-- **HTTP Transport Parity**: HTTP transport now applies full middleware chain (tool filtering, field validation, write audit, session recording)
-- **Config Caching**: LMConfig cached as singleton for better performance
-- **Code Cleanup**: Removed unused logging infrastructure
-
-### v1.3.2 Features
-- **Tool Schema Fix**: Fixed 20 broken tools where MCP schema parameter names did not match handler function signatures, causing "unexpected keyword argument" errors at runtime
-- **Regression Test**: Schema-to-function parameter validation test prevents future mismatches
-
-### v1.1.0 Features
-- **HTTP Transport**: Remote deployments via Starlette/Uvicorn with CORS support
-- **Session Context**: Track operation results for conversational workflows
-- **Session Tools**: 6 tools to manage variables and view history
-- **Health Endpoints**: `/health`, `/healthz`, `/readyz` for container orchestration
-- **Field Validation**: Validate field names with typo suggestions
-- **Docker Support**: Production-ready Dockerfile and docker-compose with optional TLS
+- **Session Persistence**: Optional file-backed session variables that survive restarts
 
 ## Installation
 
@@ -169,6 +163,8 @@ The server exposes health endpoints for container orchestration:
 | `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error` |
 | `LM_FIELD_VALIDATION` | No | `warn` | Field validation: `off`, `warn`, or `error` |
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
+| `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
+| `LM_ANALYSIS_TTL_MINUTES` | No | `60` | TTL for scheduled analysis results (1-1440 minutes) |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -197,45 +193,6 @@ The server exposes health endpoints for container orchestration:
 3. Create or view the Access ID and Access Key
 
 ## MCP Client Configuration
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token"
-      }
-    }
-  }
-}
-```
-
-To enable write operations and ingestion APIs:
-
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token",
-        "LM_ACCESS_ID": "your-access-id",
-        "LM_ACCESS_KEY": "your-access-key",
-        "LM_ENABLE_WRITE_OPERATIONS": "true"
-      }
-    }
-  }
-}
-```
 
 ### Claude Code
 
@@ -300,6 +257,45 @@ To enable write operations and ingestion APIs:
 ```
 
 Then restart Cursor or enable the server in **Cursor Settings** → **MCP**.
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token"
+      }
+    }
+  }
+}
+```
+
+To enable write operations and ingestion APIs:
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token",
+        "LM_ACCESS_ID": "your-access-id",
+        "LM_ACCESS_KEY": "your-access-key",
+        "LM_ENABLE_WRITE_OPERATIONS": "true"
+      }
+    }
+  }
+}
+```
 
 ### OpenAI Codex CLI
 
@@ -678,9 +674,24 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `clear_session_context` | Reset all session state | No |
 | `list_session_history` | List recent tool call history | No |
 
+### Correlation & Analysis Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `correlate_alerts` | Cluster related alerts by device, datasource, and temporal proximity | No |
+| `get_alert_statistics` | Aggregated alert counts by severity, top devices/datasources, time buckets | No |
+| `get_metric_anomalies` | Z-score based anomaly detection on metric datapoints | No |
+
+### Baseline Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `save_baseline` | Save a metric baseline snapshot to session for later comparison | No |
+| `compare_to_baseline` | Compare current metrics against a saved baseline | No |
+
 ## MCP Resources
 
-The server exposes 23 resources for API reference:
+The server exposes 24 resources for API reference:
 
 ### Schema Resources
 | URI | Description |
@@ -718,8 +729,9 @@ The server exposes 23 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 152 tools organized by domain category |
+| `lm://guide/tool-categories` | All 157 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
+| `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 
 ## MCP Prompts
 
@@ -734,9 +746,12 @@ Pre-built workflow templates for common tasks:
 | `sdt_planning` | Plan scheduled downtime for maintenance windows | `device_ids`, `group_id` |
 | `cost_optimization` | Analyze cloud costs, find savings opportunities | `provider`, `threshold_percent` |
 | `audit_review` | Review recent changes, logins, and security events | `hours_back`, `username` |
-| `alert_correlation` | Correlate alerts across devices to find common root causes | `severity`, `hours_back` |
+| `alert_correlation` | Correlate alerts across devices to find common root causes | `severity`, `hours_back`, `device_id`, `group_id` |
 | `collector_health` | Assess collector load balancing, versions, and failover readiness | `group_id` |
 | `troubleshoot_device` | Guided troubleshooting for a specific device | `device_id` |
+| `top_talkers` | Identify noisiest devices and datasources generating the most alerts | `hours_back`, `limit`, `group_by` |
+| `rca_workflow` | Guided root cause analysis combining alerts, topology, and change history | `device_id`, `alert_id`, `hours_back` |
+| `capacity_forecast` | Forecast capacity trends and predict threshold breaches | `device_id`, `group_id`, `datasource`, `hours_back`, `threshold` |
 
 ## Example Usage
 
@@ -846,12 +861,13 @@ uv run ruff format src tests
 ```
 src/lm_mcp/
 ├── __init__.py           # Package exports
+├── analysis.py           # Scheduled analysis workflows and store
 ├── config.py             # Environment-based configuration
 ├── exceptions.py         # Exception hierarchy
 ├── health.py             # Health check endpoints
 ├── logging.py            # Structured logging
 ├── server.py             # MCP server entry point
-├── session.py            # Session context management
+├── session.py            # Session context with optional persistence
 ├── registry.py           # Tool definitions and handlers
 ├── validation.py         # Field validation with suggestions
 ├── auth/
@@ -871,15 +887,17 @@ src/lm_mcp/
 │   ├── schemas.py        # Schema content
 │   ├── enums.py          # Enum content
 │   ├── filters.py        # Filter content
-│   └── guides.py         # Tool categories and query examples
+│   └── guides.py         # Tool categories, query examples, orchestration guide
 ├── transport/
 │   ├── __init__.py       # Transport abstraction
-│   └── http.py           # HTTP/SSE transport
+│   └── http.py           # HTTP/SSE transport with analysis endpoints
 └── tools/
     ├── __init__.py       # Tool utilities
     ├── alerts.py         # Alert management
     ├── alert_rules.py    # Alert rule CRUD
+    ├── baselines.py      # Metric baseline save/compare
     ├── collectors.py     # Collector tools
+    ├── correlation.py    # Alert correlation and anomaly detection
     ├── cost.py           # Cost optimization
     ├── dashboards.py     # Dashboard CRUD
     ├── devices.py        # Device CRUD
@@ -948,6 +966,16 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.4.0
+- **New**: 3 correlation and analysis tools: `correlate_alerts`, `get_alert_statistics`, `get_metric_anomalies` — server-side alert clustering, aggregated statistics, and Z-score anomaly detection
+- **New**: 2 baseline tools: `save_baseline`, `compare_to_baseline` — snapshot metric behavior and detect drift over time
+- **New**: 3 workflow prompts: `top_talkers` (noisiest devices/datasources), `rca_workflow` (guided root cause analysis), `capacity_forecast` (capacity trend prediction)
+- **New**: Enhanced `alert_correlation` prompt with `device_id`/`group_id` scoping and correlation tool integration
+- **New**: MCP orchestration guide resource (`lm://guide/mcp-orchestration`) documenting multi-MCP-server patterns
+- **New**: Session persistence via `LM_SESSION_PERSIST_PATH` — session variables survive restarts
+- **New**: HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /api/v1/webhooks/alert` for scheduled and webhook-triggered analysis workflows
+- **New**: `LM_ANALYSIS_TTL_MINUTES` config for analysis result retention (default 60 minutes)
 
 ### v1.3.3
 - **Fix**: HTTP transport now applies the full middleware chain (tool filtering, field validation, write audit logging, session recording) instead of bypassing it

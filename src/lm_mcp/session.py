@@ -1,9 +1,15 @@
 # Description: Session context module for tracking operation results across tool calls.
 # Description: Enables conversational workflows like "update the device" without re-specifying IDs.
 
+import json
+import logging
+import os
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -242,6 +248,7 @@ class SessionContext:
             value: Variable value (must be JSON-serializable)
         """
         self.variables[name] = value
+        _save_variables(self)
 
     def get_variable(self, name: str, default: Any = None) -> Any:
         """Get a user-defined variable.
@@ -266,6 +273,7 @@ class SessionContext:
         """
         if name in self.variables:
             del self.variables[name]
+            _save_variables(self)
             return True
         return False
 
@@ -301,6 +309,7 @@ class SessionContext:
         # Clear variables and history
         self.variables = {}
         self.history = []
+        _save_variables(self)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert session context to dictionary for serialization.
@@ -344,9 +353,90 @@ class SessionContext:
 # Global session context instance for stdio mode
 _session: SessionContext | None = None
 
+# File-backed persistence path (None = in-memory only)
+_persistence_path: str | None = None
+
+
+def set_persistence_path(path: str | None) -> None:
+    """Configure file-backed persistence for session variables.
+
+    Args:
+        path: File path for JSON storage, or None to disable.
+    """
+    global _persistence_path
+    _persistence_path = path
+
+
+def get_persistence_path() -> str | None:
+    """Get the configured persistence file path.
+
+    Returns:
+        The persistence path, or None if disabled.
+    """
+    return _persistence_path
+
+
+def _save_variables(session: SessionContext) -> None:
+    """Write session variables to persistence file (atomic).
+
+    Uses write-to-temp + os.replace() for crash safety.
+    No-op when persistence is disabled.
+    """
+    if _persistence_path is None:
+        return
+
+    try:
+        dir_name = os.path.dirname(_persistence_path) or "."
+        fd, tmp_path = tempfile.mkstemp(
+            suffix=".tmp", dir=dir_name
+        )
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(session.variables, f)
+            os.replace(tmp_path, _persistence_path)
+        except BaseException:
+            # Clean up temp file on any failure
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
+    except Exception:
+        logger.warning(
+            "Failed to save session variables to %s",
+            _persistence_path,
+            exc_info=True,
+        )
+
+
+def _load_variables(session: SessionContext) -> None:
+    """Load session variables from persistence file.
+
+    Handles missing files and corrupt JSON gracefully.
+    No-op when persistence is disabled.
+    """
+    if _persistence_path is None:
+        return
+
+    try:
+        with open(_persistence_path) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            session.variables = data
+    except FileNotFoundError:
+        pass
+    except (json.JSONDecodeError, OSError):
+        logger.warning(
+            "Failed to load session variables from %s",
+            _persistence_path,
+            exc_info=True,
+        )
+
 
 def get_session() -> SessionContext:
     """Get the global session context, creating it if needed.
+
+    On first creation, loads persisted variables from file if configured.
 
     Returns:
         The global SessionContext instance
@@ -354,6 +444,7 @@ def get_session() -> SessionContext:
     global _session
     if _session is None:
         _session = SessionContext()
+        _load_variables(_session)
     return _session
 
 
@@ -364,11 +455,11 @@ def reset_session() -> None:
         _session.clear()
 
 
-def set_session(session: SessionContext) -> None:
+def set_session(session: SessionContext | None) -> None:
     """Set the global session context.
 
     Args:
-        session: SessionContext instance to use
+        session: SessionContext instance to use, or None to clear.
     """
     global _session
     _session = session

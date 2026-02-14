@@ -2593,6 +2593,213 @@ TOOLS.extend(
     ]
 )
 
+# Correlation and Analysis
+TOOLS.extend(
+    [
+        Tool(
+            name="correlate_alerts",
+            description=(
+                "Correlate alerts by device, datasource, and temporal proximity. "
+                "Groups alerts into clusters to identify related issues."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 4,
+                        "description": "Hours to look back (default: 4)",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Filter by device name (substring match)",
+                    },
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Filter by device group ID",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "description": "Filter by severity (critical, error, warning, info)",
+                        "enum": ["critical", "error", "warning", "info"],
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 500,
+                        "description": "Max alerts to fetch (default: 500)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_alert_statistics",
+            description=(
+                "Aggregate alert counts by severity, device, datasource, and time bucket. "
+                "Returns statistical summary over a time window."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Hours to look back (default: 24)",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Filter by device name (substring match)",
+                    },
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Filter by device group ID",
+                    },
+                    "bucket_size_hours": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Size of each time bucket in hours (default: 1)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 1000,
+                        "description": "Max alerts to fetch (default: 1000)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_metric_anomalies",
+            description=(
+                "Detect metric anomalies using z-score analysis. "
+                "Identifies data points deviating significantly from the mean."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID (from get_device_datasources)",
+                    },
+                    "instance_id": {"type": "integer", "description": "Instance ID"},
+                    "datapoints": {
+                        "type": "string",
+                        "description": "Comma-separated datapoint names (optional, all if omitted)",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Hours to look back (default: 24)",
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "default": 2.0,
+                        "description": "Z-score threshold for anomaly detection (default: 2.0)",
+                    },
+                },
+                "required": ["device_id", "device_datasource_id", "instance_id"],
+            },
+        ),
+    ]
+)
+
+# Baselines
+TOOLS.extend(
+    [
+        Tool(
+            name="save_baseline",
+            description=(
+                "Save a metric baseline from historical data. "
+                "Computes mean, min, max, stddev per datapoint and stores "
+                "as a session variable for later comparison."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {
+                        "type": "integer",
+                        "description": "Device ID",
+                    },
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID",
+                    },
+                    "instance_id": {
+                        "type": "integer",
+                        "description": "Instance ID",
+                    },
+                    "baseline_name": {
+                        "type": "string",
+                        "description": "Name for the stored baseline",
+                    },
+                    "datapoints": {
+                        "type": "string",
+                        "description": (
+                            "Comma-separated datapoint names (all if omitted)"
+                        ),
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Hours of historical data to use",
+                    },
+                },
+                "required": [
+                    "device_id",
+                    "device_datasource_id",
+                    "instance_id",
+                    "baseline_name",
+                ],
+            },
+        ),
+        Tool(
+            name="compare_to_baseline",
+            description=(
+                "Compare current metrics against a stored baseline. "
+                "Reports deviation percentage and status (normal, elevated, "
+                "reduced, anomalous) per datapoint."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "baseline_name": {
+                        "type": "string",
+                        "description": "Name of the stored baseline",
+                    },
+                    "device_id": {
+                        "type": "integer",
+                        "description": (
+                            "Override device ID (uses baseline if omitted)"
+                        ),
+                    },
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": (
+                            "Override device-datasource ID"
+                        ),
+                    },
+                    "instance_id": {
+                        "type": "integer",
+                        "description": (
+                            "Override instance ID"
+                        ),
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Hours of recent data to compare",
+                    },
+                },
+                "required": ["baseline_name"],
+            },
+        ),
+    ]
+)
+
 # Session Management
 TOOLS.extend(
     [
@@ -2691,9 +2898,11 @@ def get_tool_handler(tool_name: str) -> Any:
         alerts,
         api_tokens,
         audit,
+        baselines,
         batchjobs,
         collectors,
         configsources,
+        correlation,
         cost,
         dashboard_groups,
         dashboards,
@@ -2898,6 +3107,13 @@ def get_tool_handler(tool_name: str) -> Any:
         # Ingestion
         "ingest_logs": ingestion.ingest_logs,
         "push_metrics": ingestion.push_metrics,
+        # Correlation and Analysis
+        "correlate_alerts": correlation.correlate_alerts,
+        "get_alert_statistics": correlation.get_alert_statistics,
+        "get_metric_anomalies": correlation.get_metric_anomalies,
+        # Baselines
+        "save_baseline": baselines.save_baseline,
+        "compare_to_baseline": baselines.compare_to_baseline,
         # Session
         "get_session_context": session.get_session_context,
         "set_session_variable": session.set_session_variable,

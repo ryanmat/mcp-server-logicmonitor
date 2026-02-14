@@ -76,9 +76,24 @@ class TestPromptsRegistry:
         names = [p.name for p in PROMPTS]
         assert "troubleshoot_device" in names
 
+    def test_top_talkers_prompt_exists(self):
+        """top_talkers prompt is defined."""
+        names = [p.name for p in PROMPTS]
+        assert "top_talkers" in names
+
+    def test_rca_workflow_prompt_exists(self):
+        """rca_workflow prompt is defined."""
+        names = [p.name for p in PROMPTS]
+        assert "rca_workflow" in names
+
+    def test_capacity_forecast_prompt_exists(self):
+        """capacity_forecast prompt is defined."""
+        names = [p.name for p in PROMPTS]
+        assert "capacity_forecast" in names
+
     def test_total_prompt_count(self):
-        """All 10 prompts are registered."""
-        assert len(PROMPTS) == 10
+        """All 13 prompts are registered."""
+        assert len(PROMPTS) == 13
 
 
 class TestGetPromptMessages:
@@ -183,3 +198,113 @@ class TestGetPromptMessages:
         result = get_prompt_messages("troubleshoot_device", {"device_id": "42"})
         content = str(result.messages[0].content)
         assert "42" in content
+
+    # Top Talkers prompt tests
+
+    def test_top_talkers_returns_messages(self):
+        """get_prompt_messages returns messages for top_talkers."""
+        result = get_prompt_messages("top_talkers", {})
+        assert result.messages is not None
+        assert len(result.messages) > 0
+
+    def test_top_talkers_includes_hours_back(self):
+        """top_talkers includes hours_back argument."""
+        result = get_prompt_messages("top_talkers", {"hours_back": "12"})
+        content = str(result.messages[0].content)
+        assert "12" in content
+
+    def test_top_talkers_includes_limit(self):
+        """top_talkers includes limit argument."""
+        result = get_prompt_messages("top_talkers", {"limit": "5"})
+        content = str(result.messages[0].content)
+        assert "5" in content
+
+    def test_top_talkers_mentions_get_alert_statistics(self):
+        """top_talkers references the get_alert_statistics tool."""
+        result = get_prompt_messages("top_talkers", {})
+        content = str(result.messages[0].content)
+        assert "get_alert_statistics" in content
+
+    # RCA Workflow prompt tests
+
+    def test_rca_workflow_returns_messages(self):
+        """get_prompt_messages returns messages for rca_workflow."""
+        result = get_prompt_messages("rca_workflow", {})
+        assert result.messages is not None
+        assert len(result.messages) > 0
+
+    def test_rca_workflow_with_device_id(self):
+        """rca_workflow includes device_id argument."""
+        result = get_prompt_messages("rca_workflow", {"device_id": "99"})
+        content = str(result.messages[0].content)
+        assert "99" in content
+
+    def test_rca_workflow_with_alert_id(self):
+        """rca_workflow includes alert_id argument."""
+        result = get_prompt_messages("rca_workflow", {"alert_id": "LMA555"})
+        content = str(result.messages[0].content)
+        assert "LMA555" in content
+
+    def test_rca_workflow_mentions_correlate_alerts(self):
+        """rca_workflow references the correlate_alerts tool."""
+        result = get_prompt_messages("rca_workflow", {})
+        content = str(result.messages[0].content)
+        assert "correlate_alerts" in content
+
+    def test_rca_workflow_mentions_decision_branches(self):
+        """rca_workflow includes decision branches for investigation."""
+        result = get_prompt_messages("rca_workflow", {})
+        content = str(result.messages[0].content)
+        assert "topology" in content.lower() or "config" in content.lower()
+
+    # Capacity Forecast prompt tests
+
+    def test_capacity_forecast_returns_messages(self):
+        """get_prompt_messages returns messages for capacity_forecast."""
+        result = get_prompt_messages("capacity_forecast", {})
+        assert result.messages is not None
+        assert len(result.messages) > 0
+
+    def test_capacity_forecast_with_device_id(self):
+        """capacity_forecast includes device_id argument."""
+        result = get_prompt_messages("capacity_forecast", {"device_id": "77"})
+        content = str(result.messages[0].content)
+        assert "77" in content
+
+    def test_capacity_forecast_includes_datasource(self):
+        """capacity_forecast includes datasource argument."""
+        result = get_prompt_messages("capacity_forecast", {"datasource": "Memory"})
+        content = str(result.messages[0].content)
+        assert "Memory" in content
+
+    def test_capacity_forecast_mentions_get_metric_anomalies(self):
+        """capacity_forecast references the get_metric_anomalies tool."""
+        result = get_prompt_messages("capacity_forecast", {})
+        content = str(result.messages[0].content)
+        assert "get_metric_anomalies" in content
+
+    # Enhanced alert_correlation tests
+
+    def test_enhanced_alert_correlation_mentions_correlate_alerts(self):
+        """Enhanced alert_correlation references the correlate_alerts tool."""
+        result = get_prompt_messages("alert_correlation", {})
+        content = str(result.messages[0].content)
+        assert "correlate_alerts" in content
+
+    def test_enhanced_alert_correlation_with_device_id(self):
+        """alert_correlation includes device_id argument."""
+        result = get_prompt_messages("alert_correlation", {"device_id": "33"})
+        content = str(result.messages[0].content)
+        assert "33" in content
+
+    def test_enhanced_alert_correlation_with_group_id(self):
+        """alert_correlation includes group_id argument."""
+        result = get_prompt_messages("alert_correlation", {"group_id": "7"})
+        content = str(result.messages[0].content)
+        assert "7" in content
+
+    def test_enhanced_alert_correlation_mentions_get_alert_statistics(self):
+        """Enhanced alert_correlation references the get_alert_statistics tool."""
+        result = get_prompt_messages("alert_correlation", {})
+        content = str(result.messages[0].content)
+        assert "get_alert_statistics" in content

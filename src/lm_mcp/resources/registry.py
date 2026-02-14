@@ -147,13 +147,19 @@ RESOURCES: list[Resource] = [
     Resource(
         uri="lm://guide/tool-categories",
         name="Tool Categories",
-        description="All 152 LogicMonitor MCP tools organized by domain category",
+        description="All 157 LogicMonitor MCP tools organized by domain category",
         mimeType="application/json",
     ),
     Resource(
         uri="lm://guide/examples",
         name="Common Query Examples",
         description="Common filter patterns and query examples for LogicMonitor API",
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://guide/mcp-orchestration",
+        name="MCP Server Orchestration Guide",
+        description="Patterns for combining LogicMonitor with other MCP servers",
         mimeType="application/json",
     ),
 ]
