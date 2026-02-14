@@ -19,7 +19,7 @@ cd mcp-server-logicmonitor
 uv sync --dev
 
 # Run tests
-uv run pytest -v
+uv run python -m pytest -v
 ```
 
 ## Development Workflow
@@ -27,13 +27,13 @@ uv run pytest -v
 ### Running Tests
 ```bash
 # Run all tests
-uv run pytest -v
+uv run python -m pytest -v
 
 # Run specific test file
-uv run pytest tests/test_tools/test_alerts.py -v
+uv run python -m pytest tests/test_tools/test_alerts.py -v
 
 # Run with coverage
-uv run pytest --cov=src/lm_mcp
+uv run python -m pytest --cov=src/lm_mcp
 ```
 
 ### Code Quality

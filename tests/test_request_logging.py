@@ -1,5 +1,5 @@
 # Description: Tests for request logging and debug mode.
-# Description: Verifies log level config, event structure, and debug/warning mode behavior.
+# Description: Verifies log level config and debug/warning mode behavior.
 
 import logging
 
@@ -51,48 +51,6 @@ class TestLogLevelConfig:
 
         with pytest.raises(ValueError):
             LMConfig()
-
-
-class TestApiRequestEvent:
-    """Tests for create_api_request_event."""
-
-    def test_request_event_structure(self):
-        """create_api_request_event returns properly structured dict."""
-        from lm_mcp.logging import create_api_request_event
-
-        event = create_api_request_event("GET", "/alert/alerts", {"size": 50})
-        assert event["event"] == "api_request"
-        assert event["method"] == "GET"
-        assert event["path"] == "/alert/alerts"
-        assert event["params"] == {"size": 50}
-
-    def test_request_event_none_params(self):
-        """create_api_request_event handles None params."""
-        from lm_mcp.logging import create_api_request_event
-
-        event = create_api_request_event("POST", "/device/devices", None)
-        assert event["params"] is None
-
-
-class TestApiResponseEvent:
-    """Tests for create_api_response_event."""
-
-    def test_response_event_structure(self):
-        """create_api_response_event returns properly structured dict."""
-        from lm_mcp.logging import create_api_response_event
-
-        event = create_api_response_event(200, 0.125, "/alert/alerts")
-        assert event["event"] == "api_response"
-        assert event["status_code"] == 200
-        assert event["elapsed_ms"] == 125.0
-        assert event["path"] == "/alert/alerts"
-
-    def test_response_event_error_status(self):
-        """create_api_response_event handles error status codes."""
-        from lm_mcp.logging import create_api_response_event
-
-        event = create_api_response_event(429, 1.5, "/device/devices")
-        assert event["status_code"] == 429
 
 
 class TestDebugModeLogging:

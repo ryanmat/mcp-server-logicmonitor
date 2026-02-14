@@ -21,12 +21,12 @@ async def run_stdio() -> None:
 
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
-    from lm_mcp.config import LMConfig
+    from lm_mcp.config import get_config
     from lm_mcp.server import _set_client, server
     from lm_mcp.session import get_session
 
     # Load config and create client
-    config = LMConfig()
+    config = get_config()
     auth = create_auth_provider(config)
     client = LogicMonitorClient(
         base_url=config.base_url,

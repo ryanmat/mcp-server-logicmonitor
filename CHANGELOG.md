@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2026-02-13
+
+### Fixed
+- HTTP transport now applies the full middleware chain (tool filtering, field validation, write audit logging, session recording) — previously bypassed entirely
+- HTTP `tools/list` now respects `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` filtering
+
+### Changed
+- Extracted shared `execute_tool()` middleware from `call_tool()` for transport-agnostic tool execution
+- LMConfig cached as singleton to avoid redundant environment parsing on every tool call
+- Removed dead logging infrastructure (LogLevel enum, LogEvent dataclass, 7 unused event factory functions)
+
+## [1.3.2] - 2025-02-13
+
+### Fixed
+- Fixed 20 MCP tool schemas where parameter names did not match handler function signatures, causing "unexpected keyword argument" errors at runtime
+
+### Added
+- Registry test that validates all schema property names match handler function parameter names, preventing future mismatches
+
+## [1.3.1] - 2025-02-12
+
+### Fixed
+- `get_change_audit` no longer crashes when the API returns `happenedOn` as an epoch integer
+
+## [1.3.0] - 2025-02-10
+
+### Added
+- 5 MCP prompts: `cost_optimization`, `audit_review`, `alert_correlation`, `collector_health`, `troubleshoot_device`
+- 6 resource schemas: escalations, reports, websites, datasources, users, audit
+- 2 guide resources: tool categories index (all 152 tools) and common query examples
+- `LM_LOG_LEVEL` configuration for controlling debug output (debug, info, warning, error)
+- Write operation audit trail (INFO-level logging for create/update/delete actions)
+
+### Fixed
+- Wildcard sanitization applied to all 11 remaining string filter parameters across audit, cost, batchjobs, SDTs, and topology tools
+
+## [1.2.1] - 2025-02-05
+
+### Fixed
+- Patch release with minor fixes
+
+## [1.2.0] - 2025-02-01
+
+### Added
+- Tool filtering with `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` glob patterns
+- Export/import support for all LogicModule types
+- Cost optimization recommendation categories and detail endpoints
+
+## [1.1.0] - 2025-01-20
+
+### Added
+- HTTP transport for remote deployments via Starlette/Uvicorn
+- Session context tracking for conversational workflows
+- 6 session management tools
+- Health endpoints (`/health`, `/healthz`, `/readyz`) for Kubernetes
+- Docker deployment with multi-stage build and Caddy reverse proxy
+- CORS middleware configuration via `LM_CORS_ORIGINS`
+
 ## [1.0.1] - 2025-01-15
 
 ### Changed
@@ -125,6 +183,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.3.3]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.2...v1.3.3
+[1.3.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.2.1...v1.3.0
+[1.2.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.5.1...v1.0.0
 [0.5.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.5.0...v0.5.1

@@ -4,36 +4,6 @@
 import logging
 
 
-class TestWriteOperationEvent:
-    """Tests for create_write_operation_event."""
-
-    def test_write_event_structure(self):
-        """create_write_operation_event returns properly structured dict."""
-        from lm_mcp.logging import create_write_operation_event
-
-        event = create_write_operation_event(
-            "create_device",
-            {"name": "server01", "display_name": "Server 01"},
-            success=True,
-        )
-        assert event["event"] == "write_operation"
-        assert event["tool"] == "create_device"
-        assert event["arguments"]["name"] == "server01"
-        assert event["success"] is True
-
-    def test_write_event_failure(self):
-        """create_write_operation_event handles failure case."""
-        from lm_mcp.logging import create_write_operation_event
-
-        event = create_write_operation_event(
-            "delete_device",
-            {"device_id": 123},
-            success=False,
-        )
-        assert event["success"] is False
-        assert event["tool"] == "delete_device"
-
-
 class TestWriteToolPrefixDetection:
     """Tests for identifying write tools by prefix."""
 

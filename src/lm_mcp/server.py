@@ -1,7 +1,9 @@
 # Description: MCP server entry point for LogicMonitor platform.
-# Description: Provides stdio transport for AI assistant integration.
+# Description: Provides shared tool execution middleware and stdio transport.
 
 import asyncio
+import json
+import logging
 from fnmatch import fnmatch
 
 from mcp.server import Server
@@ -9,9 +11,15 @@ from mcp.types import CompleteResult, GetPromptResult, TextContent
 
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.completions import get_completions
+from lm_mcp.config import get_config
+from lm_mcp.logging import is_write_tool, log_write_operation
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
+from lm_mcp.session import get_session
+from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
+
+logger = logging.getLogger(__name__)
 
 # Create server instance
 server = Server("logicmonitor-platform")
@@ -72,9 +80,7 @@ def _filter_tools(tools: list, config) -> list:
 @server.list_tools()
 async def list_tools():
     """Return available LogicMonitor tools, filtered by config."""
-    from lm_mcp.config import LMConfig
-
-    config = LMConfig()
+    config = get_config()
     return _filter_tools(TOOLS, config)
 
 
@@ -89,9 +95,12 @@ SESSION_TOOLS = {
 }
 
 
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Execute a LogicMonitor tool.
+async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
+    """Execute a LogicMonitor tool with full middleware chain.
+
+    Applies tool filtering, field validation, write audit logging, and
+    session recording. Used by both the MCP stdio handler and the HTTP
+    transport endpoint to ensure consistent behavior across transports.
 
     Args:
         name: Tool name to execute.
@@ -100,16 +109,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     Returns:
         List of TextContent with the tool result.
     """
-    import json
-    import logging
-
-    from lm_mcp.config import LMConfig
-    from lm_mcp.logging import is_write_tool, log_write_operation
-    from lm_mcp.session import get_session
-    from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
-
-    logger = logging.getLogger(__name__)
-    config = LMConfig()
+    config = get_config()
 
     try:
         handler = get_tool_handler(name)
@@ -236,6 +236,20 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         return [TextContent(type="text", text=f"Error executing {name}: {e}")]
 
 
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    """MCP call_tool handler that delegates to execute_tool.
+
+    Args:
+        name: Tool name to execute.
+        arguments: Tool arguments.
+
+    Returns:
+        List of TextContent with the tool result.
+    """
+    return await execute_tool(name, arguments)
+
+
 @server.list_resources()
 async def list_resources():
     """Return all available LogicMonitor schema resources.
@@ -314,10 +328,9 @@ async def run_server() -> None:
     - "stdio" (default): Standard input/output for local AI assistants
     - "http": HTTP transport for remote/shared deployments
     """
-    from lm_mcp.config import LMConfig
     from lm_mcp.transport import get_transport_runner
 
-    config = LMConfig()
+    config = get_config()
     runner = get_transport_runner(config)
     await runner()
 

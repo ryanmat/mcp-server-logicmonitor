@@ -8,6 +8,30 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
+_cached_config: "LMConfig | None" = None
+
+
+def get_config() -> "LMConfig":
+    """Get the cached LMConfig singleton.
+
+    Parses environment variables on first call, returns cached instance
+    on subsequent calls. Use reset_config() in tests to clear the cache.
+
+    Returns:
+        The LMConfig instance.
+    """
+    global _cached_config
+    if _cached_config is None:
+        _cached_config = LMConfig()
+    return _cached_config
+
+
+def reset_config() -> None:
+    """Clear the cached config. Used in tests to reset state."""
+    global _cached_config
+    _cached_config = None
+
+
 class LMConfig(BaseSettings):
     """Configuration for LogicMonitor MCP Server.
 

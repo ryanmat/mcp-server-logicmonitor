@@ -127,9 +127,9 @@ def require_write_permission(func: F) -> F:
 
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
-        from lm_mcp.config import LMConfig
+        from lm_mcp.config import get_config
 
-        config = LMConfig()
+        config = get_config()
         if not config.enable_write_operations:
             return format_response(
                 {

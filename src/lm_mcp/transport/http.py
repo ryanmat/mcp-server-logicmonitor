@@ -27,9 +27,9 @@ def create_asgi_app() -> "Starlette":
     from starlette.responses import JSONResponse, Response
     from starlette.routing import Route
 
-    from lm_mcp.config import LMConfig
+    from lm_mcp.config import get_config
 
-    config = LMConfig()
+    config = get_config()
 
     async def health(request: Request) -> Response:
         """Detailed health check endpoint."""
@@ -61,11 +61,12 @@ def create_asgi_app() -> "Starlette":
     async def mcp_endpoint(request: Request) -> Response:
         """MCP JSON-RPC endpoint for tool calls.
 
-        This is a simplified HTTP endpoint for MCP. For full streamable
-        HTTP support, consider using the MCP SDK's built-in ASGI support.
+        Delegates tool execution to the shared execute_tool middleware,
+        ensuring consistent behavior (filtering, validation, audit logging,
+        session recording) across stdio and HTTP transports.
         """
-        from lm_mcp.registry import TOOLS, get_tool_handler
-        from lm_mcp.server import SESSION_TOOLS, get_client
+        from lm_mcp.registry import TOOLS
+        from lm_mcp.server import _filter_tools, execute_tool
 
         try:
             body = await request.json()
@@ -81,7 +82,10 @@ def create_asgi_app() -> "Starlette":
 
         try:
             if method == "tools/list":
-                result = [{"name": t.name, "description": t.description} for t in TOOLS]
+                filtered = _filter_tools(TOOLS, config)
+                result = [
+                    {"name": t.name, "description": t.description} for t in filtered
+                ]
                 return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})
 
             elif method == "tools/call":
@@ -98,13 +102,7 @@ def create_asgi_app() -> "Starlette":
                         status_code=400,
                     )
 
-                handler = get_tool_handler(tool_name)
-
-                if tool_name in SESSION_TOOLS:
-                    result = await handler(**arguments)
-                else:
-                    client = get_client()
-                    result = await handler(client, **arguments)
+                result = await execute_tool(tool_name, arguments)
 
                 # Extract text content from result
                 if result and len(result) > 0:
@@ -205,12 +203,12 @@ async def create_http_server() -> None:
 
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
-    from lm_mcp.config import LMConfig
+    from lm_mcp.config import get_config
     from lm_mcp.server import _set_client
     from lm_mcp.session import get_session
 
     # Load config and create client
-    config = LMConfig()
+    config = get_config()
     auth = create_auth_provider(config)
     client = LogicMonitorClient(
         base_url=config.base_url,
