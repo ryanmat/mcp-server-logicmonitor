@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 157 structured tools, 13 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 167 structured tools, 13 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**157 Tools** across comprehensive LogicMonitor API coverage:
+**167 Tools** across comprehensive LogicMonitor API coverage:
 
 ### AI Analysis Tools
 
@@ -55,6 +55,21 @@ Server-side intelligence that transforms raw monitoring data into actionable ins
 - **Metric Anomaly Detection**: Z-score based anomaly detection on any metric datapoint with configurable thresholds and IQR fallback
 - **Metric Baselines**: Save baseline snapshots of metric behavior, then compare current performance against the baseline to detect drift
 - **Scheduled Analysis**: HTTP API endpoints for triggering analysis workflows (alert correlation, RCA, top talkers, health checks) from external schedulers and webhooks
+
+### ML/Statistical Analysis Tools
+
+Pure-Python statistical methods for capacity planning, trend analysis, and operational scoring:
+
+- **Metric Forecasting**: Linear regression to predict threshold breach timing with trend direction and confidence
+- **Metric Correlation**: Pearson correlation matrix across multiple metric series with strong-correlation highlighting
+- **Change Point Detection**: CUSUM algorithm for identifying regime shifts and mean-level changes
+- **Alert Noise Scoring**: Shannon entropy and flap detection to quantify alert noise (0-100) with tuning recommendations
+- **Seasonality Detection**: Autocorrelation-based periodicity detection at standard intervals with peak-hour identification
+- **Availability Calculation**: SLA-style uptime percentage from alert history with MTTR, incident counts, and per-device breakdown
+- **Blast Radius Analysis**: Topology-based downstream impact scoring for device failure scenarios
+- **Change Correlation**: Cross-references alert spikes with audit/change logs to identify change-induced incidents
+- **Trend Classification**: Categorizes metrics as stable, increasing, decreasing, cyclic, or volatile
+- **Device Health Scoring**: Multi-metric composite health score (0-100) using z-score analysis with configurable weights
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -729,7 +744,7 @@ The server exposes 24 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 157 tools organized by domain category |
+| `lm://guide/tool-categories` | All 167 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 
@@ -966,6 +981,21 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.5.0
+- **New**: 10 ML/statistical analysis tools using pure-Python implementations (no numpy/scipy dependencies)
+- **New**: `forecast_metric` — linear regression-based threshold breach prediction
+- **New**: `correlate_metrics` — Pearson correlation matrix across multiple metric series
+- **New**: `detect_change_points` — CUSUM algorithm for regime shift detection
+- **New**: `score_alert_noise` — Shannon entropy + flap detection for alert noise scoring
+- **New**: `detect_seasonality` — autocorrelation-based periodicity detection
+- **New**: `calculate_availability` — SLA-style uptime calculation from alert history
+- **New**: `analyze_blast_radius` — topology-based downstream impact assessment
+- **New**: `correlate_changes` — cross-references alert spikes with audit/change logs
+- **New**: `classify_trend` — categorizes metrics as stable/increasing/decreasing/cyclic/volatile
+- **New**: `score_device_health` — multi-metric composite health score (0-100)
+- **New**: 2 analysis workflows: `capacity_forecast`, `device_health_assessment`
+- **New**: Shared statistical helpers module (`stats_helpers.py`) for reusable math utilities
 
 ### v1.4.0
 - **New**: 3 correlation and analysis tools: `correlate_alerts`, `get_alert_statistics`, `get_metric_anomalies` — server-side alert clustering, aggregated statistics, and Z-score anomaly detection
