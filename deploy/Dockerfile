@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 COPY --from=builder /app/dist/*.whl /app/
 
 # Install the package with HTTP transport dependencies
-RUN uv pip install --system "/app/*.whl[http]" && rm /app/*.whl
+RUN WHEEL=$(ls /app/*.whl) && uv pip install --system "${WHEEL}[http]" && rm /app/*.whl
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash mcp
