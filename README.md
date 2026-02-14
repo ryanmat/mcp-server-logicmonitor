@@ -704,6 +704,61 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `save_baseline` | Save a metric baseline snapshot to session for later comparison | No |
 | `compare_to_baseline` | Compare current metrics against a saved baseline | No |
 
+### ML/Statistical Analysis Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `forecast_metric` | Linear regression forecasting with threshold breach prediction | No |
+| `correlate_metrics` | Pearson correlation matrix across multiple metric series (max 10) | No |
+| `detect_change_points` | CUSUM-based regime shift detection with configurable sensitivity | No |
+| `score_alert_noise` | Shannon entropy + flap detection to score alert noise (0-100) | No |
+| `detect_seasonality` | Autocorrelation-based periodicity detection at standard intervals | No |
+| `calculate_availability` | SLA-style uptime % from alert history with MTTR and incident counts | No |
+| `analyze_blast_radius` | Topology-based downstream impact scoring for device failures | No |
+| `correlate_changes` | Cross-reference alert spikes with audit/change logs | No |
+| `classify_trend` | Categorize metric behavior: stable, increasing, decreasing, cyclic, volatile | No |
+| `score_device_health` | Composite health score (0-100) from multi-metric z-score analysis | No |
+
+#### ML Tool Usage Guide
+
+These tools use pure-Python statistical methods (no external ML libraries). They all operate on data fetched from the LM API at query time. Most metric-based tools share the same core parameters: `device_id`, `device_datasource_id`, `instance_id` (find these using `get_device_datasources` and `get_device_instances`).
+
+**Capacity forecasting** — predict when a metric will breach a threshold:
+```
+"Forecast when memory usage on device 150098 will exceed 90%"
+```
+Uses `forecast_metric` with `threshold=90`. Returns days until breach, trend direction, and R-squared confidence. Use `hours_back=168` (1 week) for meaningful regression, or `hours_back=24` if the device has limited history.
+
+**Metric correlation** — find relationships between metrics across devices:
+```
+"Correlate CPU usage on server A with memory usage on server B over the last 24 hours"
+```
+Uses `correlate_metrics` with a `sources` array. Each source requires `device_id`, `device_datasource_id`, `instance_id`, and `datapoint` name. Returns an NxN Pearson correlation matrix and highlights strong correlations (|r| > 0.7). Maximum 10 sources per call.
+
+**Change point detection** — find when metric behavior shifted:
+```
+"Detect any regime shifts in CPU metrics on device 150098 in the last 24 hours"
+```
+Uses `detect_change_points` with CUSUM algorithm. The `sensitivity` parameter (default 1.0) controls detection threshold — lower values detect smaller shifts. Returns timestamps and direction of each detected change.
+
+**Alert noise scoring** — identify tuning opportunities:
+```
+"Score the alert noise across all devices over the last 24 hours"
+```
+Uses `score_alert_noise`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
+
+**Device health scoring** — aggregate health into a single number:
+```
+"Give me a health score for the stress-demo pod"
+```
+Uses `score_device_health`. Computes z-scores for each datapoint's latest value against its historical window, then produces a weighted composite score (0-100). Status: healthy (80+), degraded (50-79), critical (<50). Use the `weights` parameter to emphasize specific datapoints.
+
+**Availability calculation** — SLA reporting from alert data:
+```
+"Calculate 30-day availability across all devices at error severity or above"
+```
+Uses `calculate_availability` with `hours_back=720` and `severity_threshold="error"`. Merges overlapping alert windows and returns availability %, MTTR, incident count, longest incident, and per-device breakdown.
+
 ## MCP Resources
 
 The server exposes 24 resources for API reference:
@@ -850,6 +905,18 @@ Start with these to verify the connection is working:
 - "List ops notes tagged 'maintenance'"
 - "Add an ops note: 'Starting v2.5 deployment' with tag 'deployment'"
 
+### ML Analysis & Forecasting
+- "Forecast when memory on device 123 will hit 90%"
+- "Score the alert noise level across all devices"
+- "Classify the trend for CPU metrics on device 456"
+- "Detect any change points in network throughput over the last 24 hours"
+- "Check if there's a seasonal pattern in CPU usage over the past week"
+- "Calculate 30-day availability for the Production group"
+- "What's the blast radius if device 789 goes down?"
+- "Correlate recent config changes with alert spikes"
+- "Give me a health score for device 123"
+- "Are CPU and memory correlated on my web servers?"
+
 ### Advanced Filtering
 The server supports LogicMonitor's filter syntax for power users:
 - "Get devices where filter is 'displayName~prod,hostStatus:alive'"
@@ -912,16 +979,21 @@ src/lm_mcp/
     ├── alert_rules.py    # Alert rule CRUD
     ├── baselines.py      # Metric baseline save/compare
     ├── collectors.py     # Collector tools
-    ├── correlation.py    # Alert correlation and anomaly detection
+    ├── correlation.py    # Alert correlation, anomaly detection, metric correlation
     ├── cost.py           # Cost optimization
     ├── dashboards.py     # Dashboard CRUD
     ├── devices.py        # Device CRUD
     ├── escalations.py    # Escalation/recipient CRUD
+    ├── event_correlation.py  # Change-alert correlation
+    ├── forecasting.py    # Forecast, trend, seasonality, change points
     ├── imports.py        # LogicModule import
     ├── ingestion.py      # Log/metric ingestion
     ├── metrics.py        # Metrics and data
+    ├── scoring.py        # Alert noise, availability, device health
     ├── sdts.py           # SDT management
     ├── session.py        # Session management tools
+    ├── stats_helpers.py  # Shared statistical math utilities
+    ├── topology_analysis.py  # Blast radius analysis
     ├── websites.py       # Website CRUD
     └── ...               # Additional tool modules
 
@@ -981,6 +1053,11 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.5.1
+- **Docs**: Add ML tool usage guide with examples for capacity forecasting, metric correlation, change point detection, noise scoring, health scoring, and availability calculation
+- **Docs**: Add ML Analysis & Forecasting example prompts section
+- **Docs**: Update project structure with new tool files
 
 ### v1.5.0
 - **New**: 10 ML/statistical analysis tools using pure-Python implementations (no numpy/scipy dependencies)
