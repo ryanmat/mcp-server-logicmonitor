@@ -165,3 +165,92 @@ class TestWorkflowDispatch:
         from lm_mcp.analysis import validate_workflow
 
         validate_workflow("health_check")
+
+    def test_capacity_forecast_in_valid_workflows(self):
+        """capacity_forecast is a valid workflow."""
+        from lm_mcp.analysis import VALID_WORKFLOWS
+
+        assert "capacity_forecast" in VALID_WORKFLOWS
+
+    def test_device_health_assessment_in_valid_workflows(self):
+        """device_health_assessment is a valid workflow."""
+        from lm_mcp.analysis import VALID_WORKFLOWS
+
+        assert "device_health_assessment" in VALID_WORKFLOWS
+
+    def test_capacity_forecast_validates(self):
+        """capacity_forecast passes validation."""
+        from lm_mcp.analysis import validate_workflow
+
+        validate_workflow("capacity_forecast")
+
+    def test_device_health_assessment_validates(self):
+        """device_health_assessment passes validation."""
+        from lm_mcp.analysis import validate_workflow
+
+        validate_workflow("device_health_assessment")
+
+
+class TestCapacityForecastWorkflow:
+    """Tests for capacity_forecast workflow dispatch."""
+
+    async def test_dispatch_capacity_forecast(self):
+        """capacity_forecast dispatches to the correct runner."""
+        from lm_mcp.analysis import _dispatch_workflow
+
+        calls = []
+
+        async def mock_execute(tool_name, args):
+            calls.append(tool_name)
+            from mcp.types import TextContent
+            return [TextContent(type="text", text='{"result": "ok"}')]
+
+        result = await _dispatch_workflow(
+            "capacity_forecast",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "threshold": 90.0,
+            },
+            mock_execute,
+        )
+
+        assert result["workflow"] == "capacity_forecast"
+        assert "forecast" in result
+        assert "trend_classification" in result
+        assert "forecast_metric" in calls
+        assert "classify_trend" in calls
+
+
+class TestDeviceHealthAssessmentWorkflow:
+    """Tests for device_health_assessment workflow dispatch."""
+
+    async def test_dispatch_device_health_assessment(self):
+        """device_health_assessment dispatches to the correct runner."""
+        from lm_mcp.analysis import _dispatch_workflow
+
+        calls = []
+
+        async def mock_execute(tool_name, args):
+            calls.append(tool_name)
+            from mcp.types import TextContent
+            return [TextContent(type="text", text='{"result": "ok"}')]
+
+        result = await _dispatch_workflow(
+            "device_health_assessment",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+            },
+            mock_execute,
+        )
+
+        assert result["workflow"] == "device_health_assessment"
+        assert "health" in result
+        assert "blast_radius" in result
+        assert "anomalies" in result
+        assert "score_device_health" in calls
+        assert "analyze_blast_radius" in calls
+        assert "get_metric_anomalies" in calls

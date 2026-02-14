@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 157 tools organized by domain category.
+# All 167 tools organized by domain category.
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -266,6 +266,21 @@ TOOL_CATEGORIES = {
                 "correlate_alerts",
                 "get_alert_statistics",
                 "get_metric_anomalies",
+            ],
+        },
+        "ml_analysis": {
+            "description": "ML/statistical analysis and forecasting",
+            "tools": [
+                "forecast_metric",
+                "correlate_metrics",
+                "detect_change_points",
+                "score_alert_noise",
+                "detect_seasonality",
+                "calculate_availability",
+                "analyze_blast_radius",
+                "correlate_changes",
+                "classify_trend",
+                "score_device_health",
             ],
         },
         "session": {

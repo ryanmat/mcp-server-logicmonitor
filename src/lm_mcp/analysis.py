@@ -17,6 +17,8 @@ VALID_WORKFLOWS = {
     "rca_workflow",
     "top_talkers",
     "health_check",
+    "capacity_forecast",
+    "device_health_assessment",
 }
 
 
@@ -212,6 +214,8 @@ async def _dispatch_workflow(
         "rca_workflow": _run_rca_workflow,
         "top_talkers": _run_top_talkers,
         "health_check": _run_health_check,
+        "capacity_forecast": _run_capacity_forecast,
+        "device_health_assessment": _run_device_health_assessment,
     }
 
     func = dispatchers.get(workflow)
@@ -323,4 +327,90 @@ async def _run_health_check(
         "alerts": alerts,
         "devices": devices,
         "collectors": collectors,
+    }
+
+
+async def _run_capacity_forecast(
+    arguments: dict[str, Any], execute_tool: Any
+) -> dict[str, Any]:
+    """Run capacity forecast workflow.
+
+    Combines forecast_metric and classify_trend for a device instance.
+    """
+    device_id = arguments.get("device_id")
+    dds_id = arguments.get("device_datasource_id")
+    instance_id = arguments.get("instance_id")
+    threshold = arguments.get("threshold", 90.0)
+
+    forecast = await _extract_result(
+        execute_tool,
+        "forecast_metric",
+        {
+            "device_id": device_id,
+            "device_datasource_id": dds_id,
+            "instance_id": instance_id,
+            "threshold": threshold,
+        },
+    )
+
+    trend = await _extract_result(
+        execute_tool,
+        "classify_trend",
+        {
+            "device_id": device_id,
+            "device_datasource_id": dds_id,
+            "instance_id": instance_id,
+        },
+    )
+
+    return {
+        "workflow": "capacity_forecast",
+        "forecast": forecast,
+        "trend_classification": trend,
+    }
+
+
+async def _run_device_health_assessment(
+    arguments: dict[str, Any], execute_tool: Any
+) -> dict[str, Any]:
+    """Run device health assessment workflow.
+
+    Combines score_device_health, analyze_blast_radius,
+    and get_metric_anomalies for a comprehensive assessment.
+    """
+    device_id = arguments.get("device_id")
+    dds_id = arguments.get("device_datasource_id")
+    instance_id = arguments.get("instance_id")
+
+    health = await _extract_result(
+        execute_tool,
+        "score_device_health",
+        {
+            "device_id": device_id,
+            "device_datasource_id": dds_id,
+            "instance_id": instance_id,
+        },
+    )
+
+    blast_radius = await _extract_result(
+        execute_tool,
+        "analyze_blast_radius",
+        {"device_id": device_id},
+    )
+
+    anomalies = await _extract_result(
+        execute_tool,
+        "get_metric_anomalies",
+        {
+            "device_id": device_id,
+            "device_datasource_id": dds_id,
+            "instance_id": instance_id,
+        },
+    )
+
+    return {
+        "workflow": "device_health_assessment",
+        "health": health,
+        "blast_radius": blast_radius,
+        "anomalies": anomalies,
     }
