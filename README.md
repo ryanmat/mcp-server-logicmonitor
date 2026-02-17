@@ -117,6 +117,20 @@ Service discovery and RED metrics for LogicMonitor APM (Application Performance 
 - **Prompts**: 13 workflow templates (incident triage, RCA, capacity forecasting, top talkers, etc.)
 - **Completions**: Auto-complete for tool arguments
 
+### Claude Code Skills
+
+Pre-built slash-command workflows for Claude Code that orchestrate multiple tools into guided operational runbooks:
+
+| Skill | Command | Description |
+|-------|---------|-------------|
+| Alert Triage | `/lm-triage` | Investigate active alerts, score noise, correlate clusters, assess blast radius, take action |
+| Device Health | `/lm-health <device>` | Comprehensive health check — metrics, anomalies, health score, availability, topology |
+| Portal Overview | `/lm-portal` | Portal-wide snapshot for shift handoff — alerts, collectors, SDTs, down devices |
+| Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
+| APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
+
+Skills ship with the repo — clone it and invoke `/lm-triage` in Claude Code to get started.
+
 ### Operational Features
 - **Security-First**: Read-only by default, write operations require explicit opt-in
 - **Rate Limit Handling**: Automatic retry with exponential backoff and jitter
@@ -1076,6 +1090,18 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.7.0
+- **New**: 5 Claude Code skills for guided multi-step workflows: `/lm-triage` (alert triage), `/lm-health` (device health), `/lm-portal` (portal overview), `/lm-capacity` (capacity planning), `/lm-apm` (APM investigation)
+- **New**: Skills ship in the repo via `.claude/skills/` — available to anyone cloning the project
+
+### v1.6.1
+- **Fix**: Import tools now use `multipart/form-data` uploads (LM API requirement)
+- **Fix**: Unhandled 4xx status codes no longer returned as success
+- **New**: `create_dashboard` template/widget token support, `create_dashboard_group`, `delete_dashboard_group`
+
+### v1.6.0
+- **New**: 8 APM trace tools for service discovery and RED metrics via v3 API
 
 ### v1.5.1
 - **Docs**: Add ML tool usage guide with examples for capacity forecasting, metric correlation, change point detection, noise scoring, health scoring, and availability calculation

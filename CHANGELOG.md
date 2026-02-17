@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-02-17
+
+### Added
+
+5 Claude Code skills providing guided multi-step workflows for common LogicMonitor admin operations. Skills ship in the repo so anyone cloning it gets them automatically via `.claude/skills/`.
+
+- **`/lm-triage`** — Alert triage workflow: gathers active alerts and statistics, scores noise level, clusters correlated alerts, performs deep dive with blast radius analysis, checks change correlation, and presents numbered action options (acknowledge, add note, bulk acknowledge). Write actions require explicit confirmation.
+- **`/lm-health`** — Device health check: resolves device by ID or name, inventories datasources by category (CPU/Memory/Disk/Network), pulls core metrics, computes health score with decision tree, runs anomaly detection on degraded datasources, checks alert status, device properties, 30-day availability, and topology neighbors. Produces a compiled health report.
+- **`/lm-portal`** — Portal-wide health snapshot for shift handoff: alert severity breakdown with trends, collector status (flags any down collectors), active SDT windows, top 5 alert clusters, noise scoring, down device count with collector correlation heuristic. Outputs a GREEN/YELLOW/RED portal status.
+- **`/lm-capacity`** — Capacity planning and forecasting: current utilization across CPU/Memory/Disk, trend classification (stable/increasing/decreasing/volatile), seasonality detection, change point detection, breach forecasting with urgency tiers, and baseline comparison. Offers to save baselines with confirmation.
+- **`/lm-apm`** — APM trace investigation: service discovery, service profile with properties, service-level RED metrics, operation breakdown sorted by volume, per-operation deep dive, datasource coverage check, and alert correlation. Supports both targeted service investigation and discovery mode.
+
+### Changed
+
+- `.gitignore` updated to track `.claude/skills/` while keeping other `.claude/` contents ignored.
+
 ## [1.6.1] - 2026-02-17
 
 ### Fixed
@@ -277,6 +293,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.7.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.5.0...v1.5.1
