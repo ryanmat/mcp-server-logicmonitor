@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-02-17
+
+### Fixed
+
+- **Import tools send wrong Content-Type** — All 8 `import_*` tools now use `multipart/form-data` file upload via `post_multipart()` instead of `application/json` POST. The LM import endpoints require multipart upload; the previous JSON body approach silently failed.
+- **Unhandled 4xx status codes returned as success** — `_raise_for_status()` now has a catch-all for 400-499 status codes (400, 405, 409, 415, etc.) that raises `LMError` with code `HTTP_{status}`. Previously these fell through and returned error response bodies as if they were successful results.
+- **Export/import format mismatch documented** — Updated docstrings on all export and import functions to clarify that REST API export format differs from LM Exchange format required by import endpoints.
+
+### Added
+
+- **`create_dashboard` template and widget token support** — `create_dashboard` now accepts `widget_tokens` (list of token overrides) and `template` (full dashboard definition from `export_dashboard` to clone from). When using a template, the exported definition is used as the base payload with name overridden and id stripped.
+- **`create_dashboard_group`** — Create dashboard groups with optional parent_id and description. Follows the same pattern as `create_website_group`.
+- **`delete_dashboard_group`** — Delete dashboard groups by ID. Follows the same pattern as `delete_website_group`.
+- **`post_multipart()` client method** — Handles multipart/form-data file uploads for LM import endpoints with proper auth headers and retry logic.
+
+Tool count: 175 -> 177.
+
 ## [1.6.0] - 2026-02-16
 
 ### Added
@@ -260,6 +277,8 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.6.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.4.0...v1.4.1
