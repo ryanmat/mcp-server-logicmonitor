@@ -1,5 +1,5 @@
 # Description: Tests for Import/Export MCP tools.
-# Description: Validates export functions for LogicModules and configurations.
+# Description: Validates export and import functions for LogicModules and configurations.
 
 import json
 
@@ -486,3 +486,64 @@ class TestImportAppliestoFunction:
         assert len(result) == 1
         data = json.loads(result[0].text)
         assert data["imported_id"] == 8001
+
+
+class TestImportDatasourceErrorHandling:
+    """Tests for import_datasource error detection improvements."""
+
+    @respx.mock
+    async def test_import_datasource_empty_response_returns_error(self, client, monkeypatch):
+        """import_datasource detects empty {} response as silent failure."""
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await import_datasource(client, definition={"name": "BadXML"})
+
+        assert len(result) == 1
+        text = result[0].text
+        assert "Error:" in text or "silently failed" in text.lower()
+
+    @respx.mock
+    async def test_import_datasource_error_body_returns_error(self, client, monkeypatch):
+        """import_datasource surfaces error body from API via client detection."""
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "errorMessage": "Unknown type value: script",
+                    "errorCode": 1400,
+                },
+            )
+        )
+
+        result = await import_datasource(client, definition={"type": "script"})
+
+        assert len(result) == 1
+        assert "Error:" in result[0].text

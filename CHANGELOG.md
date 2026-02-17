@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-02-17
+
+### Fixed
+
+- **HTTP 200 error body detection** — API client now checks for `errorMessage` + `errorCode` inside HTTP 200 response bodies and raises `LMError` with code `API_ERROR_{errorCode}`. Some LM API endpoints return HTTP 200 with error details in the body instead of using HTTP status codes; these previously passed through silently as success.
+- **`add_widget` endpoint URL** — Changed from `/dashboard/dashboards/{id}/widgets` (returns 405) to `/dashboard/widgets`. The `dashboardId` field in the request body specifies which dashboard the widget belongs to.
+- **`import_datasource` silent failure detection** — Now detects empty `{}` responses (no `id` or `errorMessage`) and returns an error noting the import may have silently failed, with guidance to use `create_datasource` for REST API format definitions.
+
+### Added
+
+- **`create_datasource`** — Create a DataSource via REST API from a full definition dict. Accepts the same format as `export_datasource` output, enabling round-tripping of exported definitions. Strips `id` from the definition before POST.
+
+### Changed
+
+- **Export/import format documentation** — Updated descriptions for `export_datasource`, `import_datasource`, and `create_datasource` to clarify the difference between REST API format (used by export/create) and LM Exchange format (used by import).
+- **`add_widget` description** — Added format guidance for common widget types (bigNumber, cgraph) including GlobMatchToggle objects and aggregateFunction casing.
+
+Tool count: 177 -> 178.
+
 ## [1.7.0] - 2026-02-17
 
 ### Added

@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -148,5 +149,46 @@ async def get_datasource(
         }
 
         return format_response(datasource)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_datasource(
+    client: "LogicMonitorClient",
+    definition: dict,
+) -> list[TextContent]:
+    """Create a DataSource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_datasource).
+    Use this for creating DataSources from exported definitions or from
+    scratch. For LM Exchange format imports, use import_datasource instead.
+
+    Note: script DataSource datapoints require appropriate type values.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full DataSource definition dict in REST API format.
+
+    Returns:
+        List of TextContent with created DataSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.post("/setting/datasources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"DataSource '{result.get('name')}' created successfully",
+                "datasource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
     except Exception as e:
         return handle_error(e)

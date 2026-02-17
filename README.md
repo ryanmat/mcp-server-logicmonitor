@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 177 structured tools, 13 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 178 structured tools, 13 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**177 Tools** across comprehensive LogicMonitor API coverage:
+**178 Tools** across comprehensive LogicMonitor API coverage:
 
 ### AI Analysis Tools
 
@@ -836,7 +836,7 @@ The server exposes 24 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 177 tools organized by domain category |
+| `lm://guide/tool-categories` | All 178 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 
@@ -1090,6 +1090,13 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.7.1
+- **Fix**: API client detects errors returned inside HTTP 200 response bodies (`errorMessage` + `errorCode`)
+- **Fix**: `add_widget` endpoint corrected from `/dashboard/dashboards/{id}/widgets` to `/dashboard/widgets`
+- **Fix**: `import_datasource` detects silent failures (empty `{}` responses)
+- **New**: `create_datasource` tool for creating DataSources via REST API format (round-trip with `export_datasource`)
+- **Docs**: Clarified export/import format differences (REST API vs LM Exchange)
 
 ### v1.7.0
 - **New**: 5 Claude Code skills for guided multi-step workflows: `/lm-triage` (alert triage), `/lm-health` (device health), `/lm-portal` (portal overview), `/lm-capacity` (capacity planning), `/lm-apm` (APM investigation)

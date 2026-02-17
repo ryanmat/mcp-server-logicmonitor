@@ -589,7 +589,7 @@ class TestAddWidget:
         from lm_mcp.tools.dashboards import add_widget
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123/widgets"
+            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -617,6 +617,35 @@ class TestAddWidget:
         assert data["success"] is True
         assert data["widget"]["id"] == 789
         assert data["widget"]["name"] == "New Widget"
+
+    @respx.mock
+    async def test_add_widget_dashboard_id_in_body(self, client, enable_writes):
+        """add_widget includes dashboardId in the request body."""
+        from lm_mcp.tools.dashboards import add_widget
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 790,
+                    "name": "Body Check Widget",
+                    "type": "text",
+                    "dashboardId": 456,
+                },
+            )
+        )
+
+        await add_widget(
+            client,
+            dashboard_id=456,
+            name="Body Check Widget",
+            widget_type="text",
+        )
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["dashboardId"] == 456
 
 
 class TestUpdateWidget:
