@@ -71,6 +71,16 @@ Pure-Python statistical methods for capacity planning, trend analysis, and opera
 - **Trend Classification**: Categorizes metrics as stable, increasing, decreasing, cyclic, or volatile
 - **Device Health Scoring**: Multi-metric composite health score (0-100) using z-score analysis with configurable weights
 
+### APM Trace Tools
+
+Service discovery and RED metrics for LogicMonitor APM (Application Performance Monitoring):
+
+- **Service Discovery**: List all traced services, inspect individual service details and properties
+- **Operation Listing**: Discover endpoints/routes monitored within each service
+- **RED Metrics**: Duration, error count, and operation count at both service and per-operation level
+- **Alert Integration**: View active alerts for any traced service
+- **Property Inspection**: OTel attributes, namespace info, and auto-discovered metadata
+
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
 - **Device Management**: Full CRUD - list, create, update, delete devices and groups
@@ -464,6 +474,19 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_device_instances` | List instances for a DataSource on a device | No |
 | `get_device_data` | Get metric data for a specific instance | No |
 | `get_graph_data` | Get graph data for visualization | No |
+
+### APM Trace Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_trace_services` | List APM trace services (deviceType:6) | No |
+| `get_trace_service` | Get detailed APM service information | No |
+| `get_trace_service_alerts` | Get alerts for an APM service | No |
+| `get_trace_service_datasources` | List datasources applied to an APM service | No |
+| `get_trace_operations` | List operations (endpoints/routes) for an APM service | No |
+| `get_trace_service_metrics` | Get service-level RED metrics (Duration, ErrorOperationCount, OperationCount) | No |
+| `get_trace_operation_metrics` | Get per-operation RED metrics | No |
+| `get_trace_service_properties` | Get APM service properties (OTel attributes, metadata) | No |
 
 ### Dashboard Tools
 

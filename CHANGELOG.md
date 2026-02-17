@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-02-16
+
+### Added
+
+8 APM trace tools for service discovery and RED metrics via the v3 API. APM services are stored as `deviceType:6` devices with `LogicMonitor_APM_Services` and `LogicMonitor_APM_Operations` datasources.
+
+- **`get_trace_services`** — Lists all APM trace services by filtering for deviceType:6. Entry point for discovering which services are instrumented. Supports namespace filtering for substring matching on service names.
+- **`get_trace_service`** — Gets full device detail for a specific APM service, including status, groups, and configuration.
+- **`get_trace_service_alerts`** — Gets active alerts for an APM service with optional severity filtering (critical, error, warning, info). Bridges traces and alerting.
+- **`get_trace_service_datasources`** — Lists datasources applied to an APM service (LogicMonitor_APM_Services, LogicMonitor_APM_Operations, etc.). Required step before querying instances or metric data.
+- **`get_trace_operations`** — Lists operation instances (endpoints/routes) for an APM service datasource. Each operation has its own RED metrics.
+- **`get_trace_service_metrics`** — Gets service-level time-series data for Duration, ErrorOperationCount, OperationCount, and UniqueOperationCount. Supports time range and datapoint filtering.
+- **`get_trace_operation_metrics`** — Gets per-operation RED metrics for a specific endpoint/route. Same API shape as service metrics but scoped to an individual operation instance.
+- **`get_trace_service_properties`** — Gets device properties for an APM service including OTel attributes, namespace info, and auto-discovered metadata. Supports name filtering.
+
+Tool count: 167 -> 175. Added "traces" category to tool-categories guide resource.
+
 ## [1.5.1] - 2026-02-14
 
 ### Added
