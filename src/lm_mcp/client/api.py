@@ -12,6 +12,7 @@ from lm_mcp.auth import AuthProvider
 from lm_mcp.exceptions import (
     AuthenticationError,
     LMConnectionError,
+    LMError,
     LMPermissionError,
     NotFoundError,
     RateLimitError,
@@ -136,6 +137,13 @@ class LogicMonitorClient:
             raise RateLimitError(message, retry_after=retry_after)
         elif status >= 500:
             raise ServerError(message)
+        elif 400 <= status < 500:
+            raise LMError(
+                message=message,
+                code=f"HTTP_{status}",
+                suggestion=f"The API returned HTTP {status}. "
+                "Check the request parameters and body format.",
+            )
 
     async def request(
         self,
@@ -236,6 +244,83 @@ class LogicMonitorClient:
             Parsed JSON response.
         """
         return await self.request("POST", path, json_body=json_body)
+
+    async def post_multipart(self, path: str, definition: dict) -> dict:
+        """Make a multipart/form-data POST request for LogicModule imports.
+
+        The LM import endpoints require multipart file upload rather than JSON body.
+        The definition is serialized to JSON and uploaded as a file part named 'file'.
+        Content-Type is not set explicitly so httpx auto-generates the multipart boundary.
+
+        Args:
+            path: API resource path (e.g., /setting/datasources/importjson).
+            definition: LogicModule definition dict to import.
+
+        Returns:
+            Parsed JSON response as dict.
+
+        Raises:
+            LMConnectionError: If connection fails.
+            AuthenticationError: For 401 responses.
+            LMPermissionError: For 403 responses.
+            NotFoundError: For 404 responses.
+            RateLimitError: For 429 responses after retries exhausted.
+            ServerError: For 5xx responses.
+            LMError: For other 4xx responses.
+        """
+        url = f"{self.base_url}{path}"
+        json_str = json.dumps(definition)
+
+        # Build headers without Content-Type (httpx sets multipart boundary)
+        headers = {
+            "X-Version": str(self.api_version),
+        }
+        # Use empty body string for auth signature (multipart bodies aren't signed)
+        headers.update(self.auth.get_auth_headers("POST", path, ""))
+
+        files = {"file": ("import.json", json_str, "application/json")}
+
+        log_api_request("POST", path, None)
+
+        last_retry_after: int | None = None
+        last_message = "Rate limited"
+
+        for attempt in range(self.max_retries + 1):
+            request_start = time.monotonic()
+            try:
+                response = await self._client.request(
+                    method="POST",
+                    url=url,
+                    files=files,
+                    headers=headers,
+                )
+            except httpx.ConnectError as e:
+                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}")
+
+            # Retry on rate limit (429) or server errors (5xx)
+            if response.status_code == 429 or response.status_code >= 500:
+                message, retry_after = self._parse_error_response(response)
+                last_message = message
+                last_retry_after = retry_after
+
+                if attempt < self.max_retries:
+                    base_backoff = 2**attempt
+                    jitter = random.uniform(0, 0.5 * base_backoff)
+                    wait_time = base_backoff + jitter
+                    if retry_after is not None:
+                        wait_time = min(retry_after, wait_time)
+                    await asyncio.sleep(wait_time)
+                    continue
+
+            if response.status_code >= 400:
+                message, retry_after = self._parse_error_response(response)
+                self._raise_for_status(response, message, retry_after)
+
+            elapsed = time.monotonic() - request_start
+            log_api_response(response.status_code, elapsed, path)
+            return response.json()
+
+        raise RateLimitError(last_message, retry_after=last_retry_after)
 
     async def put(self, path: str, json_body: dict | None = None) -> dict:
         """Make a PUT request.

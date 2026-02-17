@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ryanmat/logicmonitor",
-  "description": "LogicMonitor API integration with 175 tools for alerts, devices, dashboards, traces, and more.",
+  "description": "LogicMonitor API integration with 177 tools for alerts, devices, dashboards, traces, and more.",
   "repository": {
     "url": "https://github.com/ryanmat/mcp-server-logicmonitor",
     "source": "github"
   },
-  "version": "1.6.0",
+  "version": "1.6.1",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "lm-mcp",
-      "version": "1.6.0",
+      "version": "1.6.1",
       "transport": {
         "type": "stdio"
       },

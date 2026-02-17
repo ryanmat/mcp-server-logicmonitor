@@ -17,9 +17,11 @@ async def export_datasource(
     client: "LogicMonitorClient",
     datasource_id: int,
 ) -> list[TextContent]:
-    """Export a DataSource definition as JSON.
+    """Export a DataSource definition as JSON via REST API.
 
-    Useful for backing up DataSource configurations or copying between portals.
+    Returns the REST API representation of the DataSource. This format differs
+    from LM Exchange format used by import endpoints. To import into another
+    portal, use LM Exchange export from the portal UI instead.
 
     Args:
         client: LogicMonitor API client.
@@ -46,7 +48,10 @@ async def export_eventsource(
     client: "LogicMonitorClient",
     eventsource_id: int,
 ) -> list[TextContent]:
-    """Export an EventSource definition as JSON.
+    """Export an EventSource definition as JSON via REST API.
+
+    Returns the REST API representation. This format differs from LM Exchange
+    format used by import endpoints.
 
     Args:
         client: LogicMonitor API client.
@@ -73,7 +78,10 @@ async def export_configsource(
     client: "LogicMonitorClient",
     configsource_id: int,
 ) -> list[TextContent]:
-    """Export a ConfigSource definition as JSON.
+    """Export a ConfigSource definition as JSON via REST API.
+
+    Returns the REST API representation. This format differs from LM Exchange
+    format used by import endpoints.
 
     Args:
         client: LogicMonitor API client.
@@ -100,7 +108,10 @@ async def export_propertysource(
     client: "LogicMonitorClient",
     propertysource_id: int,
 ) -> list[TextContent]:
-    """Export a PropertySource definition as JSON.
+    """Export a PropertySource definition as JSON via REST API.
+
+    Returns the REST API representation. This format differs from LM Exchange
+    format used by import endpoints.
 
     Args:
         client: LogicMonitor API client.
@@ -127,7 +138,10 @@ async def export_logsource(
     client: "LogicMonitorClient",
     logsource_id: int,
 ) -> list[TextContent]:
-    """Export a LogSource definition as JSON.
+    """Export a LogSource definition as JSON via REST API.
+
+    Returns the REST API representation. This format differs from LM Exchange
+    format used by import endpoints.
 
     Args:
         client: LogicMonitor API client.
@@ -245,7 +259,7 @@ async def import_datasource(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import a DataSource from JSON definition (v228 API).
+    """Import a DataSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -255,7 +269,9 @@ async def import_datasource(
         List of TextContent with imported DataSource info or error.
     """
     try:
-        result = await client.post("/setting/datasources/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/datasources/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -272,7 +288,7 @@ async def import_configsource(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import a ConfigSource from JSON definition (v228 API).
+    """Import a ConfigSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -282,7 +298,9 @@ async def import_configsource(
         List of TextContent with imported ConfigSource info or error.
     """
     try:
-        result = await client.post("/setting/configsources/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/configsources/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -298,7 +316,7 @@ async def import_eventsource(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import an EventSource from JSON definition (v228 API).
+    """Import an EventSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -308,7 +326,9 @@ async def import_eventsource(
         List of TextContent with imported EventSource info or error.
     """
     try:
-        result = await client.post("/setting/eventsources/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/eventsources/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -324,7 +344,7 @@ async def import_propertysource(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import a PropertySource from JSON definition (v228 API).
+    """Import a PropertySource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -334,7 +354,9 @@ async def import_propertysource(
         List of TextContent with imported PropertySource info or error.
     """
     try:
-        result = await client.post("/setting/propertyrules/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/propertyrules/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -350,7 +372,7 @@ async def import_logsource(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import a LogSource from JSON definition (v228 API).
+    """Import a LogSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -360,7 +382,9 @@ async def import_logsource(
         List of TextContent with imported LogSource info or error.
     """
     try:
-        result = await client.post("/setting/logsources/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/logsources/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -376,7 +400,7 @@ async def import_topologysource(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import a TopologySource from JSON definition (v228 API).
+    """Import a TopologySource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -386,7 +410,9 @@ async def import_topologysource(
         List of TextContent with imported TopologySource info or error.
     """
     try:
-        result = await client.post("/setting/topologysources/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/topologysources/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -402,7 +428,7 @@ async def import_jobmonitor(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import a JobMonitor from JSON definition (v228 API).
+    """Import a JobMonitor from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -412,7 +438,9 @@ async def import_jobmonitor(
         List of TextContent with imported JobMonitor info or error.
     """
     try:
-        result = await client.post("/setting/batchjobs/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/batchjobs/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -428,7 +456,7 @@ async def import_appliesto_function(
     client: "LogicMonitorClient",
     definition: dict,
 ) -> list[TextContent]:
-    """Import an AppliesTo function from JSON definition (v228 API).
+    """Import an AppliesTo function from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
@@ -438,7 +466,9 @@ async def import_appliesto_function(
         List of TextContent with imported function info or error.
     """
     try:
-        result = await client.post("/setting/functions/importjson", json_body=definition)
+        result = await client.post_multipart(
+            "/setting/functions/importjson", definition=definition
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),

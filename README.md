@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 175 structured tools, 13 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 177 structured tools, 13 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**175 Tools** across comprehensive LogicMonitor API coverage:
+**177 Tools** across comprehensive LogicMonitor API coverage:
 
 ### AI Analysis Tools
 
@@ -822,7 +822,7 @@ The server exposes 24 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 175 tools organized by domain category |
+| `lm://guide/tool-categories` | All 177 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 

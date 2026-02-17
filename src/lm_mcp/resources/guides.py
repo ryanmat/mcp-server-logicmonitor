@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 175 tools organized by domain category.
+# All 177 tools organized by domain category.
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -92,6 +92,8 @@ TOOL_CATEGORIES = {
                 "delete_widget",
                 "get_dashboard_groups",
                 "get_dashboard_group",
+                "create_dashboard_group",
+                "delete_dashboard_group",
             ],
         },
         "websites": {

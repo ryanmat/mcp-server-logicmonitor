@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -101,5 +102,72 @@ async def get_dashboard_group(
         }
 
         return format_response(group)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_dashboard_group(
+    client: "LogicMonitorClient",
+    name: str,
+    parent_id: int | None = None,
+    description: str | None = None,
+) -> list[TextContent]:
+    """Create a dashboard group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the dashboard group.
+        parent_id: Parent group ID (optional).
+        description: Optional description.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        body: dict = {"name": name}
+
+        if parent_id is not None:
+            body["parentId"] = parent_id
+        if description:
+            body["description"] = description
+
+        result = await client.post("/dashboard/groups", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Dashboard group '{name}' created",
+                "group_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_dashboard_group(
+    client: "LogicMonitorClient",
+    group_id: int,
+) -> list[TextContent]:
+    """Delete a dashboard group from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: ID of the group to delete.
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        await client.delete(f"/dashboard/groups/{group_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Dashboard group {group_id} deleted",
+            }
+        )
     except Exception as e:
         return handle_error(e)

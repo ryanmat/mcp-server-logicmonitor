@@ -276,6 +276,124 @@ class TestCreateDashboard:
         assert data["dashboard"]["name"] == "New Dashboard"
 
 
+class TestCreateDashboardWithWidgetTokens:
+    """Tests for create_dashboard with widget_tokens and template params."""
+
+    @respx.mock
+    async def test_create_dashboard_with_widget_tokens(self, client, enable_writes):
+        """create_dashboard passes widget_tokens as widgetTokens in payload."""
+        from lm_mcp.tools.dashboards import create_dashboard
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 600, "name": "Token Dashboard", "groupId": 1},
+            )
+        )
+
+        tokens = [
+            {"name": "##hostname##", "value": "prod-web-01"},
+            {"name": "##group##", "value": "Production"},
+        ]
+
+        result = await create_dashboard(
+            client,
+            name="Token Dashboard",
+            widget_tokens=tokens,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["dashboard"]["id"] == 600
+
+        # Verify widgetTokens was sent in the request body
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["widgetTokens"] == tokens
+
+    @respx.mock
+    async def test_create_dashboard_with_template(self, client, enable_writes):
+        """create_dashboard uses template as base payload, overriding name and stripping id."""
+        from lm_mcp.tools.dashboards import create_dashboard
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 700, "name": "Cloned Dashboard", "groupId": 2},
+            )
+        )
+
+        template = {
+            "id": 999,
+            "name": "Original Dashboard",
+            "groupId": 2,
+            "sharable": True,
+            "widgetsConfig": [1, 2, 3],
+            "description": "From template",
+        }
+
+        result = await create_dashboard(
+            client,
+            name="Cloned Dashboard",
+            template=template,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["dashboard"]["id"] == 700
+
+        # Verify template fields are used, name is overridden, id is stripped
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["name"] == "Cloned Dashboard"
+        assert "id" not in request_body
+        assert request_body["description"] == "From template"
+        assert request_body["widgetsConfig"] == [1, 2, 3]
+
+    @respx.mock
+    async def test_create_dashboard_template_with_tokens_override(
+        self, client, enable_writes
+    ):
+        """create_dashboard with both template and widget_tokens merges correctly."""
+        from lm_mcp.tools.dashboards import create_dashboard
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 800, "name": "Merged Dashboard", "groupId": 1},
+            )
+        )
+
+        template = {
+            "id": 100,
+            "name": "Template Name",
+            "groupId": 5,
+            "widgetTokens": [{"name": "##old##", "value": "old_val"}],
+        }
+        tokens = [{"name": "##new##", "value": "new_val"}]
+
+        result = await create_dashboard(
+            client,
+            name="Merged Dashboard",
+            group_id=1,
+            widget_tokens=tokens,
+            template=template,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        # Explicit params override template values
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["name"] == "Merged Dashboard"
+        assert request_body["groupId"] == 1
+        assert request_body["widgetTokens"] == tokens
+
+
 class TestUpdateDashboard:
     """Tests for update_dashboard tool."""
 

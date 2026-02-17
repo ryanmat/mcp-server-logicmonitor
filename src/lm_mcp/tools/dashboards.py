@@ -173,8 +173,15 @@ async def create_dashboard(
     group_id: int = 1,
     description: str | None = None,
     sharable: bool = True,
+    widget_tokens: list[dict] | None = None,
+    template: dict | None = None,
 ) -> list[TextContent]:
     """Create a new dashboard.
+
+    Supports creating from scratch or cloning from an exported dashboard template.
+    When using a template, the exported definition is used as the base payload with
+    the name overridden and the id stripped. Explicit parameters (group_id, description,
+    widget_tokens) override any values from the template.
 
     Args:
         client: LogicMonitor API client.
@@ -182,19 +189,33 @@ async def create_dashboard(
         group_id: Dashboard group ID (default: 1 for root).
         description: Dashboard description.
         sharable: Whether dashboard is sharable (default: True).
+        widget_tokens: List of token dicts (e.g., [{"name": "##host##", "value": "server1"}]).
+        template: Full dashboard definition to use as base (from export_dashboard).
 
     Returns:
         List of TextContent with created dashboard details or error.
     """
     try:
-        payload: dict = {
-            "name": name,
-            "groupId": group_id,
-            "sharable": sharable,
-        }
-
-        if description:
-            payload["description"] = description
+        if template:
+            payload = dict(template)
+            payload.pop("id", None)
+            payload["name"] = name
+            payload["groupId"] = group_id
+            payload["sharable"] = sharable
+            if description:
+                payload["description"] = description
+            if widget_tokens is not None:
+                payload["widgetTokens"] = widget_tokens
+        else:
+            payload = {
+                "name": name,
+                "groupId": group_id,
+                "sharable": sharable,
+            }
+            if description:
+                payload["description"] = description
+            if widget_tokens is not None:
+                payload["widgetTokens"] = widget_tokens
 
         result = await client.post("/dashboard/dashboards", json_body=payload)
 

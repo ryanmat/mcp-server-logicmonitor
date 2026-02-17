@@ -177,11 +177,11 @@ class TestExportEscalationChain:
 
 
 class TestImportDatasource:
-    """Tests for import_datasource tool (v228 JSON import API)."""
+    """Tests for import_datasource tool (multipart import API)."""
 
     @respx.mock
     async def test_import_datasource_success(self, client, monkeypatch):
-        """import_datasource successfully imports a DataSource."""
+        """import_datasource successfully imports a DataSource via multipart upload."""
         from lm_mcp.tools.imports import import_datasource
 
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -193,7 +193,7 @@ class TestImportDatasource:
 
         reload(lm_mcp.config)
 
-        respx.post(
+        route = respx.post(
             "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
         ).mock(
             return_value=httpx.Response(
@@ -219,6 +219,9 @@ class TestImportDatasource:
         data = json.loads(result[0].text)
         assert data["imported_id"] == 1001
         assert data["name"] == "ImportedDataSource"
+        # Verify multipart upload
+        content_type = route.calls[0].request.headers.get("content-type", "")
+        assert "multipart/form-data" in content_type
 
     async def test_import_datasource_requires_write_permission(self, client, monkeypatch):
         """import_datasource requires write permission."""

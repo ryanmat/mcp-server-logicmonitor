@@ -284,6 +284,100 @@ class TestLogicMonitorClientErrors:
                 await client.get("/test")
 
 
+class TestUnhandled4xx:
+    """Tests for unhandled 4xx status codes (400, 405, 409, 415, etc.)."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_400_raises_lm_error(self):
+        """400 Bad Request raises LMError."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(400, json={"errorMessage": "Invalid request body"})
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError, match="Invalid request body") as exc_info:
+                await client.post("/test", json_body={"bad": "data"})
+
+        assert exc_info.value.code == "HTTP_400"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_409_raises_lm_error(self):
+        """409 Conflict raises LMError."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(409, json={"errorMessage": "Resource conflict"})
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError, match="Resource conflict") as exc_info:
+                await client.post("/test", json_body={"name": "duplicate"})
+
+        assert exc_info.value.code == "HTTP_409"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_415_raises_lm_error(self):
+        """415 Unsupported Media Type raises LMError."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(
+                415, json={"errorMessage": "Unsupported media type"}
+            )
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError, match="Unsupported media type") as exc_info:
+                await client.post("/test", json_body={"data": "test"})
+
+        assert exc_info.value.code == "HTTP_415"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_4xx_error_includes_suggestion(self):
+        """Unhandled 4xx errors include helpful suggestion text."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(405, json={"errorMessage": "Method not allowed"})
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError) as exc_info:
+                await client.post("/test", json_body={})
+
+        assert "HTTP 405" in exc_info.value.suggestion
+
+
 class TestLogicMonitorClientContextManager:
     """Tests for async context manager."""
 
@@ -302,3 +396,119 @@ class TestLogicMonitorClientContextManager:
             assert client._client is not None
 
         assert client._client.is_closed
+
+
+class TestPostMultipart:
+    """Tests for post_multipart method (multipart/form-data uploads)."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_post_multipart_sends_file_upload(self):
+        """post_multipart sends definition as multipart file upload."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=Response(
+                200,
+                json={"id": 1001, "name": "TestDS"},
+            )
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            result = await client.post_multipart(
+                "/setting/datasources/importjson",
+                definition={"name": "TestDS", "appliesTo": "isLinux()"},
+            )
+
+        assert result == {"id": 1001, "name": "TestDS"}
+        assert route.called
+        request = route.calls[0].request
+        content_type = request.headers.get("content-type", "")
+        assert "multipart/form-data" in content_type
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_post_multipart_does_not_send_json_content_type(self):
+        """post_multipart does not set Content-Type to application/json."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources/importjson"
+        ).mock(
+            return_value=Response(200, json={"id": 2001, "name": "TestES"})
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            await client.post_multipart(
+                "/setting/eventsources/importjson",
+                definition={"name": "TestES"},
+            )
+
+        request = route.calls[0].request
+        content_type = request.headers.get("content-type", "")
+        assert "application/json" not in content_type
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_post_multipart_raises_on_error(self):
+        """post_multipart raises appropriate exceptions on error status."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=Response(
+                400, json={"errorMessage": "Invalid import format"}
+            )
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError, match="Invalid import format"):
+                await client.post_multipart(
+                    "/setting/datasources/importjson",
+                    definition={"bad": "format"},
+                )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_post_multipart_includes_auth_header(self):
+        """post_multipart includes Authorization header."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=Response(200, json={"id": 1, "name": "DS"})
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            await client.post_multipart(
+                "/setting/datasources/importjson",
+                definition={"name": "DS"},
+            )
+
+        request = route.calls[0].request
+        assert "Bearer test_token" in request.headers.get("authorization", "")

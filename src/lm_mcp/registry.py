@@ -711,7 +711,8 @@ TOOLS.extend(
         ),
         Tool(
             name="create_dashboard",
-            description="Create a new dashboard (requires write permission)",
+            description="Create a dashboard, optionally from template "
+            "(requires write permission)",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -727,6 +728,17 @@ TOOLS.extend(
                         "type": "boolean",
                         "default": True,
                         "description": "Make dashboard sharable",
+                    },
+                    "widget_tokens": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Widget token overrides "
+                        '(e.g., [{"name": "##host##", "value": "server1"}])',
+                    },
+                    "template": {
+                        "type": "object",
+                        "description": "Full dashboard definition to clone from "
+                        "(from export_dashboard). Name is overridden, id is stripped.",
                     },
                 },
                 "required": ["name"],
@@ -844,6 +856,38 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "group_id": {"type": "integer", "description": "Dashboard group ID"},
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="create_dashboard_group",
+            description="Create a dashboard group in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name of the dashboard group"},
+                    "parent_id": {
+                        "type": "integer",
+                        "description": "Parent group ID (optional)",
+                    },
+                    "description": {"type": "string", "description": "Optional description"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="delete_dashboard_group",
+            description="Delete a dashboard group from LogicMonitor (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Dashboard group ID to delete",
+                    },
                 },
                 "required": ["group_id"],
             },
@@ -3592,6 +3636,8 @@ def get_tool_handler(tool_name: str) -> Any:
         # Dashboard Groups
         "get_dashboard_groups": dashboard_groups.get_dashboard_groups,
         "get_dashboard_group": dashboard_groups.get_dashboard_group,
+        "create_dashboard_group": dashboard_groups.create_dashboard_group,
+        "delete_dashboard_group": dashboard_groups.delete_dashboard_group,
         # Websites
         "get_websites": websites.get_websites,
         "get_website": websites.get_website,
