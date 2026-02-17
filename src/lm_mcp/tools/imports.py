@@ -261,9 +261,12 @@ async def import_datasource(
 ) -> list[TextContent]:
     """Import a DataSource from LM Exchange JSON definition via multipart upload.
 
+    Expects LM Exchange format (different from REST API format). For REST API
+    format definitions (e.g., from export_datasource), use create_datasource instead.
+
     Args:
         client: LogicMonitor API client.
-        definition: DataSource JSON definition to import.
+        definition: DataSource JSON definition in LM Exchange format to import.
 
     Returns:
         List of TextContent with imported DataSource info or error.
@@ -272,6 +275,19 @@ async def import_datasource(
         result = await client.post_multipart(
             "/setting/datasources/importjson", definition=definition
         )
+
+        # Detect silent failures where the API returns empty or null-id responses
+        if result.get("id") is None and result.get("errorMessage") is None:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "IMPORT_SILENT_FAILURE",
+                    "message": "Import may have silently failed. The API returned no "
+                    "ID or error. Verify the definition is in LM Exchange format "
+                    "(not REST API format). For REST API format, use create_datasource.",
+                }
+            )
+
         return format_response(
             {
                 "imported_id": result.get("id"),

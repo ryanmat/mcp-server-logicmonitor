@@ -512,3 +512,112 @@ class TestPostMultipart:
 
         request = route.calls[0].request
         assert "Bearer test_token" in request.headers.get("authorization", "")
+
+
+class TestResponseBodyErrorDetection:
+    """Tests for detecting errors returned inside HTTP 200 response bodies."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_200_with_error_body_raises_lm_error(self):
+        """HTTP 200 with errorMessage and errorCode in body raises LMError."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(
+                200,
+                json={
+                    "errorMessage": "Unknown type value: script",
+                    "errorCode": 1400,
+                },
+            )
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError, match="Unknown type value: script") as exc_info:
+                await client.post("/test", json_body={"type": "script"})
+
+        assert exc_info.value.code == "API_ERROR_1400"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_200_with_valid_body_passes(self):
+        """HTTP 200 with normal response body passes through."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(200, json={"id": 1, "name": "TestDS"})
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            result = await client.post("/test", json_body={"name": "TestDS"})
+
+        assert result == {"id": 1, "name": "TestDS"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_200_with_error_in_multipart_raises_lm_error(self):
+        """HTTP 200 with error body via post_multipart raises LMError."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=Response(
+                200,
+                json={
+                    "errorMessage": "Invalid import definition",
+                    "errorCode": 1400,
+                },
+            )
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            with pytest.raises(LMError, match="Invalid import definition"):
+                await client.post_multipart(
+                    "/setting/datasources/importjson",
+                    definition={"bad": "data"},
+                )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_200_with_partial_error_fields_passes(self):
+        """HTTP 200 with only errorMessage but no errorCode passes through."""
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
+            return_value=Response(
+                200,
+                json={
+                    "errorMessage": "Some message",
+                    "id": 42,
+                },
+            )
+        )
+
+        auth = BearerAuth("test_token")
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            result = await client.post("/test", json_body={"name": "test"})
+
+        assert result["id"] == 42

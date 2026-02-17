@@ -393,7 +393,7 @@ async def add_widget(
             payload.update(config)
 
         result = await client.post(
-            f"/dashboard/dashboards/{dashboard_id}/widgets",
+            "/dashboard/widgets",
             json_body=payload,
         )
 

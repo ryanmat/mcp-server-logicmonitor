@@ -108,6 +108,29 @@ class LogicMonitorClient:
 
         return message, retry_after
 
+    def _check_response_body_errors(self, data: dict) -> None:
+        """Check for API errors returned inside HTTP 200 response bodies.
+
+        Some LM API endpoints return HTTP 200 but include error details
+        in the JSON body (errorMessage + errorCode). This method detects
+        that pattern and raises LMError so callers see the failure.
+
+        Args:
+            data: Parsed JSON response body.
+
+        Raises:
+            LMError: If response body contains both errorMessage and errorCode.
+        """
+        if not isinstance(data, dict):
+            return
+        error_message = data.get("errorMessage")
+        error_code = data.get("errorCode")
+        if error_message and error_code is not None:
+            raise LMError(
+                message=str(error_message),
+                code=f"API_ERROR_{error_code}",
+            )
+
     def _raise_for_status(
         self, response: httpx.Response, message: str, retry_after: int | None
     ) -> None:
@@ -217,7 +240,9 @@ class LogicMonitorClient:
 
             elapsed = time.monotonic() - request_start
             log_api_response(response.status_code, elapsed, path)
-            return response.json()
+            data = response.json()
+            self._check_response_body_errors(data)
+            return data
 
         raise RateLimitError(last_message, retry_after=last_retry_after)
 
@@ -318,7 +343,9 @@ class LogicMonitorClient:
 
             elapsed = time.monotonic() - request_start
             log_api_response(response.status_code, elapsed, path)
-            return response.json()
+            data = response.json()
+            self._check_response_body_errors(data)
+            return data
 
         raise RateLimitError(last_message, retry_after=last_retry_after)
 

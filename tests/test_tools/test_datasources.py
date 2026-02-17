@@ -1,5 +1,5 @@
 # Description: Tests for DataSource MCP tools.
-# Description: Validates get_datasources, get_datasource functions.
+# Description: Validates get_datasources, get_datasource, create_datasource functions.
 
 import json
 
@@ -273,3 +273,137 @@ class TestGetDatasourcesFilters:
         assert data["total"] == 500
         assert data["has_more"] is True
         assert data["offset"] == 0
+
+
+@pytest.fixture
+def enable_writes(monkeypatch):
+    """Enable write operations for testing."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+    from importlib import reload
+
+    import lm_mcp.config
+
+    reload(lm_mcp.config)
+
+
+class TestCreateDatasource:
+    """Tests for create_datasource tool."""
+
+    async def test_create_datasource_requires_write_permission(self, client, monkeypatch):
+        """create_datasource requires write permission."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await create_datasource(client, definition={"name": "TestDS"})
+
+        assert len(result) == 1
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_create_datasource_posts_definition(self, client, enable_writes):
+        """create_datasource posts definition to /setting/datasources."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        definition = {
+            "name": "CustomDS",
+            "displayName": "Custom DataSource",
+            "appliesTo": "isLinux()",
+            "collectMethod": "script",
+            "dataPoints": [{"name": "dp1", "type": 0}],
+        }
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 5001,
+                    "name": "CustomDS",
+                    "displayName": "Custom DataSource",
+                },
+            )
+        )
+
+        await create_datasource(client, definition=definition)
+
+        assert route.called
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["name"] == "CustomDS"
+        assert request_body["appliesTo"] == "isLinux()"
+
+    @respx.mock
+    async def test_create_datasource_returns_created_fields(self, client, enable_writes):
+        """create_datasource returns id, name, displayName from response."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 5002,
+                    "name": "NewDS",
+                    "displayName": "New DataSource",
+                },
+            )
+        )
+
+        result = await create_datasource(
+            client,
+            definition={"name": "NewDS", "displayName": "New DataSource"},
+        )
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["datasource"]["id"] == 5002
+        assert data["datasource"]["name"] == "NewDS"
+        assert data["datasource"]["display_name"] == "New DataSource"
+
+    @respx.mock
+    async def test_create_datasource_strips_id_from_definition(self, client, enable_writes):
+        """create_datasource strips id from definition before POST."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 5003, "name": "ClonedDS", "displayName": "Cloned DS"},
+            )
+        )
+
+        definition = {"id": 999, "name": "ClonedDS", "displayName": "Cloned DS"}
+        await create_datasource(client, definition=definition)
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert "id" not in request_body
+
+    @respx.mock
+    async def test_create_datasource_handles_api_error(self, client, enable_writes):
+        """create_datasource handles API errors gracefully."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                400, json={"errorMessage": "Invalid DataSource definition"}
+            )
+        )
+
+        result = await create_datasource(
+            client, definition={"name": "Bad"}
+        )
+
+        assert "Error:" in result[0].text

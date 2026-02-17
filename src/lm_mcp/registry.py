@@ -774,7 +774,14 @@ TOOLS.extend(
         ),
         Tool(
             name="add_widget",
-            description="Add a widget to a dashboard (requires write permission)",
+            description="Add a widget to a dashboard (requires write permission). "
+            "For bigNumber widgets: dataPoints need 'name' field, include "
+            "'bigNumberItems' array, colorThresholds use 'relation'/'threshold', "
+            "aggregateFunction is lowercase (e.g., 'average'). "
+            "For cgraph widgets: deviceDisplayName/deviceGroupFullPath/instanceName "
+            "must be GlobMatchToggle objects {'value': '...', 'isGlob': true}, "
+            "dataPoints need 'display' object, graphInfo needs 'aggregate': false "
+            "when using topX.",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -783,7 +790,8 @@ TOOLS.extend(
                     "name": {"type": "string", "description": "Widget name"},
                     "widget_type": {
                         "type": "string",
-                        "description": "Widget type (cgraph, sgraph, text, etc.)",
+                        "description": "Widget type (cgraph, sgraph, bigNumber, text, "
+                        "html, alert, noc, gauge, pieChart, table, etc.)",
                     },
                     "column_index": {
                         "type": "integer",
@@ -797,7 +805,11 @@ TOOLS.extend(
                         "description": "Column span (1-12)",
                     },
                     "description": {"type": "string", "description": "Widget description"},
-                    "config": {"type": "object", "description": "Widget configuration"},
+                    "config": {
+                        "type": "object",
+                        "description": "Widget configuration (type-specific). "
+                        "Merged into the request payload.",
+                    },
                 },
                 "required": ["dashboard_id", "name", "widget_type"],
             },
@@ -1667,6 +1679,25 @@ TOOLS.extend(
                 "required": ["datasource_id"],
             },
         ),
+        Tool(
+            name="create_datasource",
+            description="Create a DataSource via REST API from a full definition dict "
+            "(requires write permission). Accepts REST API format (same as "
+            "export_datasource output). Use for round-tripping exports or building "
+            "definitions from scratch. For LM Exchange format, use import_datasource. "
+            "Script DataSource datapoints require appropriate type values.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full DataSource definition in REST API format",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
     ]
 )
 
@@ -2371,7 +2402,8 @@ TOOLS.extend(
     [
         Tool(
             name="export_datasource",
-            description="Export a datasource definition",
+            description="Export a datasource definition (REST API format). "
+            "Output can be used with create_datasource for round-tripping.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -2470,12 +2502,18 @@ TOOLS.extend(
         ),
         Tool(
             name="import_datasource",
-            description="Import a DataSource from JSON (requires write permission)",
+            description="Import a DataSource from LM Exchange JSON format via "
+            "multipart upload (requires write permission). This expects LM Exchange "
+            "format, not REST API format. For REST API format definitions "
+            "(e.g., from export_datasource), use create_datasource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "definition": {"type": "object", "description": "DataSource JSON definition"},
+                    "definition": {
+                        "type": "object",
+                        "description": "DataSource JSON definition in LM Exchange format",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3692,6 +3730,7 @@ def get_tool_handler(tool_name: str) -> Any:
         # Datasources
         "get_datasources": datasources.get_datasources,
         "get_datasource": datasources.get_datasource,
+        "create_datasource": datasources.create_datasource,
         # ConfigSources
         "get_configsources": configsources.get_configsources,
         "get_configsource": configsources.get_configsource,
