@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 167 tools organized by domain category.
+# All 175 tools organized by domain category.
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -266,6 +266,19 @@ TOOL_CATEGORIES = {
                 "correlate_alerts",
                 "get_alert_statistics",
                 "get_metric_anomalies",
+            ],
+        },
+        "traces": {
+            "description": "APM trace service discovery, metrics, and properties",
+            "tools": [
+                "get_trace_services",
+                "get_trace_service",
+                "get_trace_service_alerts",
+                "get_trace_service_datasources",
+                "get_trace_operations",
+                "get_trace_service_metrics",
+                "get_trace_operation_metrics",
+                "get_trace_service_properties",
             ],
         },
         "ml_analysis": {

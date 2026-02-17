@@ -85,5 +85,10 @@ docs/
 # uv cache
 .uv/
 
+# HAR capture files (API traffic analysis)
+*.har
+*_api_map.json
+parse_har.py
+
 # MCP Registry tokens
 .mcpregistry_*
