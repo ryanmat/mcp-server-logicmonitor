@@ -3,11 +3,30 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
 from lm_mcp.tools import format_response, handle_error, require_write_permission
+
+
+def _ensure_dict(definition: dict | str) -> dict:
+    """Parse string definitions back to dict to prevent double-serialization.
+
+    When the MCP transport deserializes the definition parameter, complex nested
+    JSON (e.g., Groovy scripts with escape characters) may arrive as a string
+    rather than a parsed dict.
+
+    Args:
+        definition: Definition as dict or JSON string.
+
+    Returns:
+        Definition as dict.
+    """
+    if isinstance(definition, str):
+        return json.loads(definition)
+    return definition
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -257,7 +276,7 @@ async def export_escalation_chain(
 @require_write_permission
 async def import_datasource(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import a DataSource from LM Exchange JSON definition via multipart upload.
 
@@ -272,6 +291,7 @@ async def import_datasource(
         List of TextContent with imported DataSource info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/datasources/importjson", definition=definition
         )
@@ -302,7 +322,7 @@ async def import_datasource(
 @require_write_permission
 async def import_configsource(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import a ConfigSource from LM Exchange JSON definition via multipart upload.
 
@@ -314,6 +334,7 @@ async def import_configsource(
         List of TextContent with imported ConfigSource info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/configsources/importjson", definition=definition
         )
@@ -330,7 +351,7 @@ async def import_configsource(
 @require_write_permission
 async def import_eventsource(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import an EventSource from LM Exchange JSON definition via multipart upload.
 
@@ -342,6 +363,7 @@ async def import_eventsource(
         List of TextContent with imported EventSource info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/eventsources/importjson", definition=definition
         )
@@ -358,7 +380,7 @@ async def import_eventsource(
 @require_write_permission
 async def import_propertysource(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import a PropertySource from LM Exchange JSON definition via multipart upload.
 
@@ -370,6 +392,7 @@ async def import_propertysource(
         List of TextContent with imported PropertySource info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/propertyrules/importjson", definition=definition
         )
@@ -386,7 +409,7 @@ async def import_propertysource(
 @require_write_permission
 async def import_logsource(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import a LogSource from LM Exchange JSON definition via multipart upload.
 
@@ -398,6 +421,7 @@ async def import_logsource(
         List of TextContent with imported LogSource info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/logsources/importjson", definition=definition
         )
@@ -414,7 +438,7 @@ async def import_logsource(
 @require_write_permission
 async def import_topologysource(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import a TopologySource from LM Exchange JSON definition via multipart upload.
 
@@ -426,6 +450,7 @@ async def import_topologysource(
         List of TextContent with imported TopologySource info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/topologysources/importjson", definition=definition
         )
@@ -442,7 +467,7 @@ async def import_topologysource(
 @require_write_permission
 async def import_jobmonitor(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import a JobMonitor from LM Exchange JSON definition via multipart upload.
 
@@ -454,6 +479,7 @@ async def import_jobmonitor(
         List of TextContent with imported JobMonitor info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/batchjobs/importjson", definition=definition
         )
@@ -470,7 +496,7 @@ async def import_jobmonitor(
 @require_write_permission
 async def import_appliesto_function(
     client: "LogicMonitorClient",
-    definition: dict,
+    definition: dict | str,
 ) -> list[TextContent]:
     """Import an AppliesTo function from LM Exchange JSON definition via multipart upload.
 
@@ -482,6 +508,7 @@ async def import_appliesto_function(
         List of TextContent with imported function info or error.
     """
     try:
+        definition = _ensure_dict(definition)
         result = await client.post_multipart(
             "/setting/functions/importjson", definition=definition
         )

@@ -135,6 +135,38 @@ class TestGetDevices:
         assert "hostGroupIds" in params["filter"]
 
     @respx.mock
+    async def test_get_devices_with_hostname_filter(self, client):
+        """get_devices filters by hostname/IP via the name field."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, hostname_filter="192.168.1")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        # Should filter on the 'name' field (hostname/IP), not displayName
+        assert "name~" in params["filter"]
+        assert "displayName" not in params["filter"]
+
+    @respx.mock
+    async def test_get_devices_hostname_and_name_filter_combined(self, client):
+        """get_devices combines hostname_filter and name_filter."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, name_filter="prod", hostname_filter="10.0")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "displayName" in params["filter"]
+        assert "name~" in params["filter"]
+
+    @respx.mock
     async def test_get_devices_raw_filter_overrides_named(self, client):
         """Raw filter takes precedence when provided."""
         from lm_mcp.tools.devices import get_devices
@@ -339,6 +371,104 @@ class TestUpdateDevice:
         result = await update_device(client, device_id=100)
 
         assert "No updates provided" in result[0].text
+
+    @respx.mock
+    async def test_update_device_merges_custom_properties(self, client, monkeypatch):
+        """update_device merges custom_properties with existing instead of replacing."""
+        from lm_mcp.tools.devices import update_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        # GET to fetch existing custom properties
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "displayName": "server01",
+                    "customProperties": [
+                        {"name": "env", "value": "prod"},
+                        {"name": "team", "value": "platform"},
+                        {"name": "region", "value": "us-east"},
+                    ],
+                },
+            )
+        )
+
+        # PATCH with merged properties
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "displayName": "server01",
+                    "description": "",
+                },
+            )
+        )
+
+        # Only update env and add a new property "owner"
+        result = await update_device(
+            client,
+            device_id=100,
+            custom_properties={"env": "staging", "owner": "ryan"},
+        )
+
+        data = json.loads(result[0].text)
+        assert data["message"] == "Device updated successfully"
+
+        # Verify the PATCH body contains merged properties
+        request_body = json.loads(route.calls[0].request.content)
+        sent_props = {p["name"]: p["value"] for p in request_body["customProperties"]}
+        # Existing "team" and "region" should be preserved
+        assert sent_props["team"] == "platform"
+        assert sent_props["region"] == "us-east"
+        # "env" should be overridden, "owner" should be added
+        assert sent_props["env"] == "staging"
+        assert sent_props["owner"] == "ryan"
+
+    @respx.mock
+    async def test_update_device_custom_properties_without_existing(self, client, monkeypatch):
+        """update_device handles devices with no existing custom properties."""
+        from lm_mcp.tools.devices import update_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        # GET returns device with no custom properties
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/101").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 101, "displayName": "new-server", "customProperties": []},
+            )
+        )
+
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/101"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 101, "displayName": "new-server", "description": ""},
+            )
+        )
+
+        result = await update_device(
+            client,
+            device_id=101,
+            custom_properties={"env": "dev"},
+        )
+
+        data = json.loads(result[0].text)
+        assert data["message"] == "Device updated successfully"
+
+        request_body = json.loads(route.calls[0].request.content)
+        sent_props = {p["name"]: p["value"] for p in request_body["customProperties"]}
+        assert sent_props == {"env": "dev"}
 
 
 class TestDeleteDevice:

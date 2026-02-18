@@ -209,3 +209,50 @@ class TestUpdateDeviceProperty:
         assert data["device_id"] == 100
         assert data["property"]["name"] == "location"
         assert data["property"]["value"] == "US-West"
+
+    @respx.mock
+    async def test_update_device_property_creates_on_404(self, client, monkeypatch):
+        """update_device_property falls back to POST when PUT returns 404."""
+        from lm_mcp.tools.resources import update_device_property
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        # PUT returns 404 (property doesn't exist yet)
+        respx.put(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties/new.prop"
+        ).mock(
+            return_value=httpx.Response(
+                404, json={"errorMessage": "No such property"}
+            )
+        )
+
+        # POST creates it
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "name": "new.prop",
+                    "value": "hello",
+                    "type": "custom",
+                },
+            )
+        )
+
+        result = await update_device_property(
+            client, device_id=100, property_name="new.prop", property_value="hello"
+        )
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["property"]["name"] == "new.prop"
+        assert data["property"]["value"] == "hello"

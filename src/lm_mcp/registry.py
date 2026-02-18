@@ -46,7 +46,11 @@ TOOLS.extend(
                     "group_id": {"type": "integer", "description": "Filter by device group ID"},
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by device name (substring match)",
+                        "description": "Filter by display name (substring match)",
+                    },
+                    "hostname_filter": {
+                        "type": "string",
+                        "description": "Filter by hostname or IP address (substring match)",
                     },
                     "status": {
                         "type": "string",
@@ -56,7 +60,9 @@ TOOLS.extend(
                     "filter": {
                         "type": "string",
                         "description": "Raw filter expression (overrides other filters). "
-                        "Syntax: field:value, field~value. Example: systemProperties.name:val",
+                        'Syntax: field:value, field~value. String values must be quoted: '
+                        'displayName~"server". Custom property queries use dot-notation: '
+                        'customProperties.name:"env",customProperties.value:"prod"',
                     },
                     "limit": {
                         "type": "integer",
@@ -118,7 +124,8 @@ TOOLS.extend(
         ),
         Tool(
             name="update_device",
-            description="Update an existing device/resource (requires write permission)",
+            description="Update an existing device/resource (requires write permission). "
+            "Custom properties are merged with existing properties (not replaced).",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -1694,8 +1701,50 @@ TOOLS.extend(
                         "type": "object",
                         "description": "Full DataSource definition in REST API format",
                     },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, delete existing DataSource with same name "
+                        "before creating",
+                    },
                 },
                 "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_datasource",
+            description="Update an existing DataSource via REST API "
+            "(requires write permission). Accepts a definition dict with fields to update.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "datasource_id": {
+                        "type": "integer",
+                        "description": "DataSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": "DataSource definition with fields to update",
+                    },
+                },
+                "required": ["datasource_id", "definition"],
+            },
+        ),
+        Tool(
+            name="delete_datasource",
+            description="Delete a DataSource definition "
+            "(requires write permission). Existing collected data is retained.",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "datasource_id": {
+                        "type": "integer",
+                        "description": "DataSource ID to delete",
+                    },
+                },
+                "required": ["datasource_id"],
             },
         ),
     ]
@@ -3731,6 +3780,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_datasources": datasources.get_datasources,
         "get_datasource": datasources.get_datasource,
         "create_datasource": datasources.create_datasource,
+        "update_datasource": datasources.update_datasource,
+        "delete_datasource": datasources.delete_datasource,
         # ConfigSources
         "get_configsources": configsources.get_configsources,
         "get_configsource": configsources.get_configsource,

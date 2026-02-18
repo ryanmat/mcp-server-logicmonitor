@@ -488,6 +488,76 @@ class TestImportAppliestoFunction:
         assert data["imported_id"] == 8001
 
 
+class TestImportDatasourceStringDefinition:
+    """Tests for import_datasource handling string definitions."""
+
+    @respx.mock
+    async def test_import_datasource_handles_string_definition(self, client, monkeypatch):
+        """import_datasource parses string definition back to dict before upload."""
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 9001,
+                    "name": "StringDS",
+                    "displayName": "String DataSource",
+                },
+            )
+        )
+
+        # Simulate definition arriving as a JSON string (MCP transport edge case)
+        string_def = json.dumps({"name": "StringDS", "appliesTo": "isLinux()"})
+        result = await import_datasource(client, definition=string_def)
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 9001
+        # Verify the multipart body is valid JSON (not double-serialized)
+        request = route.calls[0].request
+        # The file content should be a single-level JSON string
+        content_type = request.headers.get("content-type", "")
+        assert "multipart/form-data" in content_type
+
+    @respx.mock
+    async def test_post_multipart_string_definition(self, client):
+        """post_multipart handles string definitions without double-serializing."""
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 9002, "name": "TestDS"},
+            )
+        )
+
+        # Pass a string instead of dict to post_multipart
+        string_def = '{"name": "TestDS", "appliesTo": "isLinux()"}'
+        result = await client.post_multipart(
+            "/setting/datasources/importjson", definition=string_def
+        )
+
+        assert result["id"] == 9002
+        # Verify the uploaded file content is proper JSON (not double-quoted)
+        request = route.calls[0].request
+        # The file part should contain valid parseable JSON
+        body = request.content.decode("utf-8", errors="replace")
+        # Should contain the definition once, not wrapped in extra quotes
+        assert '"name": "TestDS"' in body or '"name":"TestDS"' in body
+
+
 class TestImportDatasourceErrorHandling:
     """Tests for import_datasource error detection improvements."""
 

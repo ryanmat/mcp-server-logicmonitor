@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
+from lm_mcp.exceptions import NotFoundError
 from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
@@ -124,10 +125,17 @@ async def update_device_property(
     try:
         payload = {"value": property_value}
 
-        result = await client.put(
-            f"/device/devices/{device_id}/properties/{property_name}",
-            json_body=payload,
-        )
+        try:
+            result = await client.put(
+                f"/device/devices/{device_id}/properties/{property_name}",
+                json_body=payload,
+            )
+        except NotFoundError:
+            # Property doesn't exist yet — create it via POST
+            result = await client.post(
+                f"/device/devices/{device_id}/properties",
+                json_body={"name": property_name, "value": property_value},
+            )
 
         return format_response(
             {

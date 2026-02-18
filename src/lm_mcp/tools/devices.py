@@ -34,6 +34,7 @@ async def get_devices(
     client: "LogicMonitorClient",
     group_id: int | None = None,
     name_filter: str | None = None,
+    hostname_filter: str | None = None,
     status: str | None = None,
     filter: str | None = None,
     limit: int = 50,
@@ -44,7 +45,8 @@ async def get_devices(
     Args:
         client: LogicMonitor API client.
         group_id: Filter by device group ID.
-        name_filter: Filter by device name (supports wildcards).
+        name_filter: Filter by display name (supports wildcards).
+        hostname_filter: Filter by hostname or IP address (the 'name' field).
         status: Filter by device status (normal, dead, dead-collector, unmonitored, disabled).
         filter: Raw filter expression for advanced queries (overrides other filters).
             Supports LogicMonitor filter syntax with operators:
@@ -74,6 +76,10 @@ async def get_devices(
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
                 filters.append(f'displayName~{quote_filter_value(clean_name)}')
+            if hostname_filter:
+                clean_host, was_modified = sanitize_filter_value(hostname_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f'name~{quote_filter_value(clean_host)}')
             if status and status.lower() in DEVICE_STATUS_MAP:
                 filters.append(f"hostStatus:{DEVICE_STATUS_MAP[status.lower()]}")
 
@@ -289,8 +295,16 @@ async def update_device(
         if disable_alerting is not None:
             body["disableAlerting"] = disable_alerting
         if custom_properties is not None:
+            # Fetch existing properties to merge (prevents silent data loss)
+            existing = await client.get(f"/device/devices/{device_id}")
+            existing_props = {
+                p["name"]: p["value"]
+                for p in existing.get("customProperties", [])
+            }
+            # Merge: new values override existing, existing values preserved
+            existing_props.update(custom_properties)
             body["customProperties"] = [
-                {"name": k, "value": v} for k, v in custom_properties.items()
+                {"name": k, "value": v} for k, v in existing_props.items()
             ]
 
         if not body:

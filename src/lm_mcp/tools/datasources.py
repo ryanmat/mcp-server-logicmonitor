@@ -1,5 +1,5 @@
 # Description: DataSource tools for LogicMonitor MCP server.
-# Description: Provides get_datasources, get_datasource for querying LogicModule definitions.
+# Description: Provides DataSource CRUD functions including list, get, create, update, delete.
 
 from __future__ import annotations
 
@@ -157,6 +157,7 @@ async def get_datasource(
 async def create_datasource(
     client: "LogicMonitorClient",
     definition: dict,
+    overwrite: bool = False,
 ) -> list[TextContent]:
     """Create a DataSource via REST API using a full definition dict.
 
@@ -169,6 +170,7 @@ async def create_datasource(
     Args:
         client: LogicMonitor API client.
         definition: Full DataSource definition dict in REST API format.
+        overwrite: If True, delete existing DataSource with the same name before creating.
 
     Returns:
         List of TextContent with created DataSource info or error.
@@ -176,6 +178,16 @@ async def create_datasource(
     try:
         payload = dict(definition)
         payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            # Look up existing by name and delete if found
+            existing = await client.get(
+                "/setting/datasources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/datasources/{items[0]['id']}")
 
         result = await client.post("/setting/datasources", json_body=payload)
 
@@ -188,6 +200,83 @@ async def create_datasource(
                     "name": result.get("name"),
                     "display_name": result.get("displayName"),
                 },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_datasource(
+    client: "LogicMonitorClient",
+    datasource_id: int,
+    definition: dict,
+) -> list[TextContent]:
+    """Update an existing DataSource via REST API.
+
+    Accepts a definition dict with the fields to update. The id field is
+    stripped from the definition to prevent conflicts with the URL parameter.
+
+    Args:
+        client: LogicMonitor API client.
+        datasource_id: DataSource ID to update.
+        definition: DataSource definition dict with fields to update.
+
+    Returns:
+        List of TextContent with updated DataSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/datasources/{datasource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"DataSource '{result.get('name')}' updated successfully",
+                "datasource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_datasource(
+    client: "LogicMonitorClient",
+    datasource_id: int,
+) -> list[TextContent]:
+    """Delete a DataSource from LogicMonitor.
+
+    WARNING: This removes the DataSource definition. Monitoring data collected
+    by this DataSource is retained on devices but no new data will be collected.
+
+    Args:
+        client: LogicMonitor API client.
+        datasource_id: DataSource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        # Get DataSource info for confirmation
+        ds = await client.get(f"/setting/datasources/{datasource_id}")
+        ds_name = ds.get("name", f"ID:{datasource_id}")
+
+        await client.delete(f"/setting/datasources/{datasource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"DataSource '{ds_name}' deleted",
+                "datasource_id": datasource_id,
             }
         )
     except Exception as e:

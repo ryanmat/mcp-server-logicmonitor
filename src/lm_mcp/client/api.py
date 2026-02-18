@@ -270,7 +270,7 @@ class LogicMonitorClient:
         """
         return await self.request("POST", path, json_body=json_body)
 
-    async def post_multipart(self, path: str, definition: dict) -> dict:
+    async def post_multipart(self, path: str, definition: dict | str) -> dict:
         """Make a multipart/form-data POST request for LogicModule imports.
 
         The LM import endpoints require multipart file upload rather than JSON body.
@@ -294,7 +294,11 @@ class LogicMonitorClient:
             LMError: For other 4xx responses.
         """
         url = f"{self.base_url}{path}"
-        json_str = json.dumps(definition)
+        # Handle string definitions to prevent double-serialization
+        if isinstance(definition, str):
+            json_str = definition
+        else:
+            json_str = json.dumps(definition)
 
         # Build headers without Content-Type (httpx sets multipart boundary)
         headers = {

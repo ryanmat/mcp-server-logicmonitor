@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-02-18
+
+### Fixed
+
+- **`update_device` custom_properties merge** — Custom properties are now merged with existing properties instead of replacing them. Prevents silent data loss when updating a subset of custom properties on a device.
+- **`update_device_property` create-on-404** — Falls back to POST (create) when PUT returns 404 for a property that doesn't exist yet. Matches the tool description "Update or create a device property".
+- **`get_devices` filter validation for dot-notation fields** — Custom property filter queries like `customProperties.name:"env"` no longer fail schema validation. Dot-notation fields are now skipped during field validation since the LM API handles them natively.
+- **Import tools string definition handling** — All import tools (`import_datasource`, `import_configsource`, etc.) and `post_multipart()` now handle definitions that arrive as JSON strings instead of dicts, preventing double-serialization of complex embedded content (e.g., Groovy scripts with escape characters).
+
+### Added
+
+- **`update_datasource`** — Update an existing DataSource definition via PUT.
+- **`delete_datasource`** — Delete a DataSource definition by ID with confirmation.
+- **`hostname_filter` on `get_devices`** — Filter devices by hostname or IP address (the `name` field). The existing `name_filter` parameter searches `displayName`; the new parameter searches the actual hostname/IP.
+- **`overwrite` on `create_datasource`** — When `true`, deletes any existing DataSource with the same name before creating. Provides explicit upsert semantics without hidden behavior.
+
+### Changed
+
+- **`update_device` description** — Now documents merge behavior for custom properties.
+- **`get_devices` filter description** — Documents custom property query syntax with proper quoting examples.
+- **`get_devices` `name_filter` description** — Clarified as "display name" filter to distinguish from the new `hostname_filter`.
+
+Tool count: 178 -> 180.
+
 ## [1.7.1] - 2026-02-17
 
 ### Fixed
@@ -312,6 +336,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.7.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.0...v1.6.1
