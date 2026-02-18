@@ -312,6 +312,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.7.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.1...v1.7.0
 [1.6.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.5.1...v1.6.0

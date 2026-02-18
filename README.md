@@ -519,6 +519,8 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `update_widget` | Update a widget | Yes |
 | `delete_widget` | Delete a widget from a dashboard | Yes |
 | `export_dashboard` | Export dashboard as JSON | No |
+| `create_dashboard_group` | Create a dashboard group | Yes |
+| `delete_dashboard_group` | Delete a dashboard group | Yes |
 
 ### SDT Tools
 
@@ -600,6 +602,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_datasource` | Get DataSource details | No |
 | `export_datasource` | Export DataSource as JSON | No |
 | `import_datasource` | Import DataSource from JSON | Yes |
+| `create_datasource` | Create DataSource via REST API format | Yes |
 
 ### LogicModule Tools
 

@@ -283,28 +283,28 @@ class TestGetPromptMessages:
         content = str(result.messages[0].content)
         assert "get_metric_anomalies" in content
 
-    # Enhanced alert_correlation tests
+    # alert_correlation tool reference tests
 
-    def test_enhanced_alert_correlation_mentions_correlate_alerts(self):
-        """Enhanced alert_correlation references the correlate_alerts tool."""
+    def test_alert_correlation_mentions_correlate_alerts(self):
+        """alert_correlation references the correlate_alerts tool."""
         result = get_prompt_messages("alert_correlation", {})
         content = str(result.messages[0].content)
         assert "correlate_alerts" in content
 
-    def test_enhanced_alert_correlation_with_device_id(self):
+    def test_alert_correlation_with_device_id(self):
         """alert_correlation includes device_id argument."""
         result = get_prompt_messages("alert_correlation", {"device_id": "33"})
         content = str(result.messages[0].content)
         assert "33" in content
 
-    def test_enhanced_alert_correlation_with_group_id(self):
+    def test_alert_correlation_with_group_id(self):
         """alert_correlation includes group_id argument."""
         result = get_prompt_messages("alert_correlation", {"group_id": "7"})
         content = str(result.messages[0].content)
         assert "7" in content
 
-    def test_enhanced_alert_correlation_mentions_get_alert_statistics(self):
-        """Enhanced alert_correlation references the get_alert_statistics tool."""
+    def test_alert_correlation_mentions_get_alert_statistics(self):
+        """alert_correlation references the get_alert_statistics tool."""
         result = get_prompt_messages("alert_correlation", {})
         content = str(result.messages[0].content)
         assert "get_alert_statistics" in content
