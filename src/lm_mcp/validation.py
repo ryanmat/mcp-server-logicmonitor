@@ -217,4 +217,10 @@ def validate_filter_fields(
     if not matches:
         return ValidationResult(valid=True)
 
+    # Skip dot-notation fields (nested property queries handled by LM API)
+    matches = [m for m in matches if "." not in m]
+
+    if not matches:
+        return ValidationResult(valid=True)
+
     return validate_fields(resource_type, matches)

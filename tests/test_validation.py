@@ -260,3 +260,22 @@ class TestValidateFilterFields:
         matches = re.findall(pattern, filter_string)
 
         assert "systemProperties.name" in matches
+
+    def test_dot_notation_fields_skip_validation(self):
+        """Dot-notation fields (nested property queries) skip schema validation."""
+        # customProperties.name and systemProperties.name are valid LM API
+        # filter fields but are not in the schema, so they should be skipped
+        result = validate_filter_fields(
+            "devices", 'customProperties.name:"env",customProperties.value:"prod"'
+        )
+
+        assert result.valid is True
+
+    def test_dot_notation_mixed_with_regular_fields(self):
+        """Mixed filter with dot-notation and regular fields validates regular fields only."""
+        result = validate_filter_fields(
+            "devices", 'displayName~"server",customProperties.name:"team"'
+        )
+
+        # displayName is a valid device field, customProperties.name is skipped
+        assert result.valid is True

@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 178 tools organized by domain category.
+# All 180 tools organized by domain category.
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -76,6 +76,8 @@ TOOL_CATEGORIES = {
                 "get_datasources",
                 "get_datasource",
                 "create_datasource",
+                "update_datasource",
+                "delete_datasource",
             ],
         },
         "dashboards": {

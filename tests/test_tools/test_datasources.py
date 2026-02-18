@@ -1,5 +1,5 @@
 # Description: Tests for DataSource MCP tools.
-# Description: Validates get_datasources, get_datasource, create_datasource functions.
+# Description: Validates DataSource CRUD functions including create, update, and delete.
 
 import json
 
@@ -405,5 +405,259 @@ class TestCreateDatasource:
         result = await create_datasource(
             client, definition={"name": "Bad"}
         )
+
+        assert "Error:" in result[0].text
+
+
+class TestCreateDatasourceOverwrite:
+    """Tests for create_datasource overwrite parameter."""
+
+    @respx.mock
+    async def test_create_datasource_overwrite_deletes_existing(self, client, enable_writes):
+        """create_datasource with overwrite=True deletes existing DS before creating."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        # GET to look up existing DS by name
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [{"id": 500, "name": "MyDS"}],
+                    "total": 1,
+                },
+            )
+        )
+
+        # DELETE existing DS
+        delete_route = respx.delete(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/500"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        # POST new DS
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 501, "name": "MyDS", "displayName": "My DataSource"},
+            )
+        )
+
+        result = await create_datasource(
+            client,
+            definition={"name": "MyDS", "displayName": "My DataSource"},
+            overwrite=True,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["datasource"]["id"] == 501
+        assert delete_route.called
+
+    @respx.mock
+    async def test_create_datasource_overwrite_no_existing(self, client, enable_writes):
+        """create_datasource with overwrite=True works when no existing DS found."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        # GET returns no existing DS
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": [], "total": 0},
+            )
+        )
+
+        # POST new DS (no DELETE needed)
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 502, "name": "NewDS", "displayName": "New DS"},
+            )
+        )
+
+        result = await create_datasource(
+            client,
+            definition={"name": "NewDS", "displayName": "New DS"},
+            overwrite=True,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["datasource"]["id"] == 502
+
+    @respx.mock
+    async def test_create_datasource_without_overwrite_unchanged(self, client, enable_writes):
+        """create_datasource without overwrite flag does not look up existing."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 503, "name": "PlainDS", "displayName": "Plain DS"},
+            )
+        )
+
+        result = await create_datasource(
+            client, definition={"name": "PlainDS"}, overwrite=False
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        # Should only have the POST call, no GET for lookup
+        assert route.called
+
+
+class TestUpdateDatasource:
+    """Tests for update_datasource tool."""
+
+    async def test_update_datasource_requires_write_permission(self, client, monkeypatch):
+        """update_datasource requires write permission."""
+        from lm_mcp.tools.datasources import update_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await update_datasource(
+            client, datasource_id=100, definition={"name": "Updated"}
+        )
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_update_datasource_puts_definition(self, client, enable_writes):
+        """update_datasource PUTs definition to /setting/datasources/{id}."""
+        from lm_mcp.tools.datasources import update_datasource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/100"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "UpdatedDS",
+                    "displayName": "Updated DataSource",
+                },
+            )
+        )
+
+        result = await update_datasource(
+            client,
+            datasource_id=100,
+            definition={"name": "UpdatedDS", "displayName": "Updated DataSource"},
+        )
+
+        assert route.called
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["datasource"]["id"] == 100
+        assert data["datasource"]["name"] == "UpdatedDS"
+
+    @respx.mock
+    async def test_update_datasource_strips_id_from_definition(self, client, enable_writes):
+        """update_datasource strips id from definition before PUT."""
+        from lm_mcp.tools.datasources import update_datasource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/100"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 100, "name": "DS", "displayName": "DS"},
+            )
+        )
+
+        await update_datasource(
+            client, datasource_id=100, definition={"id": 999, "name": "DS"}
+        )
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert "id" not in request_body
+
+    @respx.mock
+    async def test_update_datasource_handles_error(self, client, enable_writes):
+        """update_datasource handles API errors."""
+        from lm_mcp.tools.datasources import update_datasource
+
+        respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/999"
+        ).mock(
+            return_value=httpx.Response(
+                404, json={"errorMessage": "DataSource not found"}
+            )
+        )
+
+        result = await update_datasource(
+            client, datasource_id=999, definition={"name": "Missing"}
+        )
+
+        assert "Error:" in result[0].text
+
+
+class TestDeleteDatasource:
+    """Tests for delete_datasource tool."""
+
+    async def test_delete_datasource_requires_write_permission(self, client, monkeypatch):
+        """delete_datasource requires write permission."""
+        from lm_mcp.tools.datasources import delete_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await delete_datasource(client, datasource_id=100)
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_delete_datasource_success(self, client, enable_writes):
+        """delete_datasource deletes and returns confirmation."""
+        from lm_mcp.tools.datasources import delete_datasource
+
+        # GET for confirmation info
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/100"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 100, "name": "OldDS", "displayName": "Old DataSource"},
+            )
+        )
+        respx.delete(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/100"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        result = await delete_datasource(client, datasource_id=100)
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "OldDS" in data["message"]
+        assert data["datasource_id"] == 100
+
+    @respx.mock
+    async def test_delete_datasource_not_found(self, client, enable_writes):
+        """delete_datasource handles 404 errors."""
+        from lm_mcp.tools.datasources import delete_datasource
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/999"
+        ).mock(
+            return_value=httpx.Response(
+                404, json={"errorMessage": "DataSource not found"}
+            )
+        )
+
+        result = await delete_datasource(client, datasource_id=999)
 
         assert "Error:" in result[0].text

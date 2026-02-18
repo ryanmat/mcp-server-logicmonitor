@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 178 structured tools, 13 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 180 structured tools, 13 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**178 Tools** across comprehensive LogicMonitor API coverage:
+**180 Tools** across comprehensive LogicMonitor API coverage:
 
 ### AI Analysis Tools
 
@@ -602,7 +602,9 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_datasource` | Get DataSource details | No |
 | `export_datasource` | Export DataSource as JSON | No |
 | `import_datasource` | Import DataSource from JSON | Yes |
-| `create_datasource` | Create DataSource via REST API format | Yes |
+| `create_datasource` | Create DataSource via REST API format (supports overwrite) | Yes |
+| `update_datasource` | Update existing DataSource definition | Yes |
+| `delete_datasource` | Delete a DataSource definition | Yes |
 
 ### LogicModule Tools
 
@@ -839,7 +841,7 @@ The server exposes 24 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 178 tools organized by domain category |
+| `lm://guide/tool-categories` | All 180 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 
