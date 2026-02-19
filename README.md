@@ -1032,13 +1032,14 @@ uv run ruff format src tests
 src/lm_mcp/
 ├── __init__.py           # Package exports
 ├── analysis.py           # Scheduled analysis workflows and store
+├── awx_config.py         # AAP connection configuration
 ├── config.py             # Environment-based configuration
 ├── exceptions.py         # Exception hierarchy
 ├── health.py             # Health check endpoints
 ├── logging.py            # Structured logging
 ├── server.py             # MCP server entry point
 ├── session.py            # Session context with optional persistence
-├── registry.py           # Tool definitions and handlers
+├── registry.py           # Tool definitions and handlers (TOOLS + AWX_TOOLS)
 ├── validation.py         # Field validation with suggestions
 ├── auth/
 │   ├── __init__.py       # Auth provider factory
@@ -1046,7 +1047,8 @@ src/lm_mcp/
 │   └── lmv1.py           # LMv1 HMAC auth
 ├── client/
 │   ├── __init__.py       # Client exports
-│   └── api.py            # Async HTTP client
+│   ├── api.py            # Async HTTP client for LogicMonitor API
+│   └── awx.py            # Async HTTP client for AAP controller API
 ├── completions/
 │   └── registry.py       # Auto-complete definitions
 ├── prompts/
@@ -1065,6 +1067,7 @@ src/lm_mcp/
     ├── __init__.py       # Tool utilities
     ├── alerts.py         # Alert management
     ├── alert_rules.py    # Alert rule CRUD
+    ├── ansible.py        # Ansible Automation Platform tool handlers
     ├── baselines.py      # Metric baseline save/compare
     ├── collectors.py     # Collector tools
     ├── correlation.py    # Alert correlation, anomaly detection, metric correlation
@@ -1081,14 +1084,15 @@ src/lm_mcp/
     ├── sdts.py           # SDT management
     ├── session.py        # Session management tools
     ├── stats_helpers.py  # Shared statistical math utilities
-    ├── ansible.py        # Ansible Automation Platform tool handlers
     ├── topology_analysis.py  # Blast radius analysis
     ├── websites.py       # Website CRUD
     └── ...               # Additional tool modules
 
-├── awx/
-│   ├── __init__.py       # AWX client exports
-│   └── client.py         # Async HTTP client for AAP controller API
+examples/playbooks/
+├── lm-remediate-disk-cleanup.yml
+├── lm-remediate-service-restart.yml
+├── lm-remediate-log-rotate.yml
+└── lm-remediate-memory-cache-clear.yml
 
 deploy/
 ├── Dockerfile            # Production Docker image
@@ -1155,6 +1159,15 @@ Verify your bearer token is correct and has appropriate permissions. API tokens 
 - **New**: Jinja2 injection protection on all AAP extra_vars inputs
 - **New**: `test_awx_connection` tool for verifying AAP connectivity
 - **Counts**: 198 tools (180 LM + 18 AAP), 14 prompts, 6 skills
+- **Release**: [v1.8.0 on GitHub](https://github.com/ryanmat/mcp-server-logicmonitor/releases/tag/v1.8.0) | [PyPI](https://pypi.org/project/lm-mcp/1.8.0/)
+
+### v1.7.2
+- **Fix**: `update_device` custom_properties merge — prevents silent data loss when updating a subset of properties
+- **Fix**: `update_device_property` create-on-404 — falls back to POST when property doesn't exist yet
+- **Fix**: `get_devices` filter validation for dot-notation fields (`customProperties.name`)
+- **Fix**: Import tools string definition handling — prevents double-serialization of complex embedded content
+- **New**: `update_datasource`, `delete_datasource`, `hostname_filter` on `get_devices`, `overwrite` on `create_datasource`
+- **Counts**: 178 -> 180 tools
 
 ### v1.7.1
 - **Fix**: API client detects errors returned inside HTTP 200 response bodies (`errorMessage` + `errorCode`)
