@@ -46,6 +46,22 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 **198 Tools** across comprehensive LogicMonitor API coverage (180 LM + 18 AAP):
 
+### Core Monitoring
+- **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
+- **Device Management**: Full CRUD - list, create, update, delete devices and groups
+- **Metrics & Data**: Query datasources, instances, metric data, and graphs
+- **Dashboard Management**: Full CRUD for dashboards, widgets, and groups
+- **SDT Management**: Create, list, bulk create/delete Scheduled Downtime
+- **Collector Management**: List collectors and collector groups
+
+### Extended Features
+- **Website Monitoring**: Full CRUD for synthetic checks and website groups
+- **Report Management**: List, view, run reports, manage schedules
+- **Escalation Management**: Full CRUD for escalation chains and recipient groups
+- **Alert Rules**: Full CRUD for alert routing rules
+- **User & Role Management**: View users, roles, access groups, API tokens
+- **Ops Management**: Audit logs, ops notes, login/change audits
+
 ### AI Analysis Tools
 
 Server-side intelligence that transforms raw monitoring data into actionable insights:
@@ -81,21 +97,19 @@ Service discovery and RED metrics for LogicMonitor APM (Application Performance 
 - **Alert Integration**: View active alerts for any traced service
 - **Property Inspection**: OTel attributes, namespace info, and auto-discovered metadata
 
-### Core Monitoring
-- **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
-- **Device Management**: Full CRUD - list, create, update, delete devices and groups
-- **Metrics & Data**: Query datasources, instances, metric data, and graphs
-- **Dashboard Management**: Full CRUD for dashboards, widgets, and groups
-- **SDT Management**: Create, list, bulk create/delete Scheduled Downtime
-- **Collector Management**: List collectors and collector groups
+### Ansible Automation Platform Integration
 
-### Extended Features
-- **Website Monitoring**: Full CRUD for synthetic checks and website groups
-- **Report Management**: List, view, run reports, manage schedules
-- **Escalation Management**: Full CRUD for escalation chains and recipient groups
-- **Alert Rules**: Full CRUD for alert routing rules
-- **User & Role Management**: View users, roles, access groups, API tokens
-- **Ops Management**: Audit logs, ops notes, login/change audits
+18 tools for observability-driven remediation via Ansible Automation Platform (AAP). Connects LogicMonitor alerts to automated remediation playbooks.
+
+- **Job Templates**: List, inspect, and launch job templates with extra variables and host limits
+- **Job Execution**: Launch jobs, check status, view output, cancel or relaunch runs
+- **Workflows**: Launch workflow templates, monitor multi-step automation sequences
+- **Inventories & Hosts**: List inventories, inspect hosts for targeted remediation
+- **Projects & Credentials**: Browse available projects and credentials (secrets never exposed)
+- **Write Protection**: launch_job, launch_workflow, cancel_job, relaunch_job require `LM_ENABLE_WRITE_OPERATIONS=true`
+- **Jinja2 Safety**: All extra_vars inputs are validated to prevent template injection
+
+AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are configured. See [Example Playbooks](examples/playbooks/) for remediation templates.
 
 ### LogicModules
 - **DataSources**: Query and export datasource definitions
@@ -131,20 +145,6 @@ Pre-built slash-command workflows for Claude Code that orchestrate multiple tool
 | Remediation | `/lm-remediate` | Diagnose alert, find/generate playbook, launch AAP job, verify fix |
 
 Skills ship with the repo — clone it and invoke `/lm-triage` in Claude Code to get started.
-
-### Ansible Automation Platform Integration
-
-18 tools for observability-driven remediation via Ansible Automation Platform (AAP). Connects LogicMonitor alerts to automated remediation playbooks.
-
-- **Job Templates**: List, inspect, and launch job templates with extra variables and host limits
-- **Job Execution**: Launch jobs, check status, view output, cancel or relaunch runs
-- **Workflows**: Launch workflow templates, monitor multi-step automation sequences
-- **Inventories & Hosts**: List inventories, inspect hosts for targeted remediation
-- **Projects & Credentials**: Browse available projects and credentials (secrets never exposed)
-- **Write Protection**: launch_job, launch_workflow, cancel_job, relaunch_job require `LM_ENABLE_WRITE_OPERATIONS=true`
-- **Jinja2 Safety**: All extra_vars inputs are validated to prevent template injection
-
-AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are configured. See [Example Playbooks](examples/playbooks/) for remediation templates.
 
 ### Operational Features
 - **Security-First**: Read-only by default, write operations require explicit opt-in
