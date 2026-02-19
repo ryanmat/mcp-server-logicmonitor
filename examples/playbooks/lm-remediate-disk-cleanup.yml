@@ -1,0 +1,71 @@
+# Description: Ansible playbook for disk space remediation.
+# Description: Clears temp files, old logs, and systemd journal to reclaim disk space.
+#
+# Extra variables:
+#   target_host  - Host or group to target (used via --limit)
+#   min_age_days - Minimum age in days for file cleanup (default: 7)
+---
+- name: Disk cleanup remediation
+  hosts: all
+  become: true
+  vars:
+    min_age_days: "{{ min_age_days | default(7) }}"
+
+  tasks:
+    - name: Remove temp files older than threshold
+      ansible.builtin.find:
+        paths:
+          - /tmp
+          - /var/tmp
+        age: "{{ min_age_days }}d"
+        recurse: true
+        file_type: file
+      register: old_temp_files
+
+    - name: Delete old temp files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_temp_files.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: old_temp_files.files | length > 0
+
+    - name: Remove rotated log files older than threshold
+      ansible.builtin.find:
+        paths: /var/log
+        patterns:
+          - "*.gz"
+          - "*.old"
+          - "*.1"
+          - "*.2"
+          - "*.3"
+        age: "{{ min_age_days }}d"
+        recurse: true
+        file_type: file
+      register: old_log_files
+
+    - name: Delete old rotated logs
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_log_files.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: old_log_files.files | length > 0
+
+    - name: Vacuum systemd journal to 500MB
+      ansible.builtin.command:
+        cmd: journalctl --vacuum-size=500M
+      register: journal_result
+      changed_when: "'Vacuuming done' in journal_result.stdout"
+
+    - name: Report disk usage after cleanup
+      ansible.builtin.command:
+        cmd: df -h /
+      register: disk_usage
+      changed_when: false
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        msg: "{{ disk_usage.stdout_lines }}"

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-02-19
+
+### Added
+
+- Ansible Automation Platform integration (18 tools) for observability-driven remediation
+- Tool categories: job templates, job execution, inventories, workflows, projects, credentials, organizations, hosts
+- Write-protected tools: launch_job, launch_workflow, cancel_job, relaunch_job (require LM_ENABLE_WRITE_OPERATIONS=true)
+- Jinja2 injection protection on all extra_vars inputs
+- `/lm-remediate` Claude Code skill: 10-step diagnosis-to-remediation workflow
+- `remediate_workflow` MCP prompt for non-Claude-Code MCP clients
+- Job template naming convention: `lm-remediate-<category>-<action>` for automatic discovery
+- Example playbooks: disk-cleanup, service-restart, log-rotate, memory-cache-clear
+- Skill structure tests validating all 6 skills against the tool registry
+- `test_awx_connection` tool for verifying AAP connectivity
+- AWX_URL, AWX_TOKEN env vars (optional — AAP tools excluded if not set)
+
+### Changed
+
+- Tool count: 180 -> 198 (180 LM + 18 AAP)
+- Prompt count: 13 -> 14
+- Skill count: 5 -> 6
+- Tool categories guide updated with "ansible" domain
+
 ## [1.7.2] - 2026-02-18
 
 ### Fixed
@@ -336,6 +359,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.8.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.6.1...v1.7.0

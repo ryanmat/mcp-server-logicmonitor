@@ -1,0 +1,53 @@
+# Description: Ansible playbook for clearing memory caches.
+# Description: Drops kernel page cache and optionally restarts memory-heavy services.
+#
+# Extra variables:
+#   target_host      - Host or group to target (used via --limit)
+#   restart_services - Comma-separated list of services to restart (optional)
+---
+- name: Memory cache clear remediation
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Record memory usage before cleanup
+      ansible.builtin.command:
+        cmd: free -m
+      register: memory_before
+      changed_when: false
+
+    - name: Display memory before cleanup
+      ansible.builtin.debug:
+        msg: "{{ memory_before.stdout_lines }}"
+
+    - name: Sync filesystem buffers
+      ansible.builtin.command:
+        cmd: sync
+      changed_when: true
+
+    - name: Drop page cache
+      ansible.builtin.shell:
+        cmd: echo 1 > /proc/sys/vm/drop_caches
+      changed_when: true
+
+    - name: Restart specified services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop: "{{ (restart_services | default('')).split(',') | select | list }}"
+      when: restart_services is defined and restart_services | length > 0
+
+    - name: Wait for system to stabilize
+      ansible.builtin.pause:
+        seconds: 5
+      when: restart_services is defined and restart_services | length > 0
+
+    - name: Record memory usage after cleanup
+      ansible.builtin.command:
+        cmd: free -m
+      register: memory_after
+      changed_when: false
+
+    - name: Display memory after cleanup
+      ansible.builtin.debug:
+        msg: "{{ memory_after.stdout_lines }}"

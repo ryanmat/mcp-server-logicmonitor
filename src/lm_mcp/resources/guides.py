@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 180 tools organized by domain category.
+# All 198 tools organized by domain category (180 LM + 18 AAP).
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -312,6 +312,29 @@ TOOL_CATEGORIES = {
                 "list_session_history",
                 "save_baseline",
                 "compare_to_baseline",
+            ],
+        },
+        "ansible": {
+            "description": "Ansible Automation Platform for observability-driven remediation",
+            "tools": [
+                "test_awx_connection",
+                "get_job_templates",
+                "get_job_template",
+                "launch_job",
+                "get_job_status",
+                "get_job_output",
+                "cancel_job",
+                "relaunch_job",
+                "get_inventories",
+                "get_inventory_hosts",
+                "launch_workflow",
+                "get_workflow_status",
+                "get_workflow_templates",
+                "get_projects",
+                "get_credentials",
+                "get_organizations",
+                "get_job_events",
+                "get_hosts",
             ],
         },
     },

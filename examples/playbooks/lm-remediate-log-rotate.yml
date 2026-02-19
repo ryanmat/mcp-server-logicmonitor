@@ -1,0 +1,60 @@
+# Description: Ansible playbook for forcing log rotation.
+# Description: Runs logrotate on specified path and compresses uncompressed logs.
+#
+# Extra variables:
+#   target_host - Host or group to target (used via --limit)
+#   log_path    - Specific log path to rotate (default: all configured paths)
+---
+- name: Log rotation remediation
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Force logrotate on all configured paths
+      ansible.builtin.command:
+        cmd: logrotate --force /etc/logrotate.conf
+      register: logrotate_result
+      changed_when: logrotate_result.rc == 0
+      when: log_path is not defined
+
+    - name: Force logrotate on specific path
+      ansible.builtin.command:
+        cmd: "logrotate --force /etc/logrotate.d/{{ log_path | basename }}"
+      register: logrotate_specific
+      changed_when: logrotate_specific.rc == 0
+      failed_when:
+        - logrotate_specific.rc != 0
+        - "'error' in logrotate_specific.stderr | lower"
+      when: log_path is defined
+
+    - name: Find uncompressed log files larger than 100MB
+      ansible.builtin.find:
+        paths: /var/log
+        patterns: "*.log.*"
+        size: 100m
+        recurse: true
+        file_type: file
+        excludes:
+          - "*.gz"
+          - "*.bz2"
+          - "*.xz"
+      register: large_logs
+
+    - name: Compress large uncompressed logs
+      ansible.builtin.command:
+        cmd: "gzip {{ item.path }}"
+      loop: "{{ large_logs.files }}"
+      loop_control:
+        label: "{{ item.path }} ({{ (item.size / 1048576) | round(1) }}MB)"
+      when: large_logs.files | length > 0
+      changed_when: true
+
+    - name: Report /var/log usage after rotation
+      ansible.builtin.command:
+        cmd: du -sh /var/log
+      register: log_usage
+      changed_when: false
+
+    - name: Display log directory size
+      ansible.builtin.debug:
+        msg: "{{ log_usage.stdout }}"

@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 180 structured tools, 13 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 198 structured tools, 14 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**180 Tools** across comprehensive LogicMonitor API coverage:
+**198 Tools** across comprehensive LogicMonitor API coverage (180 LM + 18 AAP):
 
 ### AI Analysis Tools
 
@@ -114,7 +114,7 @@ Service discovery and RED metrics for LogicMonitor APM (Application Performance 
 
 ### MCP Protocol Features
 - **Resources**: 24 schema/enum/filter/guide resources for API reference
-- **Prompts**: 13 workflow templates (incident triage, RCA, capacity forecasting, top talkers, etc.)
+- **Prompts**: 14 workflow templates (incident triage, RCA, capacity forecasting, remediation, etc.)
 - **Completions**: Auto-complete for tool arguments
 
 ### Claude Code Skills
@@ -128,8 +128,23 @@ Pre-built slash-command workflows for Claude Code that orchestrate multiple tool
 | Portal Overview | `/lm-portal` | Portal-wide snapshot for shift handoff — alerts, collectors, SDTs, down devices |
 | Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
 | APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
+| Remediation | `/lm-remediate` | Diagnose alert, find/generate playbook, launch AAP job, verify fix |
 
 Skills ship with the repo — clone it and invoke `/lm-triage` in Claude Code to get started.
+
+### Ansible Automation Platform Integration
+
+18 tools for observability-driven remediation via Ansible Automation Platform (AAP). Connects LogicMonitor alerts to automated remediation playbooks.
+
+- **Job Templates**: List, inspect, and launch job templates with extra variables and host limits
+- **Job Execution**: Launch jobs, check status, view output, cancel or relaunch runs
+- **Workflows**: Launch workflow templates, monitor multi-step automation sequences
+- **Inventories & Hosts**: List inventories, inspect hosts for targeted remediation
+- **Projects & Credentials**: Browse available projects and credentials (secrets never exposed)
+- **Write Protection**: launch_job, launch_workflow, cancel_job, relaunch_job require `LM_ENABLE_WRITE_OPERATIONS=true`
+- **Jinja2 Safety**: All extra_vars inputs are validated to prevent template injection
+
+AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are configured. See [Example Playbooks](examples/playbooks/) for remediation templates.
 
 ### Operational Features
 - **Security-First**: Read-only by default, write operations require explicit opt-in
@@ -204,6 +219,11 @@ The server exposes health endpoints for container orchestration:
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
 | `LM_ANALYSIS_TTL_MINUTES` | No | `60` | TTL for scheduled analysis results (1-1440 minutes) |
+| `AWX_URL` | No | - | Ansible Automation Platform controller URL (e.g., `https://aap.example.com`) |
+| `AWX_TOKEN` | No | - | AAP personal access token |
+| `AWX_VERIFY_SSL` | No | `true` | Verify SSL certificates for AAP connections |
+| `AWX_TIMEOUT` | No | `30` | Request timeout in seconds for AAP API calls |
+| `AWX_MAX_RETRIES` | No | `3` | Max retries for failed AAP API requests |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -761,6 +781,31 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `classify_trend` | Categorize metric behavior: stable, increasing, decreasing, cyclic, volatile | No |
 | `score_device_health` | Composite health score (0-100) from multi-metric z-score analysis | No |
 
+### Ansible Automation Platform Tools
+
+These tools are only available when `AWX_URL` and `AWX_TOKEN` are configured.
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `test_awx_connection` | Test connectivity to Ansible Automation Platform controller | No |
+| `get_job_templates` | List job templates with optional name/project filters | No |
+| `get_job_template` | Get details of a specific job template | No |
+| `launch_job` | Launch a job template with extra variables, host limits, and check mode | Yes |
+| `get_job_status` | Get the status of a running or completed job | No |
+| `get_job_output` | Get the stdout output of a job | No |
+| `cancel_job` | Cancel a running job | Yes |
+| `relaunch_job` | Relaunch a previously run job with optional variable overrides | Yes |
+| `get_inventories` | List inventories with optional name filter | No |
+| `get_inventory_hosts` | List hosts in a specific inventory | No |
+| `launch_workflow` | Launch a workflow job template | Yes |
+| `get_workflow_status` | Get the status of a workflow job | No |
+| `get_workflow_templates` | List workflow job templates | No |
+| `get_projects` | List projects from Ansible Automation Platform | No |
+| `get_credentials` | List credentials (secrets not exposed) | No |
+| `get_organizations` | List organizations from Ansible Automation Platform | No |
+| `get_job_events` | Get events from a specific job run | No |
+| `get_hosts` | List hosts with optional name/inventory filters | No |
+
 #### ML Tool Usage Guide
 
 These tools use pure-Python statistical methods (no external ML libraries). They all operate on data fetched from the LM API at query time. Most metric-based tools share the same core parameters: `device_id`, `device_datasource_id`, `instance_id` (find these using `get_device_datasources` and `get_device_instances`).
@@ -841,7 +886,7 @@ The server exposes 24 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 180 tools organized by domain category |
+| `lm://guide/tool-categories` | All 198 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 
@@ -864,6 +909,7 @@ Pre-built workflow templates for common tasks:
 | `top_talkers` | Identify noisiest devices and datasources generating the most alerts | `hours_back`, `limit`, `group_by` |
 | `rca_workflow` | Guided root cause analysis combining alerts, topology, and change history | `device_id`, `alert_id`, `hours_back` |
 | `capacity_forecast` | Forecast capacity trends and predict threshold breaches | `device_id`, `group_id`, `datasource`, `hours_back`, `threshold` |
+| `remediate_workflow` | Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform | `alert_id`, `device_id` |
 
 ## Example Usage
 
@@ -1035,9 +1081,14 @@ src/lm_mcp/
     ├── sdts.py           # SDT management
     ├── session.py        # Session management tools
     ├── stats_helpers.py  # Shared statistical math utilities
+    ├── ansible.py        # Ansible Automation Platform tool handlers
     ├── topology_analysis.py  # Blast radius analysis
     ├── websites.py       # Website CRUD
     └── ...               # Additional tool modules
+
+├── awx/
+│   ├── __init__.py       # AWX client exports
+│   └── client.py         # Async HTTP client for AAP controller API
 
 deploy/
 ├── Dockerfile            # Production Docker image
@@ -1095,6 +1146,15 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v1.8.0
+- **New**: Ansible Automation Platform integration — 18 tools for observability-driven remediation
+- **New**: `/lm-remediate` Claude Code skill — 10-step diagnosis-to-remediation workflow
+- **New**: `remediate_workflow` MCP prompt for non-Claude-Code MCP clients
+- **New**: Example playbooks for disk cleanup, service restart, log rotation, memory cache clearing
+- **New**: Jinja2 injection protection on all AAP extra_vars inputs
+- **New**: `test_awx_connection` tool for verifying AAP connectivity
+- **Counts**: 198 tools (180 LM + 18 AAP), 14 prompts, 6 skills
 
 ### v1.7.1
 - **Fix**: API client detects errors returned inside HTTP 200 response bodies (`errorMessage` + `errorCode`)
