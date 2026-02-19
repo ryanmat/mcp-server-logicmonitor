@@ -65,8 +65,8 @@ def create_asgi_app() -> "Starlette":
         ensuring consistent behavior (filtering, validation, audit logging,
         session recording) across stdio and HTTP transports.
         """
-        from lm_mcp.registry import TOOLS
-        from lm_mcp.server import _filter_tools, execute_tool
+        from lm_mcp.registry import AWX_TOOLS, TOOLS
+        from lm_mcp.server import _awx_client, _filter_tools, execute_tool
 
         try:
             body = await request.json()
@@ -82,7 +82,10 @@ def create_asgi_app() -> "Starlette":
 
         try:
             if method == "tools/list":
-                filtered = _filter_tools(TOOLS, config)
+                all_tools = list(TOOLS)
+                if _awx_client is not None:
+                    all_tools.extend(AWX_TOOLS)
+                filtered = _filter_tools(all_tools, config)
                 result = [
                     {"name": t.name, "description": t.description} for t in filtered
                 ]
@@ -300,7 +303,7 @@ async def create_http_server() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_client
+    from lm_mcp.server import _set_awx_client, _set_client
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -314,6 +317,23 @@ async def create_http_server() -> None:
         ingest_url=config.ingest_url,
     )
     _set_client(client)
+
+    # Initialize AWX client if configured
+    awx_client = None
+    from lm_mcp.awx_config import get_awx_config
+
+    awx_config = get_awx_config()
+    if awx_config is not None:
+        from lm_mcp.client.awx import AwxClient
+
+        awx_client = AwxClient(
+            base_url=awx_config.url,
+            token=awx_config.token,
+            timeout=awx_config.timeout,
+            max_retries=awx_config.max_retries,
+            verify_ssl=awx_config.verify_ssl,
+        )
+        _set_awx_client(awx_client)
 
     # Initialize session with config settings
     if config.session_enabled:
@@ -338,4 +358,6 @@ async def create_http_server() -> None:
     try:
         await server.serve()
     finally:
+        if awx_client is not None:
+            await awx_client.close()
         await client.close()

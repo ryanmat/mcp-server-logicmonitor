@@ -68,6 +68,9 @@ WRITE_TOOL_PREFIXES = (
     "import_",
     "ingest_",
     "push_",
+    "launch_",
+    "cancel_",
+    "relaunch_",
 )
 
 

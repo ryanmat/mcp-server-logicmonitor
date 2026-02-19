@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ryanmat/logicmonitor",
-  "description": "LogicMonitor API integration with 180 tools for alerts, devices, dashboards, traces, and more.",
+  "description": "LogicMonitor API integration with 198 tools for alerts, devices, dashboards, traces, Ansible Automation Platform, and more.",
   "repository": {
     "url": "https://github.com/ryanmat/mcp-server-logicmonitor",
     "source": "github"
   },
-  "version": "1.7.2",
+  "version": "1.8.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "lm-mcp",
-      "version": "1.7.2",
+      "version": "1.8.0",
       "transport": {
         "type": "stdio"
       },
@@ -68,6 +68,41 @@
         {
           "name": "LM_LOG_LEVEL",
           "description": "Logging level for API request debugging (debug, info, warning, error)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AWX_URL",
+          "description": "Ansible Automation Platform controller URL (e.g., https://aap.example.com). Optional — AAP tools excluded if not set.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AWX_TOKEN",
+          "description": "Ansible Automation Platform personal access token",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "AWX_VERIFY_SSL",
+          "description": "Verify SSL certificates for AAP connections (default: true)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AWX_TIMEOUT",
+          "description": "Request timeout in seconds for AAP API calls (default: 30)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "AWX_MAX_RETRIES",
+          "description": "Max retries for failed AAP API requests (default: 3)",
           "isRequired": false,
           "format": "string",
           "isSecret": false

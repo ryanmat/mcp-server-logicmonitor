@@ -14,7 +14,7 @@ from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
 from lm_mcp.logging import is_write_tool, log_write_operation
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import TOOLS, get_tool_handler
+from lm_mcp.registry import AWX_TOOLS, TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
@@ -54,6 +54,35 @@ def _set_client(client: LogicMonitorClient) -> None:
     _client = client
 
 
+# Global AWX client (initialized when AWX_URL and AWX_TOKEN are set)
+_awx_client = None
+
+# Set of AWX tool names for dispatch routing
+AWX_TOOL_NAMES = {t.name for t in AWX_TOOLS}
+
+
+def get_awx_client():
+    """Get the initialized AWX client.
+
+    Returns:
+        The AWX client instance, or None if not configured.
+    """
+    return _awx_client
+
+
+def _set_awx_client(client) -> None:
+    """Set the global AWX client.
+
+    Called by transport runners during initialization when AWX
+    credentials are available.
+
+    Args:
+        client: The AwxClient instance, or None to clear.
+    """
+    global _awx_client
+    _awx_client = client
+
+
 def _filter_tools(tools: list, config) -> list:
     """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
 
@@ -79,9 +108,15 @@ def _filter_tools(tools: list, config) -> list:
 
 @server.list_tools()
 async def list_tools():
-    """Return available LogicMonitor tools, filtered by config."""
+    """Return available tools, filtered by config.
+
+    Includes AWX tools only when the AWX client is configured.
+    """
     config = get_config()
-    return _filter_tools(TOOLS, config)
+    tools = list(TOOLS)
+    if _awx_client is not None:
+        tools.extend(AWX_TOOLS)
+    return _filter_tools(tools, config)
 
 
 # Session tools that don't require the LM client
@@ -201,9 +236,20 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                         else:
                             logger.warning(f"Filter validation warning for {name}: {msg}")
 
-        # Session tools don't need the LM client
+        # Session tools don't need any client
         if name in SESSION_TOOLS:
             result = await handler(**arguments)
+        elif name in AWX_TOOL_NAMES:
+            # AWX tools use the AWX client
+            if _awx_client is None:
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: Ansible Automation Platform not configured. "
+                        "Set AWX_URL and AWX_TOKEN environment variables.",
+                    )
+                ]
+            result = await handler(_awx_client, **arguments)
         else:
             client = get_client()
             result = await handler(client, **arguments)
