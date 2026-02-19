@@ -91,9 +91,14 @@ class TestPromptsRegistry:
         names = [p.name for p in PROMPTS]
         assert "capacity_forecast" in names
 
+    def test_remediate_workflow_prompt_exists(self):
+        """remediate_workflow prompt is defined."""
+        names = [p.name for p in PROMPTS]
+        assert "remediate_workflow" in names
+
     def test_total_prompt_count(self):
-        """All 13 prompts are registered."""
-        assert len(PROMPTS) == 13
+        """All 14 prompts are registered."""
+        assert len(PROMPTS) == 14
 
 
 class TestGetPromptMessages:
@@ -308,3 +313,26 @@ class TestGetPromptMessages:
         result = get_prompt_messages("alert_correlation", {})
         content = str(result.messages[0].content)
         assert "get_alert_statistics" in content
+
+    # Remediate Workflow prompt tests
+
+    def test_remediate_workflow_returns_messages(self):
+        """get_prompt_messages returns messages for remediate_workflow."""
+        result = get_prompt_messages("remediate_workflow", {})
+        assert result.messages is not None
+        assert len(result.messages) > 0
+
+    def test_remediate_workflow_includes_awx_tools(self):
+        """remediate_workflow references AAP/AWX tools."""
+        result = get_prompt_messages("remediate_workflow", {})
+        content = str(result.messages[0].content)
+        assert "launch_job" in content
+        assert "get_job_templates" in content
+        assert "test_awx_connection" in content
+
+    def test_remediate_workflow_includes_safety_constraints(self):
+        """remediate_workflow includes safety constraints for write operations."""
+        result = get_prompt_messages("remediate_workflow", {})
+        content = str(result.messages[0].content)
+        assert "dry run" in content.lower() or "check_mode" in content.lower()
+        assert "confirmation" in content.lower() or "approval" in content.lower()

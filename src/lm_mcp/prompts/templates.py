@@ -531,3 +531,110 @@ Provide a capacity report with:
   - Near-term risk (trending toward breach within 30 days)
   - Monitor closely (growing but sufficient headroom)
   - No action needed (stable or declining utilization)"""
+
+
+def remediate_workflow_template(arguments: dict) -> str:
+    """Generate remediation workflow prompt content.
+
+    Args:
+        arguments: Prompt arguments (alert_id, device_id).
+
+    Returns:
+        Prompt text for the LM alert remediation via AAP workflow.
+    """
+    alert_id = arguments.get("alert_id", "")
+    device_id = arguments.get("device_id", "")
+
+    starting_point = "Ask the operator which alert or device to remediate."
+    if alert_id:
+        starting_point = (
+            f"Start with alert {alert_id} using get_alert_details "
+            "to get the alert context and affected device."
+        )
+    elif device_id:
+        starting_point = (
+            f"Start with device {device_id} using get_alerts "
+            "to find active alerts on that device."
+        )
+
+    return f"""Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform.
+
+Parameters:
+- Alert ID: {alert_id or 'not specified'}
+- Device ID: {device_id or 'not specified'}
+
+{starting_point}
+
+Step 0 - Connection Check:
+1. Call test_awx_connection to verify AAP is reachable
+   - If connection fails, stop and report the error
+   - If connection succeeds, proceed
+
+Step 1 - Alert Context:
+2. Call get_alert_details or get_alerts to identify the target alert
+3. Call get_device to get the affected device context
+   Capture: alert ID, device ID, datasource, datapoint, severity, threshold
+
+Step 2 - Diagnosis:
+4. Call score_device_health for the affected device
+5. Call get_device_data for the alerting datasource to see current metrics
+6. Call correlate_alerts to find related alerts sharing a root cause
+7. Call correlate_changes to check for recent changes that triggered the issue
+
+Step 3 - Blast Radius:
+8. Call analyze_blast_radius with depth=2 on the affected device
+   Document upstream dependencies and downstream dependents before action
+
+Step 4 - Playbook Discovery (3-tier search):
+9. Call get_job_templates with lm-remediate-* name filter for convention match
+10. If no match, search by datasource/datapoint keywords
+11. If still no match, list all templates for manual selection
+12. For candidates, call get_job_template to get details and extra_vars
+
+Branch - No Templates Found:
+- Present the diagnosis and offer:
+  - Path A: Generate a playbook inline based on the diagnosis
+  - Path B: Provide manual remediation steps
+- Stop the workflow (no automated execution without a template)
+
+Step 5 - Present Options:
+13. Show candidate playbooks with extra_vars, risk assessment, and
+    recommended parameter values based on the diagnosis
+14. Wait for operator to select a template and confirm parameters
+
+Step 6 - Dry Run:
+15. Call get_inventories to select the target inventory
+16. Call launch_job with check_mode=true (dry run)
+17. Call get_job_status to poll until the dry run completes
+18. Call get_job_output to retrieve the dry run results
+    If dry run shows destructive changes, warn explicitly
+19. Wait for explicit approval before live execution
+
+Step 7 - Live Execution:
+20. Call launch_job with the confirmed template and parameters
+21. Call get_job_status to poll until the job completes
+22. Call get_job_output to retrieve execution results
+
+Step 8 - Verification:
+23. Call get_device_data to check current metric values after remediation
+24. Call score_device_health for the updated health score
+25. Call get_alert_details to check if the alert has cleared
+
+Step 9 - Documentation:
+26. Call add_ops_note documenting alert ID, job template, job ID, and result
+27. If alert cleared, call acknowledge_alert referencing the remediation job
+
+Safety Constraints:
+- Before ANY write operation (launch_job, add_ops_note, acknowledge_alert),
+  state exactly what will happen and get explicit confirmation
+- Never auto-launch without completing the dry run first
+- Never skip the blast radius assessment
+- If dry run shows destructive changes, warn explicitly before approval
+- If the operator declines at any approval gate, stop immediately
+
+Provide a structured remediation summary with:
+- Alert ID, datasource/datapoint, and device name
+- Health score before and after remediation
+- Job template used and job ID
+- Execution result (success/failed/partial)
+- Alert status (cleared/still active)"""
