@@ -3620,6 +3620,365 @@ TOOLS.extend(
 )
 
 
+# Ansible Automation Platform tools (conditionally included)
+AWX_TOOLS: list[Tool] = [
+    # Connection test
+    Tool(
+        name="test_awx_connection",
+        description="Test connectivity to Ansible Automation Platform controller",
+        annotations=_READ_ONLY,
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    # Job template tools
+    Tool(
+        name="get_job_templates",
+        description="List job templates from Ansible Automation Platform",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search templates by name",
+                },
+                "project_id": {
+                    "type": "integer",
+                    "description": "Filter by project ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_job_template",
+        description="Get details of a specific job template",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "template_id": {
+                    "type": "integer",
+                    "description": "The job template ID",
+                },
+            },
+            "required": ["template_id"],
+        },
+    ),
+    # Job execution tools
+    Tool(
+        name="launch_job",
+        description=(
+            "Launch an Ansible job template. Requires write permission."
+        ),
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "template_id": {
+                    "type": "integer",
+                    "description": "The job template ID to launch",
+                },
+                "extra_vars": {
+                    "type": "object",
+                    "description": "Extra variables for the playbook",
+                },
+                "inventory_id": {
+                    "type": "integer",
+                    "description": "Override inventory for this run",
+                },
+                "limit": {
+                    "type": "string",
+                    "description": "Limit execution to specific hosts (Ansible limit pattern)",
+                },
+                "check_mode": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Run in check/dry-run mode",
+                },
+            },
+            "required": ["template_id"],
+        },
+    ),
+    Tool(
+        name="get_job_status",
+        description="Get the status of a running or completed job",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "integer",
+                    "description": "The job ID to check",
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    Tool(
+        name="get_job_output",
+        description="Get the stdout output of a job",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "integer",
+                    "description": "The job ID to get output from",
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    Tool(
+        name="cancel_job",
+        description="Cancel a running job. Requires write permission.",
+        annotations=_DELETE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "integer",
+                    "description": "The job ID to cancel",
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    Tool(
+        name="relaunch_job",
+        description="Relaunch a previously run job. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "integer",
+                    "description": "The original job ID to relaunch",
+                },
+                "extra_vars": {
+                    "type": "object",
+                    "description": "Optional override variables",
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    # Inventory tools
+    Tool(
+        name="get_inventories",
+        description="List inventories from Ansible Automation Platform",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search inventories by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_inventory_hosts",
+        description="List hosts in a specific inventory",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "inventory_id": {
+                    "type": "integer",
+                    "description": "The inventory ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+            "required": ["inventory_id"],
+        },
+    ),
+    # Workflow tools
+    Tool(
+        name="launch_workflow",
+        description=(
+            "Launch a workflow job template. Requires write permission."
+        ),
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "template_id": {
+                    "type": "integer",
+                    "description": "The workflow template ID to launch",
+                },
+                "extra_vars": {
+                    "type": "object",
+                    "description": "Extra variables for the workflow",
+                },
+                "inventory_id": {
+                    "type": "integer",
+                    "description": "Override inventory for this run",
+                },
+                "limit": {
+                    "type": "string",
+                    "description": "Limit execution to specific hosts",
+                },
+            },
+            "required": ["template_id"],
+        },
+    ),
+    Tool(
+        name="get_workflow_status",
+        description="Get the status of a workflow job",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "integer",
+                    "description": "The workflow job ID",
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    Tool(
+        name="get_workflow_templates",
+        description="List workflow job templates from Ansible Automation Platform",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search workflow templates by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    # Admin tools
+    Tool(
+        name="get_projects",
+        description="List projects from Ansible Automation Platform",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search projects by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_credentials",
+        description="List credentials from Ansible Automation Platform (secrets not exposed)",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search credentials by name",
+                },
+                "credential_type": {
+                    "type": "integer",
+                    "description": "Filter by credential type ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_organizations",
+        description="List organizations from Ansible Automation Platform",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search organizations by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_job_events",
+        description="Get events from a specific job run",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "integer",
+                    "description": "The job ID to get events from",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+            "required": ["job_id"],
+        },
+    ),
+    Tool(
+        name="get_hosts",
+        description="List hosts from Ansible Automation Platform",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search hosts by name",
+                },
+                "inventory_id": {
+                    "type": "integer",
+                    "description": "Filter by inventory ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+]
+
+
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
     """Get the handler function for a tool.
@@ -3637,6 +3996,7 @@ def get_tool_handler(tool_name: str) -> Any:
         access_groups,
         alert_rules,
         alerts,
+        ansible,
         api_tokens,
         audit,
         baselines,
@@ -3892,6 +4252,25 @@ def get_tool_handler(tool_name: str) -> Any:
         "delete_session_variable": session.delete_session_variable,
         "clear_session_context": session.clear_session_context,
         "list_session_history": session.list_session_history,
+        # Ansible Automation Platform
+        "test_awx_connection": ansible.test_awx_connection,
+        "get_job_templates": ansible.get_job_templates,
+        "get_job_template": ansible.get_job_template,
+        "launch_job": ansible.launch_job,
+        "get_job_status": ansible.get_job_status,
+        "get_job_output": ansible.get_job_output,
+        "cancel_job": ansible.cancel_job,
+        "relaunch_job": ansible.relaunch_job,
+        "get_inventories": ansible.get_inventories,
+        "get_inventory_hosts": ansible.get_inventory_hosts,
+        "launch_workflow": ansible.launch_workflow,
+        "get_workflow_status": ansible.get_workflow_status,
+        "get_workflow_templates": ansible.get_workflow_templates,
+        "get_projects": ansible.get_projects,
+        "get_credentials": ansible.get_credentials,
+        "get_organizations": ansible.get_organizations,
+        "get_job_events": ansible.get_job_events,
+        "get_hosts": ansible.get_hosts,
     }
 
     if tool_name not in handlers:

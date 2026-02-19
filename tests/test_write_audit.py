@@ -55,6 +55,24 @@ class TestWriteToolPrefixDetection:
             )
 
 
+class TestAwxWriteToolPrefixes:
+    """Tests for AWX write tool prefix detection."""
+
+    AWX_WRITE_TOOLS = [
+        "launch_job",
+        "cancel_job",
+        "relaunch_job",
+        "launch_workflow",
+    ]
+
+    def test_awx_write_tools_match_prefix(self):
+        """AWX write tools match write prefixes in WRITE_TOOL_PREFIXES."""
+        from lm_mcp.logging import is_write_tool
+
+        for tool in self.AWX_WRITE_TOOLS:
+            assert is_write_tool(tool), f"{tool} should be detected as a write tool"
+
+
 class TestWriteAuditLogging:
     """Tests for write audit trail integration in server.py."""
 

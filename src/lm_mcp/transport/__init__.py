@@ -22,7 +22,7 @@ async def run_stdio() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_client, server
+    from lm_mcp.server import _set_awx_client, _set_client, server
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -37,6 +37,23 @@ async def run_stdio() -> None:
     )
     _set_client(client)
 
+    # Initialize AWX client if configured
+    awx_client = None
+    from lm_mcp.awx_config import get_awx_config
+
+    awx_config = get_awx_config()
+    if awx_config is not None:
+        from lm_mcp.client.awx import AwxClient
+
+        awx_client = AwxClient(
+            base_url=awx_config.url,
+            token=awx_config.token,
+            timeout=awx_config.timeout,
+            max_retries=awx_config.max_retries,
+            verify_ssl=awx_config.verify_ssl,
+        )
+        _set_awx_client(awx_client)
+
     # Initialize session with config settings
     if config.session_enabled:
         session = get_session()
@@ -50,6 +67,8 @@ async def run_stdio() -> None:
                 server.create_initialization_options(),
             )
     finally:
+        if awx_client is not None:
+            await awx_client.close()
         await client.close()
 
 

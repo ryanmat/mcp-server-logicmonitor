@@ -88,6 +88,43 @@ class TestHttpToolsListFiltering:
         assert len(data["result"]) == len(TOOLS)
 
 
+class TestHttpToolsListWithAwx:
+    """Tests for HTTP /mcp tools/list including AWX tools."""
+
+    @pytest.mark.asyncio
+    async def test_tools_list_includes_awx_when_configured(self, monkeypatch):
+        """HTTP tools/list count includes AWX tools when client is set."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+
+        from unittest.mock import MagicMock
+
+        from lm_mcp.registry import AWX_TOOLS, TOOLS
+        from lm_mcp.server import _set_awx_client
+
+        _set_awx_client(MagicMock())
+
+        from httpx import ASGITransport, AsyncClient
+
+        from lm_mcp.transport.http import create_asgi_app
+
+        app = create_asgi_app()
+        transport = ASGITransport(app=app)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+            )
+
+        data = resp.json()
+        assert len(data["result"]) == len(TOOLS) + len(AWX_TOOLS)
+
+        _set_awx_client(None)
+
+
 class TestHttpToolsCallMiddleware:
     """Tests for HTTP /mcp tools/call going through execute_tool."""
 
