@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 198 tools organized by domain category (180 LM + 18 AAP).
+# All 218 tools organized by domain category (180 LM + 18 AAP + 20 EDA).
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -335,6 +335,31 @@ TOOL_CATEGORIES = {
                 "get_organizations",
                 "get_job_events",
                 "get_hosts",
+            ],
+        },
+        "eda": {
+            "description": "Event-Driven Ansible for automated event response",
+            "tools": [
+                "test_eda_connection",
+                "get_eda_activations",
+                "get_eda_activation",
+                "create_eda_activation",
+                "enable_eda_activation",
+                "disable_eda_activation",
+                "restart_eda_activation",
+                "delete_eda_activation",
+                "get_eda_activation_instances",
+                "get_eda_activation_instance_logs",
+                "get_eda_projects",
+                "get_eda_project",
+                "create_eda_project",
+                "sync_eda_project",
+                "get_eda_rulebooks",
+                "get_eda_rulebook",
+                "get_eda_event_streams",
+                "get_eda_event_stream",
+                "create_eda_event_stream",
+                "delete_eda_event_stream",
             ],
         },
     },

@@ -8,17 +8,22 @@ from pathlib import Path
 
 import pytest
 
-from lm_mcp.registry import AWX_TOOLS, TOOLS
+from lm_mcp.registry import AWX_TOOLS, EDA_TOOLS, TOOLS
 
 SKILLS_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills"
 
 # Build a set of all tool names from the registry for cross-referencing
-ALL_REGISTRY_TOOLS = {tool.name for tool in TOOLS} | {tool.name for tool in AWX_TOOLS}
+ALL_REGISTRY_TOOLS = (
+    {tool.name for tool in TOOLS}
+    | {tool.name for tool in AWX_TOOLS}
+    | {tool.name for tool in EDA_TOOLS}
+)
 
 # Expected skills (directory names under .claude/skills/)
 EXPECTED_SKILLS = [
     "lm-apm",
     "lm-capacity",
+    "lm-eda",
     "lm-health",
     "lm-portal",
     "lm-triage",

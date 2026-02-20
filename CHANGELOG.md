@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-02-20
+
+### Added
+
+- Event-Driven Ansible integration (20 tools) for automated event response
+- EdaClient HTTP client with Bearer token auth, retry logic, and error mapping
+- Activation management: list, get, create, enable, disable, restart, delete
+- Activation instance monitoring with log retrieval
+- EDA project management: list, get, create, sync from Git
+- Rulebook queries: list, get (populated via project sync)
+- Event stream management: list, get, create, delete
+- Write-protected tools: create/enable/disable/restart/delete activations, create/sync projects, create/delete event streams
+- `test_eda_connection` tool for verifying EDA Controller connectivity
+- EDA_URL, EDA_TOKEN env vars (optional — EDA tools excluded if not set)
+- `/lm-eda` Claude Code skill: event-driven alert automation workflow
+- 4-way dispatch in server: session -> EDA -> AWX -> LM
+
+### Changed
+
+- Tool count: 198 -> 218 (180 LM + 18 AAP + 20 EDA)
+- Skill count: 6 -> 7
+- Tool categories guide updated with "eda" domain
+- Write audit logging expanded with enable/disable/restart/sync prefixes
+
 ## [1.8.0] - 2026-02-19
 
 ### Added

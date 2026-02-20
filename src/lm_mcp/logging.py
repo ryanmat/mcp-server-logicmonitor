@@ -71,6 +71,10 @@ WRITE_TOOL_PREFIXES = (
     "launch_",
     "cancel_",
     "relaunch_",
+    "enable_",
+    "disable_",
+    "restart_",
+    "sync_",
 )
 
 

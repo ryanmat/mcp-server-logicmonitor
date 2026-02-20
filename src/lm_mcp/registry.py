@@ -3979,6 +3979,376 @@ AWX_TOOLS: list[Tool] = [
 ]
 
 
+# EDA Controller tools (conditionally included when EDA_URL + EDA_TOKEN are set)
+EDA_TOOLS: list[Tool] = [
+    # Connection test
+    Tool(
+        name="test_eda_connection",
+        description="Test connectivity to EDA Controller",
+        annotations=_READ_ONLY,
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    # Activation tools
+    Tool(
+        name="get_eda_activations",
+        description="List rulebook activations from EDA Controller",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search activations by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_eda_activation",
+        description="Get details of a specific rulebook activation",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "activation_id": {
+                    "type": "integer",
+                    "description": "The activation ID",
+                },
+            },
+            "required": ["activation_id"],
+        },
+    ),
+    Tool(
+        name="create_eda_activation",
+        description="Create a new rulebook activation. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Activation name",
+                },
+                "rulebook_id": {
+                    "type": "integer",
+                    "description": "ID of the rulebook to activate",
+                },
+                "decision_environment_id": {
+                    "type": "integer",
+                    "description": "ID of the decision environment",
+                },
+                "extra_var": {
+                    "type": "string",
+                    "description": "Extra variables as YAML string",
+                },
+                "restart_policy": {
+                    "type": "string",
+                    "default": "on-failure",
+                    "description": "Restart policy (always, never, on-failure)",
+                },
+                "is_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Whether to enable the activation immediately",
+                },
+            },
+            "required": ["name", "rulebook_id", "decision_environment_id"],
+        },
+    ),
+    Tool(
+        name="enable_eda_activation",
+        description="Enable a rulebook activation. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "activation_id": {
+                    "type": "integer",
+                    "description": "The activation ID to enable",
+                },
+            },
+            "required": ["activation_id"],
+        },
+    ),
+    Tool(
+        name="disable_eda_activation",
+        description="Disable a rulebook activation. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "activation_id": {
+                    "type": "integer",
+                    "description": "The activation ID to disable",
+                },
+            },
+            "required": ["activation_id"],
+        },
+    ),
+    Tool(
+        name="restart_eda_activation",
+        description="Restart a rulebook activation. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "activation_id": {
+                    "type": "integer",
+                    "description": "The activation ID to restart",
+                },
+            },
+            "required": ["activation_id"],
+        },
+    ),
+    Tool(
+        name="delete_eda_activation",
+        description="Delete a rulebook activation. Requires write permission.",
+        annotations=_DELETE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "activation_id": {
+                    "type": "integer",
+                    "description": "The activation ID to delete",
+                },
+            },
+            "required": ["activation_id"],
+        },
+    ),
+    Tool(
+        name="get_eda_activation_instances",
+        description="List instances of a rulebook activation",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "activation_id": {
+                    "type": "integer",
+                    "description": "The activation ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+            "required": ["activation_id"],
+        },
+    ),
+    Tool(
+        name="get_eda_activation_instance_logs",
+        description="Get logs for an activation instance",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "instance_id": {
+                    "type": "integer",
+                    "description": "The activation instance ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+            "required": ["instance_id"],
+        },
+    ),
+    # Project tools
+    Tool(
+        name="get_eda_projects",
+        description="List projects from EDA Controller",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search projects by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_eda_project",
+        description="Get details of a specific EDA project",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "The project ID",
+                },
+            },
+            "required": ["project_id"],
+        },
+    ),
+    Tool(
+        name="create_eda_project",
+        description="Create a new EDA project from a Git repository. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Project name",
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Git repository URL containing rulebooks",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional project description",
+                },
+                "credential_id": {
+                    "type": "integer",
+                    "description": "Optional credential ID for private repos",
+                },
+            },
+            "required": ["name", "url"],
+        },
+    ),
+    Tool(
+        name="sync_eda_project",
+        description="Sync an EDA project from its Git repository. Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "The project ID to sync",
+                },
+            },
+            "required": ["project_id"],
+        },
+    ),
+    # Rulebook tools
+    Tool(
+        name="get_eda_rulebooks",
+        description="List rulebooks from EDA Controller",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search rulebooks by name",
+                },
+                "project_id": {
+                    "type": "integer",
+                    "description": "Filter by project ID",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_eda_rulebook",
+        description="Get details of a specific rulebook including rulesets",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "rulebook_id": {
+                    "type": "integer",
+                    "description": "The rulebook ID",
+                },
+            },
+            "required": ["rulebook_id"],
+        },
+    ),
+    # Event stream tools
+    Tool(
+        name="get_eda_event_streams",
+        description="List event streams (managed webhook endpoints) from EDA Controller",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name_filter": {
+                    "type": "string",
+                    "description": "Search event streams by name",
+                },
+                "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "description": "Max results",
+                },
+            },
+        },
+    ),
+    Tool(
+        name="get_eda_event_stream",
+        description="Get details of a specific event stream",
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "event_stream_id": {
+                    "type": "integer",
+                    "description": "The event stream ID",
+                },
+            },
+            "required": ["event_stream_id"],
+        },
+    ),
+    Tool(
+        name="create_eda_event_stream",
+        description="Create a new event stream (webhook endpoint). Requires write permission.",
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Event stream name",
+                },
+                "event_stream_type": {
+                    "type": "string",
+                    "default": "basic",
+                    "description": "Type of event stream (basic, hmac, etc.)",
+                },
+            },
+            "required": ["name"],
+        },
+    ),
+    Tool(
+        name="delete_eda_event_stream",
+        description="Delete an event stream. Requires write permission.",
+        annotations=_DELETE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "event_stream_id": {
+                    "type": "integer",
+                    "description": "The event stream ID to delete",
+                },
+            },
+            "required": ["event_stream_id"],
+        },
+    ),
+]
+
+
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
     """Get the handler function for a tool.
@@ -4009,6 +4379,7 @@ def get_tool_handler(tool_name: str) -> Any:
         dashboards,
         datasources,
         devices,
+        eda,
         escalations,
         event_correlation,
         eventsources,
@@ -4271,6 +4642,27 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_organizations": ansible.get_organizations,
         "get_job_events": ansible.get_job_events,
         "get_hosts": ansible.get_hosts,
+        # EDA Controller
+        "test_eda_connection": eda.test_eda_connection,
+        "get_eda_activations": eda.get_eda_activations,
+        "get_eda_activation": eda.get_eda_activation,
+        "create_eda_activation": eda.create_eda_activation,
+        "enable_eda_activation": eda.enable_eda_activation,
+        "disable_eda_activation": eda.disable_eda_activation,
+        "restart_eda_activation": eda.restart_eda_activation,
+        "delete_eda_activation": eda.delete_eda_activation,
+        "get_eda_activation_instances": eda.get_eda_activation_instances,
+        "get_eda_activation_instance_logs": eda.get_eda_activation_instance_logs,
+        "get_eda_projects": eda.get_eda_projects,
+        "get_eda_project": eda.get_eda_project,
+        "create_eda_project": eda.create_eda_project,
+        "sync_eda_project": eda.sync_eda_project,
+        "get_eda_rulebooks": eda.get_eda_rulebooks,
+        "get_eda_rulebook": eda.get_eda_rulebook,
+        "get_eda_event_streams": eda.get_eda_event_streams,
+        "get_eda_event_stream": eda.get_eda_event_stream,
+        "create_eda_event_stream": eda.create_eda_event_stream,
+        "delete_eda_event_stream": eda.delete_eda_event_stream,
     }
 
     if tool_name not in handlers:

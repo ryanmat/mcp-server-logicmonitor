@@ -14,7 +14,7 @@ from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
 from lm_mcp.logging import is_write_tool, log_write_operation
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import AWX_TOOLS, TOOLS, get_tool_handler
+from lm_mcp.registry import AWX_TOOLS, EDA_TOOLS, TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
@@ -83,6 +83,35 @@ def _set_awx_client(client) -> None:
     _awx_client = client
 
 
+# Global EDA client (initialized when EDA_URL and EDA_TOKEN are set)
+_eda_client = None
+
+# Set of EDA tool names for dispatch routing
+EDA_TOOL_NAMES = {t.name for t in EDA_TOOLS}
+
+
+def get_eda_client():
+    """Get the initialized EDA client.
+
+    Returns:
+        The EDA client instance, or None if not configured.
+    """
+    return _eda_client
+
+
+def _set_eda_client(client) -> None:
+    """Set the global EDA client.
+
+    Called by transport runners during initialization when EDA
+    credentials are available.
+
+    Args:
+        client: The EdaClient instance, or None to clear.
+    """
+    global _eda_client
+    _eda_client = client
+
+
 def _filter_tools(tools: list, config) -> list:
     """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
 
@@ -111,11 +140,14 @@ async def list_tools():
     """Return available tools, filtered by config.
 
     Includes AWX tools only when the AWX client is configured.
+    Includes EDA tools only when the EDA client is configured.
     """
     config = get_config()
     tools = list(TOOLS)
     if _awx_client is not None:
         tools.extend(AWX_TOOLS)
+    if _eda_client is not None:
+        tools.extend(EDA_TOOLS)
     return _filter_tools(tools, config)
 
 
@@ -239,6 +271,17 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         # Session tools don't need any client
         if name in SESSION_TOOLS:
             result = await handler(**arguments)
+        elif name in EDA_TOOL_NAMES:
+            # EDA tools use the EDA client
+            if _eda_client is None:
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: EDA Controller not configured. "
+                        "Set EDA_URL and EDA_TOKEN environment variables.",
+                    )
+                ]
+            result = await handler(_eda_client, **arguments)
         elif name in AWX_TOOL_NAMES:
             # AWX tools use the AWX client
             if _awx_client is None:

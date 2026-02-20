@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ryanmat/logicmonitor",
-  "description": "LogicMonitor API integration with 198 tools for alerts, devices, dashboards, traces, Ansible Automation Platform, and more.",
+  "description": "LogicMonitor API integration with 218 tools for alerts, devices, dashboards, traces, Ansible Automation Platform, Event-Driven Ansible, and more.",
   "repository": {
     "url": "https://github.com/ryanmat/mcp-server-logicmonitor",
     "source": "github"
   },
-  "version": "1.8.0",
+  "version": "1.9.0",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "lm-mcp",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "transport": {
         "type": "stdio"
       },
@@ -103,6 +103,41 @@
         {
           "name": "AWX_MAX_RETRIES",
           "description": "Max retries for failed AAP API requests (default: 3)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "EDA_URL",
+          "description": "EDA Controller URL (e.g., https://eda.example.com). Optional — EDA tools excluded if not set.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "EDA_TOKEN",
+          "description": "EDA Controller personal access token",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "EDA_VERIFY_SSL",
+          "description": "Verify SSL certificates for EDA connections (default: true)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "EDA_TIMEOUT",
+          "description": "Request timeout in seconds for EDA API calls (default: 30)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "EDA_MAX_RETRIES",
+          "description": "Max retries for failed EDA API requests (default: 3)",
           "isRequired": false,
           "format": "string",
           "isSecret": false
