@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.9.1] - 2026-02-25
+## [1.9.2] - 2026-02-25
 
 ### Fixed
 
@@ -399,7 +399,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
-[1.9.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.0...v1.9.1
+[1.9.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.0...v1.9.2
 [1.9.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.1...v1.7.2
