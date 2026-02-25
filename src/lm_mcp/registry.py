@@ -4130,6 +4130,11 @@ EDA_TOOLS: list[Tool] = [
                     "default": True,
                     "description": "Whether to enable the activation immediately",
                 },
+                "organization_id": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Organization ID (default 1 = Default org)",
+                },
             },
             "required": ["name", "rulebook_id", "decision_environment_id"],
         },
@@ -4292,6 +4297,11 @@ EDA_TOOLS: list[Tool] = [
                     "type": "integer",
                     "description": "Optional credential ID for private repos",
                 },
+                "organization_id": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Organization ID (default 1 = Default org)",
+                },
             },
             "required": ["name", "url"],
         },
@@ -4396,13 +4406,22 @@ EDA_TOOLS: list[Tool] = [
                     "type": "string",
                     "description": "Event stream name",
                 },
+                "eda_credential_id": {
+                    "type": "integer",
+                    "description": "ID of the EDA credential for authentication",
+                },
                 "event_stream_type": {
                     "type": "string",
                     "default": "basic",
                     "description": "Type of event stream (basic, hmac, etc.)",
                 },
+                "organization_id": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Organization ID (default 1 = Default org)",
+                },
             },
-            "required": ["name"],
+            "required": ["name", "eda_credential_id"],
         },
     ),
     Tool(

@@ -431,7 +431,7 @@ class TestCreateEdaEventStream:
         client.post.return_value = {"id": 8, "name": "new-stream"}
 
         result = await create_eda_event_stream(
-            client, name="new-stream", event_stream_type="basic"
+            client, name="new-stream", eda_credential_id=1, event_stream_type="basic"
         )
         data = _parse_result(result)
         assert data["id"] == 8

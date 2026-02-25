@@ -103,6 +103,7 @@ async def create_eda_activation(
     extra_var: str | None = None,
     restart_policy: str = "on-failure",
     is_enabled: bool = True,
+    organization_id: int = 1,
 ) -> list[TextContent]:
     """Create a new rulebook activation.
 
@@ -114,6 +115,7 @@ async def create_eda_activation(
         extra_var: Extra variables as YAML string.
         restart_policy: Restart policy (always, never, on-failure).
         is_enabled: Whether to enable the activation immediately.
+        organization_id: Organization ID (default 1 = "Default" org).
 
     Returns:
         List of TextContent with created activation data.
@@ -125,6 +127,7 @@ async def create_eda_activation(
             "decision_environment_id": decision_environment_id,
             "restart_policy": restart_policy,
             "is_enabled": is_enabled,
+            "organization_id": organization_id,
         }
         if extra_var is not None:
             body["extra_var"] = extra_var
@@ -340,6 +343,7 @@ async def create_eda_project(
     url: str,
     description: str | None = None,
     credential_id: int | None = None,
+    organization_id: int = 1,
 ) -> list[TextContent]:
     """Create a new EDA project from a Git repository.
 
@@ -349,12 +353,17 @@ async def create_eda_project(
         url: Git repository URL containing rulebooks.
         description: Optional project description.
         credential_id: Optional credential ID for private repos.
+        organization_id: Organization ID (default 1 = "Default" org).
 
     Returns:
         List of TextContent with created project data.
     """
     try:
-        body: dict = {"name": name, "url": url}
+        body: dict = {
+            "name": name,
+            "url": url,
+            "organization_id": organization_id,
+        }
         if description is not None:
             body["description"] = description
         if credential_id is not None:
@@ -507,14 +516,18 @@ async def get_eda_event_stream(
 async def create_eda_event_stream(
     client: "EdaClient",
     name: str,
+    eda_credential_id: int,
     event_stream_type: str = "basic",
+    organization_id: int = 1,
 ) -> list[TextContent]:
     """Create a new event stream (webhook endpoint).
 
     Args:
         client: EDA Controller API client.
         name: Event stream name.
+        eda_credential_id: ID of the EDA credential for authentication.
         event_stream_type: Type of event stream (basic, hmac, etc.).
+        organization_id: Organization ID (default 1 = "Default" org).
 
     Returns:
         List of TextContent with created event stream data.
@@ -522,7 +535,9 @@ async def create_eda_event_stream(
     try:
         body: dict = {
             "name": name,
+            "eda_credential_id": eda_credential_id,
             "event_stream_type": event_stream_type,
+            "organization_id": organization_id,
         }
         data = await client.post("/event-streams/", json_body=body)
         return format_response(data)
