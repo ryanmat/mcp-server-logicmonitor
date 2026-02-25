@@ -309,3 +309,198 @@ class TestGetGraphData:
         )
 
         assert "Error:" in result[0].text
+
+
+# -- Instance management tools (write) ----------------------------------------
+
+
+BASE_URL = "https://test.logicmonitor.com/santaba/rest"
+INSTANCES_URL = f"{BASE_URL}/device/devices/100/devicedatasources/1001/instances"
+
+
+def _enable_writes(monkeypatch):
+    """Configure environment for write operations."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+
+def _disable_writes(monkeypatch):
+    """Configure environment with write operations disabled."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+
+class TestAddDeviceInstance:
+    """Tests for add_device_instance tool."""
+
+    async def test_blocked_without_write_permission(self, client, monkeypatch):
+        """add_device_instance returns error when write operations disabled."""
+        _disable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import add_device_instance
+
+        result = await add_device_instance(
+            client, device_id=100, device_datasource_id=1001,
+            display_name="nginx", wild_value="nginx.service",
+        )
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_creates_instance_successfully(self, client, monkeypatch):
+        """add_device_instance creates an instance and returns its details."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import add_device_instance
+
+        respx.post(INSTANCES_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 5002,
+                    "displayName": "nginx",
+                    "wildValue": "nginx.service",
+                    "description": "nginx web server",
+                    "deviceId": 100,
+                    "deviceDataSourceId": 1001,
+                },
+            )
+        )
+
+        result = await add_device_instance(
+            client, device_id=100, device_datasource_id=1001,
+            display_name="nginx", wild_value="nginx.service",
+            description="nginx web server",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["instance"]["id"] == 5002
+        assert data["instance"]["display_name"] == "nginx"
+        assert data["instance"]["wild_value"] == "nginx.service"
+
+    @respx.mock
+    async def test_sends_correct_body(self, client, monkeypatch):
+        """add_device_instance sends displayName and wildValue in request body."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import add_device_instance
+
+        route = respx.post(INSTANCES_URL).mock(
+            return_value=httpx.Response(
+                200, json={"id": 5003, "displayName": "sshd", "wildValue": "sshd.service"},
+            )
+        )
+
+        await add_device_instance(
+            client, device_id=100, device_datasource_id=1001,
+            display_name="sshd", wild_value="sshd.service",
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["displayName"] == "sshd"
+        assert body["wildValue"] == "sshd.service"
+
+    @respx.mock
+    async def test_handles_api_error(self, client, monkeypatch):
+        """add_device_instance handles 404 error gracefully."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import add_device_instance
+
+        respx.post(INSTANCES_URL).mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
+        )
+
+        result = await add_device_instance(
+            client, device_id=100, device_datasource_id=1001,
+            display_name="nginx", wild_value="nginx.service",
+        )
+        assert "Error:" in result[0].text
+
+
+class TestUpdateDeviceInstance:
+    """Tests for update_device_instance tool."""
+
+    async def test_blocked_without_write_permission(self, client, monkeypatch):
+        """update_device_instance returns error when write operations disabled."""
+        _disable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import update_device_instance
+
+        result = await update_device_instance(
+            client, device_id=100, device_datasource_id=1001,
+            instance_id=5001, description="updated",
+        )
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_updates_instance_successfully(self, client, monkeypatch):
+        """update_device_instance updates and returns instance details."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import update_device_instance
+
+        respx.patch(f"{INSTANCES_URL}/5001").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 5001,
+                    "displayName": "nginx-updated",
+                    "description": "updated desc",
+                    "stopMonitoring": False,
+                },
+            )
+        )
+
+        result = await update_device_instance(
+            client, device_id=100, device_datasource_id=1001,
+            instance_id=5001, description="updated desc",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["instance"]["id"] == 5001
+        assert data["instance"]["display_name"] == "nginx-updated"
+
+    async def test_returns_error_when_no_changes(self, client, monkeypatch):
+        """update_device_instance returns error when no fields provided."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import update_device_instance
+
+        result = await update_device_instance(
+            client, device_id=100, device_datasource_id=1001, instance_id=5001,
+        )
+
+        assert "No updates provided" in result[0].text
+
+
+class TestDeleteDeviceInstance:
+    """Tests for delete_device_instance tool."""
+
+    async def test_blocked_without_write_permission(self, client, monkeypatch):
+        """delete_device_instance returns error when write operations disabled."""
+        _disable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import delete_device_instance
+
+        result = await delete_device_instance(
+            client, device_id=100, device_datasource_id=1001, instance_id=5001,
+        )
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_deletes_instance_successfully(self, client, monkeypatch):
+        """delete_device_instance deletes and returns confirmation."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.metrics import delete_device_instance
+
+        respx.get(f"{INSTANCES_URL}/5001").mock(
+            return_value=httpx.Response(
+                200, json={"id": 5001, "displayName": "nginx"},
+            )
+        )
+        respx.delete(f"{INSTANCES_URL}/5001").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_device_instance(
+            client, device_id=100, device_datasource_id=1001, instance_id=5001,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["instance_id"] == 5001
+        assert data["display_name"] == "nginx"

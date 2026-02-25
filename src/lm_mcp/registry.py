@@ -600,6 +600,80 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="add_device_instance",
+            description="Add a monitored instance to a datasource on a device (requires write permission). "
+            "Used for datasources without Active Discovery (e.g. ServiceStatus).",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID (from get_device_datasources)",
+                    },
+                    "display_name": {
+                        "type": "string",
+                        "description": "Display name for the instance",
+                    },
+                    "wild_value": {
+                        "type": "string",
+                        "description": "Wildcard value used by the datasource to query this instance "
+                        "(e.g. 'nginx.service' for ServiceStatus, a port number for Port-)",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional instance description",
+                    },
+                },
+                "required": ["device_id", "device_datasource_id", "display_name", "wild_value"],
+            },
+        ),
+        Tool(
+            name="update_device_instance",
+            description="Update a monitored instance on a device (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID",
+                    },
+                    "instance_id": {"type": "integer", "description": "Instance ID to update"},
+                    "display_name": {"type": "string", "description": "New display name"},
+                    "description": {"type": "string", "description": "New description"},
+                    "stop_monitoring": {
+                        "type": "boolean",
+                        "description": "Stop or resume monitoring for this instance",
+                    },
+                    "disable_alerting": {
+                        "type": "boolean",
+                        "description": "Disable or enable alerting for this instance",
+                    },
+                },
+                "required": ["device_id", "device_datasource_id", "instance_id"],
+            },
+        ),
+        Tool(
+            name="delete_device_instance",
+            description="Delete a monitored instance from a datasource on a device (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID",
+                    },
+                    "instance_id": {"type": "integer", "description": "Instance ID to delete"},
+                },
+                "required": ["device_id", "device_datasource_id", "instance_id"],
+            },
+        ),
+        Tool(
             name="get_device_data",
             description="Get metric data for a device/resource datasource instance",
             annotations=_READ_ONLY,
@@ -4438,6 +4512,9 @@ def get_tool_handler(tool_name: str) -> Any:
         # Metrics
         "get_device_datasources": metrics.get_device_datasources,
         "get_device_instances": metrics.get_device_instances,
+        "add_device_instance": metrics.add_device_instance,
+        "update_device_instance": metrics.update_device_instance,
+        "delete_device_instance": metrics.delete_device_instance,
         "get_device_data": metrics.get_device_data,
         "get_graph_data": metrics.get_graph_data,
         # Dashboards

@@ -71,6 +71,9 @@ TOOL_CATEGORIES = {
             "tools": [
                 "get_device_datasources",
                 "get_device_instances",
+                "add_device_instance",
+                "update_device_instance",
+                "delete_device_instance",
                 "get_device_data",
                 "get_graph_data",
                 "get_datasources",

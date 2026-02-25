@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.9.0] - 2026-02-20
+## [1.9.0] - 2026-02-25
 
 ### Added
 
@@ -21,10 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EDA_URL, EDA_TOKEN env vars (optional — EDA tools excluded if not set)
 - `/lm-eda` Claude Code skill: event-driven alert automation workflow
 - 4-way dispatch in server: session -> EDA -> AWX -> LM
+- `add_device_instance` — Create datasource instances on a device (for datasources without Active Discovery)
+- `update_device_instance` — Update instance properties (display name, description, monitoring, alerting)
+- `delete_device_instance` — Delete a datasource instance from a device
+
+### Fixed
+
+- AAP check_mode (dry run) now sends `job_type: "check"` to the controller, preventing accidental execution during dry runs
 
 ### Changed
 
-- Tool count: 198 -> 218 (180 LM + 18 AAP + 20 EDA)
+- Tool count: 198 -> 221 (183 LM + 18 AAP + 20 EDA)
 - Skill count: 6 -> 7
 - Tool categories guide updated with "eda" domain
 - Write audit logging expanded with enable/disable/restart/sync prefixes
@@ -383,6 +390,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.9.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.2...v1.8.0
 [1.7.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.0...v1.7.1

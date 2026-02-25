@@ -261,6 +261,26 @@ class TestLaunchJob:
 
         body = json.loads(route.calls[0].request.content)
         assert body["diff_mode"] is True
+        assert body["job_type"] == "check"
+
+    @respx.mock
+    async def test_normal_mode_omits_check_fields(self, awx_client, monkeypatch):
+        _reload_config(monkeypatch, writes_enabled=True)
+        from lm_mcp.tools.ansible import launch_job
+
+        route = respx.post(f"{BASE}/api/v2/job_templates/10/launch/").mock(
+            return_value=httpx.Response(201, json={"job": 52, "status": "pending"})
+        )
+
+        await launch_job(
+            awx_client,
+            template_id=10,
+            extra_vars={"host": "server01"},
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert "diff_mode" not in body
+        assert "job_type" not in body
 
 
 class TestGetJobStatus:

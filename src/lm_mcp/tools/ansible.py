@@ -156,6 +156,7 @@ async def launch_job(
         if limit:
             body["limit"] = limit
         if check_mode:
+            body["job_type"] = "check"
             body["diff_mode"] = True
 
         data = await client.post(
