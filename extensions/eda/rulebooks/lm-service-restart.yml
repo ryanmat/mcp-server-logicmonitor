@@ -1,0 +1,39 @@
+# Description: EDA rulebook that triggers service restart when LogicMonitor detects a stopped service.
+# Description: Receives LM webhook alerts via event stream and launches AAP job template.
+---
+- name: LogicMonitor Service Alert Remediation
+  hosts: all
+  sources:
+    - ansible.eda.webhook: {}
+  rules:
+    - name: Restart stopped service on ServiceStatus alert
+      condition: >-
+        event.payload.alert_type == "alert" and
+        event.payload.datapoint == "ActivationState" and
+        (event.payload.level == "error" or event.payload.level == "critical")
+      action:
+        run_job_template:
+          name: lm-remediate-service-restart
+          organization: Default
+          job_args:
+            extra_vars:
+              service_name: "{{ event.payload.instance }}"
+            limit: "{{ event.payload.hostname }}"
+
+    - name: Log cleared alerts
+      condition: >-
+        event.payload.alert_type == "clear"
+      action:
+        debug:
+          msg: >-
+            Alert cleared: {{ event.payload.datasource }} on
+            {{ event.payload.host }} - {{ event.payload.instance }}
+
+    - name: Log unmatched events
+      condition: event.payload is defined
+      action:
+        debug:
+          msg: >-
+            Unmatched LM event: {{ event.payload.alert_type | default('unknown') }} -
+            {{ event.payload.datasource | default('unknown') }} on
+            {{ event.payload.host | default('unknown') }}
