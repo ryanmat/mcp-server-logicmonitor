@@ -65,8 +65,8 @@ def create_asgi_app() -> "Starlette":
         ensuring consistent behavior (filtering, validation, audit logging,
         session recording) across stdio and HTTP transports.
         """
-        from lm_mcp.registry import AWX_TOOLS, EDA_TOOLS, TOOLS
-        from lm_mcp.server import _awx_client, _eda_client, _filter_tools, execute_tool
+        from lm_mcp.registry import AWX_TOOLS, TOOLS
+        from lm_mcp.server import _awx_client, _filter_tools, execute_tool
 
         try:
             body = await request.json()
@@ -85,8 +85,6 @@ def create_asgi_app() -> "Starlette":
                 all_tools = list(TOOLS)
                 if _awx_client is not None:
                     all_tools.extend(AWX_TOOLS)
-                if _eda_client is not None:
-                    all_tools.extend(EDA_TOOLS)
                 filtered = _filter_tools(all_tools, config)
                 result = [
                     {"name": t.name, "description": t.description} for t in filtered
@@ -305,7 +303,7 @@ async def create_http_server() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_awx_client, _set_client, _set_eda_client
+    from lm_mcp.server import _set_awx_client, _set_client
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -337,23 +335,6 @@ async def create_http_server() -> None:
         )
         _set_awx_client(awx_client)
 
-    # Initialize EDA client if configured
-    eda_client = None
-    from lm_mcp.eda_config import get_eda_config
-
-    eda_config = get_eda_config()
-    if eda_config is not None:
-        from lm_mcp.client.eda import EdaClient
-
-        eda_client = EdaClient(
-            base_url=eda_config.url,
-            token=eda_config.token,
-            timeout=eda_config.timeout,
-            max_retries=eda_config.max_retries,
-            verify_ssl=eda_config.verify_ssl,
-        )
-        _set_eda_client(eda_client)
-
     # Initialize session with config settings
     if config.session_enabled:
         session = get_session()
@@ -377,8 +358,6 @@ async def create_http_server() -> None:
     try:
         await server.serve()
     finally:
-        if eda_client is not None:
-            await eda_client.close()
         if awx_client is not None:
             await awx_client.close()
         await client.close()

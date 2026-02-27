@@ -284,7 +284,7 @@ class TestGuideResources:
 
     def test_tool_categories_covers_all_registered_tools(self):
         """Tool categories index accounts for all registered tools."""
-        from lm_mcp.registry import AWX_TOOLS, EDA_TOOLS, TOOLS
+        from lm_mcp.registry import AWX_TOOLS, TOOLS
 
         content = get_resource_content("lm://guide/tool-categories")
         data = json.loads(content)
@@ -298,7 +298,6 @@ class TestGuideResources:
         registered_tools = (
             {t.name for t in TOOLS}
             | {t.name for t in AWX_TOOLS}
-            | {t.name for t in EDA_TOOLS}
         )
 
         # Every registered tool should be in some category

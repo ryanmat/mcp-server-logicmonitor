@@ -28,9 +28,6 @@ claude mcp add logicmonitor \
     -e "AWX_URL=${AWX_URL}" \
     -e "AWX_TOKEN=${AWX_TOKEN}" \
     -e "AWX_VERIFY_SSL=${AWX_VERIFY_SSL:-false}" \
-    -e "EDA_URL=${EDA_URL}" \
-    -e "EDA_TOKEN=${EDA_TOKEN}" \
-    -e "EDA_VERIFY_SSL=${EDA_VERIFY_SSL:-false}" \
     -- uvx --from lm-mcp lm-mcp-server
 
 echo ""

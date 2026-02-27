@@ -324,7 +324,7 @@ wheels = [
 
 [[package]]
 name = "lm-mcp"
-version = "1.9.3"
+version = "1.9.5"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

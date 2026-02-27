@@ -3744,6 +3744,316 @@ TOOLS.extend(
     ]
 )
 
+# Action Chains
+TOOLS.extend(
+    [
+        Tool(
+            name="get_action_chains",
+            description="[PREVIEW] List action chains for diagnostic/remediation workflows",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by chain name (substring match)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_action_chain",
+            description=(
+                "[PREVIEW] Get details about a specific action chain "
+                "including step sequence"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="create_action_chain",
+            description=(
+                "[PREVIEW] Create an action chain with diagnostic/remediation steps "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Action chain name"},
+                    "description": {"type": "string", "description": "Optional description"},
+                    "actions": {
+                        "type": "array",
+                        "description": (
+                            "Ordered list of action steps. Each step has type "
+                            "(diagnosticsource or remediation) and a source ID"
+                        ),
+                        "items": {"type": "object"},
+                    },
+                },
+                "required": ["name", "actions"],
+            },
+        ),
+        Tool(
+            name="update_action_chain",
+            description="[PREVIEW] Update an action chain (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {
+                        "type": "integer",
+                        "description": "Action chain ID to update",
+                    },
+                    "name": {"type": "string", "description": "Updated name"},
+                    "description": {"type": "string", "description": "Updated description"},
+                    "actions": {
+                        "type": "array",
+                        "description": "Updated action steps",
+                        "items": {"type": "object"},
+                    },
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="delete_action_chain",
+            description="[PREVIEW] Delete an action chain (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {
+                        "type": "integer",
+                        "description": "Action chain ID to delete",
+                    },
+                },
+                "required": ["chain_id"],
+            },
+        ),
+    ]
+)
+
+# Action Rules
+TOOLS.extend(
+    [
+        Tool(
+            name="get_action_rules",
+            description="[PREVIEW] List action rules that map alert conditions to action chains",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by rule name (substring match)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_action_rule",
+            description="[PREVIEW] Get details about a specific action rule",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="create_action_rule",
+            description=(
+                "[PREVIEW] Create an action rule mapping alert conditions to an action chain "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Action rule name"},
+                    "action_chain_id": {
+                        "type": "integer",
+                        "description": "Action chain to trigger",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Device group patterns",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Device patterns",
+                    },
+                    "datasource": {
+                        "type": "string",
+                        "description": "DataSource pattern",
+                    },
+                    "datapoint": {
+                        "type": "string",
+                        "description": "DataPoint pattern",
+                    },
+                    "instance": {
+                        "type": "string",
+                        "description": "Instance pattern",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["warn", "error", "critical", "all"],
+                        "description": "Severity filter",
+                    },
+                },
+                "required": ["name", "action_chain_id"],
+            },
+        ),
+        Tool(
+            name="update_action_rule",
+            description="[PREVIEW] Update an action rule (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {
+                        "type": "integer",
+                        "description": "Action rule ID to update",
+                    },
+                    "name": {"type": "string", "description": "Updated name"},
+                    "action_chain_id": {
+                        "type": "integer",
+                        "description": "Updated action chain ID",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Updated device group patterns",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Updated device patterns",
+                    },
+                    "datasource": {"type": "string", "description": "Updated DataSource pattern"},
+                    "datapoint": {"type": "string", "description": "Updated DataPoint pattern"},
+                    "instance": {"type": "string", "description": "Updated instance pattern"},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["warn", "error", "critical", "all"],
+                        "description": "Updated severity filter",
+                    },
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="delete_action_rule",
+            description="[PREVIEW] Delete an action rule (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {
+                        "type": "integer",
+                        "description": "Action rule ID to delete",
+                    },
+                },
+                "required": ["rule_id"],
+            },
+        ),
+    ]
+)
+
+# Diagnostic Sources (Exchange Toolbox)
+TOOLS.extend(
+    [
+        Tool(
+            name="get_diagnosticsources",
+            description="[PREVIEW] List diagnostic sources from Exchange Toolbox",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by source name (client-side)",
+                    },
+                    "group_filter": {
+                        "type": "string",
+                        "description": "Filter by group (client-side)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_diagnosticsource",
+            description="[PREVIEW] Get details about a specific diagnostic source including script",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_id": {
+                        "type": "integer",
+                        "description": "Diagnostic source ID",
+                    },
+                },
+                "required": ["source_id"],
+            },
+        ),
+    ]
+)
+
+# Remediation Sources (Exchange Toolbox)
+TOOLS.extend(
+    [
+        Tool(
+            name="get_remediationsources",
+            description="[PREVIEW] List remediation sources from Exchange Toolbox",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by source name (client-side)",
+                    },
+                    "group_filter": {
+                        "type": "string",
+                        "description": "Filter by group (client-side)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_remediationsource",
+            description=(
+                "[PREVIEW] Get details about a specific remediation "
+                "source including script"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source_id": {
+                        "type": "integer",
+                        "description": "Remediation source ID",
+                    },
+                },
+                "required": ["source_id"],
+            },
+        ),
+    ]
+)
+
 
 # Ansible Automation Platform tools (conditionally included)
 AWX_TOOLS: list[Tool] = [
@@ -4104,398 +4414,6 @@ AWX_TOOLS: list[Tool] = [
 ]
 
 
-# EDA Controller tools (conditionally included when EDA_URL + EDA_TOKEN are set)
-EDA_TOOLS: list[Tool] = [
-    # Connection test
-    Tool(
-        name="test_eda_connection",
-        description="Test connectivity to EDA Controller",
-        annotations=_READ_ONLY,
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    # Activation tools
-    Tool(
-        name="get_eda_activations",
-        description="List rulebook activations from EDA Controller",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name_filter": {
-                    "type": "string",
-                    "description": "Search activations by name",
-                },
-                "limit": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Max results",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="get_eda_activation",
-        description="Get details of a specific rulebook activation",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "activation_id": {
-                    "type": "integer",
-                    "description": "The activation ID",
-                },
-            },
-            "required": ["activation_id"],
-        },
-    ),
-    Tool(
-        name="create_eda_activation",
-        description="Create a new rulebook activation. Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Activation name",
-                },
-                "rulebook_id": {
-                    "type": "integer",
-                    "description": "ID of the rulebook to activate",
-                },
-                "decision_environment_id": {
-                    "type": "integer",
-                    "description": "ID of the decision environment",
-                },
-                "extra_var": {
-                    "type": "string",
-                    "description": "Extra variables as YAML string",
-                },
-                "restart_policy": {
-                    "type": "string",
-                    "default": "on-failure",
-                    "description": "Restart policy (always, never, on-failure)",
-                },
-                "is_enabled": {
-                    "type": "boolean",
-                    "default": True,
-                    "description": "Whether to enable the activation immediately",
-                },
-                "organization_id": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Organization ID (default 1 = Default org)",
-                },
-                "awx_token_id": {
-                    "type": "integer",
-                    "description": "ID of the AAP Controller token for run_job_template actions",
-                },
-            },
-            "required": ["name", "rulebook_id", "decision_environment_id"],
-        },
-    ),
-    Tool(
-        name="enable_eda_activation",
-        description="Enable a rulebook activation. Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "activation_id": {
-                    "type": "integer",
-                    "description": "The activation ID to enable",
-                },
-            },
-            "required": ["activation_id"],
-        },
-    ),
-    Tool(
-        name="disable_eda_activation",
-        description="Disable a rulebook activation. Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "activation_id": {
-                    "type": "integer",
-                    "description": "The activation ID to disable",
-                },
-            },
-            "required": ["activation_id"],
-        },
-    ),
-    Tool(
-        name="restart_eda_activation",
-        description="Restart a rulebook activation. Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "activation_id": {
-                    "type": "integer",
-                    "description": "The activation ID to restart",
-                },
-            },
-            "required": ["activation_id"],
-        },
-    ),
-    Tool(
-        name="delete_eda_activation",
-        description="Delete a rulebook activation. Requires write permission.",
-        annotations=_DELETE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "activation_id": {
-                    "type": "integer",
-                    "description": "The activation ID to delete",
-                },
-            },
-            "required": ["activation_id"],
-        },
-    ),
-    Tool(
-        name="get_eda_activation_instances",
-        description="List instances of a rulebook activation",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "activation_id": {
-                    "type": "integer",
-                    "description": "The activation ID",
-                },
-                "limit": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Max results",
-                },
-            },
-            "required": ["activation_id"],
-        },
-    ),
-    Tool(
-        name="get_eda_activation_instance_logs",
-        description="Get logs for an activation instance",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "instance_id": {
-                    "type": "integer",
-                    "description": "The activation instance ID",
-                },
-                "limit": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Max results",
-                },
-            },
-            "required": ["instance_id"],
-        },
-    ),
-    # Project tools
-    Tool(
-        name="get_eda_projects",
-        description="List projects from EDA Controller",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name_filter": {
-                    "type": "string",
-                    "description": "Search projects by name",
-                },
-                "limit": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Max results",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="get_eda_project",
-        description="Get details of a specific EDA project",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project_id": {
-                    "type": "integer",
-                    "description": "The project ID",
-                },
-            },
-            "required": ["project_id"],
-        },
-    ),
-    Tool(
-        name="create_eda_project",
-        description="Create a new EDA project from a Git repository. Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Project name",
-                },
-                "url": {
-                    "type": "string",
-                    "description": "Git repository URL containing rulebooks",
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Optional project description",
-                },
-                "credential_id": {
-                    "type": "integer",
-                    "description": "Optional credential ID for private repos",
-                },
-                "organization_id": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Organization ID (default 1 = Default org)",
-                },
-            },
-            "required": ["name", "url"],
-        },
-    ),
-    Tool(
-        name="sync_eda_project",
-        description="Sync an EDA project from its Git repository. Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "project_id": {
-                    "type": "integer",
-                    "description": "The project ID to sync",
-                },
-            },
-            "required": ["project_id"],
-        },
-    ),
-    # Rulebook tools
-    Tool(
-        name="get_eda_rulebooks",
-        description="List rulebooks from EDA Controller",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name_filter": {
-                    "type": "string",
-                    "description": "Search rulebooks by name",
-                },
-                "project_id": {
-                    "type": "integer",
-                    "description": "Filter by project ID",
-                },
-                "limit": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Max results",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="get_eda_rulebook",
-        description="Get details of a specific rulebook including rulesets",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "rulebook_id": {
-                    "type": "integer",
-                    "description": "The rulebook ID",
-                },
-            },
-            "required": ["rulebook_id"],
-        },
-    ),
-    # Event stream tools
-    Tool(
-        name="get_eda_event_streams",
-        description="List event streams (managed webhook endpoints) from EDA Controller",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name_filter": {
-                    "type": "string",
-                    "description": "Search event streams by name",
-                },
-                "limit": {
-                    "type": "integer",
-                    "default": 50,
-                    "description": "Max results",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="get_eda_event_stream",
-        description="Get details of a specific event stream",
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "event_stream_id": {
-                    "type": "integer",
-                    "description": "The event stream ID",
-                },
-            },
-            "required": ["event_stream_id"],
-        },
-    ),
-    Tool(
-        name="create_eda_event_stream",
-        description="Create a new event stream (webhook endpoint). Requires write permission.",
-        annotations=_WRITE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "description": "Event stream name",
-                },
-                "eda_credential_id": {
-                    "type": "integer",
-                    "description": "ID of the EDA credential for authentication",
-                },
-                "event_stream_type": {
-                    "type": "string",
-                    "default": "basic",
-                    "description": "Type of event stream (basic, hmac, etc.)",
-                },
-                "organization_id": {
-                    "type": "integer",
-                    "default": 1,
-                    "description": "Organization ID (default 1 = Default org)",
-                },
-            },
-            "required": ["name", "eda_credential_id"],
-        },
-    ),
-    Tool(
-        name="delete_eda_event_stream",
-        description="Delete an event stream. Requires write permission.",
-        annotations=_DELETE,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "event_stream_id": {
-                    "type": "integer",
-                    "description": "The event stream ID to delete",
-                },
-            },
-            "required": ["event_stream_id"],
-        },
-    ),
-]
-
 
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
@@ -4512,6 +4430,8 @@ def get_tool_handler(tool_name: str) -> Any:
     """
     from lm_mcp.tools import (
         access_groups,
+        action_chains,
+        action_rules,
         alert_rules,
         alerts,
         ansible,
@@ -4527,7 +4447,7 @@ def get_tool_handler(tool_name: str) -> Any:
         dashboards,
         datasources,
         devices,
-        eda,
+        diagnosticsources,
         escalations,
         event_correlation,
         eventsources,
@@ -4540,6 +4460,7 @@ def get_tool_handler(tool_name: str) -> Any:
         oids,
         ops,
         propertysources,
+        remediationsources,
         reports,
         resources,
         scoring,
@@ -4643,6 +4564,24 @@ def get_tool_handler(tool_name: str) -> Any:
         "create_alert_rule": alert_rules.create_alert_rule,
         "update_alert_rule": alert_rules.update_alert_rule,
         "delete_alert_rule": alert_rules.delete_alert_rule,
+        # Action Chains
+        "get_action_chains": action_chains.get_action_chains,
+        "get_action_chain": action_chains.get_action_chain,
+        "create_action_chain": action_chains.create_action_chain,
+        "update_action_chain": action_chains.update_action_chain,
+        "delete_action_chain": action_chains.delete_action_chain,
+        # Action Rules
+        "get_action_rules": action_rules.get_action_rules,
+        "get_action_rule": action_rules.get_action_rule,
+        "create_action_rule": action_rules.create_action_rule,
+        "update_action_rule": action_rules.update_action_rule,
+        "delete_action_rule": action_rules.delete_action_rule,
+        # Diagnostic Sources
+        "get_diagnosticsources": diagnosticsources.get_diagnosticsources,
+        "get_diagnosticsource": diagnosticsources.get_diagnosticsource,
+        # Remediation Sources
+        "get_remediationsources": remediationsources.get_remediationsources,
+        "get_remediationsource": remediationsources.get_remediationsource,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,
@@ -4793,27 +4732,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_organizations": ansible.get_organizations,
         "get_job_events": ansible.get_job_events,
         "get_hosts": ansible.get_hosts,
-        # EDA Controller
-        "test_eda_connection": eda.test_eda_connection,
-        "get_eda_activations": eda.get_eda_activations,
-        "get_eda_activation": eda.get_eda_activation,
-        "create_eda_activation": eda.create_eda_activation,
-        "enable_eda_activation": eda.enable_eda_activation,
-        "disable_eda_activation": eda.disable_eda_activation,
-        "restart_eda_activation": eda.restart_eda_activation,
-        "delete_eda_activation": eda.delete_eda_activation,
-        "get_eda_activation_instances": eda.get_eda_activation_instances,
-        "get_eda_activation_instance_logs": eda.get_eda_activation_instance_logs,
-        "get_eda_projects": eda.get_eda_projects,
-        "get_eda_project": eda.get_eda_project,
-        "create_eda_project": eda.create_eda_project,
-        "sync_eda_project": eda.sync_eda_project,
-        "get_eda_rulebooks": eda.get_eda_rulebooks,
-        "get_eda_rulebook": eda.get_eda_rulebook,
-        "get_eda_event_streams": eda.get_eda_event_streams,
-        "get_eda_event_stream": eda.get_eda_event_stream,
-        "create_eda_event_stream": eda.create_eda_event_stream,
-        "delete_eda_event_stream": eda.delete_eda_event_stream,
     }
 
     if tool_name not in handlers:

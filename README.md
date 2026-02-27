@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 221 structured tools, 14 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 215 structured tools, 14 workflow prompts, and 24 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -42,9 +42,22 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
+## Release Notes
+
+### v1.9.5 (Current)
+- **New**: Action Sources integration — 14 tools for diagnostic/remediation workflows
+  (action chains, action rules, diagnostic sources, remediation sources)
+- **Preview**: Action Sources API endpoints are not yet GA in LogicMonitor portals.
+  Tools are implemented and tested but will return errors until the feature is released.
+  Tool descriptions are marked with [PREVIEW] to indicate this status.
+- **Removed**: Event-Driven Ansible (EDA) tools removed from deployed package.
+  EDA required standalone infrastructure not available via LM Portal.
+  Source code preserved in `contrib/eda/` for future reference.
+- **Counts**: 215 tools (197 LM + 18 AAP), 14 prompts, 6 skills
+
 ## Features
 
-**221 Tools** across comprehensive LogicMonitor API coverage (183 LM + 18 AAP + 20 EDA):
+**215 Tools** across comprehensive LogicMonitor API coverage (197 LM + 18 AAP):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -143,7 +156,6 @@ Pre-built slash-command workflows for Claude Code that orchestrate multiple tool
 | Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
 | APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
 | Remediation | `/lm-remediate` | Diagnose alert, find/generate playbook, launch AAP job, verify fix |
-| EDA Automation | `/lm-eda` | Set up event-driven alert automation using EDA Controller and LogicMonitor |
 
 Skills ship with the repo — clone it and invoke `/lm-triage` in Claude Code to get started.
 
@@ -225,11 +237,6 @@ The server exposes health endpoints for container orchestration:
 | `AWX_VERIFY_SSL` | No | `true` | Verify SSL certificates for AAP connections |
 | `AWX_TIMEOUT` | No | `30` | Request timeout in seconds for AAP API calls |
 | `AWX_MAX_RETRIES` | No | `3` | Max retries for failed AAP API requests |
-| `EDA_URL` | No | - | EDA Controller URL (e.g., `https://eda.example.com`) |
-| `EDA_TOKEN` | No | - | EDA Controller personal access token |
-| `EDA_VERIFY_SSL` | No | `true` | Verify SSL certificates for EDA connections |
-| `EDA_TIMEOUT` | No | `30` | Request timeout in seconds for EDA API calls |
-| `EDA_MAX_RETRIES` | No | `3` | Max retries for failed EDA API requests |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -812,32 +819,28 @@ These tools are only available when `AWX_URL` and `AWX_TOKEN` are configured.
 | `get_job_events` | Get events from a specific job run | No |
 | `get_hosts` | List hosts with optional name/inventory filters | No |
 
-### Event-Driven Ansible Tools
+### Action Sources Tools (Preview)
 
-These tools are only available when `EDA_URL` and `EDA_TOKEN` are configured.
+These tools target LM-native Action Sources for diagnostic and remediation workflows.
+The API endpoints are not yet generally available. Tools will return errors until the
+feature is released in a future LogicMonitor portal update.
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `test_eda_connection` | Test connectivity to EDA Controller | No |
-| `get_eda_activations` | List rulebook activations | No |
-| `get_eda_activation` | Get details of a specific activation | No |
-| `create_eda_activation` | Create a new rulebook activation | Yes |
-| `enable_eda_activation` | Enable a rulebook activation | Yes |
-| `disable_eda_activation` | Disable a rulebook activation | Yes |
-| `restart_eda_activation` | Restart a rulebook activation | Yes |
-| `delete_eda_activation` | Delete a rulebook activation | Yes |
-| `get_eda_activation_instances` | List instances of an activation | No |
-| `get_eda_activation_instance_logs` | Get logs for an activation instance | No |
-| `get_eda_projects` | List EDA projects | No |
-| `get_eda_project` | Get details of a specific project | No |
-| `create_eda_project` | Create a new project from a Git repository | Yes |
-| `sync_eda_project` | Sync a project from its Git repository | Yes |
-| `get_eda_rulebooks` | List rulebooks | No |
-| `get_eda_rulebook` | Get details of a specific rulebook | No |
-| `get_eda_event_streams` | List event streams (webhook endpoints) | No |
-| `get_eda_event_stream` | Get details of a specific event stream | No |
-| `create_eda_event_stream` | Create a new event stream | Yes |
-| `delete_eda_event_stream` | Delete an event stream | Yes |
+| `get_action_chains` | List action chains | No |
+| `get_action_chain` | Get action chain details | No |
+| `create_action_chain` | Create an action chain | Yes |
+| `update_action_chain` | Update an action chain | Yes |
+| `delete_action_chain` | Delete an action chain | Yes |
+| `get_action_rules` | List action rules | No |
+| `get_action_rule` | Get action rule details | No |
+| `create_action_rule` | Create an action rule | Yes |
+| `update_action_rule` | Update an action rule | Yes |
+| `delete_action_rule` | Delete an action rule | Yes |
+| `get_diagnosticsources` | List diagnostic sources from Exchange Toolbox | No |
+| `get_diagnosticsource` | Get diagnostic source details | No |
+| `get_remediationsources` | List remediation sources from Exchange Toolbox | No |
+| `get_remediationsource` | Get remediation source details | No |
 
 #### ML Tool Usage Guide
 
@@ -1101,7 +1104,6 @@ src/lm_mcp/
     ├── alerts.py         # Alert management
     ├── alert_rules.py    # Alert rule CRUD
     ├── ansible.py        # Ansible Automation Platform tool handlers
-    ├── eda.py            # Event-Driven Ansible tool handlers
     ├── baselines.py      # Metric baseline save/compare
     ├── collectors.py     # Collector tools
     ├── correlation.py    # Alert correlation, anomaly detection, metric correlation
@@ -1186,11 +1188,8 @@ Verify your bearer token is correct and has appropriate permissions. API tokens 
 ## Changelog
 
 ### v1.9.0
-- **New**: Event-Driven Ansible integration — 20 tools for automated event response
-- **New**: `/lm-eda` Claude Code skill — event-driven alert automation workflow
-- **New**: EdaClient with Bearer token auth, retry logic, and error mapping
-- **New**: 4-way dispatch: session -> EDA -> AWX -> LM
-- **Counts**: 218 tools (180 LM + 18 AAP + 20 EDA), 14 prompts, 7 skills
+- **New**: Event-Driven Ansible integration (removed in v1.9.5 — see `contrib/eda/`)
+- **New**: Device instance CRUD: add_device_instance, update_device_instance, delete_device_instance
 
 ### v1.8.0
 - **New**: Ansible Automation Platform integration — 18 tools for observability-driven remediation
@@ -1199,7 +1198,7 @@ Verify your bearer token is correct and has appropriate permissions. API tokens 
 - **New**: Example playbooks for disk cleanup, service restart, log rotation, memory cache clearing
 - **New**: Jinja2 injection protection on all AAP extra_vars inputs
 - **New**: `test_awx_connection` tool for verifying AAP connectivity
-- **Counts**: 221 tools (183 LM + 18 AAP + 20 EDA), 14 prompts, 7 skills
+- **Counts**: 201 tools (183 LM + 18 AAP), 14 prompts, 7 skills
 - **Release**: [v1.8.0 on GitHub](https://github.com/ryanmat/mcp-server-logicmonitor/releases/tag/v1.8.0) | [PyPI](https://pypi.org/project/lm-mcp/1.8.0/)
 
 ### v1.7.2

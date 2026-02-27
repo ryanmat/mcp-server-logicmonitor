@@ -22,7 +22,7 @@ async def run_stdio() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_awx_client, _set_client, _set_eda_client, server
+    from lm_mcp.server import _set_awx_client, _set_client, server
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -54,23 +54,6 @@ async def run_stdio() -> None:
         )
         _set_awx_client(awx_client)
 
-    # Initialize EDA client if configured
-    eda_client = None
-    from lm_mcp.eda_config import get_eda_config
-
-    eda_config = get_eda_config()
-    if eda_config is not None:
-        from lm_mcp.client.eda import EdaClient
-
-        eda_client = EdaClient(
-            base_url=eda_config.url,
-            token=eda_config.token,
-            timeout=eda_config.timeout,
-            max_retries=eda_config.max_retries,
-            verify_ssl=eda_config.verify_ssl,
-        )
-        _set_eda_client(eda_client)
-
     # Initialize session with config settings
     if config.session_enabled:
         session = get_session()
@@ -84,8 +67,6 @@ async def run_stdio() -> None:
                 server.create_initialization_options(),
             )
     finally:
-        if eda_client is not None:
-            await eda_client.close()
         if awx_client is not None:
             await awx_client.close()
         await client.close()

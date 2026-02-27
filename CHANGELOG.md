@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.5] - 2026-02-27
+
+### Added
+
+- Action Sources integration: 14 tools for diagnostic and remediation workflows
+  - Action chains: get, create, update, delete
+  - Action rules: get, create, update, delete
+  - Diagnostic sources: list, get details
+  - Remediation sources: list, get details
+- All Action Sources tools marked `[PREVIEW]` — API endpoints are not yet GA in LM portals
+
+### Removed
+
+- Event-Driven Ansible (EDA) tools removed from deployed package (20 tools)
+  - EDA required standalone infrastructure not available through LM Portal
+  - Source code preserved in `contrib/eda/` for future reference
+  - `/lm-eda` skill removed
+
+### Changed
+
+- Tool count: 221 -> 215 (197 LM + 18 AAP)
+- Skill count: 7 -> 6
+- Dispatch simplified from 4-way (session -> EDA -> AWX -> LM) to 3-way (session -> AWX -> LM)
+
 ## [1.9.2] - 2026-02-25
 
 ### Fixed
@@ -399,6 +423,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[1.9.5]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.2...v1.9.5
 [1.9.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.0...v1.9.2
 [1.9.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.7.2...v1.8.0
