@@ -294,7 +294,7 @@ class TestGuideResources:
         for category in data["categories"].values():
             categorized_tools.update(category["tools"])
 
-        # Collect all registered tool names (LM + AWX + EDA)
+        # Collect all registered tool names (LM + AWX)
         registered_tools = (
             {t.name for t in TOOLS}
             | {t.name for t in AWX_TOOLS}
