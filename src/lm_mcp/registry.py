@@ -601,8 +601,12 @@ TOOLS.extend(
         ),
         Tool(
             name="add_device_instance",
-            description="Add a monitored instance to a datasource on a device (requires write permission). "
-            "Used for datasources without Active Discovery (e.g. ServiceStatus).",
+            description=(
+                "Add a monitored instance to a datasource on a device"
+                " (requires write permission)."
+                " Used for datasources without Active Discovery"
+                " (e.g. ServiceStatus)."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -618,8 +622,13 @@ TOOLS.extend(
                     },
                     "wild_value": {
                         "type": "string",
-                        "description": "Wildcard value used by the datasource to query this instance "
-                        "(e.g. 'nginx.service' for ServiceStatus, a port number for Port-)",
+                        "description": (
+                            "Wildcard value used by the datasource"
+                            " to query this instance"
+                            " (e.g. 'nginx.service' for"
+                            " ServiceStatus, a port number"
+                            " for Port-)"
+                        ),
                     },
                     "description": {
                         "type": "string",
@@ -658,7 +667,10 @@ TOOLS.extend(
         ),
         Tool(
             name="delete_device_instance",
-            description="Delete a monitored instance from a datasource on a device (requires write permission)",
+            description=(
+                "Delete a monitored instance from a datasource"
+                " on a device (requires write permission)"
+            ),
             annotations=_DELETE,
             inputSchema={
                 "type": "object",
