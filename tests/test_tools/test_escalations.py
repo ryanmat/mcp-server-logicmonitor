@@ -143,6 +143,91 @@ class TestGetEscalationChain:
         assert len(data["cc_destinations"]) == 1
 
     @respx.mock
+    async def test_get_escalation_chain_nested_stages(self, client):
+        """get_escalation_chain handles nested stage arrays from LM API."""
+        from lm_mcp.tools.escalations import get_escalation_chain
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/200").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 200,
+                    "name": "Nested Stages Chain",
+                    "description": "Chain with nested stage arrays",
+                    "enableThrottling": False,
+                    "throttlingPeriod": 0,
+                    "throttlingAlerts": 0,
+                    "inAlerting": True,
+                    "destinations": [
+                        {
+                            "type": "single",
+                            "period": 15,
+                            "stages": [
+                                [
+                                    {
+                                        "type": "admin",
+                                        "addr": "nested@example.com",
+                                        "contact": "Nested Contact",
+                                    }
+                                ]
+                            ],
+                        }
+                    ],
+                    "ccDestinations": [],
+                },
+            )
+        )
+
+        result = await get_escalation_chain(client, chain_id=200)
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["id"] == 200
+        assert len(data["destinations"]) == 1
+        assert len(data["destinations"][0]["stages"]) == 1
+        assert data["destinations"][0]["stages"][0]["address"] == "nested@example.com"
+
+    @respx.mock
+    async def test_get_escalation_chain_flat_stages_still_works(self, client):
+        """get_escalation_chain still handles flat stage arrays (backward compat)."""
+        from lm_mcp.tools.escalations import get_escalation_chain
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/201").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 201,
+                    "name": "Flat Stages Chain",
+                    "description": "",
+                    "enableThrottling": False,
+                    "throttlingPeriod": 0,
+                    "throttlingAlerts": 0,
+                    "inAlerting": False,
+                    "destinations": [
+                        {
+                            "type": "single",
+                            "period": 10,
+                            "stages": [
+                                {
+                                    "type": "admin",
+                                    "addr": "flat@example.com",
+                                    "contact": "Flat Contact",
+                                }
+                            ],
+                        }
+                    ],
+                    "ccDestinations": [],
+                },
+            )
+        )
+
+        result = await get_escalation_chain(client, chain_id=201)
+
+        data = json.loads(result[0].text)
+        assert len(data["destinations"][0]["stages"]) == 1
+        assert data["destinations"][0]["stages"][0]["address"] == "flat@example.com"
+
+    @respx.mock
     async def test_get_escalation_chain_not_found(self, client):
         """get_escalation_chain returns error for missing chain."""
         from lm_mcp.tools.escalations import get_escalation_chain

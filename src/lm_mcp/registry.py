@@ -1358,6 +1358,16 @@ TOOLS.extend(
                         "type": "integer",
                         "description": "Number of alerts before throttling",
                     },
+                    "destinations": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Destination stages for the escalation chain",
+                    },
+                    "cc_destinations": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "CC destinations for the escalation chain",
+                    },
                 },
                 "required": ["name"],
             },
@@ -1375,6 +1385,24 @@ TOOLS.extend(
                     "enable_throttling": {
                         "type": "boolean",
                         "description": "Updated throttling setting",
+                    },
+                    "throttling_period": {
+                        "type": "integer",
+                        "description": "Updated throttling period in minutes",
+                    },
+                    "throttling_alerts": {
+                        "type": "integer",
+                        "description": "Updated number of alerts before throttling",
+                    },
+                    "destinations": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Updated destination stages for the escalation chain",
+                    },
+                    "cc_destinations": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": "Updated CC destinations for the escalation chain",
                     },
                 },
                 "required": ["chain_id"],
@@ -1492,10 +1520,17 @@ TOOLS.extend(
                         "description": "List of device group patterns to match",
                     },
                     "datasource": {"type": "string", "description": "DataSource pattern to match"},
+                    "datapoint": {"type": "string", "description": "DataPoint pattern to match"},
+                    "instance": {"type": "string", "description": "Instance pattern to match"},
                     "suppress_alert_clear": {
                         "type": "boolean",
                         "default": False,
                         "description": "Suppress alert clear notifications",
+                    },
+                    "suppress_alert_ack_sdt": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Suppress ack/SDT notifications",
                     },
                 },
                 "required": ["name", "priority", "escalation_chain_id"],
@@ -1519,6 +1554,10 @@ TOOLS.extend(
                     "suppress_alert_clear": {
                         "type": "boolean",
                         "description": "Updated suppress alert clear setting",
+                    },
+                    "suppress_alert_ack_sdt": {
+                        "type": "boolean",
+                        "description": "Updated suppress ack/SDT setting",
                     },
                 },
                 "required": ["rule_id"],
@@ -4134,6 +4173,10 @@ EDA_TOOLS: list[Tool] = [
                     "type": "integer",
                     "default": 1,
                     "description": "Organization ID (default 1 = Default org)",
+                },
+                "awx_token_id": {
+                    "type": "integer",
+                    "description": "ID of the AAP Controller token for run_job_template actions",
                 },
             },
             "required": ["name", "rulebook_id", "decision_environment_id"],

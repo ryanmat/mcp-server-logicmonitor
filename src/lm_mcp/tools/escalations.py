@@ -88,18 +88,22 @@ async def get_escalation_chain(
     try:
         result = await client.get(f"/setting/alert/chains/{chain_id}")
 
-        # Parse destinations into readable format
+        # Parse destinations into readable format.
+        # LM API can return stages as [[{...}]] (nested) or [{...}] (flat).
         destinations = []
         for dest in result.get("destinations", []):
             stages = []
-            for stage in dest.get("stages", []):
-                stages.append(
-                    {
-                        "type": stage.get("type"),
-                        "address": stage.get("addr"),
-                        "contact": stage.get("contact"),
-                    }
-                )
+            for stage_entry in dest.get("stages", []):
+                # Flatten nested stage arrays: [[{...}]] -> [{...}]
+                stage_items = stage_entry if isinstance(stage_entry, list) else [stage_entry]
+                for stage in stage_items:
+                    stages.append(
+                        {
+                            "type": stage.get("type"),
+                            "address": stage.get("addr"),
+                            "contact": stage.get("contact"),
+                        }
+                    )
             destinations.append(
                 {
                     "type": dest.get("type"),
@@ -235,6 +239,8 @@ async def create_escalation_chain(
     enable_throttling: bool = False,
     throttling_period: int | None = None,
     throttling_alerts: int | None = None,
+    destinations: list[dict] | None = None,
+    cc_destinations: list[dict] | None = None,
 ) -> list[TextContent]:
     """Create an escalation chain in LogicMonitor.
 
@@ -245,6 +251,8 @@ async def create_escalation_chain(
         enable_throttling: Whether to enable alert throttling.
         throttling_period: Throttling period in minutes.
         throttling_alerts: Number of alerts before throttling.
+        destinations: List of destination stage dicts for the escalation chain.
+        cc_destinations: List of CC destination dicts for the escalation chain.
 
     Returns:
         List of TextContent with result or error.
@@ -261,6 +269,10 @@ async def create_escalation_chain(
             body["throttlingPeriod"] = throttling_period
         if throttling_alerts is not None:
             body["throttlingAlerts"] = throttling_alerts
+        if destinations is not None:
+            body["destinations"] = destinations
+        if cc_destinations is not None:
+            body["ccDestinations"] = cc_destinations
 
         result = await client.post("/setting/alert/chains", json_body=body)
 
@@ -285,6 +297,8 @@ async def update_escalation_chain(
     enable_throttling: bool | None = None,
     throttling_period: int | None = None,
     throttling_alerts: int | None = None,
+    destinations: list[dict] | None = None,
+    cc_destinations: list[dict] | None = None,
 ) -> list[TextContent]:
     """Update an escalation chain in LogicMonitor.
 
@@ -296,6 +310,8 @@ async def update_escalation_chain(
         enable_throttling: Updated throttling setting.
         throttling_period: Updated throttling period.
         throttling_alerts: Updated throttling alert count.
+        destinations: Updated destination stage dicts for the escalation chain.
+        cc_destinations: Updated CC destination dicts for the escalation chain.
 
     Returns:
         List of TextContent with result or error.
@@ -313,6 +329,10 @@ async def update_escalation_chain(
             body["throttlingPeriod"] = throttling_period
         if throttling_alerts is not None:
             body["throttlingAlerts"] = throttling_alerts
+        if destinations is not None:
+            body["destinations"] = destinations
+        if cc_destinations is not None:
+            body["ccDestinations"] = cc_destinations
 
         if not body:
             return format_response(

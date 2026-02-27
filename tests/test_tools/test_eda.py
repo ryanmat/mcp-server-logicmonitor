@@ -119,6 +119,63 @@ class TestCreateEdaActivation:
         assert data["id"] == 10
 
     @pytest.mark.asyncio
+    async def test_create_with_awx_token_id(self, monkeypatch):
+        """Creates activation with awx_token_id passed to API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from lm_mcp.tools.eda import create_eda_activation
+
+        client = AsyncMock()
+        client.post.return_value = {"id": 11, "name": "activation-with-token"}
+
+        result = await create_eda_activation(
+            client,
+            name="activation-with-token",
+            rulebook_id=1,
+            decision_environment_id=2,
+            awx_token_id=42,
+        )
+        data = _parse_result(result)
+        assert data["id"] == 11
+
+        call_body = client.post.call_args[1]["json_body"]
+        assert call_body["awx_token_id"] == 42
+
+    @pytest.mark.asyncio
+    async def test_create_without_awx_token_id(self, monkeypatch):
+        """Creates activation without awx_token_id when not provided."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from lm_mcp.tools.eda import create_eda_activation
+
+        client = AsyncMock()
+        client.post.return_value = {"id": 12, "name": "activation-no-token"}
+
+        result = await create_eda_activation(
+            client,
+            name="activation-no-token",
+            rulebook_id=1,
+            decision_environment_id=2,
+        )
+        data = _parse_result(result)
+        assert data["id"] == 12
+
+        call_body = client.post.call_args[1]["json_body"]
+        assert "awx_token_id" not in call_body
+
+    def test_create_eda_activation_schema_has_awx_token_id(self):
+        """create_eda_activation registry schema includes awx_token_id."""
+        from lm_mcp.registry import EDA_TOOLS
+
+        tool = next(t for t in EDA_TOOLS if t.name == "create_eda_activation")
+        props = tool.inputSchema["properties"]
+        assert "awx_token_id" in props
+
+    @pytest.mark.asyncio
     async def test_write_disabled(self, monkeypatch):
         """Returns error when write operations are disabled."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")

@@ -104,6 +104,7 @@ async def create_eda_activation(
     restart_policy: str = "on-failure",
     is_enabled: bool = True,
     organization_id: int = 1,
+    awx_token_id: int | None = None,
 ) -> list[TextContent]:
     """Create a new rulebook activation.
 
@@ -116,6 +117,7 @@ async def create_eda_activation(
         restart_policy: Restart policy (always, never, on-failure).
         is_enabled: Whether to enable the activation immediately.
         organization_id: Organization ID (default 1 = "Default" org).
+        awx_token_id: ID of the AAP Controller token for run_job_template actions.
 
     Returns:
         List of TextContent with created activation data.
@@ -131,6 +133,8 @@ async def create_eda_activation(
         }
         if extra_var is not None:
             body["extra_var"] = extra_var
+        if awx_token_id is not None:
+            body["awx_token_id"] = awx_token_id
 
         data = await client.post("/activations/", json_body=body)
         return format_response(data)

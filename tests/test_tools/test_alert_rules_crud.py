@@ -132,6 +132,71 @@ class TestCreateAlertRule:
         assert "deviceGroups" in request_body
 
 
+    @respx.mock
+    async def test_create_alert_rule_with_datapoint_instance(self, client, monkeypatch):
+        """create_alert_rule passes datapoint and instance to API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alert_rules import create_alert_rule
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/alert/rules").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 52, "name": "Specific Rule", "priority": 100},
+            )
+        )
+
+        result = await create_alert_rule(
+            client,
+            name="Specific Rule",
+            priority=100,
+            escalation_chain_id=1,
+            datasource="Ping",
+            datapoint="PingLossPercent",
+            instance="*",
+            suppress_alert_ack_sdt=True,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert sent_body["datapoint"] == "PingLossPercent"
+        assert sent_body["instance"] == "*"
+        assert sent_body["suppressAlertAckSdt"] is True
+
+    def test_create_alert_rule_schema_has_datapoint(self):
+        """create_alert_rule registry schema includes datapoint property."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "create_alert_rule")
+        props = tool.inputSchema["properties"]
+        assert "datapoint" in props
+
+    def test_create_alert_rule_schema_has_instance(self):
+        """create_alert_rule registry schema includes instance property."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "create_alert_rule")
+        props = tool.inputSchema["properties"]
+        assert "instance" in props
+
+    def test_create_alert_rule_schema_has_suppress_alert_ack_sdt(self):
+        """create_alert_rule registry schema includes suppress_alert_ack_sdt."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "create_alert_rule")
+        props = tool.inputSchema["properties"]
+        assert "suppress_alert_ack_sdt" in props
+
+
 class TestUpdateAlertRule:
     """Tests for update_alert_rule tool."""
 
@@ -228,6 +293,45 @@ class TestUpdateAlertRule:
         assert request_body["priority"] == 200
         assert request_body["escalatingChainId"] == 2
         assert request_body["suppressAlertClear"] is True
+
+
+    @respx.mock
+    async def test_update_alert_rule_with_suppress_ack_sdt(self, client, monkeypatch):
+        """update_alert_rule passes suppress_alert_ack_sdt to API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.alert_rules import update_alert_rule
+
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/setting/alert/rules/50"
+        ).mock(return_value=httpx.Response(200, json={"id": 50}))
+
+        result = await update_alert_rule(
+            client,
+            rule_id=50,
+            suppress_alert_ack_sdt=True,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert sent_body["suppressAlertAckSdt"] is True
+
+    def test_update_alert_rule_schema_has_suppress_alert_ack_sdt(self):
+        """update_alert_rule registry schema includes suppress_alert_ack_sdt."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "update_alert_rule")
+        props = tool.inputSchema["properties"]
+        assert "suppress_alert_ack_sdt" in props
 
 
 class TestDeleteAlertRule:

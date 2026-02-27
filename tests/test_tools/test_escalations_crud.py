@@ -92,6 +92,85 @@ class TestCreateEscalationChain:
         assert data["chain_id"] == 10
 
 
+    @respx.mock
+    async def test_create_escalation_chain_with_destinations(self, client, monkeypatch):
+        """create_escalation_chain passes destinations to API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.escalations import create_escalation_chain
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/alert/chains").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 11, "name": "Chain with Dests"},
+            )
+        )
+
+        destinations = [
+            {
+                "type": "single",
+                "period": 15,
+                "stages": [[{"type": "admin", "addr": "oncall@example.com"}]],
+            }
+        ]
+        result = await create_escalation_chain(
+            client,
+            name="Chain with Dests",
+            destinations=destinations,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert "destinations" in sent_body
+        assert len(sent_body["destinations"]) == 1
+
+    @respx.mock
+    async def test_create_escalation_chain_with_cc_destinations(self, client, monkeypatch):
+        """create_escalation_chain passes ccDestinations to API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.escalations import create_escalation_chain
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/alert/chains").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 12, "name": "Chain with CC"},
+            )
+        )
+
+        cc_destinations = [
+            {"type": "ARBITRARY", "method": "email", "addr": "cc@example.com"}
+        ]
+        result = await create_escalation_chain(
+            client,
+            name="Chain with CC",
+            cc_destinations=cc_destinations,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert "ccDestinations" in sent_body
+        assert len(sent_body["ccDestinations"]) == 1
+
+
 class TestUpdateEscalationChain:
     """Tests for update_escalation_chain tool."""
 
@@ -150,6 +229,48 @@ class TestUpdateEscalationChain:
         assert "Error:" not in result[0].text
         data = json.loads(result[0].text)
         assert data["success"] is True
+
+
+    @respx.mock
+    async def test_update_escalation_chain_with_destinations(self, client, monkeypatch):
+        """update_escalation_chain passes destinations to API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.escalations import update_escalation_chain
+
+        route = respx.patch("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/10").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 10, "name": "Updated Chain"},
+            )
+        )
+
+        destinations = [
+            {
+                "type": "single",
+                "period": 30,
+                "stages": [[{"type": "admin", "addr": "new-oncall@example.com"}]],
+            }
+        ]
+        result = await update_escalation_chain(
+            client,
+            chain_id=10,
+            destinations=destinations,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert "destinations" in sent_body
+        assert len(sent_body["destinations"]) == 1
 
 
 class TestDeleteEscalationChain:
