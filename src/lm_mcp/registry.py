@@ -868,13 +868,21 @@ TOOLS.extend(
         Tool(
             name="add_widget",
             description="Add a widget to a dashboard (requires write permission). "
+            "For text widgets: use 'content' (not 'html') as the config key. "
             "For bigNumber widgets: dataPoints need 'name' field, include "
             "'bigNumberItems' array, colorThresholds use 'relation'/'threshold', "
             "aggregateFunction is lowercase (e.g., 'average'). "
             "For cgraph widgets: deviceDisplayName/deviceGroupFullPath/instanceName "
             "must be GlobMatchToggle objects {'value': '...', 'isGlob': true}, "
             "dataPoints need 'display' object, graphInfo needs 'aggregate': false "
-            "when using topX.",
+            "when using topX. "
+            "For deviceSLA widgets: required config fields are 'groupName' "
+            "(not deviceGroupFullPath), 'deviceName', 'dataSourceFullName', "
+            "'metric', 'threshold'. Also required: 'daysInWeek' (e.g., "
+            "'1,2,3,4,5,6,7'), 'periodInOneDay' (e.g., '0:00-23:59'), "
+            "'displayType' (0=availability, 1=timeline), 'calculationMethod' "
+            "(0=percent, 1=actual), 'unmonitoredTimeAlertStatus' (0=ignore, "
+            "1=warning, 2=error, 3=critical).",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",

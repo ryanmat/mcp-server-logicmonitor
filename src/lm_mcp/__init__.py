@@ -13,7 +13,7 @@ from lm_mcp.exceptions import (
     ServerError,
 )
 
-__version__ = "1.9.5"
+__version__ = "1.9.6"
 
 __all__ = [
     "LMConfig",

@@ -20,6 +20,23 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _count_widgets(item: dict) -> int:
+    """Extract widget count from a dashboard list item.
+
+    The API returns widgetsConfig in varying formats: a list of widget IDs,
+    a dict with a count key, or an empty dict/list. Use numOfWidgets when
+    available as it is the most reliable field on the list endpoint.
+    """
+    if "numOfWidgets" in item:
+        return item["numOfWidgets"]
+    cfg = item.get("widgetsConfig")
+    if isinstance(cfg, list):
+        return len(cfg)
+    if isinstance(cfg, dict) and "count" in cfg:
+        return cfg["count"]
+    return 0
+
+
 async def get_dashboards(
     client: "LogicMonitorClient",
     name_filter: str | None = None,
@@ -76,9 +93,7 @@ async def get_dashboards(
                     "description": item.get("description"),
                     "group_id": item.get("groupId"),
                     "group_name": item.get("groupFullPath"),
-                    "widget_count": item.get("widgetsConfig", {}).get("count", 0)
-                    if isinstance(item.get("widgetsConfig"), dict)
-                    else len(item.get("widgetsConfig", [])),
+                    "widget_count": _count_widgets(item),
                     "owner": item.get("owner"),
                 }
             )
@@ -341,7 +356,7 @@ async def get_widget(
         List of TextContent with widget details or error.
     """
     try:
-        result = await client.get(f"/dashboard/dashboards/{dashboard_id}/widgets/{widget_id}")
+        result = await client.get(f"/dashboard/widgets/{widget_id}")
         return format_response(result)
     except Exception as e:
         return handle_error(e)
@@ -388,9 +403,41 @@ async def add_widget(
         if description:
             payload["description"] = description
 
-        # Merge additional config
+        # Validate config field names for common widget types to catch
+        # silent data loss from field name mismatches (the LM API accepts
+        # unknown fields but discards them without error)
         if config:
-            payload.update(config)
+            _field_aliases: dict[str, dict[str, str]] = {
+                "deviceSLA": {
+                    "deviceGroupFullPath": "groupName",
+                    "hostGroup": "groupName",
+                    "device": "deviceName",
+                    "dataSource": "dataSourceFullName",
+                },
+                "text": {
+                    "html": "content",
+                },
+            }
+            aliases = _field_aliases.get(widget_type, {})
+            remapped = {}
+            for key, val in config.items():
+                if key in aliases:
+                    remapped[aliases[key]] = val
+                else:
+                    remapped[key] = val
+            payload.update(remapped)
+
+        # Apply deviceSLA defaults for fields the portal UI sets automatically
+        if widget_type == "deviceSLA":
+            _sla_defaults = {
+                "daysInWeek": "1,2,3,4,5,6,7",
+                "periodInOneDay": "0:00-23:59",
+                "displayType": 0,
+                "calculationMethod": 0,
+                "unmonitoredTimeAlertStatus": 0,
+            }
+            for key, val in _sla_defaults.items():
+                payload.setdefault(key, val)
 
         result = await client.post(
             "/dashboard/widgets",
@@ -443,7 +490,7 @@ async def update_widget(
     """
     try:
         # First get the current widget to preserve unmodified fields
-        current = await client.get(f"/dashboard/dashboards/{dashboard_id}/widgets/{widget_id}")
+        current = await client.get(f"/dashboard/widgets/{widget_id}")
 
         payload = dict(current)
         if name is not None:
@@ -460,7 +507,7 @@ async def update_widget(
             payload.update(config)
 
         result = await client.put(
-            f"/dashboard/dashboards/{dashboard_id}/widgets/{widget_id}",
+            f"/dashboard/widgets/{widget_id}",
             json_body=payload,
         )
 
@@ -496,7 +543,7 @@ async def delete_widget(
         List of TextContent with deletion result or error.
     """
     try:
-        await client.delete(f"/dashboard/dashboards/{dashboard_id}/widgets/{widget_id}")
+        await client.delete(f"/dashboard/widgets/{widget_id}")
 
         return format_response(
             {
