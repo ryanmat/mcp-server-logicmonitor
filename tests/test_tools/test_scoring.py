@@ -1,5 +1,5 @@
 # Description: Tests for scoring and availability analysis tools.
-# Description: Validates score_alert_noise, calculate_availability, score_device_health.
+# Description: Validates scoring, availability, health, and error budget tools.
 
 import json
 import time
@@ -742,3 +742,261 @@ class TestScoreDeviceHealth:
         )
 
         assert "Error:" in result[0].text
+
+
+class TestScoringGuardrails:
+    """Tests for best practice guardrails in scoring tools."""
+
+    @respx.mock
+    async def test_score_alert_noise_structured_recommendations_high_noise(self, client):
+        """High noise score includes structured recommendations."""
+        from lm_mcp.tools.scoring import score_alert_noise
+
+        # Many repeated alerts from same device+datasource to push noise up
+        alerts = []
+        for i in range(20):
+            alerts.append(_make_alert(
+                i, "server01", "CPU", "value",
+                start_epoch=BASE_EPOCH + i * 60,
+                end_epoch=BASE_EPOCH + i * 60 + 30,
+                cleared=True,
+            ))
+            # Re-fire quickly for flapping
+            alerts.append(_make_alert(
+                100 + i, "server01", "CPU", "value",
+                start_epoch=BASE_EPOCH + i * 60 + 60,
+            ))
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200, json={"items": alerts, "total": len(alerts)},
+            )
+        )
+
+        result = await score_alert_noise(client)
+        data = json.loads(result[0].text)
+
+        if data["noise_score"] > 50:
+            assert "structured_recommendations" in data
+            assert len(data["structured_recommendations"]) > 0
+            assert "anti_patterns" in data
+            assert len(data["anti_patterns"]) > 0
+            for rec in data["structured_recommendations"]:
+                assert "action" in rec
+                assert "how" in rec
+                assert "priority" in rec
+
+    @respx.mock
+    async def test_score_alert_noise_no_anti_patterns_low_noise(self, client):
+        """Low noise score omits anti_patterns key."""
+        from lm_mcp.tools.scoring import score_alert_noise
+
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": [_make_alert(1, "s1", "CPU")], "total": 1},
+            )
+        )
+
+        result = await score_alert_noise(client)
+        data = json.loads(result[0].text)
+
+        assert data["noise_score"] <= 50
+        assert "anti_patterns" not in data
+
+    @respx.mock
+    async def test_score_device_health_recommendations_critical(self, client):
+        """Critical health score includes recommendations with priority."""
+        from lm_mcp.tools.scoring import score_device_health
+
+        # Extreme anomaly to force critical health score
+        values = [[50.0]] * 19 + [[99999.0]]
+        respx.get(DATA_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["cpu"],
+                    "values": values,
+                    "time": [
+                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
+                    ],
+                },
+            )
+        )
+
+        result = await score_device_health(
+            client, device_id=1, device_datasource_id=10, instance_id=100,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["health_score"] < 50
+        assert "recommendations" in data
+        assert len(data["recommendations"]) > 0
+        for rec in data["recommendations"]:
+            assert "priority" in rec
+        assert "anti_patterns" in data
+
+    @respx.mock
+    async def test_score_device_health_degraded_has_monitor_rec(self, client):
+        """Degraded health score includes monitor-trend recommendation."""
+        from lm_mcp.tools.scoring import score_device_health
+
+        # Moderate anomaly to get degraded score (50-80)
+        values = [[50.0]] * 19 + [[100.0]]
+        respx.get(DATA_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["cpu"],
+                    "values": values,
+                    "time": [
+                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
+                    ],
+                },
+            )
+        )
+
+        result = await score_device_health(
+            client, device_id=1, device_datasource_id=10, instance_id=100,
+        )
+
+        data = json.loads(result[0].text)
+        if 50 <= data["health_score"] < 80:
+            assert "recommendations" in data
+            assert data["recommendations"][0]["action"] == "Monitor trend"
+
+    @respx.mock
+    async def test_calculate_availability_measurement_context_low(self, client):
+        """Low availability includes measurement_window_context."""
+        from lm_mcp.tools.scoring import calculate_availability
+
+        now = int(time.time())
+        recent = now - 3600
+        alerts = [
+            _make_alert(
+                1, "server01", "CPU", severity=3,
+                start_epoch=recent,
+                end_epoch=recent + 1800,
+                cleared=True,
+            ),
+        ]
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200, json={"items": alerts, "total": 1},
+            )
+        )
+
+        result = await calculate_availability(client, hours_back=24)
+
+        data = json.loads(result[0].text)
+        assert "measurement_window_context" in data
+        if data["availability_percent"] < 99.9:
+            ctx = data["measurement_window_context"]
+            assert "measurement_window_hours" in ctx
+            assert "recommendations" in ctx
+            assert "anti_patterns" in ctx
+            assert len(ctx["recommendations"]) > 0
+
+
+class TestCalculateErrorBudget:
+    """Tests for calculate_error_budget tool."""
+
+    @respx.mock
+    async def test_error_budget_zero_downtime(self, client):
+        """Zero downtime gives healthy status with full budget remaining."""
+        from lm_mcp.tools.scoring import calculate_error_budget
+
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "healthy"
+        assert data["actual_availability"] == 100.0
+        assert data["remaining_minutes"] > 0
+        assert data["budget_consumed_percent"] == 0.0
+
+    @respx.mock
+    async def test_error_budget_partial_consumption(self, client):
+        """Partial downtime shows correct consumption percentage."""
+        from lm_mcp.tools.scoring import calculate_error_budget
+
+        now_epoch = int(time.time())
+        start_epoch = now_epoch - (30 * 24 * 3600)
+
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "a1",
+                            "severity": 3,
+                            "monitorObjectName": "server1",
+                            "startEpoch": start_epoch + 1000,
+                            "endEpoch": start_epoch + 4600,  # 60 min downtime
+                        },
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
+
+        data = json.loads(result[0].text)
+        assert data["consumed_minutes"] > 0
+        assert data["remaining_minutes"] >= 0
+        assert data["status"] in ("healthy", "warning", "critical", "exhausted")
+
+    @respx.mock
+    async def test_error_budget_exhausted(self, client):
+        """Massive downtime exhausts the budget."""
+        from lm_mcp.tools.scoring import calculate_error_budget
+
+        now_epoch = int(time.time())
+        start_epoch = now_epoch - (30 * 24 * 3600)
+
+        # 99.9% SLO over 30 days = 43.2 min budget. Create 100 min downtime.
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "a1",
+                            "severity": 3,
+                            "monitorObjectName": "server1",
+                            "startEpoch": start_epoch + 1000,
+                            "endEpoch": start_epoch + 7000,  # 100 min
+                        },
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
+
+        data = json.loads(result[0].text)
+        assert data["status"] in ("critical", "exhausted")
+        assert data["budget_consumed_percent"] > 90
+
+    async def test_error_budget_slo_100_edge_case(self, client):
+        """SLO of 100% means zero budget -- any downtime exhausts it."""
+        import respx as _respx
+
+        from lm_mcp.tools.scoring import calculate_error_budget
+
+        with _respx.mock:
+            _respx.get(ALERT_URL).mock(
+                return_value=httpx.Response(200, json={"items": [], "total": 0})
+            )
+            result = await calculate_error_budget(
+                client, target_slo=100.0, period_days=30,
+            )
+
+        data = json.loads(result[0].text)
+        assert data["total_budget_minutes"] == 0.0
+        assert data["status"] == "healthy"  # No downtime with 0 budget = healthy

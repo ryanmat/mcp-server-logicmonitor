@@ -162,6 +162,23 @@ RESOURCES: list[Resource] = [
         description="Patterns for combining LogicMonitor with other MCP servers",
         mimeType="application/json",
     ),
+    Resource(
+        uri="lm://guide/best-practices",
+        name="Best Practices Guide",
+        description=(
+            "Scenario-based best practices for alert noise, device health, "
+            "availability, and remediation"
+        ),
+        mimeType="application/json",
+    ),
+    Resource(
+        uri="lm://guide/example-responses",
+        name="Example Tool Responses",
+        description=(
+            "Realistic example output from key tools to help understand response formats"
+        ),
+        mimeType="application/json",
+    ),
 ]
 
 

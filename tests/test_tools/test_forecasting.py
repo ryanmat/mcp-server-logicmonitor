@@ -265,6 +265,103 @@ class TestForecastMetric:
         assert cpu["trend"] == "decreasing"
 
 
+class TestForecastMetricMethod:
+    """Tests for forecast_metric method parameter."""
+
+    @respx.mock
+    async def test_method_auto_short_data_uses_linear(self, client):
+        """Auto method with short hours_back uses linear."""
+        from lm_mcp.tools.forecasting import forecast_metric
+
+        values = [[float(10 + i)] for i in range(10)]
+        respx.get(DATA_URL).mock(
+            return_value=httpx.Response(
+                200, json=_make_metric_response(["cpu"], values)
+            )
+        )
+
+        result = await forecast_metric(
+            client, device_id=1, device_datasource_id=10,
+            instance_id=100, threshold=100.0, hours_back=24,
+            method="auto",
+        )
+
+        data = json.loads(result[0].text)
+        cpu = data["forecasts"]["cpu"]
+        assert cpu["method_used"] == "linear"
+
+    @respx.mock
+    async def test_method_explicit_holt_winters(self, client):
+        """Explicit holt_winters method is used when requested."""
+        from lm_mcp.tools.forecasting import forecast_metric
+
+        # Enough data for Holt-Winters (2 seasons of 12)
+        values = [[float(50 + 10 * math.sin(2 * math.pi * i / 12))] for i in range(48)]
+        respx.get(DATA_URL).mock(
+            return_value=httpx.Response(
+                200, json=_make_metric_response(["cpu"], values)
+            )
+        )
+
+        result = await forecast_metric(
+            client, device_id=1, device_datasource_id=10,
+            instance_id=100, threshold=200.0,
+            method="holt_winters",
+        )
+
+        data = json.loads(result[0].text)
+        cpu = data["forecasts"]["cpu"]
+        assert cpu["method_used"] == "holt_winters"
+
+    @respx.mock
+    async def test_confidence_interval_present(self, client):
+        """Forecast output includes confidence_interval."""
+        from lm_mcp.tools.forecasting import forecast_metric
+
+        values = [[float(10 + i * 2)] for i in range(20)]
+        respx.get(DATA_URL).mock(
+            return_value=httpx.Response(
+                200, json=_make_metric_response(["cpu"], values)
+            )
+        )
+
+        result = await forecast_metric(
+            client, device_id=1, device_datasource_id=10,
+            instance_id=100, threshold=200.0,
+        )
+
+        data = json.loads(result[0].text)
+        cpu = data["forecasts"]["cpu"]
+        assert "confidence_interval" in cpu
+        ci = cpu["confidence_interval"]
+        assert "lower" in ci
+        assert "upper" in ci
+        assert "confidence_level" in ci
+        assert "data_quality" in ci
+
+    @respx.mock
+    async def test_method_linear_explicit(self, client):
+        """Explicit linear method is used when requested."""
+        from lm_mcp.tools.forecasting import forecast_metric
+
+        values = [[float(10 + i)] for i in range(10)]
+        respx.get(DATA_URL).mock(
+            return_value=httpx.Response(
+                200, json=_make_metric_response(["cpu"], values)
+            )
+        )
+
+        result = await forecast_metric(
+            client, device_id=1, device_datasource_id=10,
+            instance_id=100, threshold=100.0,
+            method="linear",
+        )
+
+        data = json.loads(result[0].text)
+        cpu = data["forecasts"]["cpu"]
+        assert cpu["method_used"] == "linear"
+
+
 class TestDetectChangePoints:
     """Tests for detect_change_points tool."""
 

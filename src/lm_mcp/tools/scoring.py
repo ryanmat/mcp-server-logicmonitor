@@ -1,5 +1,5 @@
 # Description: Scoring and availability analysis tools for LogicMonitor.
-# Description: Provides score_alert_noise, calculate_availability, score_device_health.
+# Description: Provides scoring, availability, health, and error budget tools.
 
 from __future__ import annotations
 
@@ -165,7 +165,18 @@ async def score_alert_noise(
         if not recommendations:
             recommendations.append("Alert noise levels are acceptable.")
 
-        return format_response({
+        # Best practice guardrails
+        from lm_mcp.resources.best_practices import get_best_practices
+
+        if noise_score > 50:
+            bp = get_best_practices("high_alert_noise").get("high_alert_noise", {})
+            structured_recs = bp.get("recommended_actions", [])
+            anti_patterns = bp.get("anti_patterns", [])
+        else:
+            structured_recs = []
+            anti_patterns = []
+
+        result_data: dict = {
             "noise_score": noise_score,
             "entropy": round(entropy, 4),
             "normalized_entropy": round(normalized_entropy, 4),
@@ -180,8 +191,13 @@ async def score_alert_noise(
                 {"datasource": ds, "count": c} for ds, c in top_datasources
             ],
             "recommendations": recommendations,
+            "structured_recommendations": structured_recs,
             "hours_back": hours_back,
-        })
+        }
+        if noise_score > 50:
+            result_data["anti_patterns"] = anti_patterns
+
+        return format_response(result_data)
     except Exception as e:
         return handle_error(e)
 
@@ -307,6 +323,19 @@ async def calculate_availability(
             if incident_durations else 0
         )
 
+        # Measurement window context for low availability
+        measurement_context: dict = {}
+        if worst_availability < 99.9:
+            from lm_mcp.resources.best_practices import get_best_practices
+
+            bp = get_best_practices("availability_low").get("availability_low", {})
+            measurement_context = {
+                "measurement_window_hours": hours_back,
+                "severity_threshold": severity_threshold,
+                "recommendations": bp.get("recommended_actions", []),
+                "anti_patterns": bp.get("anti_patterns", []),
+            }
+
         return format_response({
             "availability_percent": round(worst_availability, 4),
             "total_downtime_minutes": round(
@@ -321,6 +350,7 @@ async def calculate_availability(
             "by_device": by_device,
             "hours_back": hours_back,
             "severity_threshold": severity_threshold,
+            "measurement_window_context": measurement_context,
         })
     except Exception as e:
         return handle_error(e)
@@ -455,7 +485,23 @@ async def score_device_health(
         else:
             status = "critical"
 
-        return format_response({
+        # Best practice guardrails
+        from lm_mcp.resources.best_practices import get_best_practices
+
+        structured_recs: list[dict] = []
+        anti_patterns: list[str] = []
+        if health_score < 50:
+            bp = get_best_practices("device_health_low").get("device_health_low", {})
+            structured_recs = bp.get("recommended_actions", [])
+            anti_patterns = bp.get("anti_patterns", [])
+        elif health_score < 80:
+            structured_recs = [{
+                "action": "Monitor trend",
+                "how": "Re-check health score in 1-2 hours to detect worsening",
+                "priority": "low",
+            }]
+
+        result_data: dict = {
             "device_id": device_id,
             "device_datasource_id": device_datasource_id,
             "instance_id": instance_id,
@@ -463,7 +509,119 @@ async def score_device_health(
             "status": status,
             "contributing_factors": factors,
             "anomaly_count": anomaly_count,
+            "recommendations": structured_recs,
             "hours_back": hours_back,
+        }
+        if health_score < 50:
+            result_data["anti_patterns"] = anti_patterns
+
+        return format_response(result_data)
+    except Exception as e:
+        return handle_error(e)
+
+
+async def calculate_error_budget(
+    client: "LogicMonitorClient",
+    device_id: int | None = None,
+    group_id: int | None = None,
+    target_slo: float = 99.9,
+    period_days: int = 30,
+) -> list[TextContent]:
+    """Calculate SLO error budget consumption and projected exhaustion.
+
+    Calls calculate_availability internally, then computes remaining
+    error budget based on the target SLO.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Optional device ID filter.
+        group_id: Optional device group ID filter.
+        target_slo: Target SLO percentage (default: 99.9).
+        period_days: SLO measurement period in days (default: 30).
+
+    Returns:
+        Error budget status with remaining minutes and burn rate.
+    """
+    try:
+        import json as _json
+
+        # Call calculate_availability to get actual availability
+        avail_result = await calculate_availability(
+            client,
+            device_id=device_id,
+            group_id=group_id,
+            hours_back=period_days * 24,
+        )
+        avail_data = _json.loads(avail_result[0].text)
+
+        total_minutes = period_days * 24 * 60
+        total_budget_minutes = total_minutes * (1 - target_slo / 100)
+        consumed_minutes = avail_data.get("total_downtime_minutes", 0)
+        remaining_minutes = max(0.0, total_budget_minutes - consumed_minutes)
+
+        # Calculate elapsed days in the period
+        elapsed_days = period_days  # Full period for historical calculation
+
+        # Burn rate: how fast we are consuming the budget
+        if elapsed_days > 0 and total_budget_minutes > 0:
+            burn_rate = consumed_minutes / (
+                elapsed_days * (total_budget_minutes / period_days)
+            )
+        else:
+            burn_rate = 0.0
+
+        # Projected exhaustion
+        if burn_rate > 0 and remaining_minutes > 0:
+            daily_consumption = (
+                consumed_minutes / elapsed_days if elapsed_days > 0 else 0
+            )
+            projected_exhaustion_days = (
+                remaining_minutes / daily_consumption
+                if daily_consumption > 0
+                else None
+            )
+        else:
+            projected_exhaustion_days = None
+
+        # Budget consumption percentage
+        budget_consumed_percent = (
+            (consumed_minutes / total_budget_minutes * 100)
+            if total_budget_minutes > 0
+            else 0.0
+        )
+
+        # Status classification
+        # Edge case: 100% SLO means zero budget. If no downtime
+        # occurred, treat it as healthy rather than exhausted.
+        if total_budget_minutes == 0 and consumed_minutes == 0:
+            status = "healthy"
+        elif remaining_minutes <= 0:
+            status = "exhausted"
+        elif budget_consumed_percent > 90:
+            status = "critical"
+        elif budget_consumed_percent > 50:
+            status = "warning"
+        else:
+            status = "healthy"
+
+        return format_response({
+            "target_slo": target_slo,
+            "period_days": period_days,
+            "actual_availability": avail_data.get(
+                "availability_percent", 100.0
+            ),
+            "total_budget_minutes": round(total_budget_minutes, 2),
+            "consumed_minutes": round(consumed_minutes, 2),
+            "remaining_minutes": round(remaining_minutes, 2),
+            "budget_consumed_percent": round(budget_consumed_percent, 2),
+            "burn_rate": round(burn_rate, 4),
+            "projected_exhaustion_days": (
+                round(projected_exhaustion_days, 1)
+                if projected_exhaustion_days is not None
+                else None
+            ),
+            "status": status,
+            "incident_count": avail_data.get("incident_count", 0),
         })
     except Exception as e:
         return handle_error(e)

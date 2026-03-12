@@ -23,6 +23,7 @@ from lm_mcp.prompts.templates import (
     incident_triage_template,
     rca_workflow_template,
     remediate_workflow_template,
+    remediation_template,
     sdt_planning_template,
     top_talkers_template,
     troubleshoot_device_template,
@@ -279,6 +280,27 @@ PROMPTS: list[Prompt] = [
             ),
         ],
     ),
+    Prompt(
+        name="remediation",
+        description="RemediationSource execution workflow with pre-execution safety checklist",
+        arguments=[
+            PromptArgument(
+                name="host_id",
+                description="Target device/host ID",
+                required=False,
+            ),
+            PromptArgument(
+                name="remediation_source_id",
+                description="Remediation source ID to execute",
+                required=False,
+            ),
+            PromptArgument(
+                name="alert_id",
+                description="Associated alert ID (optional)",
+                required=False,
+            ),
+        ],
+    ),
 ]
 
 
@@ -310,6 +332,7 @@ def get_prompt_messages(name: str, arguments: dict) -> GetPromptResult:
         "rca_workflow": rca_workflow_template,
         "capacity_forecast": capacity_forecast_template,
         "remediate_workflow": remediate_workflow_template,
+        "remediation": remediation_template,
     }
 
     if name not in templates:

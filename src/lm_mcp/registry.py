@@ -220,7 +220,12 @@ TOOLS.extend(
     [
         Tool(
             name="get_alerts",
-            description="Get alerts from LogicMonitor with optional filtering",
+            description=(
+                "Get alerts from LogicMonitor with optional filtering"
+                "\n\nCommon mistakes: startEpoch/endEpoch use SECONDS not "
+                "milliseconds. String filter values need double quotes "
+                '(e.g., monitorObjectName:"hostname").'
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -293,7 +298,11 @@ TOOLS.extend(
         ),
         Tool(
             name="acknowledge_alert",
-            description="Acknowledge an alert (requires write permission)",
+            description=(
+                "Acknowledge an alert (requires write permission)"
+                "\n\nCommon mistakes: alert_id works with or without "
+                "the LMA prefix."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -381,7 +390,12 @@ TOOLS.extend(
         ),
         Tool(
             name="create_sdt",
-            description="Create a scheduled downtime (requires write permission)",
+            description=(
+                "Create a scheduled downtime (requires write permission)"
+                "\n\nCommon mistakes: duration_minutes is MINUTES not "
+                "hours/seconds. DeviceSDT needs device_id, "
+                "DeviceGroupSDT needs device_group_id."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -571,7 +585,12 @@ TOOLS.extend(
     [
         Tool(
             name="get_device_datasources",
-            description="Get datasources applied to a device (resource)",
+            description=(
+                "Get datasources applied to a device (resource)"
+                "\n\nCommon mistakes: Returns device-datasource associations "
+                "not definitions. The ID returned here is device_datasource_id "
+                "for use with get_device_data."
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -687,7 +706,12 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_data",
-            description="Get metric data for a device/resource datasource instance",
+            description=(
+                "Get metric data for a device/resource datasource instance"
+                "\n\nCommon mistakes: Returns most recent data unless "
+                "period/start/end specified. Requires device_datasource_id "
+                "(from get_device_datasources) not the datasource definition ID."
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -2962,6 +2986,15 @@ TOOLS.extend(
                         "default": 2.0,
                         "description": "Z-score threshold for anomaly detection (default: 2.0)",
                     },
+                    "method": {
+                        "type": "string",
+                        "enum": ["auto", "zscore", "iqr", "mad"],
+                        "default": "auto",
+                        "description": (
+                            "Anomaly detection method (auto selects based on "
+                            "data distribution)"
+                        ),
+                    },
                 },
                 "required": ["device_id", "device_datasource_id", "instance_id"],
             },
@@ -3104,6 +3137,15 @@ TOOLS.extend(
                         "type": "integer",
                         "default": 168,
                         "description": "Hours of historical data for regression",
+                    },
+                    "method": {
+                        "type": "string",
+                        "enum": ["auto", "linear", "holt_winters"],
+                        "default": "auto",
+                        "description": (
+                            "Forecasting method (auto selects based on data "
+                            "characteristics)"
+                        ),
                     },
                 },
                 "required": [
@@ -3276,6 +3318,8 @@ TOOLS.extend(
                 "Calculate availability percentage from alert history. "
                 "Computes SLA-style uptime metrics, MTTR, and per-device "
                 "breakdown from cleared and active alerts."
+                "\n\nCommon mistakes: hours_back defaults to 720 (30 days). "
+                "Narrow scope with device_id/group_id for performance."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3401,6 +3445,39 @@ TOOLS.extend(
                     "device_datasource_id",
                     "instance_id",
                 ],
+            },
+        ),
+        Tool(
+            name="calculate_error_budget",
+            description=(
+                "Calculate SLO error budget consumption and projected "
+                "exhaustion date. Computes remaining budget, burn rate, "
+                "and status (healthy/warning/critical/exhausted) based "
+                "on actual availability vs target SLO."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {
+                        "type": "integer",
+                        "description": "Filter to a specific device",
+                    },
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Filter to a device group",
+                    },
+                    "target_slo": {
+                        "type": "number",
+                        "default": 99.9,
+                        "description": "Target SLO percentage (default: 99.9)",
+                    },
+                    "period_days": {
+                        "type": "integer",
+                        "default": 30,
+                        "description": "SLO measurement period in days (default: 30)",
+                    },
+                },
             },
         ),
         Tool(
@@ -4059,6 +4136,270 @@ TOOLS.extend(
                 "required": ["source_id"],
             },
         ),
+        Tool(
+            name="execute_remediation",
+            description=(
+                "Execute a RemediationSource script on a target device. "
+                "Performs pre-execution checks (collector version, device status, "
+                "script review) before triggering manual execution. "
+                "Requires write permission."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host_id": {
+                        "type": "integer",
+                        "description": "Target device/host ID",
+                    },
+                    "remediation_source_id": {
+                        "type": "integer",
+                        "description": "Remediation source ID to execute",
+                    },
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Optional alert ID to associate with execution",
+                    },
+                },
+                "required": ["host_id", "remediation_source_id"],
+            },
+        ),
+        Tool(
+            name="get_remediation_status",
+            description=(
+                "Get the current status of a remediation source execution "
+                "on a device. Returns device state and source details."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host_id": {
+                        "type": "integer",
+                        "description": "Device/host ID",
+                    },
+                    "remediation_source_id": {
+                        "type": "integer",
+                        "description": "Remediation source ID",
+                    },
+                },
+                "required": ["host_id", "remediation_source_id"],
+            },
+        ),
+        Tool(
+            name="get_remediation_history",
+            description=(
+                "List past remediation executions for a device from "
+                "audit logs. Output truncated at 32KB."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host_id": {
+                        "type": "integer",
+                        "description": "Device/host ID",
+                    },
+                    "remediation_source_id": {
+                        "type": "integer",
+                        "description": "Filter to a specific remediation source",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Hours to look back (default: 24)",
+                    },
+                },
+                "required": ["host_id"],
+            },
+        ),
+    ]
+)
+
+# Workflows — composite tools and discovery
+TOOLS.extend(
+    [
+        Tool(
+            name="triage",
+            description=(
+                "Composite triage: correlates alerts, clusters by device/time, "
+                "scores noise, assesses blast radius, and checks recent changes. "
+                "Returns a prioritized incident report."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "error", "warning", "info"],
+                        "description": "Filter alerts by severity",
+                    },
+                    "device": {"type": "string", "description": "Filter by device name"},
+                    "group_id": {"type": "integer", "description": "Filter by device group ID"},
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 4,
+                        "description": "Hours to look back (default: 4)",
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "full"],
+                        "default": "summary",
+                        "description": "Output detail level (default: summary)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="health_check",
+            description=(
+                "Composite health check: resolves a device, scores health across "
+                "datasources, detects anomalies, checks alerts, and calculates "
+                "availability. Returns a single device health report."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_name": {
+                        "type": "string",
+                        "description": "Device display name (used if device_id not provided)",
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "full"],
+                        "default": "summary",
+                        "description": "Output detail level (default: summary)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="capacity_plan",
+            description=(
+                "Composite capacity planning: forecasts metric breach dates, "
+                "classifies trends, detects seasonality and change points. "
+                "Returns per-datasource capacity projections."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_name": {
+                        "type": "string",
+                        "description": "Device display name (used if device_id not provided)",
+                    },
+                    "datasource": {
+                        "type": "string",
+                        "description": "Filter to a specific datasource name",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 168,
+                        "description": "Hours of historical data (default: 168 = 1 week)",
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "full"],
+                        "default": "summary",
+                        "description": "Output detail level (default: summary)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="portal_overview",
+            description=(
+                "Composite portal overview: aggregates alert statistics, collector "
+                "health, maintenance windows, noise scores, and dead devices into "
+                "a shift-handoff report."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 4,
+                        "description": "Hours to look back (default: 4)",
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "full"],
+                        "default": "summary",
+                        "description": "Output detail level (default: summary)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="diagnose",
+            description=(
+                "Composite diagnosis: given an alert or device, gathers alert "
+                "details, device context, correlated alerts, recent changes, "
+                "blast radius, and health score. Returns a diagnosis report "
+                "with probable root cause and recommendations."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Alert ID to diagnose",
+                    },
+                    "device_name": {
+                        "type": "string",
+                        "description": (
+                            "Device name to diagnose "
+                            "(finds most recent critical alert)"
+                        ),
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "full"],
+                        "default": "summary",
+                        "description": "Output detail level (default: summary)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="search_tools",
+            description=(
+                "Search available MCP tools by keyword or category. "
+                "Use this to discover which tools are available for a task."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "Search keywords "
+                            "(e.g., 'alert', 'device health', 'forecast')"
+                        ),
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": (
+                            "Filter to a specific category "
+                            "(e.g., 'alerts', 'ml_analysis')"
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Maximum results to return (default: 10)",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
     ]
 )
 
@@ -4481,6 +4822,7 @@ def get_tool_handler(tool_name: str) -> Any:
         traces,
         users,
         websites,
+        workflows,
     )
 
     handlers = {
@@ -4590,6 +4932,9 @@ def get_tool_handler(tool_name: str) -> Any:
         # Remediation Sources
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
+        "execute_remediation": remediationsources.execute_remediation,
+        "get_remediation_status": remediationsources.get_remediation_status,
+        "get_remediation_history": remediationsources.get_remediation_history,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,
@@ -4705,6 +5050,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "analyze_blast_radius": topology_analysis.analyze_blast_radius,
         "correlate_changes": event_correlation.correlate_changes,
         "score_device_health": scoring.score_device_health,
+        "calculate_error_budget": scoring.calculate_error_budget,
         # Traces / APM
         "get_trace_services": traces.get_trace_services,
         "get_trace_service": traces.get_trace_service,
@@ -4740,6 +5086,13 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_organizations": ansible.get_organizations,
         "get_job_events": ansible.get_job_events,
         "get_hosts": ansible.get_hosts,
+        # Workflows
+        "triage": workflows.triage,
+        "health_check": workflows.health_check,
+        "capacity_plan": workflows.capacity_plan,
+        "portal_overview": workflows.portal_overview,
+        "diagnose": workflows.diagnose,
+        "search_tools": workflows.search_tools,
     }
 
     if tool_name not in handlers:

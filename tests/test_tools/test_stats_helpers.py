@@ -507,3 +507,167 @@ class TestFetchMetricSeries:
 
         params = dict(route.calls[0].request.url.params)
         assert params.get("datapoints") == "cpu,memory"
+
+
+class TestHoltWinters:
+    """Tests for holt_winters triple exponential smoothing."""
+
+    def test_known_seasonal_data_produces_forecast(self):
+        """Seasonal data produces a forecast of the correct length."""
+        from lm_mcp.tools.stats_helpers import holt_winters
+
+        # 4 complete seasons of length 6
+        values = [10, 15, 20, 15, 10, 5] * 4
+        result = holt_winters(values, season_length=6, forecast_periods=12)
+        assert len(result["forecast"]) == 12
+        assert len(result["fitted"]) == len(values)
+        assert len(result["residuals"]) == len(values)
+
+    def test_insufficient_data_raises(self):
+        """Insufficient data for season length raises ValueError."""
+        from lm_mcp.tools.stats_helpers import holt_winters
+
+        with pytest.raises(ValueError, match="Need at least"):
+            holt_winters([1.0, 2.0, 3.0], season_length=5)
+
+    def test_constant_data_handled(self):
+        """Constant data does not raise, produces flat forecast."""
+        from lm_mcp.tools.stats_helpers import holt_winters
+
+        values = [50.0] * 20
+        result = holt_winters(values, season_length=5)
+        # Forecast should be approximately constant
+        for fv in result["forecast"]:
+            assert abs(fv - 50.0) < 5.0
+
+    def test_forecast_length_matches_parameter(self):
+        """Forecast length matches the forecast_periods argument."""
+        from lm_mcp.tools.stats_helpers import holt_winters
+
+        values = [float(i % 10) for i in range(40)]
+        result = holt_winters(values, season_length=10, forecast_periods=6)
+        assert len(result["forecast"]) == 6
+
+
+class TestPredictionInterval:
+    """Tests for prediction_interval function."""
+
+    def test_normal_residuals_produce_interval(self):
+        """Normal data produces a valid prediction interval."""
+        from lm_mcp.tools.stats_helpers import prediction_interval
+
+        y_vals = [10.0, 12.0, 11.0, 13.0, 14.0, 12.0, 15.0, 13.0, 16.0, 14.0]
+        y_pred = [10.5, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5]
+        result = prediction_interval(y_vals, y_pred)
+        assert result["lower"] < result["upper"]
+        assert result["confidence_level"] == 0.95
+
+    def test_insufficient_data_returns_defaults(self):
+        """Fewer than 2 data points returns default interval."""
+        from lm_mcp.tools.stats_helpers import prediction_interval
+
+        result = prediction_interval([1.0], [1.0])
+        assert result["data_quality"] == "insufficient"
+        assert result["lower"] == 0.0
+        assert result["upper"] == 0.0
+
+    def test_data_quality_levels(self):
+        """Data quality reflects sample size."""
+        from lm_mcp.tools.stats_helpers import prediction_interval
+
+        small = prediction_interval(list(range(5)), list(range(5)))
+        assert small["data_quality"] == "insufficient"
+
+        medium = prediction_interval(list(range(20)), list(range(20)))
+        assert medium["data_quality"] == "limited"
+
+        large = prediction_interval(
+            [float(i) for i in range(60)],
+            [float(i) for i in range(60)],
+        )
+        assert large["data_quality"] == "good"
+
+    def test_mismatched_lengths_raises(self):
+        """Mismatched input lengths raises ValueError."""
+        from lm_mcp.tools.stats_helpers import prediction_interval
+
+        with pytest.raises(ValueError, match="same length"):
+            prediction_interval([1.0, 2.0], [1.0])
+
+
+class TestIQRAnomalies:
+    """Tests for iqr_anomalies function."""
+
+    def test_known_outlier_detected(self):
+        """Known outlier is flagged as anomaly."""
+        from lm_mcp.tools.stats_helpers import iqr_anomalies
+
+        values = [10, 11, 12, 10, 11, 12, 10, 11, 100]
+        result = iqr_anomalies(values)
+        assert 8 in result["anomaly_indices"]
+
+    def test_no_outliers_in_uniform_data(self):
+        """Uniform data has no anomalies."""
+        from lm_mcp.tools.stats_helpers import iqr_anomalies
+
+        values = [10.0, 11.0, 10.5, 10.8, 11.2, 10.3, 10.9, 11.1]
+        result = iqr_anomalies(values)
+        assert len(result["anomaly_indices"]) == 0
+
+    def test_fewer_than_four_returns_empty(self):
+        """Fewer than 4 values returns empty anomaly list."""
+        from lm_mcp.tools.stats_helpers import iqr_anomalies
+
+        result = iqr_anomalies([1.0, 2.0, 3.0])
+        assert result["anomaly_indices"] == []
+        assert result["q1"] == 0.0
+
+    def test_fences_computed(self):
+        """Q1, Q3, IQR, and fences are computed correctly."""
+        from lm_mcp.tools.stats_helpers import iqr_anomalies
+
+        values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+        result = iqr_anomalies(values)
+        assert result["q1"] > 0
+        assert result["q3"] > result["q1"]
+        assert result["iqr"] > 0
+        assert result["lower_fence"] < result["q1"]
+        assert result["upper_fence"] > result["q3"]
+
+
+class TestMADAnomalies:
+    """Tests for mad_anomalies function."""
+
+    def test_known_outlier_detected(self):
+        """Known outlier is flagged as anomaly."""
+        from lm_mcp.tools.stats_helpers import mad_anomalies
+
+        # Data with variation so MAD is nonzero, plus an extreme outlier
+        values = [10.0, 12.0, 11.0, 13.0, 10.0, 12.0, 11.0, 13.0, 200.0]
+        result = mad_anomalies(values, threshold=3.0)
+        assert 8 in result["anomaly_indices"]
+
+    def test_constant_data_returns_zero_mad(self):
+        """Constant data returns MAD=0 with no anomalies."""
+        from lm_mcp.tools.stats_helpers import mad_anomalies
+
+        values = [5.0, 5.0, 5.0, 5.0, 5.0]
+        result = mad_anomalies(values)
+        assert result["mad"] == 0.0
+        assert result["anomaly_indices"] == []
+
+    def test_fewer_than_three_returns_empty(self):
+        """Fewer than 3 values returns empty results."""
+        from lm_mcp.tools.stats_helpers import mad_anomalies
+
+        result = mad_anomalies([1.0, 2.0])
+        assert result["anomaly_indices"] == []
+        assert result["modified_z_scores"] == []
+
+    def test_modified_z_scores_present(self):
+        """Modified z-scores are computed for all values."""
+        from lm_mcp.tools.stats_helpers import mad_anomalies
+
+        values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        result = mad_anomalies(values)
+        assert len(result["modified_z_scores"]) == len(values)

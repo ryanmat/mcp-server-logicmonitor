@@ -33,7 +33,18 @@ Provide a structured analysis with:
 - Alert count by severity
 - Top affected devices
 - Potential root causes
-- Recommended actions"""
+- Recommended actions
+
+Composite shortcut: Use the `triage` tool to perform steps
+1-4 automatically.
+
+Argument parsing: Extract severity from words like "critical
+alerts" or "errors". Time windows from "last hour" (1),
+"today" (24), "this week" (168).
+
+Expected output: Structured incident report with severity
+counts, top affected devices, root cause hypothesis, and
+prioritized action items."""
 
 
 def capacity_review_template(arguments: dict) -> str:
@@ -65,7 +76,17 @@ Provide a report with:
 - Devices approaching capacity limits
 - Current utilization metrics
 - Growth trend analysis
-- Recommended actions (rightsizing, cleanup, scaling)"""
+- Recommended actions (rightsizing, cleanup, scaling)
+
+Composite shortcut: Use the `capacity_plan` tool to automate
+metric collection, trending, and forecasting.
+
+Argument parsing: Group IDs are numeric. Threshold defaults
+to 80 if not specified. "Production servers" likely maps to
+a group name, not an ID.
+
+Expected output: Table of devices sorted by utilization, with
+trend indicators and days-until-threshold-breach."""
 
 
 def health_check_template(arguments: dict) -> str:
@@ -100,7 +121,17 @@ Provide a health dashboard with:
 - Active critical/error/warning alert counts
 - Device status summary (normal, dead, unmonitored)
 - Collector status (if included)
-- Key concerns requiring attention"""
+- Key concerns requiring attention
+
+Composite shortcut: Use the `health_check` tool for a single
+device, or `portal_overview` for environment-wide health.
+
+Argument parsing: "Include collectors" defaults to true. If
+user says "quick check" or "just devices", set
+include_collectors=false.
+
+Expected output: Dashboard-style summary with health score,
+alert counts, and a prioritized list of concerns."""
 
 
 def alert_summary_template(arguments: dict) -> str:
@@ -132,7 +163,17 @@ Provide a summary with:
 - Breakdown by {group_by}
 - Top 5 most frequent alert types
 - Recently cleared alerts
-- Alerts requiring immediate attention"""
+- Alerts requiring immediate attention
+
+Composite shortcut: Use the `triage` tool with hours_back
+matching the requested time range for an automated summary.
+
+Argument parsing: "By device" means group_by=device. "By
+datasource" or "by monitor" means group_by=datasource.
+Default is severity.
+
+Expected output: Digest with total count, severity breakdown,
+top-5 lists, and action recommendations."""
 
 
 def sdt_planning_template(arguments: dict) -> str:
@@ -171,7 +212,15 @@ Provide a plan with:
 - Any conflicts with existing SDTs
 - Risk assessment for the maintenance window
 
-Note: Creating SDTs requires write permissions (LM_ENABLE_WRITE_OPERATIONS=true)"""
+Note: Creating SDTs requires write permissions (LM_ENABLE_WRITE_OPERATIONS=true)
+
+Argument parsing: Device IDs are comma-separated integers.
+Group IDs are single integers. Time references like "tonight"
+or "this weekend" should be converted to specific datetime
+ranges.
+
+Expected output: SDT plan with device list, recommended
+window, SDT type, conflict check, and risk assessment."""
 
 
 def cost_optimization_template(arguments: dict) -> str:
@@ -204,7 +253,14 @@ Provide a report with:
 - Top cost optimization recommendations
 - Idle resources that could be terminated or downsized
 - Estimated monthly savings if recommendations are applied
-- Risk assessment for each recommendation"""
+- Risk assessment for each recommendation
+
+Argument parsing: Cloud account IDs are strings. Time ranges
+like "last month" map to "30d", "last quarter" to "90d".
+
+Expected output: Cost report with current spend, top
+recommendations sorted by savings, idle resource inventory,
+and implementation priority."""
 
 
 def audit_review_template(arguments: dict) -> str:
@@ -236,7 +292,15 @@ Provide a report with:
 - Failed login attempts and source IPs
 - Configuration changes by user
 - Any suspicious or unusual activity
-- Recommendations for security improvements"""
+- Recommendations for security improvements
+
+Argument parsing: Hours defaults to 24. Username is
+case-sensitive and should match the LM portal username
+format.
+
+Expected output: Security audit report with activity
+timeline, failed login analysis, change summary, and risk
+flags."""
 
 
 def alert_correlation_template(arguments: dict) -> str:
@@ -288,7 +352,17 @@ Provide a report with:
 - Correlation with recent configuration changes
 - Root cause hypothesis with confidence assessment
 - Impact assessment (devices, services, business impact)
-- Prioritized investigation order and recommended actions"""
+- Prioritized investigation order and recommended actions
+
+Composite shortcut: Use the `triage` tool for automated
+correlation including blast radius and noise scoring.
+
+Argument parsing: Severity values are critical, error,
+warning, info. Device and group IDs are integers.
+
+Expected output: Correlation report with cluster diagrams,
+topology context, change timeline, and ranked investigation
+order."""
 
 
 def collector_health_template(arguments: dict) -> str:
@@ -319,7 +393,16 @@ Provide a report with:
 - Collectors running outdated versions
 - Collector group distribution and balance
 - Collectors needing attention (down, outdated, overloaded)
-- Recommended actions for collector maintenance"""
+- Recommended actions for collector maintenance
+
+Composite shortcut: The `portal_overview` tool includes
+collector health as part of its environment-wide assessment.
+
+Argument parsing: Collector group IDs are integers. If user
+says "all collectors", omit the group filter.
+
+Expected output: Collector health table with status, version,
+device count, and upgrade recommendations."""
 
 
 def troubleshoot_device_template(arguments: dict) -> str:
@@ -352,7 +435,18 @@ Provide a report with:
 - Active and recent alerts for the device
 - Datasource health and data collection status
 - Any configuration issues identified
-- Recommended troubleshooting steps"""
+- Recommended troubleshooting steps
+
+Composite shortcut: Use the `diagnose` tool with device_name
+for automated troubleshooting including correlation and blast
+radius.
+
+Argument parsing: Device ID is required and must be an
+integer. Hours defaults to 24.
+
+Expected output: Device troubleshooting report with status,
+alert history, datasource health, and recommended next
+steps."""
 
 
 def top_talkers_template(arguments: dict) -> str:
@@ -395,7 +489,17 @@ Provide a ranked report with:
   - Threshold tuning (raise thresholds to reduce noise)
   - SDT scheduling (recurring maintenance windows)
   - Alert rule changes (escalation chain adjustments)
-  - Investigation needed (genuine issues requiring attention)"""
+  - Investigation needed (genuine issues requiring attention)
+
+Composite shortcut: The `triage` tool includes noise scoring
+and top-talker identification automatically.
+
+Argument parsing: Limit defaults to 10. Group_by accepts
+"device" or "datasource". Hours defaults to 24.
+
+Expected output: Ranked list with alert volume, severity
+breakdown, SDT status, and specific tuning recommendation
+per source."""
 
 
 def rca_workflow_template(arguments: dict) -> str:
@@ -465,7 +569,17 @@ Provide a structured RCA report with:
 - Topology and dependency context
 - Blast radius assessment
 - Recommended remediation actions (immediate and long-term)
-- Prevention recommendations"""
+- Prevention recommendations
+
+Composite shortcut: Use the `diagnose` tool for automated
+RCA including correlation, blast radius, and health scoring.
+
+Argument parsing: Alert IDs are strings (may include LMA
+prefix). Device IDs are integers. Hours defaults to 4.
+
+Expected output: Structured RCA report with root cause
+hypothesis, confidence level, evidence chain, blast radius
+map, and remediation plan."""
 
 
 def capacity_forecast_template(arguments: dict) -> str:
@@ -530,7 +644,19 @@ Provide a capacity report with:
   - Immediate action needed (already above {threshold}%)
   - Near-term risk (trending toward breach within 30 days)
   - Monitor closely (growing but sufficient headroom)
-  - No action needed (stable or declining utilization)"""
+  - No action needed (stable or declining utilization)
+
+Composite shortcut: Use the `capacity_plan` tool to automate
+data collection, trend analysis, and forecasting with
+seasonality detection.
+
+Argument parsing: Device and group IDs are integers.
+Datasource defaults to "CPU". Hours defaults to 168 (1 week).
+Threshold defaults to 80.
+
+Expected output: Capacity forecast with per-device
+utilization, trend classification, forecast breach dates,
+and prioritized action categories."""
 
 
 def remediate_workflow_template(arguments: dict) -> str:
@@ -637,4 +763,67 @@ Provide a structured remediation summary with:
 - Health score before and after remediation
 - Job template used and job ID
 - Execution result (success/failed/partial)
-- Alert status (cleared/still active)"""
+- Alert status (cleared/still active)
+
+Argument parsing: Alert IDs are strings (may include LMA
+prefix). Device IDs are integers. If neither is specified,
+ask the operator.
+
+Expected output: Structured remediation summary with
+pre/post health scores, job execution details, and alert
+clearance status."""
+
+
+def remediation_template(arguments: dict) -> str:
+    """Generate RemediationSource execution workflow prompt content.
+
+    Args:
+        arguments: Prompt arguments (host_id, remediation_source_id, alert_id).
+
+    Returns:
+        Prompt text for RemediationSource execution workflow.
+    """
+    host_id = arguments.get("host_id", "")
+    source_id = arguments.get("remediation_source_id", "")
+    alert_id = arguments.get("alert_id", "")
+
+    return f"""Execute a LogicMonitor RemediationSource on a target device.
+
+Parameters:
+- Host ID: {host_id or 'not specified'}
+- Remediation Source ID: {source_id or 'not specified'}
+- Alert ID: {alert_id or 'not specified (optional)'}
+
+Pre-Execution Safety Checklist:
+1. Verify collector version >= 39.200 using get_collector
+2. Confirm device is reachable (hostStatus != 1) using get_device
+3. Review the remediation source script using get_remediationsource
+4. Check AppliesTo script matches the target device
+5. Look for state-mutating keywords (restart, rm, delete, stop, kill, reboot, shutdown)
+6. Verify no concurrent execution is in progress
+
+Execution Steps:
+1. Use get_remediationsource to retrieve the remediation source details
+2. Review the groovyScript content and appliesTo conditions
+3. Use get_device to verify the target device status and collector
+4. Use get_collector to verify collector build version
+5. If all checks pass, use execute_remediation to run the script
+6. Use get_remediation_status to monitor execution progress
+7. Use get_remediation_history to verify the execution result
+
+Post-Execution:
+8. Verify the original alert condition has improved
+9. Document the execution result with add_ops_note
+
+Safety Constraints:
+- Write permission is required (LM_ENABLE_WRITE_OPERATIONS=true)
+- Cannot pause or cancel once execution starts
+- Success does not guarantee resolution -- verify independently
+- Do not run concurrent remediations on the same device
+
+Argument parsing: Host ID and remediation source ID are
+required integers. Alert ID is an optional string.
+
+Expected output: Execution summary with pre-check results,
+script preview, execution status, and post-execution
+verification."""

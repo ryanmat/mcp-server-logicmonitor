@@ -135,6 +135,8 @@ async def get_datasource(
                     "description": dp.get("description"),
                     "type": dp.get("type"),
                     "alert_expr": dp.get("alertExpr"),
+                    "post_processor_method": dp.get("postProcessorMethod", ""),
+                    "post_processor_param": dp.get("postProcessorParam", ""),
                 }
                 for dp in result.get("dataPoints", [])
             ],

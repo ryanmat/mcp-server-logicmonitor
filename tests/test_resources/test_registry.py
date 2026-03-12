@@ -341,11 +341,11 @@ class TestGuideResources:
     def test_all_guide_resources_loadable(self):
         """All guide resources return valid JSON."""
         guide_uris = [str(r.uri) for r in RESOURCES if "/guide/" in str(r.uri)]
-        assert len(guide_uris) == 3
+        assert len(guide_uris) == 5
         for uri in guide_uris:
             content = get_resource_content(uri)
             data = json.loads(content)
-            assert "name" in data
+            assert isinstance(data, dict)
 
 
 class TestOrchestrationGuide:
@@ -401,5 +401,54 @@ class TestOrchestrationGuide:
         assert "logicmonitor" in config["mcpServers"]
 
     def test_orchestration_guide_total_resource_count(self):
-        """Total resource count is 24 after adding orchestration guide."""
-        assert len(RESOURCES) == 24
+        """Total resource count is 26 after adding example-responses guide."""
+        assert len(RESOURCES) == 26
+
+
+class TestBestPracticesResource:
+    """Tests for best practices guide resource."""
+
+    def test_best_practices_resource_resolves(self):
+        """lm://guide/best-practices returns content."""
+        content = get_resource_content("lm://guide/best-practices")
+        data = json.loads(content)
+        assert isinstance(data, dict)
+        assert len(data) > 0
+
+    def test_best_practices_structure(self):
+        """Each scenario has condition, recommended_actions, anti_patterns."""
+        content = get_resource_content("lm://guide/best-practices")
+        data = json.loads(content)
+        for scenario_name, scenario in data.items():
+            assert "condition" in scenario, f"{scenario_name} missing condition"
+            assert "recommended_actions" in scenario, (
+                f"{scenario_name} missing recommended_actions"
+            )
+            assert "anti_patterns" in scenario, (
+                f"{scenario_name} missing anti_patterns"
+            )
+            assert isinstance(scenario["recommended_actions"], list)
+            assert isinstance(scenario["anti_patterns"], list)
+            for rec in scenario["recommended_actions"]:
+                assert "action" in rec
+                assert "how" in rec
+                assert "priority" in rec
+
+    def test_best_practices_scenarios_present(self):
+        """All expected scenarios are present."""
+        content = get_resource_content("lm://guide/best-practices")
+        data = json.loads(content)
+        expected = [
+            "high_alert_noise",
+            "device_health_low",
+            "availability_low",
+            "remediation_execution",
+            "genai_monitoring",
+        ]
+        for scenario in expected:
+            assert scenario in data, f"Missing scenario: {scenario}"
+
+    def test_best_practices_resource_in_list(self):
+        """Best practices resource URI appears in resource listing."""
+        uris = list_resource_uris()
+        assert "lm://guide/best-practices" in uris

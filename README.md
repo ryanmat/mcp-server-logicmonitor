@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 215 structured tools, 14 workflow prompts, and 24 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 225 structured tools, 15 workflow prompts, and 26 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,44 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v1.9.5 (Current)
+### v2.0.0 (Current)
+
+**Composite Workflows** — 5 multi-step tools that replace manual orchestration:
+- `triage` — alert correlation, noise scoring, blast radius, change correlation in one call
+- `health_check` — device health score, anomalies, alerts, availability in one call
+- `capacity_plan` — forecasting, trend classification, seasonality, change points per datasource
+- `portal_overview` — alert stats, collector health, active SDTs, down devices for shift handoff
+- `diagnose` — alert details, device context, correlation, blast radius, root cause analysis
+
+**Progressive Discovery** — `search_tools` for keyword-based tool search across 225 tools.
+
+**ML/Statistical Improvements:**
+- Holt-Winters triple exponential smoothing for seasonal forecasting
+- IQR and MAD anomaly detection methods alongside existing z-score
+- Prediction intervals with confidence levels on forecasts
+- Auto-selection of forecasting/anomaly methods based on data characteristics
+- `calculate_error_budget` — SLO tracking with burn rate and projected exhaustion
+
+**Best Practices Guardrails** — scoring tools now return structured remediation
+recommendations and anti-patterns when thresholds are breached.
+
+**Metric Presets** — automatic parameter defaults based on datapoint name detection
+(CPU, memory, disk, latency, error rate, token usage).
+
+**RemediationSource Execution** — 3 tools for running LogicMonitor remediation scripts:
+- `execute_remediation` — 8-point pre-execution safety checklist, script preview, state mutation warnings
+- `get_remediation_status` — current execution state
+- `get_remediation_history` — past executions from audit logs
+
+**Other:**
+- Enriched all 15 MCP prompts with composite tool shortcuts and argument parsing guidance
+- New `remediation` prompt for execution workflows
+- 2 new resources: `lm://guide/best-practices`, `lm://guide/example-responses`
+- Common mistake notes added to 6 frequently misused tool descriptions
+- DataSource datapoints now include `post_processor_method` and `post_processor_param`
+- **Counts**: 225 tools (207 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v1.9.5
 - **New**: Action Sources integration — 14 tools for diagnostic/remediation workflows
   (action chains, action rules, diagnostic sources, remediation sources)
 - **Preview**: Action Sources API endpoints are not yet GA in LogicMonitor portals.
@@ -57,7 +94,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**215 Tools** across comprehensive LogicMonitor API coverage (197 LM + 18 AAP):
+**225 Tools** across comprehensive LogicMonitor API coverage (207 LM + 18 AAP):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -81,7 +118,7 @@ Server-side intelligence that transforms raw monitoring data into actionable ins
 
 - **Alert Correlation**: Automatically clusters related alerts by device, datasource, and temporal proximity — replaces dozens of manual API calls with a single aggregated view
 - **Alert Statistics**: Aggregated alert counts by severity, top-10 devices and datasources, time-bucketed distributions for trend analysis
-- **Metric Anomaly Detection**: Z-score based anomaly detection on any metric datapoint with configurable thresholds and IQR fallback
+- **Metric Anomaly Detection**: Multi-method anomaly detection (z-score, IQR, MAD) with auto-selection based on data distribution
 - **Metric Baselines**: Save baseline snapshots of metric behavior, then compare current performance against the baseline to detect drift
 - **Scheduled Analysis**: HTTP API endpoints for triggering analysis workflows (alert correlation, RCA, top talkers, health checks) from external schedulers and webhooks
 
@@ -89,8 +126,9 @@ Server-side intelligence that transforms raw monitoring data into actionable ins
 
 Pure-Python statistical methods for capacity planning, trend analysis, and operational scoring:
 
-- **Metric Forecasting**: Linear regression to predict threshold breach timing with trend direction and confidence
+- **Metric Forecasting**: Linear regression and Holt-Winters triple exponential smoothing with auto-selection, confidence intervals, and threshold breach prediction
 - **Metric Correlation**: Pearson correlation matrix across multiple metric series with strong-correlation highlighting
+- **Error Budget Tracking**: SLO-based error budget calculation with burn rate, projected exhaustion, and status classification
 - **Change Point Detection**: CUSUM algorithm for identifying regime shifts and mean-level changes
 - **Alert Noise Scoring**: Shannon entropy and flap detection to quantify alert noise (0-100) with tuning recommendations
 - **Seasonality Detection**: Autocorrelation-based periodicity detection at standard intervals with peak-hour identification
@@ -99,6 +137,17 @@ Pure-Python statistical methods for capacity planning, trend analysis, and opera
 - **Change Correlation**: Cross-references alert spikes with audit/change logs to identify change-induced incidents
 - **Trend Classification**: Categorizes metrics as stable, increasing, decreasing, cyclic, or volatile
 - **Device Health Scoring**: Multi-metric composite health score (0-100) using z-score analysis with configurable weights
+
+### Composite Workflow Tools
+
+Multi-step analysis tools that combine several sub-tools into a single call. Each supports `detail_level` ("summary" or "full") and handles sub-tool failures gracefully with partial results.
+
+- **Triage**: Correlates active alerts, scores noise, analyzes blast radius, and cross-references recent changes
+- **Health Check**: Device health score, monitoring coverage, anomaly detection, active alerts, and 30-day availability
+- **Capacity Plan**: Per-datasource forecasting, trend classification, seasonality detection, and change point analysis
+- **Portal Overview**: Alert statistics, collector health, active SDTs, alert clusters, noise assessment, and down devices
+- **Diagnose**: Alert details, device context, correlation, blast radius, health scoring, and root cause analysis
+- **Search Tools**: Keyword search across all 225 tools by name and description with category filtering
 
 ### APM Trace Tools
 
@@ -140,8 +189,8 @@ AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are c
 - **Log/Metric Ingestion**: Push logs and metrics via LMv1 authentication
 
 ### MCP Protocol Features
-- **Resources**: 24 schema/enum/filter/guide resources for API reference
-- **Prompts**: 14 workflow templates (incident triage, RCA, capacity forecasting, remediation, etc.)
+- **Resources**: 26 schema/enum/filter/guide resources for API reference
+- **Prompts**: 15 workflow templates (incident triage, RCA, capacity forecasting, remediation execution, etc.)
 - **Completions**: Auto-complete for tool arguments
 
 ### Claude Code Skills
@@ -770,7 +819,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 |------|-------------|-------|
 | `correlate_alerts` | Cluster related alerts by device, datasource, and temporal proximity | No |
 | `get_alert_statistics` | Aggregated alert counts by severity, top devices/datasources, time buckets | No |
-| `get_metric_anomalies` | Z-score based anomaly detection on metric datapoints | No |
+| `get_metric_anomalies` | Multi-method anomaly detection (z-score/IQR/MAD/auto) on metric datapoints | No |
 
 ### Baseline Tools
 
@@ -783,7 +832,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `forecast_metric` | Linear regression forecasting with threshold breach prediction | No |
+| `forecast_metric` | Multi-method forecasting (linear/Holt-Winters/auto) with confidence intervals | No |
 | `correlate_metrics` | Pearson correlation matrix across multiple metric series (max 10) | No |
 | `detect_change_points` | CUSUM-based regime shift detection with configurable sensitivity | No |
 | `score_alert_noise` | Shannon entropy + flap detection to score alert noise (0-100) | No |
@@ -841,6 +890,26 @@ feature is released in a future LogicMonitor portal update.
 | `get_diagnosticsource` | Get diagnostic source details | No |
 | `get_remediationsources` | List remediation sources from Exchange Toolbox | No |
 | `get_remediationsource` | Get remediation source details | No |
+| `execute_remediation` | Execute a remediation source on a device with safety checks | Yes |
+| `get_remediation_status` | Get current status of a remediation source on a device | No |
+| `get_remediation_history` | Get past remediation executions from audit logs | No |
+
+### Composite Workflow Tools
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `triage` | Multi-step alert triage: correlation, noise scoring, blast radius, change correlation | No |
+| `health_check` | Device health: score, anomalies, alerts, availability, monitoring coverage | No |
+| `capacity_plan` | Capacity planning: forecasting, trends, seasonality per datasource | No |
+| `portal_overview` | Portal snapshot: alert stats, collectors, SDTs, clusters, down devices | No |
+| `diagnose` | Alert diagnosis: details, device context, correlation, blast radius, root cause | No |
+| `search_tools` | Keyword search across all tools by name and description | No |
+
+### Error Budget Tool
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `calculate_error_budget` | SLO error budget tracking with burn rate and projected exhaustion | No |
 
 #### ML Tool Usage Guide
 
@@ -850,7 +919,7 @@ These tools use pure-Python statistical methods (no external ML libraries). They
 ```
 "Forecast when memory usage on device 150098 will exceed 90%"
 ```
-Uses `forecast_metric` with `threshold=90`. Returns days until breach, trend direction, and R-squared confidence. Use `hours_back=168` (1 week) for meaningful regression, or `hours_back=24` if the device has limited history.
+Uses `forecast_metric` with `threshold=90`. Supports `method` parameter: `"auto"` (default, selects based on data), `"linear"` (regression), or `"holt_winters"` (seasonal). Returns days until breach, trend direction, confidence interval, and method used. Use `hours_back=168` (1 week) for meaningful regression, or `hours_back=24` if the device has limited history.
 
 **Metric correlation** — find relationships between metrics across devices:
 ```
@@ -884,7 +953,7 @@ Uses `calculate_availability` with `hours_back=720` and `severity_threshold="err
 
 ## MCP Resources
 
-The server exposes 24 resources for API reference:
+The server exposes 26 resources for API reference:
 
 ### Schema Resources
 | URI | Description |
@@ -922,9 +991,11 @@ The server exposes 24 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 218 tools organized by domain category |
+| `lm://guide/tool-categories` | All 225 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
+| `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
+| `lm://guide/example-responses` | Example output for key tools to help understand response formats |
 
 ## MCP Prompts
 
@@ -946,6 +1017,7 @@ Pre-built workflow templates for common tasks:
 | `rca_workflow` | Guided root cause analysis combining alerts, topology, and change history | `device_id`, `alert_id`, `hours_back` |
 | `capacity_forecast` | Forecast capacity trends and predict threshold breaches | `device_id`, `group_id`, `datasource`, `hours_back`, `threshold` |
 | `remediate_workflow` | Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform | `alert_id`, `device_id` |
+| `remediation` | Execute a LogicMonitor remediation source with pre-execution safety checks | `host_id`, `remediation_source_id` |
 
 ## Example Usage
 
@@ -1029,6 +1101,14 @@ Start with these to verify the connection is working:
 - "List ops notes tagged 'maintenance'"
 - "Add an ops note: 'Starting v2.5 deployment' with tag 'deployment'"
 
+### Composite Workflows
+- "Triage all critical alerts from the last 4 hours"
+- "Run a health check on device 123"
+- "Do a capacity plan for the database server over the last week"
+- "Give me a portal overview for shift handoff"
+- "Diagnose alert LMA12345"
+- "Search for tools related to dashboards"
+
 ### ML Analysis & Forecasting
 - "Forecast when memory on device 123 will hit 90%"
 - "Score the alert noise level across all devices"
@@ -1040,6 +1120,7 @@ Start with these to verify the connection is working:
 - "Correlate recent config changes with alert spikes"
 - "Give me a health score for device 123"
 - "Are CPU and memory correlated on my web servers?"
+- "Calculate error budget for the Production group with a 99.9% SLO"
 
 ### Advanced Filtering
 The server supports LogicMonitor's filter syntax for power users:
@@ -1095,7 +1176,9 @@ src/lm_mcp/
 │   ├── schemas.py        # Schema content
 │   ├── enums.py          # Enum content
 │   ├── filters.py        # Filter content
-│   └── guides.py         # Tool categories, query examples, orchestration guide
+│   ├── guides.py         # Tool categories, query examples, orchestration guide
+│   ├── best_practices.py # Scenario-based best practices and anti-patterns
+│   └── examples.py       # Example responses for key tools
 ├── transport/
 │   ├── __init__.py       # Transport abstraction
 │   └── http.py           # HTTP/SSE transport with analysis endpoints
@@ -1119,9 +1202,11 @@ src/lm_mcp/
     ├── scoring.py        # Alert noise, availability, device health
     ├── sdts.py           # SDT management
     ├── session.py        # Session management tools
-    ├── stats_helpers.py  # Shared statistical math utilities
+    ├── stats_helpers.py  # Shared statistical math utilities (incl. Holt-Winters, IQR, MAD)
     ├── topology_analysis.py  # Blast radius analysis
     ├── websites.py       # Website CRUD
+    ├── workflows.py      # Composite workflow tools (triage, health_check, etc.)
+    ├── metric_presets.py # Metric-type presets for auto-configuration
     └── ...               # Additional tool modules
 
 examples/playbooks/
@@ -1186,6 +1271,23 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v2.0.0
+- **New**: 5 composite workflow tools (`triage`, `health_check`, `capacity_plan`, `portal_overview`, `diagnose`) for multi-step analysis in a single call
+- **New**: `search_tools` for keyword-based tool discovery across all 225 tools
+- **New**: `calculate_error_budget` — SLO error budget tracking with burn rate and projected exhaustion
+- **New**: 3 remediation execution tools (`execute_remediation`, `get_remediation_status`, `get_remediation_history`) with 8-point safety checklist
+- **New**: Holt-Winters triple exponential smoothing in `forecast_metric` with auto-selection and confidence intervals
+- **New**: IQR and MAD anomaly detection methods in `get_metric_anomalies` with auto-selection based on data skewness
+- **New**: Best practices resource (`lm://guide/best-practices`) with scenario-based recommendations and anti-patterns
+- **New**: Example responses resource (`lm://guide/example-responses`) for understanding tool output formats
+- **New**: Metric-type presets — auto-configuration of analysis parameters based on datapoint name detection
+- **New**: `remediation` MCP prompt for execution workflows with safety guidance
+- **Improved**: Scoring tools (`score_alert_noise`, `score_device_health`, `calculate_availability`) return structured remediation recommendations when thresholds are breached
+- **Improved**: All 15 prompts enriched with composite tool shortcuts, argument parsing guidance, and expected output format
+- **Improved**: Common mistake notes added to 6 frequently misused tool descriptions
+- **Fix**: `get_datasource` datapoints now include `post_processor_method` and `post_processor_param` fields
+- **Counts**: 225 tools (207 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
 
 ### v1.9.0
 - **New**: Event-Driven Ansible integration (removed in v1.9.5 — see `contrib/eda/`)

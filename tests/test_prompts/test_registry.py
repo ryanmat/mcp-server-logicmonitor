@@ -96,9 +96,14 @@ class TestPromptsRegistry:
         names = [p.name for p in PROMPTS]
         assert "remediate_workflow" in names
 
+    def test_remediation_prompt_exists(self):
+        """remediation prompt is defined."""
+        names = [p.name for p in PROMPTS]
+        assert "remediation" in names
+
     def test_total_prompt_count(self):
-        """All 14 prompts are registered."""
-        assert len(PROMPTS) == 14
+        """All 15 prompts are registered."""
+        assert len(PROMPTS) == 15
 
 
 class TestGetPromptMessages:
@@ -336,3 +341,64 @@ class TestGetPromptMessages:
         content = str(result.messages[0].content)
         assert "dry run" in content.lower() or "check_mode" in content.lower()
         assert "confirmation" in content.lower() or "approval" in content.lower()
+
+    # Remediation prompt tests
+
+    def test_remediation_prompt_returns_messages(self):
+        """get_prompt_messages returns messages for remediation."""
+        result = get_prompt_messages("remediation", {})
+        assert result.messages is not None
+        assert len(result.messages) > 0
+
+    def test_remediation_prompt_generates_content(self):
+        """Remediation prompt generates valid content with arguments."""
+        result = get_prompt_messages(
+            "remediation",
+            {"host_id": "123", "remediation_source_id": "456"},
+        )
+        assert result.messages
+        text = result.messages[0].content.text
+        assert "Pre-Execution Safety Checklist" in text
+        assert "123" in text
+        assert "456" in text
+
+    def test_remediation_prompt_includes_safety_constraints(self):
+        """Remediation prompt includes safety constraints."""
+        result = get_prompt_messages("remediation", {})
+        text = result.messages[0].content.text
+        assert "LM_ENABLE_WRITE_OPERATIONS" in text
+        assert "concurrent" in text.lower()
+
+    # Enriched prompt tests
+
+    def test_enriched_prompts_have_shortcuts(self):
+        """Enriched prompts include composite tool shortcuts or argument parsing."""
+        enrichment_keywords = [
+            "Composite shortcut",
+            "Argument parsing",
+            "Expected output",
+        ]
+        # Test key prompts that should have enrichment
+        for prompt_name in ["incident_triage", "health_check", "rca_workflow"]:
+            result = get_prompt_messages(prompt_name, {})
+            text = result.messages[0].content.text
+            has_enrichment = any(kw in text for kw in enrichment_keywords)
+            assert has_enrichment, f"{prompt_name} missing enrichment keywords"
+
+    def test_all_prompts_have_argument_parsing(self):
+        """All prompts include Argument parsing enrichment."""
+        for prompt in PROMPTS:
+            result = get_prompt_messages(prompt.name, {})
+            text = result.messages[0].content.text
+            assert "Argument parsing" in text, (
+                f"{prompt.name} missing Argument parsing"
+            )
+
+    def test_all_prompts_have_expected_output(self):
+        """All prompts include Expected output enrichment."""
+        for prompt in PROMPTS:
+            result = get_prompt_messages(prompt.name, {})
+            text = result.messages[0].content.text
+            assert "Expected output" in text, (
+                f"{prompt.name} missing Expected output"
+            )

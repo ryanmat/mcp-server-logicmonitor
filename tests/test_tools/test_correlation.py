@@ -743,6 +743,128 @@ class TestGetMetricAnomalies:
         assert "timestamp" in anomaly
 
 
+class TestGetMetricAnomaliesMethod:
+    """Tests for get_metric_anomalies method parameter."""
+
+    @respx.mock
+    async def test_method_auto_present_in_output(self, client):
+        """Auto-selected method is included in output."""
+        from lm_mcp.tools.correlation import get_metric_anomalies
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["cpu"],
+                    "values": [[50.0], [51.0], [49.0], [50.5], [50.2]],
+                    "time": [BASE_EPOCH + i * 300 for i in range(5)],
+                },
+            )
+        )
+
+        result = await get_metric_anomalies(
+            client, device_id=1, device_datasource_id=10, instance_id=100,
+        )
+
+        data = json.loads(result[0].text)
+        assert "method_used" in data
+        assert data["method_used"] in ("zscore", "iqr", "mad")
+
+    @respx.mock
+    async def test_method_iqr_explicit(self, client):
+        """Explicit IQR method is used when requested."""
+        from lm_mcp.tools.correlation import get_metric_anomalies
+
+        # Data with an outlier that IQR should catch
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["cpu"],
+                    "values": [
+                        [50.0], [51.0], [49.0], [50.0], [50.5],
+                        [49.5], [50.2], [50.1], [49.8], [200.0],
+                    ],
+                    "time": [BASE_EPOCH + i * 300 for i in range(10)],
+                },
+            )
+        )
+
+        result = await get_metric_anomalies(
+            client, device_id=1, device_datasource_id=10, instance_id=100,
+            method="iqr",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["method_used"] == "iqr"
+        assert data["anomaly_count"] >= 1
+
+    @respx.mock
+    async def test_method_mad_explicit(self, client):
+        """Explicit MAD method is used when requested."""
+        from lm_mcp.tools.correlation import get_metric_anomalies
+
+        # Use data with variation so MAD is nonzero, plus an extreme outlier
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["cpu"],
+                    "values": [
+                        [50.0], [52.0], [48.0], [51.0], [49.0],
+                        [50.5], [49.5], [51.5], [48.5], [200.0],
+                    ],
+                    "time": [BASE_EPOCH + i * 300 for i in range(10)],
+                },
+            )
+        )
+
+        result = await get_metric_anomalies(
+            client, device_id=1, device_datasource_id=10, instance_id=100,
+            method="mad",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["method_used"] == "mad"
+        assert data["anomaly_count"] >= 1
+
+    @respx.mock
+    async def test_data_quality_in_output(self, client):
+        """Output includes data_quality assessment."""
+        from lm_mcp.tools.correlation import get_metric_anomalies
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dataPoints": ["cpu"],
+                    "values": [[50.0], [51.0], [49.0]],
+                    "time": [BASE_EPOCH + i * 300 for i in range(3)],
+                },
+            )
+        )
+
+        result = await get_metric_anomalies(
+            client, device_id=1, device_datasource_id=10, instance_id=100,
+        )
+
+        data = json.loads(result[0].text)
+        assert "data_quality" in data
+        assert data["data_quality"] in ("insufficient", "limited", "good")
+
+
 class TestCorrelateMetrics:
     """Tests for correlate_metrics tool."""
 

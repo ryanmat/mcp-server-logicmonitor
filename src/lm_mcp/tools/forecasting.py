@@ -13,7 +13,9 @@ from lm_mcp.tools.stats_helpers import (
     coefficient_of_variation,
     cusum,
     fetch_metric_series,
+    holt_winters,
     linear_regression,
+    prediction_interval,
 )
 
 if TYPE_CHECKING:
@@ -28,11 +30,13 @@ async def forecast_metric(
     threshold: float,
     datapoints: str | None = None,
     hours_back: int = 168,
+    method: str = "auto",
 ) -> list[TextContent]:
-    """Forecast when a metric will breach a threshold using linear regression.
+    """Forecast when a metric will breach a threshold.
 
-    Fetches historical data and fits a linear trend per datapoint.
-    Calculates predicted breach time if the current trend continues.
+    Supports linear regression and Holt-Winters (triple exponential smoothing).
+    Auto mode selects Holt-Winters when sufficient data with seasonal patterns
+    exists, otherwise falls back to linear regression.
 
     Args:
         client: LogicMonitor API client.
@@ -42,9 +46,11 @@ async def forecast_metric(
         threshold: Value that, if exceeded, constitutes a breach.
         datapoints: Comma-separated datapoint names (all if omitted).
         hours_back: Hours of historical data for the regression (default: 168).
+        method: Forecasting method - auto, linear, or holt_winters (default: auto).
 
     Returns:
-        Per-datapoint forecast with slope, breach time, and trend direction.
+        Per-datapoint forecast with slope, breach time, trend direction,
+        method_used, and confidence_interval.
     """
     try:
         series = await fetch_metric_series(
@@ -64,49 +70,26 @@ async def forecast_metric(
                 }
                 continue
 
+            # Determine method to use
+            method_used = _select_forecast_method(
+                method, values, timestamps, hours_back,
+            )
+
             # Convert timestamps to hours relative to first
             t0 = timestamps[0]
             x_hours = [(t - t0) / 3600.0 for t in timestamps]
 
-            slope, intercept, r_squared = linear_regression(x_hours, values)
-            current_value = values[-1]
-
-            # Determine trend direction
-            if abs(slope) < 1e-10:
-                trend = "stable"
-            elif slope > 0:
-                trend = "increasing"
+            if method_used == "holt_winters":
+                forecast_result = _forecast_holt_winters(
+                    values, timestamps, threshold, t0, x_hours,
+                )
             else:
-                trend = "decreasing"
+                forecast_result = _forecast_linear(
+                    values, timestamps, threshold, t0, x_hours,
+                )
 
-            # Calculate breach time
-            days_until_breach = None
-            predicted_breach_epoch = None
-
-            if slope != 0:
-                # Hours until threshold is reached from t0
-                hours_to_breach = (threshold - intercept) / slope
-                # Only valid if breach is in the future
-                current_hours = (timestamps[-1] - t0) / 3600.0
-                remaining_hours = hours_to_breach - current_hours
-
-                if remaining_hours > 0:
-                    days_until_breach = round(remaining_hours / 24.0, 2)
-                    predicted_breach_epoch = int(
-                        timestamps[-1] + remaining_hours * 3600
-                    )
-
-            forecasts[dp_name] = {
-                "current_value": round(current_value, 4),
-                "threshold": threshold,
-                "trend": trend,
-                "slope_per_hour": round(slope, 6),
-                "intercept": round(intercept, 4),
-                "r_squared": round(r_squared, 4),
-                "days_until_breach": days_until_breach,
-                "predicted_breach_epoch": predicted_breach_epoch,
-                "sample_count": len(values),
-            }
+            forecast_result["method_used"] = method_used
+            forecasts[dp_name] = forecast_result
 
         return format_response({
             "device_id": device_id,
@@ -117,6 +100,210 @@ async def forecast_metric(
         })
     except Exception as e:
         return handle_error(e)
+
+
+def _select_forecast_method(
+    method: str,
+    values: list[float],
+    timestamps: list[int],
+    hours_back: int,
+) -> str:
+    """Select the forecasting method based on data characteristics.
+
+    Args:
+        method: Requested method (auto, linear, holt_winters).
+        values: Time series values.
+        timestamps: Epoch timestamps.
+        hours_back: Hours of historical data.
+
+    Returns:
+        The method to use: 'linear' or 'holt_winters'.
+    """
+    if method == "linear":
+        return "linear"
+    if method == "holt_winters":
+        return "holt_winters"
+
+    # Auto selection: use Holt-Winters only with enough data and seasonality
+    if hours_back < 168 or len(values) < 48:
+        return "linear"
+
+    # Check autocorrelation at standard periods to detect seasonality
+    if len(timestamps) >= 2:
+        avg_interval = (timestamps[-1] - timestamps[0]) / (len(timestamps) - 1)
+    else:
+        avg_interval = 300
+
+    # Check common periods: 12h, 24h
+    best_ac = 0.0
+    for period_hours in [12, 24]:
+        lag = int(period_hours * 3600 / avg_interval) if avg_interval > 0 else 0
+        if 1 <= lag < len(values) // 2:
+            ac = abs(autocorrelation(values, lag=lag))
+            if ac > best_ac:
+                best_ac = ac
+
+    # Require strong seasonality and enough data for 2 full seasons
+    min_season_len = 12
+    if best_ac > 0.5 and len(values) >= 2 * min_season_len:
+        return "holt_winters"
+
+    return "linear"
+
+
+def _forecast_linear(
+    values: list[float],
+    timestamps: list[int],
+    threshold: float,
+    t0: int,
+    x_hours: list[float],
+) -> dict:
+    """Perform linear regression forecast.
+
+    Args:
+        values: Time series values.
+        timestamps: Epoch timestamps.
+        threshold: Breach threshold.
+        t0: First timestamp.
+        x_hours: Hours relative to t0.
+
+    Returns:
+        Forecast result dict.
+    """
+    slope, intercept, r_squared = linear_regression(x_hours, values)
+    current_value = values[-1]
+
+    # Determine trend direction
+    if abs(slope) < 1e-10:
+        trend = "stable"
+    elif slope > 0:
+        trend = "increasing"
+    else:
+        trend = "decreasing"
+
+    # Calculate breach time
+    days_until_breach = None
+    predicted_breach_epoch = None
+
+    if slope != 0:
+        hours_to_breach = (threshold - intercept) / slope
+        current_hours = (timestamps[-1] - t0) / 3600.0
+        remaining_hours = hours_to_breach - current_hours
+
+        if remaining_hours > 0:
+            days_until_breach = round(remaining_hours / 24.0, 2)
+            predicted_breach_epoch = int(
+                timestamps[-1] + remaining_hours * 3600
+            )
+
+    # Compute predicted values for confidence interval
+    y_predicted = [slope * xh + intercept for xh in x_hours]
+    conf_interval = prediction_interval(values, y_predicted)
+
+    return {
+        "current_value": round(current_value, 4),
+        "threshold": threshold,
+        "trend": trend,
+        "slope_per_hour": round(slope, 6),
+        "intercept": round(intercept, 4),
+        "r_squared": round(r_squared, 4),
+        "days_until_breach": days_until_breach,
+        "predicted_breach_epoch": predicted_breach_epoch,
+        "sample_count": len(values),
+        "confidence_interval": conf_interval,
+    }
+
+
+def _forecast_holt_winters(
+    values: list[float],
+    timestamps: list[int],
+    threshold: float,
+    t0: int,
+    x_hours: list[float],
+) -> dict:
+    """Perform Holt-Winters forecast.
+
+    Args:
+        values: Time series values.
+        timestamps: Epoch timestamps.
+        threshold: Breach threshold.
+        t0: First timestamp.
+        x_hours: Hours relative to t0.
+
+    Returns:
+        Forecast result dict.
+    """
+    # Determine season length from data interval
+    if len(timestamps) >= 2:
+        avg_interval = (timestamps[-1] - timestamps[0]) / (len(timestamps) - 1)
+    else:
+        avg_interval = 300
+
+    # Use 24h as default season; fall back to 12 points minimum
+    season_length = max(12, int(86400 / avg_interval)) if avg_interval > 0 else 12
+
+    # Ensure we have enough data for the season length
+    if len(values) < 2 * season_length:
+        season_length = max(4, len(values) // 2)
+
+    try:
+        hw_result = holt_winters(
+            values, season_length=season_length, forecast_periods=24,
+        )
+    except ValueError:
+        # Fall back to linear if Holt-Winters fails
+        return _forecast_linear(values, timestamps, threshold, t0, x_hours)
+
+    fitted = hw_result["fitted"]
+    forecast_vals = hw_result["forecast"]
+    current_value = values[-1]
+
+    # Trend from last fitted values
+    if len(fitted) >= 2:
+        recent_slope = (fitted[-1] - fitted[0]) / max(len(fitted) - 1, 1)
+    else:
+        recent_slope = 0.0
+
+    if abs(recent_slope) < 1e-10:
+        trend = "stable"
+    elif recent_slope > 0:
+        trend = "increasing"
+    else:
+        trend = "decreasing"
+
+    # Check if forecast breaches threshold
+    days_until_breach = None
+    predicted_breach_epoch = None
+    last_ts = timestamps[-1]
+
+    if len(timestamps) >= 2:
+        interval = (timestamps[-1] - timestamps[0]) / (len(timestamps) - 1)
+    else:
+        interval = 300
+
+    for i, fv in enumerate(forecast_vals):
+        if fv > threshold:
+            hours_to_breach = (i + 1) * interval / 3600.0
+            days_until_breach = round(hours_to_breach / 24.0, 2)
+            predicted_breach_epoch = int(last_ts + (i + 1) * interval)
+            break
+
+    # Confidence interval from fitted vs actual
+    conf_interval = prediction_interval(values, fitted)
+
+    return {
+        "current_value": round(current_value, 4),
+        "threshold": threshold,
+        "trend": trend,
+        "slope_per_hour": round(recent_slope, 6),
+        "r_squared": 0.0,
+        "days_until_breach": days_until_breach,
+        "predicted_breach_epoch": predicted_breach_epoch,
+        "sample_count": len(values),
+        "season_length": season_length,
+        "forecast_values": forecast_vals[:24],
+        "confidence_interval": conf_interval,
+    }
 
 
 async def detect_change_points(

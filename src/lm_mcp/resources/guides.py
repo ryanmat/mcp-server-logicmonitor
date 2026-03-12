@@ -3,12 +3,26 @@
 
 from __future__ import annotations
 
-# All 215 tools organized by domain category (197 LM + 18 AAP).
+# All 225 tools organized by domain category (207 LM + 18 AAP).
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
     "description": "All LogicMonitor MCP tools organized by domain",
     "categories": {
+        "workflows": {
+            "description": "Composite workflow tools -- recommended starting point",
+            "tools": [
+                "triage",
+                "health_check",
+                "capacity_plan",
+                "portal_overview",
+                "diagnose",
+            ],
+        },
+        "discovery": {
+            "description": "Tool search and discovery",
+            "tools": ["search_tools"],
+        },
         "devices": {
             "description": "Device/resource management",
             "tools": [
@@ -302,6 +316,7 @@ TOOL_CATEGORIES = {
                 "correlate_changes",
                 "classify_trend",
                 "score_device_health",
+                "calculate_error_budget",
             ],
         },
         "session": {
@@ -360,6 +375,9 @@ TOOL_CATEGORIES = {
                 "get_diagnosticsource",
                 "get_remediationsources",
                 "get_remediationsource",
+                "execute_remediation",
+                "get_remediation_status",
+                "get_remediation_history",
             ],
         },
     },
@@ -633,9 +651,14 @@ def get_guide_content(guide_name: str) -> dict | None:
     Returns:
         Guide content dict or None if not found.
     """
-    guides = {
+    from lm_mcp.resources.best_practices import get_best_practices
+    from lm_mcp.resources.examples import get_example_responses
+
+    guides: dict[str, dict] = {
         "tool-categories": TOOL_CATEGORIES,
         "examples": COMMON_QUERY_EXAMPLES,
         "mcp-orchestration": MCP_ORCHESTRATION_GUIDE,
+        "best-practices": get_best_practices(),
+        "example-responses": get_example_responses(),
     }
     return guides.get(guide_name)

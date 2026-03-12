@@ -152,6 +152,15 @@ class TestGetDatasource:
                             "type": 0,
                             "alertExpr": "",
                         },
+                        {
+                            "id": 3,
+                            "name": "CPUUsagePercent",
+                            "description": "Computed CPU usage",
+                            "type": 0,
+                            "alertExpr": "> 95",
+                            "postProcessorMethod": "expression",
+                            "postProcessorParam": "(cpuUsageNanoCores*100)/cpuNanoCoreCapacity",
+                        },
                     ],
                     "graphs": [
                         {
@@ -170,8 +179,15 @@ class TestGetDatasource:
         data = json.loads(result[0].text)
         assert data["id"] == 100
         assert data["name"] == "CPU"
-        assert len(data["datapoints"]) == 2
+        assert len(data["datapoints"]) == 3
         assert data["datapoints"][0]["name"] == "CPUBusyPercent"
+        assert data["datapoints"][0]["post_processor_method"] == ""
+        assert data["datapoints"][0]["post_processor_param"] == ""
+        assert data["datapoints"][2]["name"] == "CPUUsagePercent"
+        assert data["datapoints"][2]["post_processor_method"] == "expression"
+        assert data["datapoints"][2]["post_processor_param"] == (
+            "(cpuUsageNanoCores*100)/cpuNanoCoreCapacity"
+        )
         assert len(data["graphs"]) == 1
         assert data["graphs"][0]["title"] == "CPU Usage Over Time"
 

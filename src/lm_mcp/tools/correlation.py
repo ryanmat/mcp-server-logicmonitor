@@ -12,7 +12,12 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import TextContent
 
 from lm_mcp.tools import format_response, handle_error, quote_filter_value
-from lm_mcp.tools.stats_helpers import fetch_metric_series, pearson_correlation
+from lm_mcp.tools.stats_helpers import (
+    fetch_metric_series,
+    iqr_anomalies,
+    mad_anomalies,
+    pearson_correlation,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -383,6 +388,29 @@ def _detect_anomalies(
     return anomalies
 
 
+def _compute_skewness(values: list[float]) -> float:
+    """Compute sample skewness using the third standardized moment.
+
+    Args:
+        values: List of numeric values.
+
+    Returns:
+        Skewness coefficient. Returns 0.0 for fewer than 3 values.
+    """
+    n = len(values)
+    if n < 3:
+        return 0.0
+
+    mean = sum(values) / n
+    variance = sum((v - mean) ** 2 for v in values) / (n - 1)
+    if variance == 0:
+        return 0.0
+
+    stddev = math.sqrt(variance)
+    m3 = sum((v - mean) ** 3 for v in values) / n
+    return m3 / (stddev ** 3)
+
+
 async def get_metric_anomalies(
     client: "LogicMonitorClient",
     device_id: int,
@@ -391,11 +419,13 @@ async def get_metric_anomalies(
     datapoints: str | None = None,
     hours_back: int = 24,
     threshold: float = 2.0,
+    method: str = "auto",
 ) -> list[TextContent]:
     """Detect metric anomalies using statistical analysis.
 
     Fetches metric data and identifies values that deviate significantly
-    from the mean using z-score analysis. No external ML dependencies.
+    from normal behavior. Supports z-score, IQR, and MAD methods.
+    Auto mode selects IQR for skewed data, z-score otherwise.
 
     Args:
         client: LogicMonitor API client.
@@ -405,6 +435,7 @@ async def get_metric_anomalies(
         datapoints: Comma-separated datapoint names (optional, all if omitted).
         hours_back: Number of hours to look back (default: 24).
         threshold: Z-score threshold for anomaly detection (default: 2.0).
+        method: Detection method - auto, zscore, iqr, or mad (default: auto).
 
     Returns:
         List of TextContent with anomaly report or error.
@@ -432,6 +463,9 @@ async def get_metric_anomalies(
 
         # Transpose: rows-of-values into per-datapoint columns
         all_anomalies: list[dict] = []
+        method_used = method
+        total_points = 0
+
         for dp_idx, dp_name in enumerate(dp_names):
             dp_values = [
                 row[dp_idx] for row in value_rows
@@ -441,10 +475,33 @@ async def get_metric_anomalies(
                 timestamps[i] for i, row in enumerate(value_rows)
                 if dp_idx < len(row) and row[dp_idx] != "No Data"
             ]
-            anomalies = _detect_anomalies(
-                dp_name, dp_values, dp_timestamps, threshold,
-            )
+            total_points += len(dp_values)
+
+            # Select method for this datapoint
+            effective_method = _select_anomaly_method(method, dp_values)
+            method_used = effective_method
+
+            if effective_method == "iqr":
+                anomalies = _detect_anomalies_iqr(
+                    dp_name, dp_values, dp_timestamps,
+                )
+            elif effective_method == "mad":
+                anomalies = _detect_anomalies_mad(
+                    dp_name, dp_values, dp_timestamps, threshold,
+                )
+            else:
+                anomalies = _detect_anomalies(
+                    dp_name, dp_values, dp_timestamps, threshold,
+                )
             all_anomalies.extend(anomalies)
+
+        # Data quality assessment
+        if total_points < 10:
+            data_quality = "insufficient"
+        elif total_points < 50:
+            data_quality = "limited"
+        else:
+            data_quality = "good"
 
         return format_response({
             "device_id": device_id,
@@ -455,9 +512,102 @@ async def get_metric_anomalies(
             "anomalies": all_anomalies,
             "threshold": threshold,
             "hours_back": hours_back,
+            "method_used": method_used,
+            "data_quality": data_quality,
         })
     except Exception as e:
         return handle_error(e)
+
+
+def _select_anomaly_method(method: str, values: list[float]) -> str:
+    """Select anomaly detection method based on data characteristics.
+
+    Args:
+        method: Requested method (auto, zscore, iqr, mad).
+        values: Data values to analyze.
+
+    Returns:
+        The method to use: 'zscore', 'iqr', or 'mad'.
+    """
+    if method in ("zscore", "iqr", "mad"):
+        return method
+
+    # Auto selection: use IQR for skewed data, zscore otherwise
+    if len(values) < 4:
+        return "zscore"
+
+    skewness = _compute_skewness(values)
+    if abs(skewness) > 1.0:
+        return "iqr"
+    return "zscore"
+
+
+def _detect_anomalies_iqr(
+    datapoint_name: str,
+    values: list[float],
+    timestamps: list[int],
+) -> list[dict]:
+    """Detect anomalies using IQR method.
+
+    Args:
+        datapoint_name: Name of the datapoint.
+        values: List of numeric values.
+        timestamps: List of epoch timestamps.
+
+    Returns:
+        List of anomaly dicts.
+    """
+    if len(values) < 4:
+        return []
+
+    result = iqr_anomalies(values)
+    anomalies = []
+    for idx in result["anomaly_indices"]:
+        if idx < len(timestamps):
+            anomalies.append({
+                "datapoint": datapoint_name,
+                "value": values[idx],
+                "timestamp": timestamps[idx],
+                "z_score": 0.0,
+                "mean": round((result["q1"] + result["q3"]) / 2, 2),
+                "stddev": round(result["iqr"], 2),
+            })
+    return anomalies
+
+
+def _detect_anomalies_mad(
+    datapoint_name: str,
+    values: list[float],
+    timestamps: list[int],
+    threshold: float,
+) -> list[dict]:
+    """Detect anomalies using MAD method.
+
+    Args:
+        datapoint_name: Name of the datapoint.
+        values: List of numeric values.
+        timestamps: List of epoch timestamps.
+        threshold: Modified z-score threshold.
+
+    Returns:
+        List of anomaly dicts.
+    """
+    if len(values) < 3:
+        return []
+
+    result = mad_anomalies(values, threshold=threshold)
+    anomalies = []
+    for idx in result["anomaly_indices"]:
+        if idx < len(timestamps):
+            anomalies.append({
+                "datapoint": datapoint_name,
+                "value": values[idx],
+                "timestamp": timestamps[idx],
+                "z_score": abs(result["modified_z_scores"][idx]),
+                "mean": round(result["median"], 2),
+                "stddev": round(result["mad"], 2),
+            })
+    return anomalies
 
 
 async def correlate_metrics(

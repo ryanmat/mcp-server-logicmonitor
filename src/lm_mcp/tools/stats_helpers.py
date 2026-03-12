@@ -217,6 +217,252 @@ def coefficient_of_variation(values: list[float]) -> float:
     return abs(stddev / mean)
 
 
+def holt_winters(
+    values: list[float],
+    season_length: int,
+    alpha: float = 0.3,
+    beta: float = 0.1,
+    gamma: float = 0.3,
+    forecast_periods: int = 24,
+) -> dict:
+    """Triple exponential smoothing with additive seasonality.
+
+    Args:
+        values: Time series values.
+        season_length: Number of data points per seasonal cycle.
+        alpha: Level smoothing parameter (0 < alpha < 1).
+        beta: Trend smoothing parameter (0 < beta < 1).
+        gamma: Seasonal smoothing parameter (0 < gamma < 1).
+        forecast_periods: Number of future periods to forecast.
+
+    Returns:
+        Dict with fitted, forecast, and residuals lists.
+
+    Raises:
+        ValueError: If insufficient data for the season length.
+    """
+    n = len(values)
+    if n < 2 * season_length:
+        raise ValueError(
+            f"Need at least {2 * season_length} data points for "
+            f"season_length={season_length}, got {n}"
+        )
+
+    # Initialize level and trend from first two seasons
+    level = sum(values[:season_length]) / season_length
+    trend = sum(
+        values[season_length + i] - values[i] for i in range(season_length)
+    ) / (season_length * season_length)
+
+    # Initialize seasonal components from first season
+    seasonals = [values[i] - level for i in range(season_length)]
+
+    fitted = []
+    for i in range(n):
+        s_idx = i % season_length
+        if i == 0:
+            fitted.append(level + trend + seasonals[s_idx])
+            continue
+
+        val = values[i]
+        prev_level = level
+        level = alpha * (val - seasonals[s_idx]) + (1 - alpha) * (level + trend)
+        trend = beta * (level - prev_level) + (1 - beta) * trend
+        seasonals[s_idx] = gamma * (val - level) + (1 - gamma) * seasonals[s_idx]
+        fitted.append(level + trend + seasonals[s_idx])
+
+    # Forecast future periods
+    forecast = []
+    for j in range(1, forecast_periods + 1):
+        s_idx = (n + j - 1) % season_length
+        forecast.append(round(level + j * trend + seasonals[s_idx], 6))
+
+    residuals = [round(values[i] - fitted[i], 6) for i in range(n)]
+    fitted = [round(f, 6) for f in fitted]
+
+    return {"fitted": fitted, "forecast": forecast, "residuals": residuals}
+
+
+def prediction_interval(
+    y_values: list[float],
+    y_predicted: list[float],
+    confidence: float = 0.95,
+) -> dict:
+    """Compute prediction interval from actual and predicted values.
+
+    Uses residual standard error with a t-distribution lookup table
+    for common confidence levels.
+
+    Args:
+        y_values: Actual observed values.
+        y_predicted: Predicted (fitted) values.
+        confidence: Confidence level (default: 0.95).
+
+    Returns:
+        Dict with lower, upper bounds, confidence_level, and data_quality.
+    """
+    n = len(y_values)
+    if n != len(y_predicted):
+        raise ValueError("y_values and y_predicted must have the same length")
+    if n < 2:
+        return {
+            "lower": 0.0,
+            "upper": 0.0,
+            "confidence_level": confidence,
+            "data_quality": "insufficient",
+        }
+
+    residuals = [y_values[i] - y_predicted[i] for i in range(n)]
+    sse = sum(r * r for r in residuals)
+    rse = math.sqrt(sse / (n - 2)) if n > 2 else math.sqrt(sse / n)
+
+    # t-distribution critical values (two-tailed)
+    # Approximate for common confidence levels and moderate df
+    t_table: dict[float, dict[int, float]] = {
+        0.90: {5: 2.015, 10: 1.812, 20: 1.725, 30: 1.697, 50: 1.676, 100: 1.660},
+        0.95: {5: 2.571, 10: 2.228, 20: 2.086, 30: 2.042, 50: 2.009, 100: 1.984},
+        0.99: {5: 4.032, 10: 3.169, 20: 2.845, 30: 2.750, 50: 2.678, 100: 2.626},
+    }
+
+    # Find closest confidence level
+    closest_conf = min(t_table.keys(), key=lambda c: abs(c - confidence))
+    df_table = t_table[closest_conf]
+
+    # Find closest degrees of freedom
+    df = max(1, n - 2)
+    closest_df = min(df_table.keys(), key=lambda d: abs(d - df))
+    t_crit = df_table[closest_df]
+
+    margin = t_crit * rse
+    last_predicted = y_predicted[-1] if y_predicted else 0.0
+
+    # Data quality assessment
+    if n < 10:
+        data_quality = "insufficient"
+    elif n < 50:
+        data_quality = "limited"
+    else:
+        data_quality = "good"
+
+    return {
+        "lower": round(last_predicted - margin, 4),
+        "upper": round(last_predicted + margin, 4),
+        "confidence_level": confidence,
+        "data_quality": data_quality,
+    }
+
+
+def iqr_anomalies(values: list[float], multiplier: float = 1.5) -> dict:
+    """Detect anomalies using the Interquartile Range method.
+
+    Args:
+        values: List of numeric values.
+        multiplier: IQR multiplier for fence calculation (default: 1.5).
+
+    Returns:
+        Dict with q1, q3, iqr, fences, and anomaly_indices.
+    """
+    if len(values) < 4:
+        return {
+            "q1": 0.0,
+            "q3": 0.0,
+            "iqr": 0.0,
+            "lower_fence": 0.0,
+            "upper_fence": 0.0,
+            "anomaly_indices": [],
+        }
+
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+
+    # Q1 and Q3 via linear interpolation
+    q1_pos = 0.25 * (n - 1)
+    q3_pos = 0.75 * (n - 1)
+
+    q1_low = int(q1_pos)
+    q1_frac = q1_pos - q1_low
+    q1 = sorted_vals[q1_low] + q1_frac * (
+        sorted_vals[min(q1_low + 1, n - 1)] - sorted_vals[q1_low]
+    )
+
+    q3_low = int(q3_pos)
+    q3_frac = q3_pos - q3_low
+    q3 = sorted_vals[q3_low] + q3_frac * (
+        sorted_vals[min(q3_low + 1, n - 1)] - sorted_vals[q3_low]
+    )
+
+    iqr = q3 - q1
+    lower_fence = q1 - multiplier * iqr
+    upper_fence = q3 + multiplier * iqr
+
+    anomaly_indices = [
+        i for i, v in enumerate(values) if v < lower_fence or v > upper_fence
+    ]
+
+    return {
+        "q1": round(q1, 4),
+        "q3": round(q3, 4),
+        "iqr": round(iqr, 4),
+        "lower_fence": round(lower_fence, 4),
+        "upper_fence": round(upper_fence, 4),
+        "anomaly_indices": anomaly_indices,
+    }
+
+
+def mad_anomalies(values: list[float], threshold: float = 3.0) -> dict:
+    """Detect anomalies using Median Absolute Deviation.
+
+    Args:
+        values: List of numeric values.
+        threshold: Modified z-score threshold for anomaly detection.
+
+    Returns:
+        Dict with median, mad, anomaly_indices, and modified_z_scores.
+    """
+    if len(values) < 3:
+        return {
+            "median": 0.0,
+            "mad": 0.0,
+            "anomaly_indices": [],
+            "modified_z_scores": [],
+        }
+
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    if n % 2 == 1:
+        median = sorted_vals[n // 2]
+    else:
+        median = (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2
+
+    abs_devs = sorted(abs(v - median) for v in values)
+    n_devs = len(abs_devs)
+    if n_devs % 2 == 1:
+        mad = abs_devs[n_devs // 2]
+    else:
+        mad = (abs_devs[n_devs // 2 - 1] + abs_devs[n_devs // 2]) / 2
+
+    if mad == 0:
+        return {
+            "median": round(median, 4),
+            "mad": 0.0,
+            "anomaly_indices": [],
+            "modified_z_scores": [0.0] * len(values),
+        }
+
+    # Modified z-score: 0.6745 * (x - median) / MAD
+    modified_z_scores = [round(0.6745 * (v - median) / mad, 4) for v in values]
+    anomaly_indices = [
+        i for i, z in enumerate(modified_z_scores) if abs(z) > threshold
+    ]
+
+    return {
+        "median": round(median, 4),
+        "mad": round(mad, 4),
+        "anomaly_indices": anomaly_indices,
+        "modified_z_scores": modified_z_scores,
+    }
+
+
 async def fetch_metric_series(
     client: "LogicMonitorClient",
     device_id: int,

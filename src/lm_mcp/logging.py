@@ -75,6 +75,7 @@ WRITE_TOOL_PREFIXES = (
     "disable_",
     "restart_",
     "sync_",
+    "execute_",
 )
 
 
