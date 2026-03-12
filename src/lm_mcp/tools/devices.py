@@ -430,6 +430,83 @@ async def create_device_group(
 
 
 @require_write_permission
+async def update_device_group(
+    client: "LogicMonitorClient",
+    group_id: int,
+    name: str | None = None,
+    description: str | None = None,
+    applies_to: str | None = None,
+    parent_id: int | None = None,
+    disable_alerting: bool | None = None,
+    custom_properties: dict[str, str] | None = None,
+) -> list[TextContent]:
+    """Update an existing device group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Device group ID to update.
+        name: New group name.
+        description: New group description.
+        applies_to: New AppliesTo expression for dynamic membership.
+        parent_id: New parent group ID (moves the group).
+        disable_alerting: Disable alerting for all devices in this group.
+        custom_properties: Custom properties to set/update (merged with existing).
+
+    Returns:
+        List of TextContent with updated group details or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+        if applies_to is not None:
+            body["appliesTo"] = applies_to
+        if parent_id is not None:
+            body["parentId"] = parent_id
+        if disable_alerting is not None:
+            body["disableAlerting"] = disable_alerting
+        if custom_properties is not None:
+            existing = await client.get(f"/device/groups/{group_id}")
+            existing_props = {
+                p["name"]: p["value"]
+                for p in existing.get("customProperties", [])
+            }
+            existing_props.update(custom_properties)
+            body["customProperties"] = [
+                {"name": k, "value": v} for k, v in existing_props.items()
+            ]
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(f"/device/groups/{group_id}", json_body=body)
+
+        return format_response(
+            {
+                "message": "Device group updated successfully",
+                "group": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "parent_id": result.get("parentId"),
+                    "full_path": result.get("fullPath"),
+                    "device_count": result.get("numOfHosts"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
 async def delete_device_group(
     client: "LogicMonitorClient",
     group_id: int,

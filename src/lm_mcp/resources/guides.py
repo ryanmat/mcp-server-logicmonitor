@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 225 tools organized by domain category (207 LM + 18 AAP).
+# All 216 tools organized by domain category (198 LM + 18 AAP).
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -33,6 +33,7 @@ TOOL_CATEGORIES = {
                 "update_device",
                 "delete_device",
                 "create_device_group",
+                "update_device_group",
                 "delete_device_group",
                 "get_device_properties",
                 "get_device_property",
@@ -355,22 +356,11 @@ TOOL_CATEGORIES = {
                 "get_hosts",
             ],
         },
-        "action_sources": {
+        "remediation": {
             "description": (
-                "[PREVIEW] Action chains, action rules, diagnostic and "
-                "remediation sources. Endpoints not yet GA."
+                "Diagnostic sources, remediation sources, and remediation execution."
             ),
             "tools": [
-                "get_action_chains",
-                "get_action_chain",
-                "create_action_chain",
-                "update_action_chain",
-                "delete_action_chain",
-                "get_action_rules",
-                "get_action_rule",
-                "create_action_rule",
-                "update_action_rule",
-                "delete_action_rule",
                 "get_diagnosticsources",
                 "get_diagnosticsource",
                 "get_remediationsources",

@@ -44,7 +44,13 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.0.0 (Current)
+### v2.0.1 (Current)
+- **New**: `update_device_group` — update device group name, description, AppliesTo, properties, alerting
+- **Removed**: 10 Action Sources preview tools (action chains, action rules) — not on v3 API swagger
+- **Renamed**: Action Sources category to Remediation (7 tools retained)
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.0.0
 
 **Composite Workflows** — 5 multi-step tools that replace manual orchestration:
 - `triage` — alert correlation, noise scoring, blast radius, change correlation in one call
@@ -53,7 +59,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - `portal_overview` — alert stats, collector health, active SDTs, down devices for shift handoff
 - `diagnose` — alert details, device context, correlation, blast radius, root cause analysis
 
-**Progressive Discovery** — `search_tools` for keyword-based tool search across 225 tools.
+**Progressive Discovery** — `search_tools` for keyword-based tool search across 216 tools.
 
 **ML/Statistical Improvements:**
 - Holt-Winters triple exponential smoothing for seasonal forecasting
@@ -79,7 +85,7 @@ recommendations and anti-patterns when thresholds are breached.
 - 2 new resources: `lm://guide/best-practices`, `lm://guide/example-responses`
 - Common mistake notes added to 6 frequently misused tool descriptions
 - DataSource datapoints now include `post_processor_method` and `post_processor_param`
-- **Counts**: 225 tools (207 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
 
 ### v1.9.5
 - **New**: Action Sources integration — 14 tools for diagnostic/remediation workflows
@@ -94,7 +100,7 @@ recommendations and anti-patterns when thresholds are breached.
 
 ## Features
 
-**225 Tools** across comprehensive LogicMonitor API coverage (207 LM + 18 AAP):
+**226 Tools** across comprehensive LogicMonitor API coverage (198 LM + 18 AAP):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -147,7 +153,7 @@ Multi-step analysis tools that combine several sub-tools into a single call. Eac
 - **Capacity Plan**: Per-datasource forecasting, trend classification, seasonality detection, and change point analysis
 - **Portal Overview**: Alert statistics, collector health, active SDTs, alert clusters, noise assessment, and down devices
 - **Diagnose**: Alert details, device context, correlation, blast radius, health scoring, and root cause analysis
-- **Search Tools**: Keyword search across all 225 tools by name and description with category filtering
+- **Search Tools**: Keyword search across all 216 tools by name and description with category filtering
 
 ### APM Trace Tools
 
@@ -560,6 +566,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `update_device` | Update an existing device | Yes |
 | `delete_device` | Delete a device | Yes |
 | `create_device_group` | Create a new device group | Yes |
+| `update_device_group` | Update a device group (name, properties, AppliesTo, alerting) | Yes |
 | `delete_device_group` | Delete a device group | Yes |
 
 ### Metrics Tools
@@ -868,24 +875,10 @@ These tools are only available when `AWX_URL` and `AWX_TOKEN` are configured.
 | `get_job_events` | Get events from a specific job run | No |
 | `get_hosts` | List hosts with optional name/inventory filters | No |
 
-### Action Sources Tools (Preview)
-
-These tools target LM-native Action Sources for diagnostic and remediation workflows.
-The API endpoints are not yet generally available. Tools will return errors until the
-feature is released in a future LogicMonitor portal update.
+### Remediation Tools
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_action_chains` | List action chains | No |
-| `get_action_chain` | Get action chain details | No |
-| `create_action_chain` | Create an action chain | Yes |
-| `update_action_chain` | Update an action chain | Yes |
-| `delete_action_chain` | Delete an action chain | Yes |
-| `get_action_rules` | List action rules | No |
-| `get_action_rule` | Get action rule details | No |
-| `create_action_rule` | Create an action rule | Yes |
-| `update_action_rule` | Update an action rule | Yes |
-| `delete_action_rule` | Delete an action rule | Yes |
 | `get_diagnosticsources` | List diagnostic sources from Exchange Toolbox | No |
 | `get_diagnosticsource` | Get diagnostic source details | No |
 | `get_remediationsources` | List remediation sources from Exchange Toolbox | No |
@@ -991,7 +984,7 @@ The server exposes 26 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 225 tools organized by domain category |
+| `lm://guide/tool-categories` | All 216 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
@@ -1274,7 +1267,7 @@ Verify your bearer token is correct and has appropriate permissions. API tokens 
 
 ### v2.0.0
 - **New**: 5 composite workflow tools (`triage`, `health_check`, `capacity_plan`, `portal_overview`, `diagnose`) for multi-step analysis in a single call
-- **New**: `search_tools` for keyword-based tool discovery across all 225 tools
+- **New**: `search_tools` for keyword-based tool discovery across all 216 tools
 - **New**: `calculate_error_budget` — SLO error budget tracking with burn rate and projected exhaustion
 - **New**: 3 remediation execution tools (`execute_remediation`, `get_remediation_status`, `get_remediation_history`) with 8-point safety checklist
 - **New**: Holt-Winters triple exponential smoothing in `forecast_metric` with auto-selection and confidence intervals
@@ -1287,7 +1280,7 @@ Verify your bearer token is correct and has appropriate permissions. API tokens 
 - **Improved**: All 15 prompts enriched with composite tool shortcuts, argument parsing guidance, and expected output format
 - **Improved**: Common mistake notes added to 6 frequently misused tool descriptions
 - **Fix**: `get_datasource` datapoints now include `post_processor_method` and `post_processor_param` fields
-- **Counts**: 225 tools (207 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
 
 ### v1.9.0
 - **New**: Event-Driven Ansible integration (removed in v1.9.5 — see `contrib/eda/`)

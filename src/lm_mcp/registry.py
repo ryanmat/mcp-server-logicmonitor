@@ -191,6 +191,36 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="update_device_group",
+            description="Update a device/resource group (requires write permission). Custom properties are merged with existing.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Device group ID to update"},
+                    "name": {"type": "string", "description": "New group name"},
+                    "description": {"type": "string", "description": "New group description"},
+                    "applies_to": {
+                        "type": "string",
+                        "description": "New AppliesTo expression for dynamic membership",
+                    },
+                    "parent_id": {
+                        "type": "integer",
+                        "description": "New parent group ID (moves the group)",
+                    },
+                    "disable_alerting": {
+                        "type": "boolean",
+                        "description": "Disable alerting for all devices in this group",
+                    },
+                    "custom_properties": {
+                        "type": "object",
+                        "description": "Custom properties to set/update (merged with existing)",
+                    },
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
             name="delete_device_group",
             description="Delete a device/resource group (requires write permission). Shows impact.",
             annotations=_DELETE,
@@ -3829,235 +3859,6 @@ TOOLS.extend(
     ]
 )
 
-# Action Chains
-TOOLS.extend(
-    [
-        Tool(
-            name="get_action_chains",
-            description="[PREVIEW] List action chains for diagnostic/remediation workflows",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name_filter": {
-                        "type": "string",
-                        "description": "Filter by chain name (substring match)",
-                    },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                },
-            },
-        ),
-        Tool(
-            name="get_action_chain",
-            description=(
-                "[PREVIEW] Get details about a specific action chain "
-                "including step sequence"
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chain_id": {"type": "integer", "description": "Action chain ID"},
-                },
-                "required": ["chain_id"],
-            },
-        ),
-        Tool(
-            name="create_action_chain",
-            description=(
-                "[PREVIEW] Create an action chain with diagnostic/remediation steps "
-                "(requires write permission)"
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Action chain name"},
-                    "description": {"type": "string", "description": "Optional description"},
-                    "actions": {
-                        "type": "array",
-                        "description": (
-                            "Ordered list of action steps. Each step has type "
-                            "(diagnosticsource or remediation) and a source ID"
-                        ),
-                        "items": {"type": "object"},
-                    },
-                },
-                "required": ["name", "actions"],
-            },
-        ),
-        Tool(
-            name="update_action_chain",
-            description="[PREVIEW] Update an action chain (requires write permission)",
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chain_id": {
-                        "type": "integer",
-                        "description": "Action chain ID to update",
-                    },
-                    "name": {"type": "string", "description": "Updated name"},
-                    "description": {"type": "string", "description": "Updated description"},
-                    "actions": {
-                        "type": "array",
-                        "description": "Updated action steps",
-                        "items": {"type": "object"},
-                    },
-                },
-                "required": ["chain_id"],
-            },
-        ),
-        Tool(
-            name="delete_action_chain",
-            description="[PREVIEW] Delete an action chain (requires write permission)",
-            annotations=_DELETE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "chain_id": {
-                        "type": "integer",
-                        "description": "Action chain ID to delete",
-                    },
-                },
-                "required": ["chain_id"],
-            },
-        ),
-    ]
-)
-
-# Action Rules
-TOOLS.extend(
-    [
-        Tool(
-            name="get_action_rules",
-            description="[PREVIEW] List action rules that map alert conditions to action chains",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name_filter": {
-                        "type": "string",
-                        "description": "Filter by rule name (substring match)",
-                    },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                },
-            },
-        ),
-        Tool(
-            name="get_action_rule",
-            description="[PREVIEW] Get details about a specific action rule",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "rule_id": {"type": "integer", "description": "Action rule ID"},
-                },
-                "required": ["rule_id"],
-            },
-        ),
-        Tool(
-            name="create_action_rule",
-            description=(
-                "[PREVIEW] Create an action rule mapping alert conditions to an action chain "
-                "(requires write permission)"
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Action rule name"},
-                    "action_chain_id": {
-                        "type": "integer",
-                        "description": "Action chain to trigger",
-                    },
-                    "device_groups": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Device group patterns",
-                    },
-                    "devices": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Device patterns",
-                    },
-                    "datasource": {
-                        "type": "string",
-                        "description": "DataSource pattern",
-                    },
-                    "datapoint": {
-                        "type": "string",
-                        "description": "DataPoint pattern",
-                    },
-                    "instance": {
-                        "type": "string",
-                        "description": "Instance pattern",
-                    },
-                    "severity": {
-                        "type": "string",
-                        "enum": ["warn", "error", "critical", "all"],
-                        "description": "Severity filter",
-                    },
-                },
-                "required": ["name", "action_chain_id"],
-            },
-        ),
-        Tool(
-            name="update_action_rule",
-            description="[PREVIEW] Update an action rule (requires write permission)",
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "rule_id": {
-                        "type": "integer",
-                        "description": "Action rule ID to update",
-                    },
-                    "name": {"type": "string", "description": "Updated name"},
-                    "action_chain_id": {
-                        "type": "integer",
-                        "description": "Updated action chain ID",
-                    },
-                    "device_groups": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Updated device group patterns",
-                    },
-                    "devices": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Updated device patterns",
-                    },
-                    "datasource": {"type": "string", "description": "Updated DataSource pattern"},
-                    "datapoint": {"type": "string", "description": "Updated DataPoint pattern"},
-                    "instance": {"type": "string", "description": "Updated instance pattern"},
-                    "severity": {
-                        "type": "string",
-                        "enum": ["warn", "error", "critical", "all"],
-                        "description": "Updated severity filter",
-                    },
-                },
-                "required": ["rule_id"],
-            },
-        ),
-        Tool(
-            name="delete_action_rule",
-            description="[PREVIEW] Delete an action rule (requires write permission)",
-            annotations=_DELETE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "rule_id": {
-                        "type": "integer",
-                        "description": "Action rule ID to delete",
-                    },
-                },
-                "required": ["rule_id"],
-            },
-        ),
-    ]
-)
-
 # Diagnostic Sources (Exchange Toolbox)
 TOOLS.extend(
     [
@@ -4779,8 +4580,6 @@ def get_tool_handler(tool_name: str) -> Any:
     """
     from lm_mcp.tools import (
         access_groups,
-        action_chains,
-        action_rules,
         alert_rules,
         alerts,
         ansible,
@@ -4834,6 +4633,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_device": devices.update_device,
         "delete_device": devices.delete_device,
         "create_device_group": devices.create_device_group,
+        "update_device_group": devices.update_device_group,
         "delete_device_group": devices.delete_device_group,
         # Alerts
         "get_alerts": alerts.get_alerts,
@@ -4914,18 +4714,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "create_alert_rule": alert_rules.create_alert_rule,
         "update_alert_rule": alert_rules.update_alert_rule,
         "delete_alert_rule": alert_rules.delete_alert_rule,
-        # Action Chains
-        "get_action_chains": action_chains.get_action_chains,
-        "get_action_chain": action_chains.get_action_chain,
-        "create_action_chain": action_chains.create_action_chain,
-        "update_action_chain": action_chains.update_action_chain,
-        "delete_action_chain": action_chains.delete_action_chain,
-        # Action Rules
-        "get_action_rules": action_rules.get_action_rules,
-        "get_action_rule": action_rules.get_action_rule,
-        "create_action_rule": action_rules.create_action_rule,
-        "update_action_rule": action_rules.update_action_rule,
-        "delete_action_rule": action_rules.delete_action_rule,
         # Diagnostic Sources
         "get_diagnosticsources": diagnosticsources.get_diagnosticsources,
         "get_diagnosticsource": diagnosticsources.get_diagnosticsource,
