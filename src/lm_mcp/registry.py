@@ -424,7 +424,10 @@ TOOLS.extend(
                 "Create a scheduled downtime (requires write permission)"
                 "\n\nCommon mistakes: duration_minutes is MINUTES not "
                 "hours/seconds. DeviceSDT needs device_id, "
-                "DeviceGroupSDT needs device_group_id."
+                "DeviceGroupSDT needs device_group_id. "
+                "DeviceDataSourceSDT needs device_id + datasource_id. "
+                "Cloud resources (collector_id=-2) may not support DeviceSDT; "
+                "use DeviceGroupSDT on their parent group instead."
             ),
             annotations=_WRITE,
             inputSchema={
@@ -432,13 +435,34 @@ TOOLS.extend(
                 "properties": {
                     "sdt_type": {
                         "type": "string",
-                        "enum": ["DeviceSDT", "DeviceGroupSDT"],
+                        "enum": [
+                            "DeviceSDT",
+                            "DeviceGroupSDT",
+                            "DeviceDataSourceSDT",
+                            "DeviceDataSourceInstanceSDT",
+                            "DeviceDataSourceInstanceGroupSDT",
+                            "DeviceBatchJobSDT",
+                            "DeviceClusterAlertDefSDT",
+                            "DeviceEventSourceSDT",
+                            "ServiceSDT",
+                            "ServiceGroupSDT",
+                            "WebsiteSDT",
+                            "WebsiteGroupSDT",
+                            "CollectorSDT",
+                        ],
                         "description": "SDT type",
                     },
-                    "device_id": {"type": "integer", "description": "Device ID (for DeviceSDT)"},
+                    "device_id": {
+                        "type": "integer",
+                        "description": "Device ID (for Device* SDT types)",
+                    },
                     "device_group_id": {
                         "type": "integer",
                         "description": "Device group ID (for DeviceGroupSDT)",
+                    },
+                    "datasource_id": {
+                        "type": "integer",
+                        "description": "Datasource ID (for DeviceDataSourceSDT)",
                     },
                     "duration_minutes": {
                         "type": "integer",

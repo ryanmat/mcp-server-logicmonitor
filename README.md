@@ -44,7 +44,14 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.0.1 (Current)
+### v2.1.0 (Current)
+- **Improved**: `create_sdt` — expanded from 2 to all 13 SDT types (DeviceDataSourceSDT, CollectorSDT, WebsiteSDT, etc.)
+- **New parameter**: `datasource_id` on `create_sdt` for DeviceDataSourceSDT scheduling
+- **Fix**: `create_sdt` now maps `deviceId` for all Device-prefixed SDT types, not just DeviceSDT
+- **Improved**: SDT error messages include sent type and cloud resource workaround guidance
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.0.1
 - **New**: `update_device_group` — update device group name, description, AppliesTo, properties, alerting
 - **Removed**: 10 Action Sources preview tools (action chains, action rules) — not on v3 API swagger
 - **Renamed**: Action Sources category to Remediation (7 tools retained)

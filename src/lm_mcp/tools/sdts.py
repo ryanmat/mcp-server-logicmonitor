@@ -107,6 +107,7 @@ async def create_sdt(
     sdt_type: str,
     device_id: int | None = None,
     device_group_id: int | None = None,
+    datasource_id: int | None = None,
     duration_minutes: int = 60,
     comment: str = "",
 ) -> list[TextContent]:
@@ -114,9 +115,10 @@ async def create_sdt(
 
     Args:
         client: LogicMonitor API client.
-        sdt_type: Type of SDT (DeviceSDT, DeviceGroupSDT, etc.).
-        device_id: Device ID for DeviceSDT.
-        device_group_id: Device group ID for DeviceGroupSDT.
+        sdt_type: Type of SDT (DeviceSDT, DeviceGroupSDT, DeviceDataSourceSDT, etc.).
+        device_id: Device ID (for Device* SDT types).
+        device_group_id: Device group ID (for DeviceGroupSDT).
+        datasource_id: Datasource ID (for DeviceDataSourceSDT).
         duration_minutes: Duration in minutes.
         comment: Optional comment for the SDT.
 
@@ -127,7 +129,7 @@ async def create_sdt(
         now = int(time.time() * 1000)
         end_time = now + (duration_minutes * 60 * 1000)
 
-        body = {
+        body: dict = {
             "type": sdt_type,
             "startDateTime": now,
             "endDateTime": end_time,
@@ -136,23 +138,31 @@ async def create_sdt(
         if comment:
             body["comment"] = comment
 
-        if sdt_type == "DeviceSDT" and device_id:
-            body["deviceId"] = device_id
-        elif sdt_type == "DeviceGroupSDT" and device_group_id:
+        # Map SDT type to required body parameters
+        if sdt_type == "DeviceGroupSDT" and device_group_id is not None:
             body["deviceGroupId"] = device_group_id
+        elif sdt_type.startswith("Device") and device_id is not None:
+            body["deviceId"] = device_id
+            if sdt_type == "DeviceDataSourceSDT" and datasource_id is not None:
+                body["dataSourceId"] = datasource_id
 
         result = await client.post("/sdt/sdts", json_body=body)
 
         # Check for API error in response (LogicMonitor returns 200 with error body)
         if "errorMessage" in result or "errorCode" in result:
+            error_msg = result.get("errorMessage", "Unknown API error")
+            suggestion = (
+                f"Check SDT type and parameters (sent type={sdt_type}). "
+                "Cloud resources (collector_id=-2, deviceType=4) may not support "
+                "DeviceSDT. Use DeviceGroupSDT on the parent group instead."
+            )
             return format_response(
                 {
                     "success": False,
                     "error": True,
                     "code": result.get("errorCode", "API_ERROR"),
-                    "message": result.get("errorMessage", "Unknown API error"),
-                    "suggestion": "Check SDT type and parameters. "
-                    "Valid types: DeviceSDT, DeviceGroupSDT",
+                    "message": error_msg,
+                    "suggestion": suggestion,
                 }
             )
 

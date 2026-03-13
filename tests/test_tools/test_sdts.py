@@ -218,6 +218,46 @@ class TestCreateSdt:
         assert "Invalid type" in result[0].text
 
 
+    @respx.mock
+    async def test_create_sdt_datasource_type(self, client, monkeypatch):
+        """create_sdt sends correct body for DeviceDataSourceSDT."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import create_sdt
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": "SDT_789", "type": "DeviceDataSourceSDT"},
+            )
+        )
+
+        result = await create_sdt(
+            client,
+            sdt_type="DeviceDataSourceSDT",
+            device_id=123,
+            datasource_id=456,
+            duration_minutes=30,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        # Verify the request body included both deviceId and dataSourceId
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["type"] == "DeviceDataSourceSDT"
+        assert request_body["deviceId"] == 123
+        assert request_body["dataSourceId"] == 456
+
+
 class TestDeleteSdt:
     """Tests for delete_sdt tool."""
 
