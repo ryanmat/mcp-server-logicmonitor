@@ -20,6 +20,19 @@ from lm_mcp.tools import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
+# LM API v3 renamed Device* SDT types to Resource* for POST/create endpoints.
+# GET/filter endpoints still accept the old names. Map before sending POST body.
+_SDT_TYPE_API_MAP: dict[str, str] = {
+    "DeviceSDT": "ResourceSDT",
+    "DeviceGroupSDT": "ResourceGroupSDT",
+    "DeviceDataSourceSDT": "ResourceDataSourceSDT",
+    "DeviceDataSourceInstanceSDT": "ResourceDataSourceInstanceSDT",
+    "DeviceDataSourceInstanceGroupSDT": "ResourceDataSourceInstanceGroupSDT",
+    "DeviceBatchJobSDT": "ResourceBatchJobSDT",
+    "DeviceClusterAlertDefSDT": "ResourceClusterAlertDefSDT",
+    "DeviceEventSourceSDT": "ResourceEventSourceSDT",
+}
+
 
 async def list_sdts(
     client: "LogicMonitorClient",
@@ -129,8 +142,9 @@ async def create_sdt(
         now = int(time.time() * 1000)
         end_time = now + (duration_minutes * 60 * 1000)
 
+        api_type = _SDT_TYPE_API_MAP.get(sdt_type, sdt_type)
         body: dict = {
-            "type": sdt_type,
+            "type": api_type,
             "startDateTime": now,
             "endDateTime": end_time,
         }
@@ -152,7 +166,7 @@ async def create_sdt(
         if "errorMessage" in result or "errorCode" in result:
             error_msg = result.get("errorMessage", "Unknown API error")
             suggestion = (
-                f"Check SDT type and parameters (sent type={sdt_type}). "
+                f"Check SDT type and parameters (sent type={api_type}). "
                 "Cloud resources (collector_id=-2, deviceType=4) may not support "
                 "DeviceSDT. Use DeviceGroupSDT on the parent group instead."
             )
@@ -264,10 +278,12 @@ async def bulk_create_device_sdt(
 
     results = {"success": [], "failed": []}
 
+    api_type = _SDT_TYPE_API_MAP.get("DeviceSDT", "DeviceSDT")
+
     for device_id in device_ids:
         try:
             body = {
-                "type": "DeviceSDT",
+                "type": api_type,
                 "deviceId": device_id,
                 "startDateTime": now,
                 "endDateTime": end_time,

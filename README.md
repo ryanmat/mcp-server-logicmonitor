@@ -44,7 +44,11 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.1.0 (Current)
+### v2.1.1 (Current)
+- **Fix**: `create_sdt` and `bulk_create_device_sdt` now map `Device*` SDT types to `Resource*` for LM API v3 POST endpoints (fixes `400 "Invalid type"` errors)
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.1.0
 - **Improved**: `create_sdt` — expanded from 2 to all 13 SDT types (DeviceDataSourceSDT, CollectorSDT, WebsiteSDT, etc.)
 - **New parameter**: `datasource_id` on `create_sdt` for DeviceDataSourceSDT scheduling
 - **Fix**: `create_sdt` now maps `deviceId` for all Device-prefixed SDT types, not just DeviceSDT

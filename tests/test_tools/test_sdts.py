@@ -253,9 +253,119 @@ class TestCreateSdt:
 
         # Verify the request body included both deviceId and dataSourceId
         request_body = json.loads(route.calls[0].request.content)
-        assert request_body["type"] == "DeviceDataSourceSDT"
+        assert request_body["type"] == "ResourceDataSourceSDT"
         assert request_body["deviceId"] == 123
         assert request_body["dataSourceId"] == 456
+
+    @respx.mock
+    async def test_create_sdt_maps_device_type_to_resource(self, client, monkeypatch):
+        """create_sdt maps DeviceGroupSDT to ResourceGroupSDT in the POST body."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import create_sdt
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": "SDT_100", "type": "ResourceGroupSDT"},
+            )
+        )
+
+        result = await create_sdt(
+            client,
+            sdt_type="DeviceGroupSDT",
+            device_group_id=42,
+            duration_minutes=30,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["type"] == "ResourceGroupSDT"
+        assert request_body["deviceGroupId"] == 42
+
+    @respx.mock
+    async def test_create_sdt_passthrough_non_device_type(self, client, monkeypatch):
+        """create_sdt passes through non-Device types unchanged."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import create_sdt
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": "SDT_101", "type": "CollectorSDT"},
+            )
+        )
+
+        result = await create_sdt(
+            client,
+            sdt_type="CollectorSDT",
+            duration_minutes=15,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["type"] == "CollectorSDT"
+
+
+class TestBulkCreateDeviceSdt:
+    """Tests for bulk_create_device_sdt type mapping."""
+
+    @respx.mock
+    async def test_bulk_create_sends_resource_type(self, client, monkeypatch):
+        """bulk_create_device_sdt sends ResourceSDT, not DeviceSDT."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import bulk_create_device_sdt
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": "SDT_200", "type": "ResourceSDT"},
+            )
+        )
+
+        result = await bulk_create_device_sdt(
+            client,
+            device_ids=[10, 20],
+            duration_minutes=60,
+            comment="Bulk test",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["created"] == 2
+
+        for call in route.calls:
+            request_body = json.loads(call.request.content)
+            assert request_body["type"] == "ResourceSDT"
 
 
 class TestDeleteSdt:
