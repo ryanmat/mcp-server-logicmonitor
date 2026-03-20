@@ -40,7 +40,7 @@ def validate_extra_vars(extra_vars: dict) -> None:
 
 
 async def test_awx_connection(
-    client: "AwxClient",
+    client: AwxClient,
 ) -> list[TextContent]:
     """Test connectivity to Ansible Automation Platform controller.
 
@@ -67,7 +67,7 @@ async def test_awx_connection(
 
 
 async def get_job_templates(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     project_id: int | None = None,
     limit: int = 50,
@@ -102,7 +102,7 @@ async def get_job_templates(
 
 
 async def get_job_template(
-    client: "AwxClient",
+    client: AwxClient,
     template_id: int,
 ) -> list[TextContent]:
     """Get details of a specific job template.
@@ -126,7 +126,7 @@ async def get_job_template(
 
 @require_write_permission
 async def launch_job(
-    client: "AwxClient",
+    client: AwxClient,
     template_id: int,
     extra_vars: dict | None = None,
     inventory_id: int | None = None,
@@ -183,7 +183,7 @@ async def launch_job(
 
 
 async def get_job_status(
-    client: "AwxClient",
+    client: AwxClient,
     job_id: int,
 ) -> list[TextContent]:
     """Get the status of a running or completed job.
@@ -203,7 +203,7 @@ async def get_job_status(
 
 
 async def get_job_output(
-    client: "AwxClient",
+    client: AwxClient,
     job_id: int,
 ) -> list[TextContent]:
     """Get the stdout output of a job.
@@ -230,7 +230,7 @@ async def get_job_output(
 
 @require_write_permission
 async def cancel_job(
-    client: "AwxClient",
+    client: AwxClient,
     job_id: int,
 ) -> list[TextContent]:
     """Cancel a running job.
@@ -251,7 +251,7 @@ async def cancel_job(
 
 @require_write_permission
 async def relaunch_job(
-    client: "AwxClient",
+    client: AwxClient,
     job_id: int,
     extra_vars: dict | None = None,
 ) -> list[TextContent]:
@@ -297,7 +297,7 @@ async def relaunch_job(
 
 
 async def get_inventories(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -328,7 +328,7 @@ async def get_inventories(
 
 
 async def get_inventory_hosts(
-    client: "AwxClient",
+    client: AwxClient,
     inventory_id: int,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -344,9 +344,7 @@ async def get_inventory_hosts(
     """
     try:
         params: dict = {"page_size": min(limit, 200)}
-        data = await client.get(
-            f"/inventories/{inventory_id}/hosts/", params=params
-        )
+        data = await client.get(f"/inventories/{inventory_id}/hosts/", params=params)
         return format_response(
             {
                 "count": data.get("count", 0),
@@ -362,7 +360,7 @@ async def get_inventory_hosts(
 
 @require_write_permission
 async def launch_workflow(
-    client: "AwxClient",
+    client: AwxClient,
     template_id: int,
     extra_vars: dict | None = None,
     inventory_id: int | None = None,
@@ -413,7 +411,7 @@ async def launch_workflow(
 
 
 async def get_workflow_status(
-    client: "AwxClient",
+    client: AwxClient,
     job_id: int,
 ) -> list[TextContent]:
     """Get the status of a workflow job.
@@ -433,7 +431,7 @@ async def get_workflow_status(
 
 
 async def get_workflow_templates(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -452,9 +450,7 @@ async def get_workflow_templates(
         if name_filter:
             params["search"] = name_filter
 
-        data = await client.get(
-            "/workflow_job_templates/", params=params
-        )
+        data = await client.get("/workflow_job_templates/", params=params)
         return format_response(
             {
                 "count": data.get("count", 0),
@@ -469,7 +465,7 @@ async def get_workflow_templates(
 
 
 async def get_projects(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -500,7 +496,7 @@ async def get_projects(
 
 
 async def get_credentials(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     credential_type: int | None = None,
     limit: int = 50,
@@ -535,7 +531,7 @@ async def get_credentials(
 
 
 async def get_organizations(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -566,7 +562,7 @@ async def get_organizations(
 
 
 async def get_job_events(
-    client: "AwxClient",
+    client: AwxClient,
     job_id: int,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -582,9 +578,7 @@ async def get_job_events(
     """
     try:
         params: dict = {"page_size": min(limit, 200)}
-        data = await client.get(
-            f"/jobs/{job_id}/job_events/", params=params
-        )
+        data = await client.get(f"/jobs/{job_id}/job_events/", params=params)
         return format_response(
             {
                 "count": data.get("count", 0),
@@ -596,7 +590,7 @@ async def get_job_events(
 
 
 async def get_hosts(
-    client: "AwxClient",
+    client: AwxClient,
     name_filter: str | None = None,
     inventory_id: int | None = None,
     limit: int = 50,

@@ -149,9 +149,7 @@ class TestSaveBaseline:
         respx.get(
             "https://test.logicmonitor.com/santaba/rest"
             "/device/devices/1/devicedatasources/10/instances/100/data"
-        ).mock(
-            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await save_baseline(
             client,
@@ -177,7 +175,8 @@ class TestSaveBaseline:
                 json={
                     "dataPoints": ["cpu", "memory"],
                     "values": [
-                        [50.0, 70.0], [60.0, 80.0],
+                        [50.0, 70.0],
+                        [60.0, 80.0],
                     ],
                     "time": [BASE_EPOCH, BASE_EPOCH + 300],
                 },
@@ -207,15 +206,23 @@ class TestCompareToBaseline:
 
         # Set up a baseline in session
         session = get_session()
-        session.set_variable("baseline_test", {
-            "device_id": 1,
-            "device_datasource_id": 10,
-            "instance_id": 100,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_test",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest"
@@ -242,15 +249,23 @@ class TestCompareToBaseline:
         from lm_mcp.tools.baselines import compare_to_baseline
 
         session = get_session()
-        session.set_variable("baseline_test", {
-            "device_id": 1,
-            "device_datasource_id": 10,
-            "instance_id": 100,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_test",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         # Current values ~35% higher than baseline mean
         respx.get(
@@ -278,15 +293,23 @@ class TestCompareToBaseline:
         from lm_mcp.tools.baselines import compare_to_baseline
 
         session = get_session()
-        session.set_variable("baseline_test", {
-            "device_id": 1,
-            "device_datasource_id": 10,
-            "instance_id": 100,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_test",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         # Current values ~100% higher than baseline mean
         respx.get(
@@ -327,15 +350,23 @@ class TestCompareToBaseline:
         from lm_mcp.tools.baselines import compare_to_baseline
 
         session = get_session()
-        session.set_variable("baseline_auto", {
-            "device_id": 42,
-            "device_datasource_id": 15,
-            "instance_id": 200,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_auto",
+            {
+                "device_id": 42,
+                "device_datasource_id": 15,
+                "instance_id": 200,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest"
@@ -361,15 +392,23 @@ class TestCompareToBaseline:
         from lm_mcp.tools.baselines import compare_to_baseline
 
         session = get_session()
-        session.set_variable("baseline_override", {
-            "device_id": 1,
-            "device_datasource_id": 10,
-            "instance_id": 100,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_override",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest"
@@ -401,22 +440,28 @@ class TestCompareToBaseline:
         from lm_mcp.tools.baselines import compare_to_baseline
 
         session = get_session()
-        session.set_variable("baseline_err", {
-            "device_id": 1,
-            "device_datasource_id": 10,
-            "instance_id": 100,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_err",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest"
             "/device/devices/1/devicedatasources/10/instances/100/data"
-        ).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
-        )
+        ).mock(return_value=httpx.Response(500, json={"errorMessage": "Server error"}))
 
         result = await compare_to_baseline(client, baseline_name="err")
 
@@ -428,15 +473,23 @@ class TestCompareToBaseline:
         from lm_mcp.tools.baselines import compare_to_baseline
 
         session = get_session()
-        session.set_variable("baseline_pct", {
-            "device_id": 1,
-            "device_datasource_id": 10,
-            "instance_id": 100,
-            "datapoints": {
-                "cpu": {"mean": 50.0, "min": 40.0, "max": 60.0, "stddev": 5.0,
-                        "sample_count": 10},
+        session.set_variable(
+            "baseline_pct",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
             },
-        })
+        )
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest"

@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2026-03-17
+
+### Fixed
+
+- `create_sdt` and `bulk_create_device_sdt` map Device* SDT type names to Resource* before POST, fixing 400 "Invalid type" errors on the v3 API which renamed Device* to Resource* for SDT create endpoints
+
+## [2.1.0] - 2026-03-12
+
+### Added
+
+- `create_sdt` expanded from 2 types (DeviceSDT, DeviceGroupSDT) to all 13 LM API SDT types
+- `datasource_id` parameter on `create_sdt` for DeviceDataSourceSDT type
+- Generalized Device-prefixed type handling so `deviceId` is sent for all Device* types
+- Improved error messages with cloud resource workaround guidance
+
+## [2.0.1] - 2026-03-12
+
+### Added
+
+- `update_device_group` tool for modifying group name, description, AppliesTo, properties, and alerting state with property merging
+
+### Removed
+
+- 10 action chain/rule tools removed (not present on v3 API swagger)
+- Action sources guide category renamed to remediation (7 tools retained)
+
+### Changed
+
+- Tool count: 225 -> 216 (198 LM + 18 AAP)
+
+## [2.0.0] - 2026-03-12
+
+### Added
+
+- 5 composite workflow tools (`triage`, `health_check`, `capacity_plan`, `portal_overview`, `diagnose`) combining multiple sub-tools into single calls with summary/full detail levels and partial failure handling
+- `search_tools` for keyword-based progressive discovery across all 225 tools
+- `calculate_error_budget` for SLO error budget tracking
+- `execute_remediation`, `get_remediation_status`, `get_remediation_history` for RemediationSource execution with 8-point pre-execution safety checklist
+- Holt-Winters forecasting with auto-selection between linear and exponential smoothing
+- IQR and MAD anomaly detection methods alongside existing z-score
+- Prediction intervals on forecast results
+- Metric presets auto-configure analysis parameters by datapoint name
+- 15 enriched prompts with composite shortcuts and argument parsing
+- 2 new resources (best-practices, example-responses)
+- Common mistake notes on 6 frequently misused tool descriptions
+
+### Changed
+
+- Scoring tools return structured best-practice recommendations and anti-patterns when thresholds are breached
+- Tool count: 215 -> 225 (207 LM + 18 AAP), prompt count: 14 -> 15, resource count: 24 -> 26
+
+## [1.9.6] - 2026-03-11
+
+### Fixed
+
+- `get_widget`, `update_widget`, `delete_widget` use flat `/dashboard/widgets/{id}` endpoint instead of nested path that returned 404
+- `add_widget` applies deviceSLA default fields (daysInWeek, periodInOneDay, displayType, calculationMethod, unmonitoredTimeAlertStatus) that the portal UI sets automatically
+- `add_widget` remaps common field name aliases (`deviceGroupFullPath` -> `groupName`, `html` -> `content`) to prevent silent data loss from LM API discarding unknown fields
+- `get_dashboards` prefers `numOfWidgets` over unreliable `widgetsConfig` for widget count
+
+### Changed
+
+- `add_widget` description documents text widget `content` key and deviceSLA required fields
+
 ## [1.9.5] - 2026-02-27
 
 ### Added
@@ -423,6 +487,11 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[2.1.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.0...v2.1.1
+[2.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.0.1...v2.1.0
+[2.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.6...v2.0.0
+[1.9.6]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.5...v1.9.6
 [1.9.5]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.2...v1.9.5
 [1.9.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.9.0...v1.9.2
 [1.9.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.8.0...v1.9.0

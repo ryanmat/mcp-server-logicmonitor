@@ -52,7 +52,7 @@ class TestLinearRegression:
 
         x = [1.0, 2.0, 3.0, 4.0, 5.0]
         y = [10.0, 8.0, 6.0, 4.0, 2.0]
-        slope, intercept, r_sq = linear_regression(x, y)
+        slope, _intercept, r_sq = linear_regression(x, y)
         assert slope < 0
         assert abs(r_sq - 1.0) < 1e-10
 
@@ -98,7 +98,7 @@ class TestLinearRegression:
 
         x = [3.0, 3.0, 3.0]
         y = [1.0, 2.0, 3.0]
-        slope, intercept, r_sq = linear_regression(x, y)
+        slope, _intercept, _r_sq = linear_regression(x, y)
         assert abs(slope) < 1e-10
 
     def test_noisy_data_r_squared_less_than_one(self):
@@ -107,7 +107,7 @@ class TestLinearRegression:
 
         x = [1.0, 2.0, 3.0, 4.0, 5.0]
         y = [2.1, 3.9, 6.2, 7.8, 10.1]
-        slope, intercept, r_sq = linear_regression(x, y)
+        slope, _intercept, r_sq = linear_regression(x, y)
         assert slope > 0
         assert 0 < r_sq < 1.0
 

@@ -2,6 +2,7 @@
 # Description: Verifies that write operations emit audit events and reads do not.
 
 import logging
+from typing import ClassVar
 
 
 class TestWriteToolPrefixDetection:
@@ -58,7 +59,7 @@ class TestWriteToolPrefixDetection:
 class TestAwxWriteToolPrefixes:
     """Tests for AWX write tool prefix detection."""
 
-    AWX_WRITE_TOOLS = [
+    AWX_WRITE_TOOLS: ClassVar[list[str]] = [
         "launch_job",
         "cancel_job",
         "relaunch_job",

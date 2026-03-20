@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_cloud_cost_accounts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     provider: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -71,7 +71,7 @@ async def get_cloud_cost_accounts(
 
 
 async def get_cost_recommendations(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     cloud_account_id: int | None = None,
     recommendation_type: str | None = None,
     limit: int = 50,
@@ -133,7 +133,7 @@ async def get_cost_recommendations(
 
 
 async def get_cost_summary(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     cloud_account_id: int | None = None,
     time_range: str = "last30days",
 ) -> list[TextContent]:
@@ -170,7 +170,7 @@ async def get_cost_summary(
 
 
 async def get_resource_cost(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     time_range: str = "last30days",
 ) -> list[TextContent]:
@@ -202,7 +202,7 @@ async def get_resource_cost(
 
 
 async def get_idle_resources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     cloud_account_id: int | None = None,
     resource_type: str | None = None,
     limit: int = 50,
@@ -262,7 +262,7 @@ async def get_idle_resources(
 
 
 async def get_cost_recommendation_categories(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
 ) -> list[TextContent]:
     """Get cost recommendation categories (v224 Cost Optimization API).
 
@@ -300,7 +300,7 @@ async def get_cost_recommendation_categories(
 
 
 async def get_cost_recommendation(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     recommendation_id: int,
 ) -> list[TextContent]:
     """Get a specific cost recommendation by ID (v224 Cost Optimization API).

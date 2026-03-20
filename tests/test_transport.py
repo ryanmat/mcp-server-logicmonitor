@@ -2,6 +2,7 @@
 # Description: Validates transport runner selection and configuration.
 
 import pytest
+from pydantic import ValidationError
 
 from lm_mcp.transport import get_transport_runner, run_http, run_stdio
 
@@ -60,7 +61,7 @@ class TestGetTransportRunner:
         from lm_mcp.config import LMConfig
 
         # LMConfig validation should catch invalid transport
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             LMConfig()
 
     def test_default_transport_is_stdio(self, monkeypatch):
@@ -156,7 +157,7 @@ class TestTransportConfig:
 
         config = LMConfig()
 
-        assert config.cors_origins == "*"
+        assert config.cors_origins == ""
 
     def test_cors_origins_from_env(self, monkeypatch):
         """CORS origins can be set from environment."""

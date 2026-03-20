@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 async def forecast_metric(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -54,8 +54,12 @@ async def forecast_metric(
     """
     try:
         series = await fetch_metric_series(
-            client, device_id, device_datasource_id, instance_id,
-            datapoints=datapoints, hours_back=hours_back,
+            client,
+            device_id,
+            device_datasource_id,
+            instance_id,
+            datapoints=datapoints,
+            hours_back=hours_back,
         )
 
         forecasts = {}
@@ -72,7 +76,10 @@ async def forecast_metric(
 
             # Determine method to use
             method_used = _select_forecast_method(
-                method, values, timestamps, hours_back,
+                method,
+                values,
+                timestamps,
+                hours_back,
             )
 
             # Convert timestamps to hours relative to first
@@ -81,23 +88,33 @@ async def forecast_metric(
 
             if method_used == "holt_winters":
                 forecast_result = _forecast_holt_winters(
-                    values, timestamps, threshold, t0, x_hours,
+                    values,
+                    timestamps,
+                    threshold,
+                    t0,
+                    x_hours,
                 )
             else:
                 forecast_result = _forecast_linear(
-                    values, timestamps, threshold, t0, x_hours,
+                    values,
+                    timestamps,
+                    threshold,
+                    t0,
+                    x_hours,
                 )
 
             forecast_result["method_used"] = method_used
             forecasts[dp_name] = forecast_result
 
-        return format_response({
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "instance_id": instance_id,
-            "hours_back": hours_back,
-            "forecasts": forecasts,
-        })
+        return format_response(
+            {
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+                "hours_back": hours_back,
+                "forecasts": forecasts,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
@@ -192,9 +209,7 @@ def _forecast_linear(
 
         if remaining_hours > 0:
             days_until_breach = round(remaining_hours / 24.0, 2)
-            predicted_breach_epoch = int(
-                timestamps[-1] + remaining_hours * 3600
-            )
+            predicted_breach_epoch = int(timestamps[-1] + remaining_hours * 3600)
 
     # Compute predicted values for confidence interval
     y_predicted = [slope * xh + intercept for xh in x_hours]
@@ -248,7 +263,9 @@ def _forecast_holt_winters(
 
     try:
         hw_result = holt_winters(
-            values, season_length=season_length, forecast_periods=24,
+            values,
+            season_length=season_length,
+            forecast_periods=24,
         )
     except ValueError:
         # Fall back to linear if Holt-Winters fails
@@ -259,10 +276,7 @@ def _forecast_holt_winters(
     current_value = values[-1]
 
     # Trend from last fitted values
-    if len(fitted) >= 2:
-        recent_slope = (fitted[-1] - fitted[0]) / max(len(fitted) - 1, 1)
-    else:
-        recent_slope = 0.0
+    recent_slope = (fitted[-1] - fitted[0]) / max(len(fitted) - 1, 1) if len(fitted) >= 2 else 0.0
 
     if abs(recent_slope) < 1e-10:
         trend = "stable"
@@ -307,7 +321,7 @@ def _forecast_holt_winters(
 
 
 async def detect_change_points(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -334,8 +348,12 @@ async def detect_change_points(
     """
     try:
         series = await fetch_metric_series(
-            client, device_id, device_datasource_id, instance_id,
-            datapoints=datapoints, hours_back=hours_back,
+            client,
+            device_id,
+            device_datasource_id,
+            instance_id,
+            datapoints=datapoints,
+            hours_back=hours_back,
         )
 
         results = {}
@@ -351,12 +369,14 @@ async def detect_change_points(
             for cp in raw_points:
                 idx = cp["index"]
                 ts = timestamps[idx] if idx < len(timestamps) else None
-                change_points.append({
-                    "timestamp": ts,
-                    "direction": cp["direction"],
-                    "magnitude": cp["magnitude"],
-                    "index": idx,
-                })
+                change_points.append(
+                    {
+                        "timestamp": ts,
+                        "direction": cp["direction"],
+                        "magnitude": cp["magnitude"],
+                        "index": idx,
+                    }
+                )
 
             total_change_points += len(change_points)
             results[dp_name] = {
@@ -365,21 +385,23 @@ async def detect_change_points(
                 "sample_count": len(values),
             }
 
-        return format_response({
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "instance_id": instance_id,
-            "hours_back": hours_back,
-            "sensitivity": sensitivity,
-            "total_change_points": total_change_points,
-            "datapoints": results,
-        })
+        return format_response(
+            {
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+                "hours_back": hours_back,
+                "sensitivity": sensitivity,
+                "total_change_points": total_change_points,
+                "datapoints": results,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
 
 async def classify_trend(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -404,8 +426,12 @@ async def classify_trend(
     """
     try:
         series = await fetch_metric_series(
-            client, device_id, device_datasource_id, instance_id,
-            datapoints=datapoints, hours_back=hours_back,
+            client,
+            device_id,
+            device_datasource_id,
+            instance_id,
+            datapoints=datapoints,
+            hours_back=hours_back,
         )
 
         classifications = {}
@@ -426,7 +452,7 @@ async def classify_trend(
 
             t0 = timestamps[0] if timestamps else 0
             x_hours = [(t - t0) / 3600.0 for t in timestamps]
-            slope, intercept, r_squared = linear_regression(x_hours, values)
+            slope, _intercept, r_squared = linear_regression(x_hours, values)
 
             # Autocorrelation at ~24h lag (use lag that represents 24h)
             # Estimate sample interval from timestamps
@@ -464,19 +490,21 @@ async def classify_trend(
                 "sample_count": len(values),
             }
 
-        return format_response({
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "instance_id": instance_id,
-            "hours_back": hours_back,
-            "classifications": classifications,
-        })
+        return format_response(
+            {
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+                "hours_back": hours_back,
+                "classifications": classifications,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
 
 async def detect_seasonality(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -502,8 +530,12 @@ async def detect_seasonality(
     """
     try:
         series = await fetch_metric_series(
-            client, device_id, device_datasource_id, instance_id,
-            datapoints=datapoints, hours_back=hours_back,
+            client,
+            device_id,
+            device_datasource_id,
+            instance_id,
+            datapoints=datapoints,
+            hours_back=hours_back,
         )
 
         results = {}
@@ -549,19 +581,15 @@ async def detect_seasonality(
 
             # Bin values by hour-of-day to find peak hours
             hourly_bins: dict[int, list[float]] = {}
-            for val, ts in zip(values, timestamps):
+            for val, ts in zip(values, timestamps, strict=True):
                 hour = (ts % 86400) // 3600
                 hourly_bins.setdefault(hour, []).append(val)
 
             peak_hours = []
             if hourly_bins:
-                hourly_means = {
-                    h: sum(v) / len(v) for h, v in hourly_bins.items()
-                }
+                hourly_means = {h: sum(v) / len(v) for h, v in hourly_bins.items()}
                 overall_mean = sum(values) / len(values)
-                peak_hours = sorted([
-                    h for h, m in hourly_means.items() if m > overall_mean
-                ])
+                peak_hours = sorted([h for h, m in hourly_means.items() if m > overall_mean])
 
             results[dp_name] = {
                 "is_seasonal": is_seasonal,
@@ -572,12 +600,14 @@ async def detect_seasonality(
                 "sample_count": len(values),
             }
 
-        return format_response({
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "instance_id": instance_id,
-            "hours_back": hours_back,
-            "seasonality": results,
-        })
+        return format_response(
+            {
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+                "hours_back": hours_back,
+                "seasonality": results,
+            }
+        )
     except Exception as e:
         return handle_error(e)

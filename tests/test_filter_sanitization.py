@@ -112,7 +112,7 @@ class TestWildcardNoteInResponse:
         assert "wildcard" in data["note"].lower() or "Wildcard" in data["note"]
         # Verify the actual filter sent to API has no wildcard
         params = dict(route.calls[0].request.url.params)
-        assert 'displayName~"prod"' == params["filter"]
+        assert params["filter"] == 'displayName~"prod"'
 
     @respx.mock
     async def test_clean_input_no_note(self, client):
@@ -133,16 +133,16 @@ class TestWildcardNoteInResponse:
         """DataSource filter also strips wildcards and includes note."""
         from lm_mcp.tools.datasources import get_datasources
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         result = await get_datasources(client, name_filter="CPU*")
 
         data = json.loads(result[0].text)
         assert "note" in data
         params = dict(route.calls[0].request.url.params)
-        assert 'name~"CPU"' == params["filter"]
+        assert params["filter"] == 'name~"CPU"'
 
     @respx.mock
     async def test_alerts_device_wildcard_note(self, client):
@@ -158,7 +158,7 @@ class TestWildcardNoteInResponse:
         data = json.loads(result[0].text)
         assert "note" in data
         params = dict(route.calls[0].request.url.params)
-        assert 'monitorObjectName~"server"' == params["filter"]
+        assert params["filter"] == 'monitorObjectName~"server"'
 
     @respx.mock
     async def test_collectors_wildcard_note(self, client):
@@ -174,7 +174,7 @@ class TestWildcardNoteInResponse:
         data = json.loads(result[0].text)
         assert "note" in data
         params = dict(route.calls[0].request.url.params)
-        assert 'hostname~"coll"' == params["filter"]
+        assert params["filter"] == 'hostname~"coll"'
 
 
 class TestFilterValueSentToApi:
@@ -213,9 +213,9 @@ class TestFilterValueSentToApi:
         """get_logsources sends name~{value} as filter to API."""
         from lm_mcp.tools.logsources import get_logsources
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/logsources"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/setting/logsources").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_logsources(client, name_filter="syslog")
 
@@ -227,9 +227,9 @@ class TestFilterValueSentToApi:
         """get_dashboards sends name~{value} as filter to API."""
         from lm_mcp.tools.dashboards import get_dashboards
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_dashboards(client, name_filter="overview")
 
@@ -241,9 +241,9 @@ class TestFilterValueSentToApi:
         """get_websites sends name~{value} as filter to API."""
         from lm_mcp.tools.websites import get_websites
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/website/websites"
-        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/website/websites").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         await get_websites(client, name_filter="portal")
 

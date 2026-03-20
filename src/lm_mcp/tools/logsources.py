@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_logsources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     applies_to_filter: str | None = None,
     filter: str | None = None,
@@ -59,11 +59,11 @@ async def get_logsources(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'name~{quote_filter_value(clean_name)}')
+                filters.append(f"name~{quote_filter_value(clean_name)}")
             if applies_to_filter:
                 clean_val, was_modified = sanitize_filter_value(applies_to_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'appliesTo~{quote_filter_value(clean_val)}')
+                filters.append(f"appliesTo~{quote_filter_value(clean_val)}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -103,7 +103,7 @@ async def get_logsources(
 
 
 async def get_logsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     logsource_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific LogSource.
@@ -139,7 +139,7 @@ async def get_logsource(
 
 
 async def get_device_logsources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     limit: int = 50,
 ) -> list[TextContent]:

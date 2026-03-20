@@ -530,8 +530,8 @@ def rca_workflow_template(arguments: dict) -> str:
     return f"""Perform a root cause analysis for a LogicMonitor incident.
 
 Parameters:
-- Starting alert: {alert_id or 'not specified'}
-- Starting device: {device_id or 'not specified'}
+- Starting alert: {alert_id or "not specified"}
+- Starting device: {device_id or "not specified"}
 - Time window: Last {hours_back} hours
 
 Phase 1 - Gather Context:
@@ -679,15 +679,14 @@ def remediate_workflow_template(arguments: dict) -> str:
         )
     elif device_id:
         starting_point = (
-            f"Start with device {device_id} using get_alerts "
-            "to find active alerts on that device."
+            f"Start with device {device_id} using get_alerts to find active alerts on that device."
         )
 
     return f"""Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform.
 
 Parameters:
-- Alert ID: {alert_id or 'not specified'}
-- Device ID: {device_id or 'not specified'}
+- Alert ID: {alert_id or "not specified"}
+- Device ID: {device_id or "not specified"}
 
 {starting_point}
 
@@ -790,9 +789,9 @@ def remediation_template(arguments: dict) -> str:
     return f"""Execute a LogicMonitor RemediationSource on a target device.
 
 Parameters:
-- Host ID: {host_id or 'not specified'}
-- Remediation Source ID: {source_id or 'not specified'}
-- Alert ID: {alert_id or 'not specified (optional)'}
+- Host ID: {host_id or "not specified"}
+- Remediation Source ID: {source_id or "not specified"}
+- Alert ID: {alert_id or "not specified (optional)"}
 
 Pre-Execution Safety Checklist:
 1. Verify collector version >= 39.200 using get_collector

@@ -341,8 +341,11 @@ class TestAddDeviceInstance:
         from lm_mcp.tools.metrics import add_device_instance
 
         result = await add_device_instance(
-            client, device_id=100, device_datasource_id=1001,
-            display_name="nginx", wild_value="nginx.service",
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            display_name="nginx",
+            wild_value="nginx.service",
         )
         assert "Write operations are disabled" in result[0].text
 
@@ -367,8 +370,11 @@ class TestAddDeviceInstance:
         )
 
         result = await add_device_instance(
-            client, device_id=100, device_datasource_id=1001,
-            display_name="nginx", wild_value="nginx.service",
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            display_name="nginx",
+            wild_value="nginx.service",
             description="nginx web server",
         )
 
@@ -385,13 +391,17 @@ class TestAddDeviceInstance:
 
         route = respx.post(INSTANCES_URL).mock(
             return_value=httpx.Response(
-                200, json={"id": 5003, "displayName": "sshd", "wildValue": "sshd.service"},
+                200,
+                json={"id": 5003, "displayName": "sshd", "wildValue": "sshd.service"},
             )
         )
 
         await add_device_instance(
-            client, device_id=100, device_datasource_id=1001,
-            display_name="sshd", wild_value="sshd.service",
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            display_name="sshd",
+            wild_value="sshd.service",
         )
 
         body = json.loads(route.calls[0].request.content)
@@ -409,8 +419,11 @@ class TestAddDeviceInstance:
         )
 
         result = await add_device_instance(
-            client, device_id=100, device_datasource_id=1001,
-            display_name="nginx", wild_value="nginx.service",
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            display_name="nginx",
+            wild_value="nginx.service",
         )
         assert "Error:" in result[0].text
 
@@ -424,8 +437,11 @@ class TestUpdateDeviceInstance:
         from lm_mcp.tools.metrics import update_device_instance
 
         result = await update_device_instance(
-            client, device_id=100, device_datasource_id=1001,
-            instance_id=5001, description="updated",
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            instance_id=5001,
+            description="updated",
         )
         assert "Write operations are disabled" in result[0].text
 
@@ -448,8 +464,11 @@ class TestUpdateDeviceInstance:
         )
 
         result = await update_device_instance(
-            client, device_id=100, device_datasource_id=1001,
-            instance_id=5001, description="updated desc",
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            instance_id=5001,
+            description="updated desc",
         )
 
         data = json.loads(result[0].text)
@@ -462,7 +481,10 @@ class TestUpdateDeviceInstance:
         from lm_mcp.tools.metrics import update_device_instance
 
         result = await update_device_instance(
-            client, device_id=100, device_datasource_id=1001, instance_id=5001,
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            instance_id=5001,
         )
 
         assert "No updates provided" in result[0].text
@@ -477,7 +499,10 @@ class TestDeleteDeviceInstance:
         from lm_mcp.tools.metrics import delete_device_instance
 
         result = await delete_device_instance(
-            client, device_id=100, device_datasource_id=1001, instance_id=5001,
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            instance_id=5001,
         )
         assert "Write operations are disabled" in result[0].text
 
@@ -489,15 +514,17 @@ class TestDeleteDeviceInstance:
 
         respx.get(f"{INSTANCES_URL}/5001").mock(
             return_value=httpx.Response(
-                200, json={"id": 5001, "displayName": "nginx"},
+                200,
+                json={"id": 5001, "displayName": "nginx"},
             )
         )
-        respx.delete(f"{INSTANCES_URL}/5001").mock(
-            return_value=httpx.Response(200, json={})
-        )
+        respx.delete(f"{INSTANCES_URL}/5001").mock(return_value=httpx.Response(200, json={}))
 
         result = await delete_device_instance(
-            client, device_id=100, device_datasource_id=1001, instance_id=5001,
+            client,
+            device_id=100,
+            device_datasource_id=1001,
+            instance_id=5001,
         )
 
         data = json.loads(result[0].text)

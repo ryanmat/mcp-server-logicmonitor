@@ -91,9 +91,7 @@ class TestAwxToolDefinitions:
         awx_map = {t.name: t for t in AWX_TOOLS}
         for name in read_tools:
             tool = awx_map[name]
-            assert tool.annotations.readOnlyHint is True, (
-                f"{name} should be readOnlyHint=True"
-            )
+            assert tool.annotations.readOnlyHint is True, f"{name} should be readOnlyHint=True"
 
     def test_awx_write_tools_not_readonly(self):
         """Launch and relaunch tools are not marked read-only."""
@@ -103,9 +101,7 @@ class TestAwxToolDefinitions:
         awx_map = {t.name: t for t in AWX_TOOLS}
         for name in write_tools:
             tool = awx_map[name]
-            assert tool.annotations.readOnlyHint is False, (
-                f"{name} should be readOnlyHint=False"
-            )
+            assert tool.annotations.readOnlyHint is False, f"{name} should be readOnlyHint=False"
 
     def test_cancel_job_marked_destructive(self):
         """cancel_job has destructiveHint=True."""
@@ -123,9 +119,7 @@ class TestAwxToolDefinitions:
         awx_map = {t.name: t for t in AWX_TOOLS}
         for name in launch_tools:
             tool = awx_map[name]
-            assert tool.annotations.destructiveHint is False, (
-                f"{name} should not be destructive"
-            )
+            assert tool.annotations.destructiveHint is False, f"{name} should not be destructive"
 
     def test_awx_tools_all_open_world(self):
         """All AWX tools have openWorldHint=True."""
@@ -156,9 +150,7 @@ class TestAwxToolHandlers:
             handler = get_tool_handler(tool.name)
             schema_props = set(tool.inputSchema.get("properties", {}).keys())
             sig = inspect.signature(handler)
-            func_params = {
-                p for p in sig.parameters if p != "client"
-            }
+            func_params = {p for p in sig.parameters if p != "client"}
             assert schema_props == func_params, (
                 f"{tool.name}: schema={schema_props} != func={func_params}"
             )

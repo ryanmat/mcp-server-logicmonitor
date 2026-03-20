@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_datasources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     applies_to_filter: str | None = None,
     filter: str | None = None,
@@ -58,11 +58,11 @@ async def get_datasources(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'name~{quote_filter_value(clean_name)}')
+                filters.append(f"name~{quote_filter_value(clean_name)}")
             if applies_to_filter:
                 clean_val, was_modified = sanitize_filter_value(applies_to_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'appliesTo~{quote_filter_value(clean_val)}')
+                filters.append(f"appliesTo~{quote_filter_value(clean_val)}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -102,7 +102,7 @@ async def get_datasources(
 
 
 async def get_datasource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     datasource_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific DataSource.
@@ -157,7 +157,7 @@ async def get_datasource(
 
 @require_write_permission
 async def create_datasource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict,
     overwrite: bool = False,
 ) -> list[TextContent]:
@@ -210,7 +210,7 @@ async def create_datasource(
 
 @require_write_permission
 async def update_datasource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     datasource_id: int,
     definition: dict,
 ) -> list[TextContent]:
@@ -231,9 +231,7 @@ async def update_datasource(
         payload = dict(definition)
         payload.pop("id", None)
 
-        result = await client.put(
-            f"/setting/datasources/{datasource_id}", json_body=payload
-        )
+        result = await client.put(f"/setting/datasources/{datasource_id}", json_body=payload)
 
         return format_response(
             {
@@ -252,7 +250,7 @@ async def update_datasource(
 
 @require_write_permission
 async def delete_datasource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     datasource_id: int,
 ) -> list[TextContent]:
     """Delete a DataSource from LogicMonitor.

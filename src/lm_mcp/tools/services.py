@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_services(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -41,7 +41,7 @@ async def get_services(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/service/services", params=params)
 
@@ -72,7 +72,7 @@ async def get_services(
 
 
 async def get_service(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific service.
@@ -105,7 +105,7 @@ async def get_service(
 
 
 async def get_service_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -126,7 +126,7 @@ async def get_service_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/service/groups", params=params)
 

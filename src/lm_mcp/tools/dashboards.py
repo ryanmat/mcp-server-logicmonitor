@@ -38,7 +38,7 @@ def _count_widgets(item: dict) -> int:
 
 
 async def get_dashboards(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     group_id: int | None = None,
     filter: str | None = None,
@@ -75,7 +75,7 @@ async def get_dashboards(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'name~{quote_filter_value(clean_name)}')
+                filters.append(f"name~{quote_filter_value(clean_name)}")
             if group_id is not None:
                 filters.append(f"groupId:{group_id}")
 
@@ -116,7 +116,7 @@ async def get_dashboards(
 
 
 async def get_dashboard(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific dashboard.
@@ -136,7 +136,7 @@ async def get_dashboard(
 
 
 async def get_dashboard_widgets(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     limit: int = 100,
 ) -> list[TextContent]:
@@ -183,7 +183,7 @@ async def get_dashboard_widgets(
 
 @require_write_permission
 async def create_dashboard(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     group_id: int = 1,
     description: str | None = None,
@@ -251,7 +251,7 @@ async def create_dashboard(
 
 @require_write_permission
 async def update_dashboard(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     name: str | None = None,
     description: str | None = None,
@@ -304,7 +304,7 @@ async def update_dashboard(
 
 @require_write_permission
 async def delete_dashboard(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
 ) -> list[TextContent]:
     """Delete a dashboard.
@@ -341,7 +341,7 @@ async def delete_dashboard(
 
 
 async def get_widget(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     widget_id: int,
 ) -> list[TextContent]:
@@ -364,7 +364,7 @@ async def get_widget(
 
 @require_write_permission
 async def add_widget(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     name: str,
     widget_type: str,
@@ -462,7 +462,7 @@ async def add_widget(
 
 @require_write_permission
 async def update_widget(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     widget_id: int,
     name: str | None = None,
@@ -528,7 +528,7 @@ async def update_widget(
 
 @require_write_permission
 async def delete_widget(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     widget_id: int,
 ) -> list[TextContent]:

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_batchjobs(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     status: str | None = None,
     limit: int = 50,
@@ -44,11 +44,11 @@ async def get_batchjobs(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'name~{quote_filter_value(clean_name)}')
+            filters.append(f"name~{quote_filter_value(clean_name)}")
         if status:
             clean_status, was_modified = sanitize_filter_value(status)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'status:{quote_filter_value(clean_status)}')
+            filters.append(f"status:{quote_filter_value(clean_status)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -83,7 +83,7 @@ async def get_batchjobs(
 
 
 async def get_batchjob(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     batchjob_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific batch job.
@@ -118,7 +118,7 @@ async def get_batchjob(
 
 
 async def get_device_batchjobs(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -164,7 +164,7 @@ async def get_device_batchjobs(
 
 
 async def get_batchjob_history(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     batchjob_id: int,
     limit: int = 50,
@@ -213,7 +213,7 @@ async def get_batchjob_history(
 
 
 async def get_scheduled_downtime_jobs(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     limit: int = 50,
 ) -> list[TextContent]:
     """Get scheduled downtime (maintenance window) configurations.

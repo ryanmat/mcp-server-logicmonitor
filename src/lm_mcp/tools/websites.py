@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_websites(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     group_id: int | None = None,
     filter: str | None = None,
@@ -58,7 +58,7 @@ async def get_websites(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'name~{quote_filter_value(clean_name)}')
+                filters.append(f"name~{quote_filter_value(clean_name)}")
             if group_id is not None:
                 filters.append(f"groupId:{group_id}")
 
@@ -102,7 +102,7 @@ async def get_websites(
 
 
 async def get_website(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     website_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific website.
@@ -154,7 +154,7 @@ async def get_website(
 
 
 async def get_website_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     parent_id: int | None = None,
     name_filter: str | None = None,
     limit: int = 50,
@@ -180,7 +180,7 @@ async def get_website_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'name~{quote_filter_value(clean_name)}')
+            filters.append(f"name~{quote_filter_value(clean_name)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -214,7 +214,7 @@ async def get_website_groups(
 
 
 async def get_website_data(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     website_id: int,
     checkpoint_id: int,
     start_time: int | None = None,
@@ -260,7 +260,7 @@ async def get_website_data(
 
 @require_write_permission
 async def create_website(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     website_type: str,
     domain: str,
@@ -314,7 +314,7 @@ async def create_website(
 
 @require_write_permission
 async def update_website(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     website_id: int,
     name: str | None = None,
     description: str | None = None,
@@ -374,7 +374,7 @@ async def update_website(
 
 @require_write_permission
 async def delete_website(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     website_id: int,
 ) -> list[TextContent]:
     """Delete a website check from LogicMonitor.
@@ -401,7 +401,7 @@ async def delete_website(
 
 @require_write_permission
 async def create_website_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     parent_id: int | None = None,
     description: str | None = None,
@@ -441,7 +441,7 @@ async def create_website_group(
 
 @require_write_permission
 async def delete_website_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
 ) -> list[TextContent]:
     """Delete a website group from LogicMonitor.

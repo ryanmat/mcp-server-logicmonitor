@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-async def _call_sub_tool(handler, client: "LogicMonitorClient", **kwargs) -> dict:
+async def _call_sub_tool(handler, client: LogicMonitorClient, **kwargs) -> dict:
     """Call a sub-handler, parse JSON response, raise on errors."""
     result = await handler(client, **kwargs)
     data = json.loads(result[0].text)
@@ -48,17 +48,19 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
         blocked = [t for t in required if any(fnmatch(t, p) for p in patterns)]
 
     if blocked:
-        return format_response({
-            "error": True,
-            "code": "REQUIRED_TOOLS_DISABLED",
-            "message": f"Composite tool requires disabled tools: {', '.join(blocked)}",
-            "suggestion": "Enable these tools or use individual tools instead",
-        })
+        return format_response(
+            {
+                "error": True,
+                "code": "REQUIRED_TOOLS_DISABLED",
+                "message": f"Composite tool requires disabled tools: {', '.join(blocked)}",
+                "suggestion": "Enable these tools or use individual tools instead",
+            }
+        )
     return None
 
 
 async def _resolve_device(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     device_name: str | None = None,
 ) -> tuple[int, dict]:
@@ -70,7 +72,10 @@ async def _resolve_device(
         return device_id, data
     if device_name:
         data = await _call_sub_tool(
-            get_devices, client, name_filter=device_name, limit=1,
+            get_devices,
+            client,
+            name_filter=device_name,
+            limit=1,
         )
         devices = data.get("devices", [])
         if not devices:
@@ -102,7 +107,7 @@ _TRIAGE_REQUIRED = [
 
 
 async def triage(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     severity: str | None = None,
     device: str | None = None,
     group_id: int | None = None,
@@ -142,8 +147,11 @@ async def triage(
         # 1. Get alert statistics
         try:
             stats = await _call_sub_tool(
-                get_alert_statistics, client,
-                hours_back=hours_back, device=device, group_id=group_id,
+                get_alert_statistics,
+                client,
+                hours_back=hours_back,
+                device=device,
+                group_id=group_id,
             )
             report["statistics"] = stats
         except Exception as exc:
@@ -154,9 +162,12 @@ async def triage(
         clusters_data: dict = {}
         try:
             clusters_data = await _call_sub_tool(
-                correlate_alerts, client,
-                hours_back=hours_back, severity=severity,
-                device=device, group_id=group_id,
+                correlate_alerts,
+                client,
+                hours_back=hours_back,
+                severity=severity,
+                device=device,
+                group_id=group_id,
             )
             report["clusters"] = clusters_data
         except Exception as exc:
@@ -166,8 +177,11 @@ async def triage(
         # 3. Score alert noise
         try:
             noise = await _call_sub_tool(
-                score_alert_noise, client,
-                hours_back=hours_back, device=device, group_id=group_id,
+                score_alert_noise,
+                client,
+                hours_back=hours_back,
+                device=device,
+                group_id=group_id,
             )
             report["noise"] = noise
         except Exception as exc:
@@ -185,18 +199,24 @@ async def triage(
                 from lm_mcp.tools.devices import get_devices
 
                 dev_data = await _call_sub_tool(
-                    get_devices, client, name_filter=device_key, limit=1,
+                    get_devices,
+                    client,
+                    name_filter=device_key,
+                    limit=1,
                 )
                 devs = dev_data.get("devices", [])
                 if devs:
                     br = await _call_sub_tool(
-                        analyze_blast_radius, client,
+                        analyze_blast_radius,
+                        client,
                         device_id=devs[0]["id"],
                     )
-                    blast_results.append({
-                        "device": device_key,
-                        "blast_radius": br,
-                    })
+                    blast_results.append(
+                        {
+                            "device": device_key,
+                            "blast_radius": br,
+                        }
+                    )
             except Exception:
                 pass
         report["blast_radius"] = blast_results
@@ -204,7 +224,9 @@ async def triage(
         # 5. Correlate changes
         try:
             changes = await _call_sub_tool(
-                correlate_changes, client, hours_back=hours_back,
+                correlate_changes,
+                client,
+                hours_back=hours_back,
             )
             report["changes"] = changes
         except Exception as exc:
@@ -242,7 +264,7 @@ _HEALTH_CHECK_REQUIRED = [
 
 
 async def health_check(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     device_name: str | None = None,
     detail_level: str = "summary",
@@ -275,7 +297,9 @@ async def health_check(
 
         # 1. Resolve device
         resolved_id, device_info = await _resolve_device(
-            client, device_id=device_id, device_name=device_name,
+            client,
+            device_id=device_id,
+            device_name=device_name,
         )
         report: dict = {
             "device_id": resolved_id,
@@ -287,7 +311,9 @@ async def health_check(
         ds_list: list[dict] = []
         try:
             ds_data = await _call_sub_tool(
-                get_device_datasources, client, device_id=resolved_id,
+                get_device_datasources,
+                client,
+                device_id=resolved_id,
             )
             ds_list = ds_data.get("datasources", [])
             report["datasource_count"] = len(ds_list)
@@ -306,8 +332,10 @@ async def health_check(
                 continue
             try:
                 inst_data = await _call_sub_tool(
-                    get_device_instances, client,
-                    device_id=resolved_id, device_datasource_id=ds_id,
+                    get_device_instances,
+                    client,
+                    device_id=resolved_id,
+                    device_datasource_id=ds_id,
                 )
                 instances = inst_data.get("instances", [])
                 if not instances:
@@ -320,15 +348,18 @@ async def health_check(
 
                 try:
                     score = await _call_sub_tool(
-                        score_device_health, client,
+                        score_device_health,
+                        client,
                         device_id=resolved_id,
                         device_datasource_id=ds_id,
                         instance_id=inst_id,
                     )
-                    health_scores.append({
-                        "datasource": ds.get("name", ""),
-                        "score": score,
-                    })
+                    health_scores.append(
+                        {
+                            "datasource": ds.get("name", ""),
+                            "score": score,
+                        }
+                    )
                 except Exception:
                     pass
             except Exception:
@@ -340,7 +371,8 @@ async def health_check(
         if primary_ds_id is not None and primary_instance_id is not None:
             try:
                 anomalies = await _call_sub_tool(
-                    get_metric_anomalies, client,
+                    get_metric_anomalies,
+                    client,
                     device_id=resolved_id,
                     device_datasource_id=primary_ds_id,
                     instance_id=primary_instance_id,
@@ -355,7 +387,10 @@ async def health_check(
         try:
             device_display = report["device_name"]
             alert_data = await _call_sub_tool(
-                get_alerts, client, device=device_display, cleared=False,
+                get_alerts,
+                client,
+                device=device_display,
+                cleared=False,
             )
             report["active_alerts"] = alert_data
         except Exception as exc:
@@ -365,7 +400,9 @@ async def health_check(
         # 6. Availability (30-day)
         try:
             avail = await _call_sub_tool(
-                calculate_availability, client, device_id=resolved_id,
+                calculate_availability,
+                client,
+                device_id=resolved_id,
             )
             report["availability"] = avail
         except Exception as exc:
@@ -399,7 +436,7 @@ _CAPACITY_PLAN_REQUIRED = [
 
 
 async def capacity_plan(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     device_name: str | None = None,
     datasource: str | None = None,
@@ -439,7 +476,9 @@ async def capacity_plan(
 
         # 1. Resolve device
         resolved_id, device_info = await _resolve_device(
-            client, device_id=device_id, device_name=device_name,
+            client,
+            device_id=device_id,
+            device_name=device_name,
         )
         report: dict = {
             "device_id": resolved_id,
@@ -451,7 +490,8 @@ async def capacity_plan(
         # 2. Get datasources (filtered if datasource param given)
         try:
             ds_data = await _call_sub_tool(
-                get_device_datasources, client,
+                get_device_datasources,
+                client,
                 device_id=resolved_id,
                 name_filter=datasource,
             )
@@ -471,8 +511,10 @@ async def capacity_plan(
 
             try:
                 inst_data = await _call_sub_tool(
-                    get_device_instances, client,
-                    device_id=resolved_id, device_datasource_id=ds_id,
+                    get_device_instances,
+                    client,
+                    device_id=resolved_id,
+                    device_datasource_id=ds_id,
                 )
                 instances = inst_data.get("instances", [])
             except Exception:
@@ -494,8 +536,10 @@ async def capacity_plan(
                 # Forecast (use threshold=90 as default capacity threshold)
                 try:
                     fc = await _call_sub_tool(
-                        forecast_metric, client,
-                        threshold=90.0, **common_kwargs,
+                        forecast_metric,
+                        client,
+                        threshold=90.0,
+                        **common_kwargs,
                     )
                     inst_report["forecast"] = fc
                 except Exception:
@@ -504,7 +548,9 @@ async def capacity_plan(
                 # Classify trend
                 try:
                     trend = await _call_sub_tool(
-                        classify_trend, client, **common_kwargs,
+                        classify_trend,
+                        client,
+                        **common_kwargs,
                     )
                     inst_report["trend"] = trend
                 except Exception:
@@ -513,7 +559,9 @@ async def capacity_plan(
                 # Seasonality
                 try:
                     season = await _call_sub_tool(
-                        detect_seasonality, client, **common_kwargs,
+                        detect_seasonality,
+                        client,
+                        **common_kwargs,
                     )
                     inst_report["seasonality"] = season
                 except Exception:
@@ -531,7 +579,9 @@ async def capacity_plan(
                 if is_volatile:
                     try:
                         cps = await _call_sub_tool(
-                            detect_change_points, client, **common_kwargs,
+                            detect_change_points,
+                            client,
+                            **common_kwargs,
                         )
                         inst_report["change_points"] = cps
                     except Exception:
@@ -570,7 +620,7 @@ _PORTAL_OVERVIEW_REQUIRED = [
 
 
 async def portal_overview(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hours_back: int = 4,
     detail_level: str = "summary",
 ) -> list[TextContent]:
@@ -605,7 +655,9 @@ async def portal_overview(
         # 1. Alert statistics
         try:
             stats = await _call_sub_tool(
-                get_alert_statistics, client, hours_back=hours_back,
+                get_alert_statistics,
+                client,
+                hours_back=hours_back,
             )
             report["alert_statistics"] = stats
         except Exception as exc:
@@ -615,10 +667,18 @@ async def portal_overview(
         # 2. High-severity active alerts (critical + error)
         try:
             crit_alerts = await _call_sub_tool(
-                get_alerts, client, severity="critical", cleared=False, limit=20,
+                get_alerts,
+                client,
+                severity="critical",
+                cleared=False,
+                limit=20,
             )
             err_alerts = await _call_sub_tool(
-                get_alerts, client, severity="error", cleared=False, limit=20,
+                get_alerts,
+                client,
+                severity="error",
+                cleared=False,
+                limit=20,
             )
             report["critical_alerts"] = crit_alerts
             report["error_alerts"] = err_alerts
@@ -646,7 +706,9 @@ async def portal_overview(
         # 5. Correlate alerts
         try:
             cluster_data = await _call_sub_tool(
-                correlate_alerts, client, hours_back=hours_back,
+                correlate_alerts,
+                client,
+                hours_back=hours_back,
             )
             report["alert_clusters"] = cluster_data
         except Exception as exc:
@@ -656,7 +718,9 @@ async def portal_overview(
         # 6. Noise assessment
         try:
             noise = await _call_sub_tool(
-                score_alert_noise, client, hours_back=hours_back,
+                score_alert_noise,
+                client,
+                hours_back=hours_back,
             )
             report["noise"] = noise
         except Exception as exc:
@@ -699,7 +763,7 @@ _DIAGNOSE_REQUIRED = [
 
 
 async def diagnose(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     alert_id: str | None = None,
     device_name: str | None = None,
     detail_level: str = "summary",
@@ -741,7 +805,9 @@ async def diagnose(
         if alert_id:
             try:
                 alert_data = await _call_sub_tool(
-                    get_alert_details, client, alert_id=alert_id,
+                    get_alert_details,
+                    client,
+                    alert_id=alert_id,
                 )
                 target_device_id = alert_data.get("monitorObjectId")
                 report["alert"] = alert_data
@@ -750,14 +816,19 @@ async def diagnose(
         elif device_name:
             try:
                 alerts_data = await _call_sub_tool(
-                    get_alerts, client, device=device_name,
-                    severity="critical", cleared=False, limit=1,
+                    get_alerts,
+                    client,
+                    device=device_name,
+                    severity="critical",
+                    cleared=False,
+                    limit=1,
                 )
                 alert_list = alerts_data.get("alerts", [])
                 if alert_list:
                     resolved_alert_id = alert_list[0].get("id", "")
                     alert_data = await _call_sub_tool(
-                        get_alert_details, client,
+                        get_alert_details,
+                        client,
                         alert_id=str(resolved_alert_id),
                     )
                     target_device_id = alert_data.get("monitorObjectId")
@@ -768,17 +839,21 @@ async def diagnose(
             except Exception as exc:
                 warnings.append(f"get_alerts/get_alert_details failed: {exc}")
         else:
-            return format_response({
-                "error": True,
-                "code": "MISSING_PARAMS",
-                "message": "Either alert_id or device_name is required",
-            })
+            return format_response(
+                {
+                    "error": True,
+                    "code": "MISSING_PARAMS",
+                    "message": "Either alert_id or device_name is required",
+                }
+            )
 
         # 2. Device context
         if target_device_id is not None:
             try:
                 dev = await _call_sub_tool(
-                    get_device, client, device_id=target_device_id,
+                    get_device,
+                    client,
+                    device_id=target_device_id,
                 )
                 report["device"] = dev
             except Exception as exc:
@@ -786,7 +861,9 @@ async def diagnose(
 
             try:
                 props = await _call_sub_tool(
-                    get_device_properties, client, device_id=target_device_id,
+                    get_device_properties,
+                    client,
+                    device_id=target_device_id,
                 )
                 report["device_properties"] = props
             except Exception as exc:
@@ -795,7 +872,9 @@ async def diagnose(
         # 3. Correlated alerts
         try:
             corr = await _call_sub_tool(
-                correlate_alerts, client, hours_back=4,
+                correlate_alerts,
+                client,
+                hours_back=4,
             )
             report["correlated_alerts"] = corr
         except Exception as exc:
@@ -804,7 +883,9 @@ async def diagnose(
         # 4. Change correlation
         try:
             changes = await _call_sub_tool(
-                correlate_changes, client, hours_back=4,
+                correlate_changes,
+                client,
+                hours_back=4,
             )
             report["changes"] = changes
         except Exception as exc:
@@ -814,7 +895,9 @@ async def diagnose(
         if target_device_id is not None:
             try:
                 blast = await _call_sub_tool(
-                    analyze_blast_radius, client, device_id=target_device_id,
+                    analyze_blast_radius,
+                    client,
+                    device_id=target_device_id,
                 )
                 report["blast_radius"] = blast
             except Exception as exc:
@@ -856,7 +939,7 @@ _WORKFLOW_ALIASES: dict[str, list[str]] = {
 
 
 async def search_tools(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     query: str,
     category: str | None = None,
     limit: int = 10,
@@ -884,12 +967,14 @@ async def search_tools(
         # Tokenize query into lowercase words
         query_words = re.findall(r"[a-z0-9_]+", query.lower())
         if not query_words:
-            return format_response({
-                "matches": [],
-                "total": 0,
-                "query": query,
-                "suggestions": [],
-            })
+            return format_response(
+                {
+                    "matches": [],
+                    "total": 0,
+                    "query": query,
+                    "suggestions": [],
+                }
+            )
 
         # Optionally filter by category
         category_tool_names: set[str] | None = None
@@ -899,14 +984,16 @@ async def search_tools(
             if cat_data:
                 category_tool_names = set(cat_data.get("tools", []))
             else:
-                return format_response({
-                    "matches": [],
-                    "total": 0,
-                    "query": query,
-                    "category": category,
-                    "available_categories": list(cats.keys()),
-                    "suggestions": [],
-                })
+                return format_response(
+                    {
+                        "matches": [],
+                        "total": 0,
+                        "query": query,
+                        "category": category,
+                        "available_categories": list(cats.keys()),
+                        "suggestions": [],
+                    }
+                )
 
         # Score each tool
         scored: list[tuple[float, dict]] = []
@@ -936,11 +1023,16 @@ async def search_tools(
                     score += 1.0
 
             if score > 0:
-                scored.append((score, {
-                    "name": name,
-                    "description": tool.description,
-                    "score": round(score, 1),
-                }))
+                scored.append(
+                    (
+                        score,
+                        {
+                            "name": name,
+                            "description": tool.description,
+                            "score": round(score, 1),
+                        },
+                    )
+                )
 
         # Sort by score descending
         scored.sort(key=lambda x: x[0], reverse=True)
@@ -955,12 +1047,14 @@ async def search_tools(
                     if t not in suggestions:
                         suggestions.append(t)
 
-        return format_response({
-            "matches": matches,
-            "total": len(scored),
-            "query": query,
-            "category": category,
-            "suggestions": suggestions if suggestions else None,
-        })
+        return format_response(
+            {
+                "matches": matches,
+                "total": len(scored),
+                "query": query,
+                "category": category,
+                "suggestions": suggestions if suggestions else None,
+            }
+        )
     except Exception as e:
         return handle_error(e)

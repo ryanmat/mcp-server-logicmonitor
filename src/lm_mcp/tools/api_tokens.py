@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 async def get_api_tokens(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     admin_id: int,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -60,7 +60,7 @@ async def get_api_tokens(
 
 
 async def get_api_token(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     admin_id: int,
     token_id: int,
 ) -> list[TextContent]:

@@ -39,10 +39,7 @@ DATA_URL = (
 
 def _make_metric_response(dp_names, values, interval_sec=300):
     """Helper to build metric API response."""
-    times = [
-        (BASE_EPOCH + i * interval_sec) * 1000
-        for i in range(len(values))
-    ]
+    times = [(BASE_EPOCH + i * interval_sec) * 1000 for i in range(len(values))]
     return {
         "dataPoints": dp_names,
         "values": values,
@@ -61,14 +58,15 @@ class TestForecastMetric:
         # Steadily increasing: 10, 20, 30, 40, 50
         values = [[float(10 + i * 10)] for i in range(5)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -86,14 +84,15 @@ class TestForecastMetric:
 
         values = [[50.0]] * 10
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -108,14 +107,15 @@ class TestForecastMetric:
 
         values = [[float(50 - i * 5)] for i in range(10)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -129,14 +129,15 @@ class TestForecastMetric:
         from lm_mcp.tools.forecasting import forecast_metric
 
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json={"dataPoints": ["cpu"], "values": [], "time": []}
-            )
+            return_value=httpx.Response(200, json={"dataPoints": ["cpu"], "values": [], "time": []})
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -148,14 +149,15 @@ class TestForecastMetric:
         from lm_mcp.tools.forecasting import forecast_metric
 
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], [[50.0]])
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], [[50.0]]))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -168,14 +170,15 @@ class TestForecastMetric:
 
         values = [[50.0], [55.0], [60.0]]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -190,14 +193,15 @@ class TestForecastMetric:
 
         values = [[50.0, 70.0], [55.0, 65.0], [60.0, 60.0]]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu", "memory"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu", "memory"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -214,8 +218,11 @@ class TestForecastMetric:
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         assert "Error:" in result[0].text
@@ -227,14 +234,15 @@ class TestForecastMetric:
 
         values = [[float(10 + i * 10)] for i in range(5)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -249,14 +257,15 @@ class TestForecastMetric:
         # Values well above threshold, decreasing
         values = [[float(200 - i * 10)] for i in range(5)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
         )
 
         data = json.loads(result[0].text)
@@ -275,14 +284,16 @@ class TestForecastMetricMethod:
 
         values = [[float(10 + i)] for i in range(10)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0, hours_back=24,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
+            hours_back=24,
             method="auto",
         )
 
@@ -298,14 +309,15 @@ class TestForecastMetricMethod:
         # Enough data for Holt-Winters (2 seasons of 12)
         values = [[float(50 + 10 * math.sin(2 * math.pi * i / 12))] for i in range(48)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=200.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=200.0,
             method="holt_winters",
         )
 
@@ -320,14 +332,15 @@ class TestForecastMetricMethod:
 
         values = [[float(10 + i * 2)] for i in range(20)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=200.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=200.0,
         )
 
         data = json.loads(result[0].text)
@@ -346,14 +359,15 @@ class TestForecastMetricMethod:
 
         values = [[float(10 + i)] for i in range(10)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await forecast_metric(
-            client, device_id=1, device_datasource_id=10,
-            instance_id=100, threshold=100.0,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=100.0,
             method="linear",
         )
 
@@ -372,21 +386,20 @@ class TestDetectChangePoints:
 
         values = [[10.0]] * 15 + [[30.0]] * 15
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await detect_change_points(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
         assert data["total_change_points"] > 0
         cpu_data = data["datapoints"]["cpu"]
-        assert any(
-            cp["direction"] == "increase" for cp in cpu_data["change_points"]
-        )
+        assert any(cp["direction"] == "increase" for cp in cpu_data["change_points"])
 
     @respx.mock
     async def test_stable_data_no_changes(self, client):
@@ -395,13 +408,14 @@ class TestDetectChangePoints:
 
         values = [[10.0 + (i % 3) * 0.1] for i in range(30)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await detect_change_points(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -414,13 +428,14 @@ class TestDetectChangePoints:
 
         values = [[10.0]] * 15 + [[20.0]] * 15
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await detect_change_points(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
             sensitivity=5.0,
         )
 
@@ -435,13 +450,14 @@ class TestDetectChangePoints:
 
         values = [[10.0]] * 15 + [[30.0]] * 15
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await detect_change_points(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -457,13 +473,14 @@ class TestDetectChangePoints:
         from lm_mcp.tools.forecasting import detect_change_points
 
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json={"dataPoints": ["cpu"], "values": [], "time": []}
-            )
+            return_value=httpx.Response(200, json={"dataPoints": ["cpu"], "values": [], "time": []})
         )
 
         result = await detect_change_points(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -479,7 +496,10 @@ class TestDetectChangePoints:
         )
 
         result = await detect_change_points(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         assert "Error:" in result[0].text
@@ -496,13 +516,14 @@ class TestClassifyTrend:
         # Start high so CV stays low (variation small relative to mean)
         values = [[float(100 + i * 2)] for i in range(20)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -518,13 +539,14 @@ class TestClassifyTrend:
         # Start high so CV stays low (variation small relative to mean)
         values = [[float(200 - i * 2)] for i in range(20)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -538,13 +560,14 @@ class TestClassifyTrend:
 
         values = [[50.0]] * 20
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -557,16 +580,18 @@ class TestClassifyTrend:
         import random
 
         from lm_mcp.tools.forecasting import classify_trend
+
         random.seed(42)
         values = [[random.uniform(0, 100)] for _ in range(20)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -580,13 +605,14 @@ class TestClassifyTrend:
         from lm_mcp.tools.forecasting import classify_trend
 
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], [[50.0]])
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], [[50.0]]))
         )
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -599,13 +625,14 @@ class TestClassifyTrend:
 
         values = [[float(10 + i)] for i in range(10)]
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -621,12 +648,13 @@ class TestClassifyTrend:
         """API errors are returned as error response."""
         from lm_mcp.tools.forecasting import classify_trend
 
-        respx.get(DATA_URL).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "error"})
-        )
+        respx.get(DATA_URL).mock(return_value=httpx.Response(500, json={"errorMessage": "error"}))
 
         result = await classify_trend(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         assert "Error:" in result[0].text
@@ -648,7 +676,10 @@ class TestDetectSeasonality:
         )
 
         result = await detect_seasonality(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -661,10 +692,7 @@ class TestDetectSeasonality:
         from lm_mcp.tools.forecasting import detect_seasonality
 
         # Period of 12 samples (1 hour at 5-min intervals)
-        values = [
-            [50.0 + 20.0 * math.sin(2 * math.pi * i / 12)]
-            for i in range(200)
-        ]
+        values = [[50.0 + 20.0 * math.sin(2 * math.pi * i / 12)] for i in range(200)]
         respx.get(DATA_URL).mock(
             return_value=httpx.Response(
                 200, json=_make_metric_response(["cpu"], values, interval_sec=300)
@@ -672,7 +700,10 @@ class TestDetectSeasonality:
         )
 
         result = await detect_seasonality(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -699,7 +730,10 @@ class TestDetectSeasonality:
         )
 
         result = await detect_seasonality(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -713,13 +747,14 @@ class TestDetectSeasonality:
         from lm_mcp.tools.forecasting import detect_seasonality
 
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], [[50.0], [51.0]])
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], [[50.0], [51.0]]))
         )
 
         result = await detect_seasonality(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -732,13 +767,14 @@ class TestDetectSeasonality:
 
         values = [[50.0]] * 50
         respx.get(DATA_URL).mock(
-            return_value=httpx.Response(
-                200, json=_make_metric_response(["cpu"], values)
-            )
+            return_value=httpx.Response(200, json=_make_metric_response(["cpu"], values))
         )
 
         result = await detect_seasonality(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
             hours_back=48,
         )
 
@@ -750,12 +786,13 @@ class TestDetectSeasonality:
         """API errors are returned as error response."""
         from lm_mcp.tools.forecasting import detect_seasonality
 
-        respx.get(DATA_URL).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "error"})
-        )
+        respx.get(DATA_URL).mock(return_value=httpx.Response(500, json={"errorMessage": "error"}))
 
         result = await detect_seasonality(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         assert "Error:" in result[0].text

@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def create_asgi_app() -> "Starlette":
+def create_asgi_app() -> Starlette:
     """Create the ASGI application with MCP and health endpoints.
 
     Returns:
@@ -86,9 +87,7 @@ def create_asgi_app() -> "Starlette":
                 if _awx_client is not None:
                     all_tools.extend(AWX_TOOLS)
                 filtered = _filter_tools(all_tools, config)
-                result = [
-                    {"name": t.name, "description": t.description} for t in filtered
-                ]
+                result = [{"name": t.name, "description": t.description} for t in filtered]
                 return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})
 
             elif method == "tools/call":
@@ -157,6 +156,8 @@ def create_asgi_app() -> "Starlette":
     from lm_mcp.analysis import AnalysisStore, run_analysis, validate_workflow
 
     analysis_store = AnalysisStore(ttl_minutes=60)
+    # Hold references to background tasks to prevent garbage collection (RUF006)
+    _background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
 
     async def post_analyze(request: Request) -> Response:
         """Start an analysis workflow.
@@ -164,20 +165,14 @@ def create_asgi_app() -> "Starlette":
         Accepts JSON body with 'workflow' and 'arguments' fields.
         Returns 202 with analysis_id for async polling.
         """
-        import asyncio
-
         try:
             body = await request.json()
         except (json.JSONDecodeError, Exception):
-            return JSONResponse(
-                {"error": "Invalid JSON body"}, status_code=400
-            )
+            return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
 
         workflow = body.get("workflow")
         if not workflow:
-            return JSONResponse(
-                {"error": "Missing 'workflow' field"}, status_code=400
-            )
+            return JSONResponse({"error": "Missing 'workflow' field"}, status_code=400)
 
         try:
             validate_workflow(workflow)
@@ -188,7 +183,9 @@ def create_asgi_app() -> "Starlette":
         req = analysis_store.create(workflow, arguments)
 
         # Run analysis in background
-        asyncio.create_task(run_analysis(analysis_store, req.id))
+        task = asyncio.create_task(run_analysis(analysis_store, req.id))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
         return JSONResponse(
             {"analysis_id": req.id, "status": "pending"},
@@ -204,9 +201,7 @@ def create_asgi_app() -> "Starlette":
         req = analysis_store.get(analysis_id)
 
         if req is None:
-            return JSONResponse(
-                {"error": "Analysis not found"}, status_code=404
-            )
+            return JSONResponse({"error": "Analysis not found"}, status_code=404)
 
         return JSONResponse(req.to_dict())
 
@@ -215,14 +210,10 @@ def create_asgi_app() -> "Starlette":
 
         Accepts alert payload and starts an automatic RCA analysis.
         """
-        import asyncio
-
         try:
             body = await request.json()
         except (json.JSONDecodeError, Exception):
-            return JSONResponse(
-                {"error": "Invalid JSON body"}, status_code=400
-            )
+            return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
 
         # Extract alert context for RCA
         device_id = body.get("deviceId")
@@ -236,7 +227,9 @@ def create_asgi_app() -> "Starlette":
             arguments["alert_id"] = alert_id
 
         req = analysis_store.create("rca_workflow", arguments)
-        asyncio.create_task(run_analysis(analysis_store, req.id))
+        task = asyncio.create_task(run_analysis(analysis_store, req.id))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
 
         return JSONResponse(
             {"analysis_id": req.id, "status": "pending"},
@@ -261,7 +254,7 @@ def create_asgi_app() -> "Starlette":
                     "analysis": "/api/v1/analysis/{id}",
                     "webhook_alert": "/api/v1/webhooks/alert",
                 },
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
 

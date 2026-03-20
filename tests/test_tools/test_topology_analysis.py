@@ -52,9 +52,7 @@ class TestAnalyzeBlastRadius:
             )
         )
         # Alert checks for each neighbor
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
@@ -80,9 +78,7 @@ class TestAnalyzeBlastRadius:
                 json={"items": [{"id": 3, "displayName": "server-01"}]},
             )
         )
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await analyze_blast_radius(client, device_id=1, depth=2)
 
@@ -165,9 +161,7 @@ class TestAnalyzeBlastRadius:
                 },
             )
         )
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
@@ -209,9 +203,7 @@ class TestAnalyzeBlastRadius:
                 json={"items": [{"id": 2, "displayName": "neighbor-01"}]},
             )
         )
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 

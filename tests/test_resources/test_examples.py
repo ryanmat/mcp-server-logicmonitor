@@ -39,12 +39,8 @@ class TestExampleResponses:
         """Each tool example has description and example keys."""
         data = get_example_responses()
         for tool_name, tool_data in data["examples"].items():
-            assert "description" in tool_data, (
-                f"{tool_name} missing description"
-            )
-            assert "example" in tool_data, (
-                f"{tool_name} missing example"
-            )
+            assert "description" in tool_data, f"{tool_name} missing description"
+            assert "example" in tool_data, f"{tool_name} missing example"
 
     def test_top_level_has_name_and_description(self):
         """Top-level dict has name and description fields."""

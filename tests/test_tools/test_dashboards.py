@@ -284,9 +284,7 @@ class TestCreateDashboardWithWidgetTokens:
         """create_dashboard passes widget_tokens as widgetTokens in payload."""
         from lm_mcp.tools.dashboards import create_dashboard
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 600, "name": "Token Dashboard", "groupId": 1},
@@ -317,9 +315,7 @@ class TestCreateDashboardWithWidgetTokens:
         """create_dashboard uses template as base payload, overriding name and stripping id."""
         from lm_mcp.tools.dashboards import create_dashboard
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 700, "name": "Cloned Dashboard", "groupId": 2},
@@ -353,15 +349,11 @@ class TestCreateDashboardWithWidgetTokens:
         assert request_body["widgetsConfig"] == [1, 2, 3]
 
     @respx.mock
-    async def test_create_dashboard_template_with_tokens_override(
-        self, client, enable_writes
-    ):
+    async def test_create_dashboard_template_with_tokens_override(self, client, enable_writes):
         """create_dashboard with both template and widget_tokens merges correctly."""
         from lm_mcp.tools.dashboards import create_dashboard
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 800, "name": "Merged Dashboard", "groupId": 1},
@@ -520,9 +512,7 @@ class TestGetWidget:
         """get_widget returns single widget details."""
         from lm_mcp.tools.dashboards import get_widget
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -550,9 +540,9 @@ class TestGetWidget:
         """get_widget returns error for missing widget."""
         from lm_mcp.tools.dashboards import get_widget
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets/999"
-        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Widget not found"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/widgets/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Widget not found"})
+        )
 
         result = await get_widget(client, dashboard_id=123, widget_id=999)
 
@@ -588,9 +578,7 @@ class TestAddWidget:
         """add_widget creates widget when writes enabled."""
         from lm_mcp.tools.dashboards import add_widget
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
-        ).mock(
+        respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -623,9 +611,7 @@ class TestAddWidget:
         """add_widget includes dashboardId in the request body."""
         from lm_mcp.tools.dashboards import add_widget
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -678,9 +664,7 @@ class TestUpdateWidget:
         from lm_mcp.tools.dashboards import update_widget
 
         # First the GET to fetch current widget
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -696,9 +680,7 @@ class TestUpdateWidget:
         )
 
         # Then the PUT to update
-        respx.put(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456"
-        ).mock(
+        respx.put("https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -747,9 +729,9 @@ class TestDeleteWidget:
         """delete_widget deletes widget when writes enabled."""
         from lm_mcp.tools.dashboards import delete_widget
 
-        respx.delete(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456"
-        ).mock(return_value=httpx.Response(200, json={}))
+        respx.delete("https://test.logicmonitor.com/santaba/rest/dashboard/widgets/456").mock(
+            return_value=httpx.Response(200, json={})
+        )
 
         result = await delete_widget(client, dashboard_id=123, widget_id=456)
 
@@ -870,9 +852,7 @@ class TestWidgetCountAccuracy:
             return_value=httpx.Response(
                 200,
                 json={
-                    "items": [
-                        {"id": 1, "name": "Dashboard", "widgetsConfig": [1, 2, 3, 4, 5]}
-                    ],
+                    "items": [{"id": 1, "name": "Dashboard", "widgetsConfig": [1, 2, 3, 4, 5]}],
                     "total": 1,
                 },
             )
@@ -891,9 +871,7 @@ class TestAddWidgetSLADefaults:
         """add_widget applies deviceSLA defaults when not provided in config."""
         from lm_mcp.tools.dashboards import add_widget
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 900, "name": "SLA Widget", "type": "deviceSLA", "dashboardId": 123},
@@ -926,9 +904,7 @@ class TestAddWidgetSLADefaults:
         """add_widget does not override explicitly provided SLA fields."""
         from lm_mcp.tools.dashboards import add_widget
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 901, "name": "SLA Widget", "type": "deviceSLA", "dashboardId": 123},
@@ -964,9 +940,7 @@ class TestAddWidgetFieldRemapping:
         """add_widget remaps deviceGroupFullPath to groupName for deviceSLA widgets."""
         from lm_mcp.tools.dashboards import add_widget
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 902, "name": "SLA", "type": "deviceSLA", "dashboardId": 123},
@@ -996,9 +970,7 @@ class TestAddWidgetFieldRemapping:
         """add_widget remaps 'html' to 'content' for text widgets."""
         from lm_mcp.tools.dashboards import add_widget
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 903, "name": "Info", "type": "text", "dashboardId": 123},

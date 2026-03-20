@@ -51,8 +51,7 @@ class TestGetRemediationSources:
         from lm_mcp.tools.remediationsources import get_remediationsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -99,8 +98,7 @@ class TestGetRemediationSources:
         from lm_mcp.tools.remediationsources import get_remediationsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -138,8 +136,7 @@ class TestGetRemediationSources:
         from lm_mcp.tools.remediationsources import get_remediationsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -177,8 +174,7 @@ class TestGetRemediationSources:
         from lm_mcp.tools.remediationsources import get_remediationsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -198,11 +194,8 @@ class TestGetRemediationSources:
         from lm_mcp.tools.remediationsources import get_remediationsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources"
-        ).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
-        )
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
+        ).mock(return_value=httpx.Response(500, json={"errorMessage": "Server error"}))
 
         result = await get_remediationsources(client)
 
@@ -289,9 +282,7 @@ class TestGetRemediationSource:
         respx.post(
             "https://test.logicmonitor.com/santaba/rest"
             "/exchange/toolbox/exchangeRemediationSources/999"
-        ).mock(
-            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await get_remediationsource(client, source_id=999)
 
@@ -397,9 +388,7 @@ class TestExecuteRemediation:
         """execute_remediation blocks execution on dead devices."""
         from lm_mcp.tools.remediationsources import execute_remediation
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "hostStatus": 1, "preferredCollectorId": 10},
@@ -415,17 +404,14 @@ class TestExecuteRemediation:
         """execute_remediation blocks when collector version is too old."""
         from lm_mcp.tools.remediationsources import execute_remediation
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "hostStatus": 0, "preferredCollectorId": 10},
             )
         )
         respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/collector/collectors/10"
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/10"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -442,27 +428,21 @@ class TestExecuteRemediation:
         """execute_remediation succeeds with valid device and collector."""
         from lm_mcp.tools.remediationsources import execute_remediation
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "hostStatus": 0, "preferredCollectorId": 10},
             )
         )
         respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/collector/collectors/10"
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/10"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 10, "build": "40.100"},
             )
         )
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/100"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/100").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -474,8 +454,7 @@ class TestExecuteRemediation:
             )
         )
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/executemanually"
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/executemanually"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -494,27 +473,21 @@ class TestExecuteRemediation:
         """execute_remediation passes alert_id in the request payload."""
         from lm_mcp.tools.remediationsources import execute_remediation
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "hostStatus": 0, "preferredCollectorId": 10},
             )
         )
         respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/collector/collectors/10"
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/10"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 10, "build": "40.100"},
             )
         )
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/100"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/100").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -526,8 +499,7 @@ class TestExecuteRemediation:
             )
         )
         post_route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/executemanually"
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/executemanually"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -549,35 +521,28 @@ class TestExecuteRemediation:
         """execute_remediation handles API errors gracefully."""
         from lm_mcp.tools.remediationsources import execute_remediation
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "hostStatus": 0, "preferredCollectorId": 10},
             )
         )
         respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/collector/collectors/10"
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/10"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 10, "build": "40.100"},
             )
         )
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/100"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/100").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 100, "name": "Test", "groovyScript": "test"},
             )
         )
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/executemanually"
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/executemanually"
         ).mock(
             return_value=httpx.Response(
                 500,
@@ -597,27 +562,20 @@ class TestGetRemediationStatus:
         """get_remediation_status returns device and source info."""
         from lm_mcp.tools.remediationsources import get_remediation_status
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/100"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/100").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 100, "name": "RestartApache", "group": "Linux"},
             )
         )
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "displayName": "prod-web-01", "hostStatus": 0},
             )
         )
 
-        result = await get_remediation_status(
-            client, host_id=1, remediation_source_id=100
-        )
+        result = await get_remediation_status(client, host_id=1, remediation_source_id=100)
         data = json.loads(result[0].text)
         assert data["host_id"] == 1
         assert data["source_name"] == "RestartApache"
@@ -628,27 +586,20 @@ class TestGetRemediationStatus:
         """get_remediation_status handles missing source gracefully."""
         from lm_mcp.tools.remediationsources import get_remediation_status
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/setting/remediationsources/999"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/999").mock(
             return_value=httpx.Response(
                 404,
                 json={"errorMessage": "Not found"},
             )
         )
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/1"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 1, "displayName": "prod-web-01", "hostStatus": 0},
             )
         )
 
-        result = await get_remediation_status(
-            client, host_id=1, remediation_source_id=999
-        )
+        result = await get_remediation_status(client, host_id=1, remediation_source_id=999)
         data = json.loads(result[0].text)
         assert data["source_name"] == "unknown"
 
@@ -661,9 +612,7 @@ class TestGetRemediationHistory:
         """get_remediation_history returns filtered audit entries."""
         from lm_mcp.tools.remediationsources import get_remediation_history
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/accesslogs"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -671,9 +620,7 @@ class TestGetRemediationHistory:
                         {
                             "happenedOn": 1710288000,
                             "username": "admin",
-                            "description": (
-                                "Remediation source 100 executed on host 1"
-                            ),
+                            "description": ("Remediation source 100 executed on host 1"),
                             "ip": "10.0.1.1",
                         },
                         {
@@ -698,9 +645,7 @@ class TestGetRemediationHistory:
         """get_remediation_history handles no entries gracefully."""
         from lm_mcp.tools.remediationsources import get_remediation_history
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/accesslogs"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
             return_value=httpx.Response(
                 200,
                 json={"items": [], "total": 0},
@@ -717,9 +662,7 @@ class TestGetRemediationHistory:
         """get_remediation_history filters by remediation_source_id."""
         from lm_mcp.tools.remediationsources import get_remediation_history
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/accesslogs"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -742,9 +685,7 @@ class TestGetRemediationHistory:
             )
         )
 
-        result = await get_remediation_history(
-            client, host_id=1, remediation_source_id=100
-        )
+        result = await get_remediation_history(client, host_id=1, remediation_source_id=100)
         data = json.loads(result[0].text)
         assert data["total_entries"] == 1
         assert "100" in data["entries"][0]["description"]

@@ -44,6 +44,7 @@ def client(auth):
 # Helpers for building mock sub-tool responses
 # ---------------------------------------------------------------------------
 
+
 def _mock_text(data: dict) -> list:
     """Build a list matching the TextContent return format of tool handlers."""
     from mcp.types import TextContent
@@ -71,6 +72,7 @@ class TestCheckRequiredTools:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = check_required_tools(["get_alerts", "correlate_alerts"])
@@ -84,6 +86,7 @@ class TestCheckRequiredTools:
         monkeypatch.setenv("LM_ENABLED_TOOLS", "get_alerts,get_devices")
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = check_required_tools(["get_alerts", "correlate_alerts"])
@@ -99,6 +102,7 @@ class TestCheckRequiredTools:
         monkeypatch.setenv("LM_DISABLED_TOOLS", "correlate_*")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = check_required_tools(["get_alerts", "correlate_alerts"])
@@ -128,15 +132,17 @@ class TestResolveDevice:
         """Resolving by device_name calls get_devices and returns first match."""
         mock_result = {"devices": [{"id": 99, "displayName": "web-01"}]}
         with _patch_sub("lm_mcp.tools.devices.get_devices", mock_result):
-            dev_id, dev_data = await _resolve_device(client, device_name="web-01")
+            dev_id, _dev_data = await _resolve_device(client, device_name="web-01")
         assert dev_id == 99
 
     async def test_not_found_raises(self, client):
         """Raises ValueError when no device matches the name."""
         mock_result = {"devices": []}
-        with _patch_sub("lm_mcp.tools.devices.get_devices", mock_result):
-            with pytest.raises(ValueError, match="No device found"):
-                await _resolve_device(client, device_name="ghost")
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", mock_result),
+            pytest.raises(ValueError, match="No device found"),
+        ):
+            await _resolve_device(client, device_name="ghost")
 
     async def test_missing_params_raises(self, client):
         """Raises ValueError when neither device_id nor device_name given."""
@@ -178,6 +184,7 @@ class TestTriage:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         stats_data = {"summary": {"total": 5}, "time_buckets": []}
@@ -207,6 +214,7 @@ class TestTriage:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         stats_data = {"summary": {"total": 0}, "time_buckets": []}
@@ -233,6 +241,7 @@ class TestTriage:
         monkeypatch.setenv("LM_DISABLED_TOOLS", "correlate_alerts")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = await triage(client)
@@ -247,6 +256,7 @@ class TestTriage:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         clusters_data = {"total_alerts": 0, "clusters": [], "cluster_count": 0}
@@ -286,6 +296,7 @@ class TestHealthCheck:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         device_data = {"id": 1, "displayName": "server-01"}
@@ -322,6 +333,7 @@ class TestHealthCheck:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         device_data = {"id": 1, "displayName": "server-01"}
@@ -355,6 +367,7 @@ class TestHealthCheck:
         monkeypatch.setenv("LM_DISABLED_TOOLS", "get_device_datasources")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = await health_check(client, device_id=1)
@@ -369,6 +382,7 @@ class TestHealthCheck:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         device_data = {"id": 1, "displayName": "server-01"}
@@ -408,6 +422,7 @@ class TestCapacityPlan:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         device_data = {"id": 1, "displayName": "server-01"}
@@ -426,7 +441,9 @@ class TestCapacityPlan:
             _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
         ):
             result = await capacity_plan(
-                client, device_id=1, detail_level="summary",
+                client,
+                device_id=1,
+                detail_level="summary",
             )
 
         data = json.loads(result[0].text)
@@ -442,6 +459,7 @@ class TestCapacityPlan:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         device_data = {"id": 1, "displayName": "server-01"}
@@ -460,7 +478,9 @@ class TestCapacityPlan:
             _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
         ):
             result = await capacity_plan(
-                client, device_id=1, detail_level="full",
+                client,
+                device_id=1,
+                detail_level="full",
             )
 
         data = json.loads(result[0].text)
@@ -475,6 +495,7 @@ class TestCapacityPlan:
         monkeypatch.setenv("LM_DISABLED_TOOLS", "forecast_metric")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = await capacity_plan(client, device_id=1)
@@ -489,6 +510,7 @@ class TestCapacityPlan:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         device_data = {"id": 1, "displayName": "server-01"}
@@ -499,7 +521,9 @@ class TestCapacityPlan:
             _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
         ):
             result = await capacity_plan(
-                client, device_id=1, detail_level="full",
+                client,
+                device_id=1,
+                detail_level="full",
             )
 
         data = json.loads(result[0].text)
@@ -522,6 +546,7 @@ class TestPortalOverview:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         stats_data = {"summary": {"total": 10}}
@@ -558,6 +583,7 @@ class TestPortalOverview:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         stats_data = {"summary": {"total": 10}}
@@ -591,6 +617,7 @@ class TestPortalOverview:
         monkeypatch.setenv("LM_DISABLED_TOOLS", "get_collectors")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = await portal_overview(client)
@@ -614,6 +641,7 @@ class TestDiagnose:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         alert_detail = {
@@ -651,6 +679,7 @@ class TestDiagnose:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         alerts_list = {"total": 1, "alerts": [{"id": "LMA456", "severity": 4}]}
@@ -687,6 +716,7 @@ class TestDiagnose:
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = await diagnose(client)
@@ -701,6 +731,7 @@ class TestDiagnose:
         monkeypatch.setenv("LM_DISABLED_TOOLS", "analyze_blast_radius")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
+
         reset_config()
 
         result = await diagnose(client, alert_id="LMA123")
@@ -740,8 +771,11 @@ class TestSearchTools:
         data = json.loads(result[0].text)
         # All results should be from the alerts category
         alert_tools = {
-            "get_alerts", "get_alert_details", "acknowledge_alert",
-            "add_alert_note", "bulk_acknowledge_alerts",
+            "get_alerts",
+            "get_alert_details",
+            "acknowledge_alert",
+            "add_alert_note",
+            "bulk_acknowledge_alerts",
         }
         for match in data["matches"]:
             assert match["name"] in alert_tools
@@ -769,7 +803,9 @@ class TestSearchTools:
     async def test_invalid_category(self, client):
         """Invalid category returns empty results with available categories."""
         result = await search_tools(
-            client, query="alert", category="nonexistent_cat",
+            client,
+            query="alert",
+            category="nonexistent_cat",
         )
         data = json.loads(result[0].text)
         assert data["total"] == 0

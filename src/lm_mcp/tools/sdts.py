@@ -35,7 +35,7 @@ _SDT_TYPE_API_MAP: dict[str, str] = {
 
 
 async def list_sdts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     device_group_id: int | None = None,
     sdt_type: str | None = None,
@@ -78,11 +78,11 @@ async def list_sdts(
             if sdt_type:
                 clean_type, was_modified = sanitize_filter_value(sdt_type)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'type:{quote_filter_value(clean_type)}')
+                filters.append(f"type:{quote_filter_value(clean_type)}")
             if admin:
                 clean_admin, was_modified = sanitize_filter_value(admin)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'admin~{quote_filter_value(clean_admin)}')
+                filters.append(f"admin~{quote_filter_value(clean_admin)}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -116,7 +116,7 @@ async def list_sdts(
 
 @require_write_permission
 async def create_sdt(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     sdt_type: str,
     device_id: int | None = None,
     device_group_id: int | None = None,
@@ -194,7 +194,7 @@ async def create_sdt(
 
 @require_write_permission
 async def delete_sdt(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     sdt_id: str,
 ) -> list[TextContent]:
     """Delete a scheduled downtime from LogicMonitor.
@@ -227,7 +227,7 @@ MAX_SDT_DURATION_MINUTES = 10080
 
 @require_write_permission
 async def bulk_create_device_sdt(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_ids: list[int],
     duration_minutes: int = 60,
     comment: str = "",
@@ -310,7 +310,7 @@ async def bulk_create_device_sdt(
 
 @require_write_permission
 async def bulk_delete_sdt(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     sdt_ids: list[str],
 ) -> list[TextContent]:
     """Delete multiple SDTs at once.
@@ -363,7 +363,7 @@ async def bulk_delete_sdt(
 
 
 async def get_active_sdts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     device_group_id: int | None = None,
     limit: int = 50,
@@ -422,7 +422,7 @@ async def get_active_sdts(
 
 
 async def get_upcoming_sdts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hours_ahead: int = 24,
     limit: int = 50,
 ) -> list[TextContent]:

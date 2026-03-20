@@ -13,10 +13,7 @@ from lm_mcp.registry import AWX_TOOLS, TOOLS
 SKILLS_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills"
 
 # Build a set of all tool names from the registry for cross-referencing
-ALL_REGISTRY_TOOLS = (
-    {tool.name for tool in TOOLS}
-    | {tool.name for tool in AWX_TOOLS}
-)
+ALL_REGISTRY_TOOLS = {tool.name for tool in TOOLS} | {tool.name for tool in AWX_TOOLS}
 
 # Expected skills (directory names under .claude/skills/)
 EXPECTED_SKILLS = [
@@ -44,7 +41,7 @@ def _parse_frontmatter(text: str) -> dict:
             result[current_key].append(line.strip("- ").strip())
             continue
         # Key: value pair
-        kv_match = re.match(r'^(\S[\w-]+):\s*(.*)', line)
+        kv_match = re.match(r"^(\S[\w-]+):\s*(.*)", line)
         if kv_match:
             key = kv_match.group(1)
             value = kv_match.group(2).strip().strip('"').strip("'")
@@ -101,22 +98,16 @@ class TestSkillFileStructure:
     def test_all_skills_have_description(self):
         """Every skill frontmatter contains a 'description' field."""
         for name, fm in self.skills.items():
-            assert "description" in fm, (
-                f"Skill '{name}' missing 'description' in frontmatter"
-            )
+            assert "description" in fm, f"Skill '{name}' missing 'description' in frontmatter"
 
     def test_all_skills_have_allowed_tools(self):
         """Every skill frontmatter contains an 'allowed-tools' list."""
         for name, fm in self.skills.items():
-            assert "allowed-tools" in fm, (
-                f"Skill '{name}' missing 'allowed-tools' in frontmatter"
-            )
+            assert "allowed-tools" in fm, f"Skill '{name}' missing 'allowed-tools' in frontmatter"
             assert isinstance(fm["allowed-tools"], list), (
                 f"Skill '{name}' 'allowed-tools' is not a list"
             )
-            assert len(fm["allowed-tools"]) > 0, (
-                f"Skill '{name}' 'allowed-tools' is empty"
-            )
+            assert len(fm["allowed-tools"]) > 0, f"Skill '{name}' 'allowed-tools' is empty"
 
     def test_skill_allowed_tools_exist_in_registry(self):
         """Every tool referenced in skill frontmatter maps to a real registry tool.
@@ -130,7 +121,7 @@ class TestSkillFileStructure:
                 assert tool_ref.startswith(prefix), (
                     f"Skill '{name}' tool '{tool_ref}' missing expected prefix"
                 )
-                tool_name = tool_ref[len(prefix):]
+                tool_name = tool_ref[len(prefix) :]
                 assert tool_name in ALL_REGISTRY_TOOLS, (
                     f"Skill '{name}' references tool '{tool_name}' "
                     f"which does not exist in TOOLS or AWX_TOOLS"
@@ -156,9 +147,7 @@ class TestSkillFileStructure:
             "mcp__logicmonitor__get_inventory_hosts",
         ]
         for expected in awx_tool_names:
-            assert expected in tools, (
-                f"lm-remediate missing AWX tool '{expected}'"
-            )
+            assert expected in tools, f"lm-remediate missing AWX tool '{expected}'"
 
     def test_lm_remediate_has_lm_diagnostic_tools(self):
         """lm-remediate skill includes LM diagnostic tools."""
@@ -175,6 +164,4 @@ class TestSkillFileStructure:
             "mcp__logicmonitor__analyze_blast_radius",
         ]
         for expected in lm_tool_names:
-            assert expected in tools, (
-                f"lm-remediate missing LM diagnostic tool '{expected}'"
-            )
+            assert expected in tools, f"lm-remediate missing LM diagnostic tool '{expected}'"

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 async def get_diagnosticsources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     group_filter: str | None = None,
 ) -> list[TextContent]:
@@ -29,9 +29,7 @@ async def get_diagnosticsources(
         List of TextContent with diagnostic source data or error.
     """
     try:
-        result = await client.post(
-            "/exchange/toolbox/exchangeDiagnosticSources", json_body={}
-        )
+        result = await client.post("/exchange/toolbox/exchangeDiagnosticSources", json_body={})
 
         # Unwrap Exchange Toolbox envelope
         data = result.get("data", {})
@@ -70,7 +68,7 @@ async def get_diagnosticsources(
 
 
 async def get_diagnosticsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     source_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific diagnostic source.

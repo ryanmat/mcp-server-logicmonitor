@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_netscans(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -42,7 +42,7 @@ async def get_netscans(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/setting/netscans", params=params)
 
@@ -75,7 +75,7 @@ async def get_netscans(
 
 
 async def get_netscan(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     netscan_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific netscan.
@@ -115,7 +115,7 @@ async def get_netscan(
 
 @require_write_permission
 async def run_netscan(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     netscan_id: int,
 ) -> list[TextContent]:
     """Execute a netscan immediately.

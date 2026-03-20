@@ -232,7 +232,7 @@ class TestLMConfigValidation:
 
         from lm_mcp.config import LMConfig
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             LMConfig()
 
 

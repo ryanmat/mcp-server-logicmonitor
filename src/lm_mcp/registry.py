@@ -60,7 +60,7 @@ TOOLS.extend(
                     "filter": {
                         "type": "string",
                         "description": "Raw filter expression (overrides other filters). "
-                        'Syntax: field:value, field~value. String values must be quoted: '
+                        "Syntax: field:value, field~value. String values must be quoted: "
                         'displayName~"server". Custom property queries use dot-notation: '
                         'customProperties.name:"env",customProperties.value:"prod"',
                     },
@@ -192,7 +192,10 @@ TOOLS.extend(
         ),
         Tool(
             name="update_device_group",
-            description="Update a device/resource group (requires write permission). Custom properties are merged with existing.",
+            description=(
+                "Update a device/resource group (requires write permission)."
+                " Custom properties are merged with existing."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -882,8 +885,7 @@ TOOLS.extend(
         ),
         Tool(
             name="create_dashboard",
-            description="Create a dashboard, optionally from template "
-            "(requires write permission)",
+            description="Create a dashboard, optionally from template (requires write permission)",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3045,8 +3047,7 @@ TOOLS.extend(
                         "enum": ["auto", "zscore", "iqr", "mad"],
                         "default": "auto",
                         "description": (
-                            "Anomaly detection method (auto selects based on "
-                            "data distribution)"
+                            "Anomaly detection method (auto selects based on data distribution)"
                         ),
                     },
                 },
@@ -3088,9 +3089,7 @@ TOOLS.extend(
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": (
-                            "Comma-separated datapoint names (all if omitted)"
-                        ),
+                        "description": ("Comma-separated datapoint names (all if omitted)"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3123,21 +3122,15 @@ TOOLS.extend(
                     },
                     "device_id": {
                         "type": "integer",
-                        "description": (
-                            "Override device ID (uses baseline if omitted)"
-                        ),
+                        "description": ("Override device ID (uses baseline if omitted)"),
                     },
                     "device_datasource_id": {
                         "type": "integer",
-                        "description": (
-                            "Override device-datasource ID"
-                        ),
+                        "description": ("Override device-datasource ID"),
                     },
                     "instance_id": {
                         "type": "integer",
-                        "description": (
-                            "Override instance ID"
-                        ),
+                        "description": ("Override instance ID"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3183,9 +3176,7 @@ TOOLS.extend(
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": (
-                            "Comma-separated datapoint names (all if omitted)"
-                        ),
+                        "description": ("Comma-separated datapoint names (all if omitted)"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3197,8 +3188,7 @@ TOOLS.extend(
                         "enum": ["auto", "linear", "holt_winters"],
                         "default": "auto",
                         "description": (
-                            "Forecasting method (auto selects based on data "
-                            "characteristics)"
+                            "Forecasting method (auto selects based on data characteristics)"
                         ),
                     },
                 },
@@ -3273,9 +3263,7 @@ TOOLS.extend(
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": (
-                            "Comma-separated datapoint names (all if omitted)"
-                        ),
+                        "description": ("Comma-separated datapoint names (all if omitted)"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3285,9 +3273,7 @@ TOOLS.extend(
                     "sensitivity": {
                         "type": "number",
                         "default": 1.0,
-                        "description": (
-                            "Detection sensitivity (lower = more sensitive)"
-                        ),
+                        "description": ("Detection sensitivity (lower = more sensitive)"),
                     },
                 },
                 "required": [
@@ -3349,9 +3335,7 @@ TOOLS.extend(
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": (
-                            "Comma-separated datapoint names (all if omitted)"
-                        ),
+                        "description": ("Comma-separated datapoint names (all if omitted)"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3396,8 +3380,7 @@ TOOLS.extend(
                         "type": "string",
                         "default": "error",
                         "description": (
-                            "Minimum severity for downtime "
-                            "(critical, error, warning, info)"
+                            "Minimum severity for downtime (critical, error, warning, info)"
                         ),
                     },
                 },
@@ -3446,9 +3429,7 @@ TOOLS.extend(
                     "correlation_window_minutes": {
                         "type": "integer",
                         "default": 30,
-                        "description": (
-                            "Minutes after a change to look for alert spikes"
-                        ),
+                        "description": ("Minutes after a change to look for alert spikes"),
                     },
                 },
             },
@@ -3478,9 +3459,7 @@ TOOLS.extend(
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": (
-                            "Comma-separated datapoint names (all if omitted)"
-                        ),
+                        "description": ("Comma-separated datapoint names (all if omitted)"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3489,9 +3468,7 @@ TOOLS.extend(
                     },
                     "weights": {
                         "type": "object",
-                        "description": (
-                            "Optional dict of datapoint_name -> weight"
-                        ),
+                        "description": ("Optional dict of datapoint_name -> weight"),
                     },
                 },
                 "required": [
@@ -3559,9 +3536,7 @@ TOOLS.extend(
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": (
-                            "Comma-separated datapoint names (all if omitted)"
-                        ),
+                        "description": ("Comma-separated datapoint names (all if omitted)"),
                     },
                     "hours_back": {
                         "type": "integer",
@@ -3780,8 +3755,7 @@ TOOLS.extend(
         Tool(
             name="get_trace_service_metrics",
             description=(
-                "Get APM service-level RED metrics "
-                "(Duration, ErrorOperationCount, OperationCount)"
+                "Get APM service-level RED metrics (Duration, ErrorOperationCount, OperationCount)"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3818,8 +3792,7 @@ TOOLS.extend(
         Tool(
             name="get_trace_operation_metrics",
             description=(
-                "Get per-operation RED metrics "
-                "(Duration, ErrorOperationCount, OperationCount)"
+                "Get per-operation RED metrics (Duration, ErrorOperationCount, OperationCount)"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3856,8 +3829,7 @@ TOOLS.extend(
         Tool(
             name="get_trace_service_properties",
             description=(
-                "Get properties for an APM service "
-                "(OTel attributes, namespace, metadata)"
+                "Get properties for an APM service (OTel attributes, namespace, metadata)"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3946,8 +3918,7 @@ TOOLS.extend(
         Tool(
             name="get_remediationsource",
             description=(
-                "[PREVIEW] Get details about a specific remediation "
-                "source including script"
+                "[PREVIEW] Get details about a specific remediation source including script"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4179,8 +4150,7 @@ TOOLS.extend(
                     "device_name": {
                         "type": "string",
                         "description": (
-                            "Device name to diagnose "
-                            "(finds most recent critical alert)"
+                            "Device name to diagnose (finds most recent critical alert)"
                         ),
                     },
                     "detail_level": {
@@ -4205,15 +4175,13 @@ TOOLS.extend(
                     "query": {
                         "type": "string",
                         "description": (
-                            "Search keywords "
-                            "(e.g., 'alert', 'device health', 'forecast')"
+                            "Search keywords (e.g., 'alert', 'device health', 'forecast')"
                         ),
                     },
                     "category": {
                         "type": "string",
                         "description": (
-                            "Filter to a specific category "
-                            "(e.g., 'alerts', 'ml_analysis')"
+                            "Filter to a specific category (e.g., 'alerts', 'ml_analysis')"
                         ),
                     },
                     "limit": {
@@ -4280,9 +4248,7 @@ AWX_TOOLS: list[Tool] = [
     # Job execution tools
     Tool(
         name="launch_job",
-        description=(
-            "Launch an Ansible job template. Requires write permission."
-        ),
+        description=("Launch an Ansible job template. Requires write permission."),
         annotations=_WRITE,
         inputSchema={
             "type": "object",
@@ -4419,9 +4385,7 @@ AWX_TOOLS: list[Tool] = [
     # Workflow tools
     Tool(
         name="launch_workflow",
-        description=(
-            "Launch a workflow job template. Requires write permission."
-        ),
+        description=("Launch a workflow job template. Requires write permission."),
         annotations=_WRITE,
         inputSchema={
             "type": "object",
@@ -4586,7 +4550,6 @@ AWX_TOOLS: list[Tool] = [
         },
     ),
 ]
-
 
 
 # Map tool names to their handler functions

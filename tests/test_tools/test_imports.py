@@ -577,9 +577,7 @@ class TestImportDatasourceErrorHandling:
 
         respx.post(
             "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
-        ).mock(
-            return_value=httpx.Response(200, json={})
-        )
+        ).mock(return_value=httpx.Response(200, json={}))
 
         result = await import_datasource(client, definition={"name": "BadXML"})
 

@@ -398,9 +398,7 @@ class TestUpdateDevice:
         )
 
         # PATCH with merged properties
-        route = respx.patch(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/100"
-        ).mock(
+        route = respx.patch("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -448,9 +446,7 @@ class TestUpdateDevice:
             )
         )
 
-        route = respx.patch(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/101"
-        ).mock(
+        route = respx.patch("https://test.logicmonitor.com/santaba/rest/device/devices/101").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 101, "displayName": "new-server", "description": ""},

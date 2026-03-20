@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -105,7 +105,7 @@ async def run_health_checks(include_connectivity: bool = False) -> HealthRespons
 
     return HealthResponse(
         status=overall_status,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         version=__version__,
         checks=checks,
     )

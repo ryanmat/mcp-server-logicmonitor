@@ -91,7 +91,6 @@ class TestCreateEscalationChain:
         assert data["success"] is True
         assert data["chain_id"] == 10
 
-
     @respx.mock
     async def test_create_escalation_chain_with_destinations(self, client, monkeypatch):
         """create_escalation_chain passes destinations to API."""
@@ -155,9 +154,7 @@ class TestCreateEscalationChain:
             )
         )
 
-        cc_destinations = [
-            {"type": "ARBITRARY", "method": "email", "addr": "cc@example.com"}
-        ]
+        cc_destinations = [{"type": "ARBITRARY", "method": "email", "addr": "cc@example.com"}]
         result = await create_escalation_chain(
             client,
             name="Chain with CC",
@@ -230,7 +227,6 @@ class TestUpdateEscalationChain:
         data = json.loads(result[0].text)
         assert data["success"] is True
 
-
     @respx.mock
     async def test_update_escalation_chain_with_destinations(self, client, monkeypatch):
         """update_escalation_chain passes destinations to API."""
@@ -246,7 +242,9 @@ class TestUpdateEscalationChain:
 
         from lm_mcp.tools.escalations import update_escalation_chain
 
-        route = respx.patch("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/10").mock(
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/setting/alert/chains/10"
+        ).mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 10, "name": "Updated Chain"},

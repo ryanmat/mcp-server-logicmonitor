@@ -5,19 +5,33 @@ from __future__ import annotations
 
 import functools
 import json
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from mcp.types import TextContent
 
 from lm_mcp.exceptions import LMError
 
 __all__ = [
+    "SEVERITY_MAP",
+    "SEVERITY_NAMES",
     "format_response",
     "handle_error",
     "quote_filter_value",
     "require_write_permission",
     "sanitize_filter_value",
 ]
+
+# Severity name-to-integer mapping used by alert, trace, and scoring tools
+SEVERITY_MAP: dict[str, int] = {
+    "critical": 4,
+    "error": 3,
+    "warning": 2,
+    "info": 1,
+}
+
+# Severity integer-to-name mapping (reverse of SEVERITY_MAP)
+SEVERITY_NAMES: dict[int, str] = {v: k for k, v in SEVERITY_MAP.items()}
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -82,10 +96,7 @@ def format_response(data: Any) -> list[TextContent]:
         return [TextContent(type="text", text=text)]
 
     # Success response
-    if isinstance(data, (dict, list)):
-        text = json.dumps(data, indent=2, default=str)
-    else:
-        text = str(data)
+    text = json.dumps(data, indent=2, default=str) if isinstance(data, (dict, list)) else str(data)
 
     return [TextContent(type="text", text=text)]
 

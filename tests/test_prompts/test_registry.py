@@ -390,15 +390,11 @@ class TestGetPromptMessages:
         for prompt in PROMPTS:
             result = get_prompt_messages(prompt.name, {})
             text = result.messages[0].content.text
-            assert "Argument parsing" in text, (
-                f"{prompt.name} missing Argument parsing"
-            )
+            assert "Argument parsing" in text, f"{prompt.name} missing Argument parsing"
 
     def test_all_prompts_have_expected_output(self):
         """All prompts include Expected output enrichment."""
         for prompt in PROMPTS:
             result = get_prompt_messages(prompt.name, {})
             text = result.messages[0].content.text
-            assert "Expected output" in text, (
-                f"{prompt.name} missing Expected output"
-            )
+            assert "Expected output" in text, f"{prompt.name} missing Expected output"

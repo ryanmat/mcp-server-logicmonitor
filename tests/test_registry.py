@@ -145,9 +145,12 @@ class TestRegistry:
     def test_session_tools_not_open_world(self):
         """Session tools have openWorldHint=False."""
         session_tools = {
-            "get_session_context", "set_session_variable",
-            "get_session_variable", "delete_session_variable",
-            "clear_session_context", "list_session_history",
+            "get_session_context",
+            "set_session_variable",
+            "get_session_variable",
+            "delete_session_variable",
+            "clear_session_context",
+            "list_session_history",
         }
         for tool in TOOLS:
             if tool.name in session_tools:
@@ -165,9 +168,12 @@ class TestRegistry:
         """
         # Session tools don't receive a client param
         session_tools = {
-            "get_session_context", "set_session_variable",
-            "get_session_variable", "delete_session_variable",
-            "clear_session_context", "list_session_history",
+            "get_session_context",
+            "set_session_variable",
+            "get_session_variable",
+            "delete_session_variable",
+            "clear_session_context",
+            "list_session_history",
         }
 
         for tool in TOOLS:
@@ -179,9 +185,7 @@ class TestRegistry:
             if tool.name not in session_tools:
                 func_params.discard("client")
 
-            schema_props = set(
-                tool.inputSchema.get("properties", {}).keys()
-            )
+            schema_props = set(tool.inputSchema.get("properties", {}).keys())
 
             # Every schema property must be a valid function parameter
             unexpected = schema_props - func_params

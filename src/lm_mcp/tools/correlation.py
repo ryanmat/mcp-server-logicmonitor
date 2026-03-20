@@ -11,7 +11,13 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, quote_filter_value
+from lm_mcp.tools import (
+    SEVERITY_MAP,
+    SEVERITY_NAMES,
+    format_response,
+    handle_error,
+    quote_filter_value,
+)
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
     iqr_anomalies,
@@ -21,12 +27,6 @@ from lm_mcp.tools.stats_helpers import (
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
-
-# Severity integer-to-name mapping (reverse of alerts.SEVERITY_MAP)
-SEVERITY_NAMES = {4: "critical", 3: "error", 2: "warning", 1: "info"}
-
-# Severity name-to-integer mapping for filter building
-SEVERITY_MAP = {"critical": 4, "error": 3, "warning": 2, "info": 1}
 
 # Temporal proximity window for clustering (seconds)
 TEMPORAL_WINDOW_SECONDS = 300  # 5 minutes
@@ -79,19 +79,19 @@ def _cluster_by_device(alerts: list[dict]) -> list[dict]:
         by_device[device].append(alert)
 
     clusters = []
-    for device, device_alerts in sorted(
-        by_device.items(), key=lambda x: len(x[1]), reverse=True
-    ):
+    for device, device_alerts in sorted(by_device.items(), key=lambda x: len(x[1]), reverse=True):
         if len(device_alerts) >= 2:
             epochs = [a.get("startEpoch", 0) for a in device_alerts]
-            clusters.append({
-                "type": "device",
-                "key": device,
-                "count": len(device_alerts),
-                "alert_ids": [a.get("id") for a in device_alerts],
-                "first_alert_time": min(epochs),
-                "last_alert_time": max(epochs),
-            })
+            clusters.append(
+                {
+                    "type": "device",
+                    "key": device,
+                    "count": len(device_alerts),
+                    "alert_ids": [a.get("id") for a in device_alerts],
+                    "first_alert_time": min(epochs),
+                    "last_alert_time": max(epochs),
+                }
+            )
     return clusters
 
 
@@ -110,21 +110,21 @@ def _cluster_by_datasource(alerts: list[dict]) -> list[dict]:
         by_ds[ds].append(alert)
 
     clusters = []
-    for ds, ds_alerts in sorted(
-        by_ds.items(), key=lambda x: len(x[1]), reverse=True
-    ):
+    for ds, ds_alerts in sorted(by_ds.items(), key=lambda x: len(x[1]), reverse=True):
         if len(ds_alerts) >= 2:
             devices = list({a.get("monitorObjectName", "") for a in ds_alerts})
             epochs = [a.get("startEpoch", 0) for a in ds_alerts]
-            clusters.append({
-                "type": "datasource",
-                "key": ds,
-                "count": len(ds_alerts),
-                "devices": devices,
-                "alert_ids": [a.get("id") for a in ds_alerts],
-                "first_alert_time": min(epochs),
-                "last_alert_time": max(epochs),
-            })
+            clusters.append(
+                {
+                    "type": "datasource",
+                    "key": ds,
+                    "count": len(ds_alerts),
+                    "devices": devices,
+                    "alert_ids": [a.get("id") for a in ds_alerts],
+                    "first_alert_time": min(epochs),
+                    "last_alert_time": max(epochs),
+                }
+            )
     return clusters
 
 
@@ -156,33 +156,37 @@ def _cluster_by_time(alerts: list[dict]) -> list[dict]:
         else:
             if len(current_group) >= 2:
                 epochs = [a.get("startEpoch", 0) for a in current_group]
-                clusters.append({
-                    "type": "temporal",
-                    "key": f"window_{min(epochs)}",
-                    "count": len(current_group),
-                    "alert_ids": [a.get("id") for a in current_group],
-                    "first_alert_time": min(epochs),
-                    "last_alert_time": max(epochs),
-                })
+                clusters.append(
+                    {
+                        "type": "temporal",
+                        "key": f"window_{min(epochs)}",
+                        "count": len(current_group),
+                        "alert_ids": [a.get("id") for a in current_group],
+                        "first_alert_time": min(epochs),
+                        "last_alert_time": max(epochs),
+                    }
+                )
             current_group = [alert]
 
     # Handle the last group
     if len(current_group) >= 2:
         epochs = [a.get("startEpoch", 0) for a in current_group]
-        clusters.append({
-            "type": "temporal",
-            "key": f"window_{min(epochs)}",
-            "count": len(current_group),
-            "alert_ids": [a.get("id") for a in current_group],
-            "first_alert_time": min(epochs),
-            "last_alert_time": max(epochs),
-        })
+        clusters.append(
+            {
+                "type": "temporal",
+                "key": f"window_{min(epochs)}",
+                "count": len(current_group),
+                "alert_ids": [a.get("id") for a in current_group],
+                "first_alert_time": min(epochs),
+                "last_alert_time": max(epochs),
+            }
+        )
 
     return clusters
 
 
 async def correlate_alerts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hours_back: int = 4,
     device: str | None = None,
     group_id: int | None = None,
@@ -224,18 +228,20 @@ async def correlate_alerts(
 
         all_clusters = device_clusters + ds_clusters + temporal_clusters
 
-        return format_response({
-            "total_alerts": len(alerts),
-            "cluster_count": len(all_clusters),
-            "time_window_hours": hours_back,
-            "clusters": all_clusters,
-        })
+        return format_response(
+            {
+                "total_alerts": len(alerts),
+                "cluster_count": len(all_clusters),
+                "time_window_hours": hours_back,
+                "clusters": all_clusters,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
 
 async def get_alert_statistics(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hours_back: int = 24,
     device: str | None = None,
     group_id: int | None = None,
@@ -267,7 +273,10 @@ async def get_alert_statistics(
 
         # Count by severity
         by_severity: dict[str, int] = {
-            "critical": 0, "error": 0, "warning": 0, "info": 0,
+            "critical": 0,
+            "error": 0,
+            "warning": 0,
+            "info": 0,
         }
         for alert in alerts:
             sev = alert.get("severity", 0)
@@ -305,27 +314,28 @@ async def get_alert_statistics(
         for i in range(num_buckets):
             bucket_start = start_epoch + (i * bucket_seconds)
             bucket_end = bucket_start + bucket_seconds
-            count = sum(
-                1 for a in alerts
-                if bucket_start <= a.get("startEpoch", 0) < bucket_end
+            count = sum(1 for a in alerts if bucket_start <= a.get("startEpoch", 0) < bucket_end)
+            time_buckets.append(
+                {
+                    "bucket_start": bucket_start,
+                    "bucket_end": bucket_end,
+                    "count": count,
+                }
             )
-            time_buckets.append({
-                "bucket_start": bucket_start,
-                "bucket_end": bucket_end,
-                "count": count,
-            })
 
-        return format_response({
-            "summary": {
-                "total": len(alerts),
-                "by_severity": by_severity,
-                "by_device": by_device,
-                "by_datasource": by_datasource,
-            },
-            "time_buckets": time_buckets,
-            "time_window_hours": hours_back,
-            "bucket_size_hours": bucket_size_hours,
-        })
+        return format_response(
+            {
+                "summary": {
+                    "total": len(alerts),
+                    "by_severity": by_severity,
+                    "by_device": by_device,
+                    "by_datasource": by_datasource,
+                },
+                "time_buckets": time_buckets,
+                "time_window_hours": hours_back,
+                "bucket_size_hours": bucket_size_hours,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
@@ -352,7 +362,8 @@ def _detect_anomalies(
     """
     # Filter out None/NaN values
     valid_pairs = [
-        (v, t) for v, t in zip(values, timestamps)
+        (v, t)
+        for v, t in zip(values, timestamps, strict=True)
         if v is not None and not (isinstance(v, float) and math.isnan(v))
     ]
 
@@ -373,17 +384,19 @@ def _detect_anomalies(
         return []
 
     anomalies = []
-    for val, ts in zip(clean_values, clean_timestamps):
+    for val, ts in zip(clean_values, clean_timestamps, strict=True):
         z_score = abs(val - mean) / stddev
         if z_score > threshold:
-            anomalies.append({
-                "datapoint": datapoint_name,
-                "value": val,
-                "timestamp": ts,
-                "z_score": round(z_score, 2),
-                "mean": round(mean, 2),
-                "stddev": round(stddev, 2),
-            })
+            anomalies.append(
+                {
+                    "datapoint": datapoint_name,
+                    "value": val,
+                    "timestamp": ts,
+                    "z_score": round(z_score, 2),
+                    "mean": round(mean, 2),
+                    "stddev": round(stddev, 2),
+                }
+            )
 
     return anomalies
 
@@ -408,11 +421,11 @@ def _compute_skewness(values: list[float]) -> float:
 
     stddev = math.sqrt(variance)
     m3 = sum((v - mean) ** 3 for v in values) / n
-    return m3 / (stddev ** 3)
+    return m3 / (stddev**3)
 
 
 async def get_metric_anomalies(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -468,11 +481,11 @@ async def get_metric_anomalies(
 
         for dp_idx, dp_name in enumerate(dp_names):
             dp_values = [
-                row[dp_idx] for row in value_rows
-                if dp_idx < len(row) and row[dp_idx] != "No Data"
+                row[dp_idx] for row in value_rows if dp_idx < len(row) and row[dp_idx] != "No Data"
             ]
             dp_timestamps = [
-                timestamps[i] for i, row in enumerate(value_rows)
+                timestamps[i]
+                for i, row in enumerate(value_rows)
                 if dp_idx < len(row) and row[dp_idx] != "No Data"
             ]
             total_points += len(dp_values)
@@ -483,15 +496,23 @@ async def get_metric_anomalies(
 
             if effective_method == "iqr":
                 anomalies = _detect_anomalies_iqr(
-                    dp_name, dp_values, dp_timestamps,
+                    dp_name,
+                    dp_values,
+                    dp_timestamps,
                 )
             elif effective_method == "mad":
                 anomalies = _detect_anomalies_mad(
-                    dp_name, dp_values, dp_timestamps, threshold,
+                    dp_name,
+                    dp_values,
+                    dp_timestamps,
+                    threshold,
                 )
             else:
                 anomalies = _detect_anomalies(
-                    dp_name, dp_values, dp_timestamps, threshold,
+                    dp_name,
+                    dp_values,
+                    dp_timestamps,
+                    threshold,
                 )
             all_anomalies.extend(anomalies)
 
@@ -503,18 +524,20 @@ async def get_metric_anomalies(
         else:
             data_quality = "good"
 
-        return format_response({
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "instance_id": instance_id,
-            "total_datapoints_checked": len(dp_names),
-            "anomaly_count": len(all_anomalies),
-            "anomalies": all_anomalies,
-            "threshold": threshold,
-            "hours_back": hours_back,
-            "method_used": method_used,
-            "data_quality": data_quality,
-        })
+        return format_response(
+            {
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+                "total_datapoints_checked": len(dp_names),
+                "anomaly_count": len(all_anomalies),
+                "anomalies": all_anomalies,
+                "threshold": threshold,
+                "hours_back": hours_back,
+                "method_used": method_used,
+                "data_quality": data_quality,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
@@ -564,14 +587,16 @@ def _detect_anomalies_iqr(
     anomalies = []
     for idx in result["anomaly_indices"]:
         if idx < len(timestamps):
-            anomalies.append({
-                "datapoint": datapoint_name,
-                "value": values[idx],
-                "timestamp": timestamps[idx],
-                "z_score": 0.0,
-                "mean": round((result["q1"] + result["q3"]) / 2, 2),
-                "stddev": round(result["iqr"], 2),
-            })
+            anomalies.append(
+                {
+                    "datapoint": datapoint_name,
+                    "value": values[idx],
+                    "timestamp": timestamps[idx],
+                    "z_score": 0.0,
+                    "mean": round((result["q1"] + result["q3"]) / 2, 2),
+                    "stddev": round(result["iqr"], 2),
+                }
+            )
     return anomalies
 
 
@@ -599,19 +624,21 @@ def _detect_anomalies_mad(
     anomalies = []
     for idx in result["anomaly_indices"]:
         if idx < len(timestamps):
-            anomalies.append({
-                "datapoint": datapoint_name,
-                "value": values[idx],
-                "timestamp": timestamps[idx],
-                "z_score": abs(result["modified_z_scores"][idx]),
-                "mean": round(result["median"], 2),
-                "stddev": round(result["mad"], 2),
-            })
+            anomalies.append(
+                {
+                    "datapoint": datapoint_name,
+                    "value": values[idx],
+                    "timestamp": timestamps[idx],
+                    "z_score": abs(result["modified_z_scores"][idx]),
+                    "mean": round(result["median"], 2),
+                    "stddev": round(result["mad"], 2),
+                }
+            )
     return anomalies
 
 
 async def correlate_metrics(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     sources: list[dict],
     hours_back: int = 24,
 ) -> list[TextContent]:
@@ -632,17 +659,21 @@ async def correlate_metrics(
     """
     try:
         if len(sources) > 10:
-            return format_response({
-                "error": True,
-                "message": "Maximum 10 sources allowed for correlation.",
-                "suggestion": "Reduce the number of sources to 10 or fewer.",
-            })
+            return format_response(
+                {
+                    "error": True,
+                    "message": "Maximum 10 sources allowed for correlation.",
+                    "suggestion": "Reduce the number of sources to 10 or fewer.",
+                }
+            )
 
         if len(sources) < 2:
-            return format_response({
-                "error": True,
-                "message": "At least 2 sources required for correlation.",
-            })
+            return format_response(
+                {
+                    "error": True,
+                    "message": "At least 2 sources required for correlation.",
+                }
+            )
 
         # Fetch each series
         labels = []
@@ -678,11 +709,13 @@ async def correlate_metrics(
         # Align series to the shortest length
         min_len = min(len(v) for v in all_values) if all_values else 0
         if min_len < 2:
-            return format_response({
-                "error": True,
-                "message": "Insufficient overlapping data for correlation.",
-                "suggestion": "Ensure sources have at least 2 data points in the time window.",
-            })
+            return format_response(
+                {
+                    "error": True,
+                    "message": "Insufficient overlapping data for correlation.",
+                    "suggestion": "Ensure sources have at least 2 data points in the time window.",
+                }
+            )
 
         aligned = [v[:min_len] for v in all_values]
 
@@ -701,23 +734,24 @@ async def correlate_metrics(
                     r = round(r, 4)
                     row.append(r)
                     if i < j and abs(r) > 0.7:
-                        strong_correlations.append({
-                            "source_a": labels[i],
-                            "source_b": labels[j],
-                            "correlation": r,
-                            "strength": (
-                                "strong_positive" if r > 0
-                                else "strong_negative"
-                            ),
-                        })
+                        strong_correlations.append(
+                            {
+                                "source_a": labels[i],
+                                "source_b": labels[j],
+                                "correlation": r,
+                                "strength": ("strong_positive" if r > 0 else "strong_negative"),
+                            }
+                        )
             matrix.append(row)
 
-        return format_response({
-            "labels": labels,
-            "correlation_matrix": matrix,
-            "strong_correlations": strong_correlations,
-            "sample_count": min_len,
-            "hours_back": hours_back,
-        })
+        return format_response(
+            {
+                "labels": labels,
+                "correlation_matrix": matrix,
+                "strong_correlations": strong_correlations,
+                "sample_count": min_len,
+                "hours_back": hours_back,
+            }
+        )
     except Exception as e:
         return handle_error(e)

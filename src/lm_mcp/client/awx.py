@@ -118,8 +118,7 @@ class AwxClient:
         if status == 401:
             raise AuthenticationError(
                 message,
-                suggestion="Check your AWX_TOKEN. Generate a new token in AWX "
-                "under User > Tokens.",
+                suggestion="Check your AWX_TOKEN. Generate a new token in AWX under User > Tokens.",
             )
         elif status == 403:
             raise LMPermissionError(
@@ -143,8 +142,7 @@ class AwxClient:
             raise LMError(
                 message=message,
                 code=f"HTTP_{status}",
-                suggestion=f"AWX API returned HTTP {status}. "
-                "Check the request parameters.",
+                suggestion=f"AWX API returned HTTP {status}. Check the request parameters.",
             )
 
     async def request(
@@ -194,9 +192,7 @@ class AwxClient:
                     headers=headers,
                 )
             except httpx.ConnectError as e:
-                raise LMConnectionError(
-                    f"Failed to connect to AWX at {self.base_url}: {e}"
-                )
+                raise LMConnectionError(f"Failed to connect to AWX at {self.base_url}: {e}") from e
 
             # Retry on rate limit (429) or server errors (5xx)
             if response.status_code == 429 or response.status_code >= 500:

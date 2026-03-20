@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_device_datasources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     name_filter: str | None = None,
     limit: int = 50,
@@ -44,7 +44,7 @@ async def get_device_datasources(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'dataSourceName~{quote_filter_value(clean_name)}'
+            params["filter"] = f"dataSourceName~{quote_filter_value(clean_name)}"
 
         result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
 
@@ -74,7 +74,7 @@ async def get_device_datasources(
 
 
 async def get_device_instances(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     name_filter: str | None = None,
@@ -99,7 +99,7 @@ async def get_device_instances(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'displayName~{quote_filter_value(clean_name)}'
+            params["filter"] = f"displayName~{quote_filter_value(clean_name)}"
 
         result = await client.get(
             f"/device/devices/{device_id}/devicedatasources/{device_datasource_id}/instances",
@@ -134,7 +134,7 @@ async def get_device_instances(
 
 
 async def get_device_data(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -186,7 +186,7 @@ async def get_device_data(
 
 
 async def get_graph_data(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -239,7 +239,7 @@ async def get_graph_data(
 
 @require_write_permission
 async def add_device_instance(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     display_name: str,
@@ -295,7 +295,7 @@ async def add_device_instance(
 
 @require_write_permission
 async def update_device_instance(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -362,7 +362,7 @@ async def update_device_instance(
 
 @require_write_permission
 async def delete_device_instance(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,

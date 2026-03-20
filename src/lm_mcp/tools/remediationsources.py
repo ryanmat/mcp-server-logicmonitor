@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 async def get_remediationsources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     group_filter: str | None = None,
 ) -> list[TextContent]:
@@ -29,9 +29,7 @@ async def get_remediationsources(
         List of TextContent with remediation source data or error.
     """
     try:
-        result = await client.post(
-            "/exchange/toolbox/exchangeRemediationSources", json_body={}
-        )
+        result = await client.post("/exchange/toolbox/exchangeRemediationSources", json_body={})
 
         # Unwrap Exchange Toolbox envelope
         data = result.get("data", {})
@@ -70,7 +68,7 @@ async def get_remediationsources(
 
 
 async def get_remediationsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     source_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific remediation source.
@@ -112,7 +110,7 @@ async def get_remediationsource(
 
 @require_write_permission
 async def execute_remediation(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     host_id: int,
     remediation_source_id: int,
     alert_id: str | None = None,
@@ -145,41 +143,42 @@ async def execute_remediation(
         device = await client.get(f"/device/devices/{host_id}")
         host_status = device.get("hostStatus", -1)
         if host_status == 1:
-            return format_response({
-                "error": True,
-                "code": "DEVICE_UNREACHABLE",
-                "message": (
-                    f"Device {host_id} is dead (hostStatus=1). "
-                    "Cannot execute remediation."
-                ),
-                "suggestion": "Verify device connectivity before executing remediation.",
-            })
+            return format_response(
+                {
+                    "error": True,
+                    "code": "DEVICE_UNREACHABLE",
+                    "message": (
+                        f"Device {host_id} is dead (hostStatus=1). Cannot execute remediation."
+                    ),
+                    "suggestion": "Verify device connectivity before executing remediation.",
+                }
+            )
 
         # Check 2: Verify collector version
         collector_id = device.get("preferredCollectorId")
         collector_version = "unknown"
         if collector_id:
             try:
-                collector = await client.get(
-                    f"/setting/collector/collectors/{collector_id}"
-                )
+                collector = await client.get(f"/setting/collector/collectors/{collector_id}")
                 build = collector.get("build", "0")
                 collector_version = str(build)
                 # Parse version: build is a string like "39.200" or an int
                 try:
                     version_num = float(str(build).replace(",", ""))
                     if version_num < 39.200:
-                        return format_response({
-                            "error": True,
-                            "code": "COLLECTOR_VERSION_LOW",
-                            "message": (
-                                f"Collector {collector_id} build {build} is below "
-                                "minimum 39.200 required for remediation execution."
-                            ),
-                            "suggestion": (
-                                "Upgrade the collector before executing remediation."
-                            ),
-                        })
+                        return format_response(
+                            {
+                                "error": True,
+                                "code": "COLLECTOR_VERSION_LOW",
+                                "message": (
+                                    f"Collector {collector_id} build {build} is below "
+                                    "minimum 39.200 required for remediation execution."
+                                ),
+                                "suggestion": (
+                                    "Upgrade the collector before executing remediation."
+                                ),
+                            }
+                        )
                 except (ValueError, TypeError):
                     warnings.append(
                         f"Could not parse collector build version '{build}'. "
@@ -187,8 +186,7 @@ async def execute_remediation(
                     )
             except Exception:
                 warnings.append(
-                    f"Could not verify collector {collector_id} version. "
-                    "Proceeding with caution."
+                    f"Could not verify collector {collector_id} version. Proceeding with caution."
                 )
 
         # Check 5-8: Get remediation source details
@@ -198,9 +196,7 @@ async def execute_remediation(
 
         try:
             # Try the settings endpoint for remediation source details
-            source = await client.get(
-                f"/setting/remediationsources/{remediation_source_id}"
-            )
+            source = await client.get(f"/setting/remediationsources/{remediation_source_id}")
             applies_to = source.get("appliesTo", source.get("appliesToScript", ""))
             script_content = source.get("groovyScript", source.get("script", ""))
 
@@ -212,12 +208,17 @@ async def execute_remediation(
 
                 # Check for state-mutating keywords
                 mutation_keywords = [
-                    "restart", "rm ", "rm\t", "delete", "stop",
-                    "kill", "reboot", "shutdown",
+                    "restart",
+                    "rm ",
+                    "rm\t",
+                    "delete",
+                    "stop",
+                    "kill",
+                    "reboot",
+                    "shutdown",
                 ]
                 found_keywords = [
-                    kw.strip() for kw in mutation_keywords
-                    if kw.lower() in script_content.lower()
+                    kw.strip() for kw in mutation_keywords if kw.lower() in script_content.lower()
                 ]
                 if found_keywords:
                     mutation_warning = (
@@ -278,7 +279,7 @@ async def execute_remediation(
 
 
 async def get_remediation_status(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     host_id: int,
     remediation_source_id: int,
 ) -> list[TextContent]:
@@ -303,9 +304,7 @@ async def get_remediation_status(
 
         # Try to get the remediation source details
         try:
-            source = await client.get(
-                f"/setting/remediationsources/{remediation_source_id}"
-            )
+            source = await client.get(f"/setting/remediationsources/{remediation_source_id}")
             status_info["source_name"] = source.get("name", "unknown")
             status_info["source_group"] = source.get("group", "unknown")
         except Exception:
@@ -319,9 +318,7 @@ async def get_remediation_status(
         try:
             device = await client.get(f"/device/devices/{host_id}")
             status_info["device_name"] = device.get("displayName", "unknown")
-            status_info["device_status"] = (
-                "normal" if device.get("hostStatus", 0) == 0 else "dead"
-            )
+            status_info["device_status"] = "normal" if device.get("hostStatus", 0) == 0 else "dead"
         except Exception:
             status_info["device_name"] = "unknown"
             status_info["device_status"] = "unknown"
@@ -338,7 +335,7 @@ async def get_remediation_status(
 
 
 async def get_remediation_history(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     host_id: int,
     remediation_source_id: int | None = None,
     hours_back: int = 24,

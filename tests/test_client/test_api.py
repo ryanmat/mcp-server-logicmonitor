@@ -340,9 +340,7 @@ class TestUnhandled4xx:
         from lm_mcp.exceptions import LMError
 
         respx.post("https://test.logicmonitor.com/santaba/rest/test").mock(
-            return_value=Response(
-                415, json={"errorMessage": "Unsupported media type"}
-            )
+            return_value=Response(415, json={"errorMessage": "Unsupported media type"})
         )
 
         auth = BearerAuth("test_token")
@@ -442,9 +440,7 @@ class TestPostMultipart:
 
         route = respx.post(
             "https://test.logicmonitor.com/santaba/rest/setting/eventsources/importjson"
-        ).mock(
-            return_value=Response(200, json={"id": 2001, "name": "TestES"})
-        )
+        ).mock(return_value=Response(200, json={"id": 2001, "name": "TestES"}))
 
         auth = BearerAuth("test_token")
         async with LogicMonitorClient(
@@ -470,11 +466,7 @@ class TestPostMultipart:
 
         respx.post(
             "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
-        ).mock(
-            return_value=Response(
-                400, json={"errorMessage": "Invalid import format"}
-            )
-        )
+        ).mock(return_value=Response(400, json={"errorMessage": "Invalid import format"}))
 
         auth = BearerAuth("test_token")
         async with LogicMonitorClient(
@@ -496,9 +488,7 @@ class TestPostMultipart:
 
         route = respx.post(
             "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
-        ).mock(
-            return_value=Response(200, json={"id": 1, "name": "DS"})
-        )
+        ).mock(return_value=Response(200, json={"id": 1, "name": "DS"}))
 
         auth = BearerAuth("test_token")
         async with LogicMonitorClient(

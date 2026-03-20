@@ -217,7 +217,6 @@ class TestCreateSdt:
         assert "Error:" in result[0].text
         assert "Invalid type" in result[0].text
 
-
     @respx.mock
     async def test_create_sdt_datasource_type(self, client, monkeypatch):
         """create_sdt sends correct body for DeviceDataSourceSDT."""

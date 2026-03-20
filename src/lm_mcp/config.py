@@ -49,7 +49,7 @@ class LMConfig(BaseSettings):
         LM_TRANSPORT: Transport mode - stdio or http (default: stdio)
         LM_HTTP_HOST: HTTP server bind address (default: 0.0.0.0)
         LM_HTTP_PORT: HTTP server port (default: 8080)
-        LM_CORS_ORIGINS: Comma-separated CORS origins (default: *)
+        LM_CORS_ORIGINS: Comma-separated CORS origins (default: empty, no CORS)
         LM_SESSION_ENABLED: Enable session context tracking (default: true)
         LM_SESSION_HISTORY_SIZE: Number of tool calls to keep in history (default: 50)
         LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
@@ -77,7 +77,7 @@ class LMConfig(BaseSettings):
     transport: Literal["stdio", "http"] = "stdio"
     http_host: str = "0.0.0.0"
     http_port: int = 8080
-    cors_origins: str = "*"
+    cors_origins: str = ""
 
     # Session settings
     session_enabled: bool = True
@@ -191,8 +191,7 @@ class LMConfig(BaseSettings):
         """Validate that enabled_tools and disabled_tools are not both set."""
         if self.enabled_tools and self.disabled_tools:
             raise ValueError(
-                "Cannot set both LM_ENABLED_TOOLS and LM_DISABLED_TOOLS. "
-                "Use one or the other."
+                "Cannot set both LM_ENABLED_TOOLS and LM_DISABLED_TOOLS. Use one or the other."
             )
         return self
 

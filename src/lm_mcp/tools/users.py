@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_users(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     filter: str | None = None,
     limit: int = 50,
@@ -52,7 +52,7 @@ async def get_users(
         elif name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'username~{quote_filter_value(clean_name)}'
+            params["filter"] = f"username~{quote_filter_value(clean_name)}"
 
         result = await client.get("/setting/admins", params=params)
 
@@ -90,7 +90,7 @@ async def get_users(
 
 
 async def get_user(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     user_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific user.
@@ -128,7 +128,7 @@ async def get_user(
 
 
 async def get_roles(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     filter: str | None = None,
     limit: int = 50,
@@ -160,7 +160,7 @@ async def get_roles(
         elif name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/setting/roles", params=params)
 
@@ -190,7 +190,7 @@ async def get_roles(
 
 
 async def get_role(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     role_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific role.

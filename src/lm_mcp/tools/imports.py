@@ -28,12 +28,13 @@ def _ensure_dict(definition: dict | str) -> dict:
         return json.loads(definition)
     return definition
 
+
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
 async def export_datasource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     datasource_id: int,
 ) -> list[TextContent]:
     """Export a DataSource definition as JSON via REST API.
@@ -64,7 +65,7 @@ async def export_datasource(
 
 
 async def export_eventsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     eventsource_id: int,
 ) -> list[TextContent]:
     """Export an EventSource definition as JSON via REST API.
@@ -94,7 +95,7 @@ async def export_eventsource(
 
 
 async def export_configsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     configsource_id: int,
 ) -> list[TextContent]:
     """Export a ConfigSource definition as JSON via REST API.
@@ -124,7 +125,7 @@ async def export_configsource(
 
 
 async def export_propertysource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     propertysource_id: int,
 ) -> list[TextContent]:
     """Export a PropertySource definition as JSON via REST API.
@@ -154,7 +155,7 @@ async def export_propertysource(
 
 
 async def export_logsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     logsource_id: int,
 ) -> list[TextContent]:
     """Export a LogSource definition as JSON via REST API.
@@ -184,7 +185,7 @@ async def export_logsource(
 
 
 async def export_dashboard(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     dashboard_id: int,
     include_widgets: bool = True,
 ) -> list[TextContent]:
@@ -220,7 +221,7 @@ async def export_dashboard(
 
 
 async def export_alert_rule(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     alert_rule_id: int,
 ) -> list[TextContent]:
     """Export an Alert Rule definition as JSON.
@@ -247,7 +248,7 @@ async def export_alert_rule(
 
 
 async def export_escalation_chain(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     escalation_chain_id: int,
 ) -> list[TextContent]:
     """Export an Escalation Chain definition as JSON.
@@ -275,7 +276,7 @@ async def export_escalation_chain(
 
 @require_write_permission
 async def import_datasource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import a DataSource from LM Exchange JSON definition via multipart upload.
@@ -321,7 +322,7 @@ async def import_datasource(
 
 @require_write_permission
 async def import_configsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import a ConfigSource from LM Exchange JSON definition via multipart upload.
@@ -350,7 +351,7 @@ async def import_configsource(
 
 @require_write_permission
 async def import_eventsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import an EventSource from LM Exchange JSON definition via multipart upload.
@@ -379,7 +380,7 @@ async def import_eventsource(
 
 @require_write_permission
 async def import_propertysource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import a PropertySource from LM Exchange JSON definition via multipart upload.
@@ -408,7 +409,7 @@ async def import_propertysource(
 
 @require_write_permission
 async def import_logsource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import a LogSource from LM Exchange JSON definition via multipart upload.
@@ -437,7 +438,7 @@ async def import_logsource(
 
 @require_write_permission
 async def import_topologysource(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import a TopologySource from LM Exchange JSON definition via multipart upload.
@@ -466,7 +467,7 @@ async def import_topologysource(
 
 @require_write_permission
 async def import_jobmonitor(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import a JobMonitor from LM Exchange JSON definition via multipart upload.
@@ -480,9 +481,7 @@ async def import_jobmonitor(
     """
     try:
         definition = _ensure_dict(definition)
-        result = await client.post_multipart(
-            "/setting/batchjobs/importjson", definition=definition
-        )
+        result = await client.post_multipart("/setting/batchjobs/importjson", definition=definition)
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -495,7 +494,7 @@ async def import_jobmonitor(
 
 @require_write_permission
 async def import_appliesto_function(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     definition: dict | str,
 ) -> list[TextContent]:
     """Import an AppliesTo function from LM Exchange JSON definition via multipart upload.
@@ -509,9 +508,7 @@ async def import_appliesto_function(
     """
     try:
         definition = _ensure_dict(definition)
-        result = await client.post_multipart(
-            "/setting/functions/importjson", definition=definition
-        )
+        result = await client.post_multipart("/setting/functions/importjson", definition=definition)
         return format_response(
             {
                 "imported_id": result.get("id"),

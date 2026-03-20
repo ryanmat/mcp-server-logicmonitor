@@ -227,16 +227,10 @@ class TestUpdateDeviceProperty:
         # PUT returns 404 (property doesn't exist yet)
         respx.put(
             "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties/new.prop"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "No such property"}
-            )
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "No such property"}))
 
         # POST creates it
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties"
-        ).mock(
+        respx.post("https://test.logicmonitor.com/santaba/rest/device/devices/100/properties").mock(
             return_value=httpx.Response(
                 200,
                 json={
