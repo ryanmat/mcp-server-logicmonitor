@@ -68,6 +68,7 @@ Thumbs.db
 
 # Project specific
 *.log
+*.docx
 
 # Claude and LLM artifacts
 .claude/*

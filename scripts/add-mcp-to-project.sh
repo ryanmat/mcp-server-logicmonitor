@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-MCP_PROJECT_DIR="/home/rmatuszewski/dev/tools/mcp-server-logicmonitor"
+MCP_PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${MCP_PROJECT_DIR}/.env"
 
 if [ ! -f "$ENV_FILE" ]; then
@@ -27,7 +27,7 @@ claude mcp add logicmonitor \
     -e "LM_ENABLE_WRITE_OPERATIONS=${LM_ENABLE_WRITE_OPERATIONS:-true}" \
     -e "AWX_URL=${AWX_URL}" \
     -e "AWX_TOKEN=${AWX_TOKEN}" \
-    -e "AWX_VERIFY_SSL=${AWX_VERIFY_SSL:-false}" \
+    -e "AWX_VERIFY_SSL=${AWX_VERIFY_SSL:-true}" \
     -- uvx --from lm-mcp lm-mcp-server
 
 echo ""
