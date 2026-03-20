@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_audit_logs(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     username_filter: str | None = None,
     keyword_filter: str | None = None,
     limit: int = 50,
@@ -45,11 +45,11 @@ async def get_audit_logs(
         if username_filter:
             clean_username, was_modified = sanitize_filter_value(username_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'username~{quote_filter_value(clean_username)}')
+            filters.append(f"username~{quote_filter_value(clean_username)}")
         if keyword_filter:
             clean_keyword, was_modified = sanitize_filter_value(keyword_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'_all~{quote_filter_value(clean_keyword)}')
+            filters.append(f"_all~{quote_filter_value(clean_keyword)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -83,7 +83,7 @@ async def get_audit_logs(
 
 
 async def get_ops_notes(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     tag_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -104,7 +104,7 @@ async def get_ops_notes(
         if tag_filter:
             clean_tag, was_modified = sanitize_filter_value(tag_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'tags~{quote_filter_value(clean_tag)}'
+            params["filter"] = f"tags~{quote_filter_value(clean_tag)}"
 
         result = await client.get("/setting/opsnotes", params=params)
 
@@ -134,7 +134,7 @@ async def get_ops_notes(
 
 
 async def get_ops_note(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     note_id: str,
 ) -> list[TextContent]:
     """Get detailed information about a specific ops note.
@@ -172,7 +172,7 @@ async def get_ops_note(
 
 @require_write_permission
 async def add_ops_note(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     note: str,
     tags: list[str] | None = None,
     device_ids: list[int] | None = None,

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_escalation_chains(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -42,7 +42,7 @@ async def get_escalation_chains(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/setting/alert/chains", params=params)
 
@@ -73,7 +73,7 @@ async def get_escalation_chains(
 
 
 async def get_escalation_chain(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     chain_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific escalation chain.
@@ -142,7 +142,7 @@ async def get_escalation_chain(
 
 
 async def get_recipient_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -163,7 +163,7 @@ async def get_recipient_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/setting/recipientgroups", params=params)
 
@@ -191,7 +191,7 @@ async def get_recipient_groups(
 
 
 async def get_recipient_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific recipient group.
@@ -233,7 +233,7 @@ async def get_recipient_group(
 
 @require_write_permission
 async def create_escalation_chain(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     description: str | None = None,
     enable_throttling: bool = False,
@@ -290,7 +290,7 @@ async def create_escalation_chain(
 
 @require_write_permission
 async def update_escalation_chain(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     chain_id: int,
     name: str | None = None,
     description: str | None = None,
@@ -358,7 +358,7 @@ async def update_escalation_chain(
 
 @require_write_permission
 async def delete_escalation_chain(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     chain_id: int,
 ) -> list[TextContent]:
     """Delete an escalation chain from LogicMonitor.
@@ -385,7 +385,7 @@ async def delete_escalation_chain(
 
 @require_write_permission
 async def create_recipient_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     description: str | None = None,
 ) -> list[TextContent]:
@@ -421,7 +421,7 @@ async def create_recipient_group(
 
 @require_write_permission
 async def update_recipient_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
     name: str | None = None,
     description: str | None = None,
@@ -469,7 +469,7 @@ async def update_recipient_group(
 
 @require_write_permission
 async def delete_recipient_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
 ) -> list[TextContent]:
     """Delete a recipient group from LogicMonitor.

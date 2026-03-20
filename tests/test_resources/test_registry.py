@@ -295,10 +295,7 @@ class TestGuideResources:
             categorized_tools.update(category["tools"])
 
         # Collect all registered tool names (LM + AWX)
-        registered_tools = (
-            {t.name for t in TOOLS}
-            | {t.name for t in AWX_TOOLS}
-        )
+        registered_tools = {t.name for t in TOOLS} | {t.name for t in AWX_TOOLS}
 
         # Every registered tool should be in some category
         missing = registered_tools - categorized_tools
@@ -421,12 +418,8 @@ class TestBestPracticesResource:
         data = json.loads(content)
         for scenario_name, scenario in data.items():
             assert "condition" in scenario, f"{scenario_name} missing condition"
-            assert "recommended_actions" in scenario, (
-                f"{scenario_name} missing recommended_actions"
-            )
-            assert "anti_patterns" in scenario, (
-                f"{scenario_name} missing anti_patterns"
-            )
+            assert "recommended_actions" in scenario, f"{scenario_name} missing recommended_actions"
+            assert "anti_patterns" in scenario, f"{scenario_name} missing anti_patterns"
             assert isinstance(scenario["recommended_actions"], list)
             assert isinstance(scenario["anti_patterns"], list)
             for rec in scenario["recommended_actions"]:

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
+    SEVERITY_MAP,
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
@@ -18,14 +19,6 @@ from lm_mcp.tools import (
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
-
-# Severity mapping for LogicMonitor alerts
-SEVERITY_MAP = {
-    "critical": 4,
-    "error": 3,
-    "warning": 2,
-    "info": 1,
-}
 
 
 def _normalize_alert_id(alert_id: str) -> str:
@@ -43,7 +36,7 @@ def _normalize_alert_id(alert_id: str) -> str:
 
 
 async def get_alerts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     severity: str | None = None,
     status: str | None = None,
     cleared: bool | None = None,
@@ -117,19 +110,19 @@ async def get_alerts(
             if datapoint:
                 clean_val, was_modified = sanitize_filter_value(datapoint)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'dataPointName~{quote_filter_value(clean_val)}')
+                filters.append(f"dataPointName~{quote_filter_value(clean_val)}")
             if instance:
                 clean_val, was_modified = sanitize_filter_value(instance)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'instanceName~{quote_filter_value(clean_val)}')
+                filters.append(f"instanceName~{quote_filter_value(clean_val)}")
             if datasource:
                 clean_val, was_modified = sanitize_filter_value(datasource)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'resourceTemplateName~{quote_filter_value(clean_val)}')
+                filters.append(f"resourceTemplateName~{quote_filter_value(clean_val)}")
             if device:
                 clean_val, was_modified = sanitize_filter_value(device)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'monitorObjectName~{quote_filter_value(clean_val)}')
+                filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -168,7 +161,7 @@ async def get_alerts(
 
 
 async def get_alert_details(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     alert_id: str,
 ) -> list[TextContent]:
     """Get detailed information about a specific alert.
@@ -190,7 +183,7 @@ async def get_alert_details(
 
 @require_write_permission
 async def acknowledge_alert(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     alert_id: str,
     note: str = "",
 ) -> list[TextContent]:
@@ -224,7 +217,7 @@ async def acknowledge_alert(
 
 @require_write_permission
 async def add_alert_note(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     alert_id: str,
     note: str,
 ) -> list[TextContent]:
@@ -271,7 +264,7 @@ BULK_OPERATION_LIMIT = 100
 
 @require_write_permission
 async def bulk_acknowledge_alerts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     alert_ids: list[str],
     note: str = "",
 ) -> list[TextContent]:

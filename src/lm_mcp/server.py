@@ -83,7 +83,6 @@ def _set_awx_client(client) -> None:
     _awx_client = client
 
 
-
 def _filter_tools(tools: list, config) -> list:
     """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
 
@@ -177,7 +176,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             resource_type = infer_resource_type(name)
             if resource_type:
                 # Validate 'fields' argument if present
-                if "fields" in arguments and arguments["fields"]:
+                if arguments.get("fields"):
                     validation = validate_fields(resource_type, arguments["fields"])
                     if not validation.valid:
                         msg = f"Invalid fields: {validation.invalid_fields}"
@@ -208,7 +207,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                             logger.warning(f"Field validation warning for {name}: {msg}")
 
                 # Validate 'filter' argument if present
-                if "filter" in arguments and arguments["filter"]:
+                if arguments.get("filter"):
                     validation = validate_filter_fields(resource_type, arguments["filter"])
                     if not validation.valid:
                         msg = f"Invalid filter fields: {validation.invalid_fields}"

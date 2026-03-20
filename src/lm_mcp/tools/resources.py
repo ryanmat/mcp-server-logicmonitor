@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 async def get_device_properties(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     name_filter: str | None = None,
     limit: int = 100,
@@ -45,7 +45,7 @@ async def get_device_properties(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get(f"/device/devices/{device_id}/properties", params=params)
 
@@ -74,7 +74,7 @@ async def get_device_properties(
 
 
 async def get_device_property(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     property_name: str,
 ) -> list[TextContent]:
@@ -106,7 +106,7 @@ async def get_device_property(
 
 @require_write_permission
 async def update_device_property(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     property_name: str,
     property_value: str,

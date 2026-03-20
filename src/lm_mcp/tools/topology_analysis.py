@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 async def analyze_blast_radius(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     depth: int = 2,
 ) -> list[TextContent]:
@@ -76,14 +76,16 @@ async def analyze_blast_radius(
                     if n_id not in visited:
                         visited.add(n_id)
                         next_layer.append(n_id)
-                        affected_devices.append({
-                            "device_id": n_id,
-                            "device_name": neighbor.get(
-                                "displayName",
-                                neighbor.get("name", f"device-{n_id}"),
-                            ),
-                            "depth": current_depth,
-                        })
+                        affected_devices.append(
+                            {
+                                "device_id": n_id,
+                                "device_name": neighbor.get(
+                                    "displayName",
+                                    neighbor.get("name", f"device-{n_id}"),
+                                ),
+                                "depth": current_depth,
+                            }
+                        )
 
             current_layer = next_layer
             if not current_layer:
@@ -97,18 +99,13 @@ async def analyze_blast_radius(
                 alert_result = await client.get(
                     "/alert/alerts",
                     params={
-                        "filter": (
-                            f"monitorObjectId:{dev['device_id']},"
-                            "cleared:false"
-                        ),
+                        "filter": (f"monitorObjectId:{dev['device_id']},cleared:false"),
                         "size": 5,
                     },
                 )
                 dev_alerts = alert_result.get("items", [])
                 dev["active_alert_count"] = len(dev_alerts)
-                dev["has_critical"] = any(
-                    a.get("severity", 0) >= 4 for a in dev_alerts
-                )
+                dev["has_critical"] = any(a.get("severity", 0) >= 4 for a in dev_alerts)
                 if dev["has_critical"]:
                     critical_alert_count += 1
             except Exception:
@@ -135,19 +132,19 @@ async def analyze_blast_radius(
         affected_count = len(affected_devices)
         blast_radius_score = min(
             100,
-            affected_count * 10
-            + critical_alert_count * 15
-            + len(critical_path_devices) * 20,
+            affected_count * 10 + critical_alert_count * 15 + len(critical_path_devices) * 20,
         )
 
-        return format_response({
-            "device_id": device_id,
-            "depth": depth,
-            "total_affected_devices": affected_count,
-            "blast_radius_score": blast_radius_score,
-            "affected_devices": affected_devices,
-            "critical_path_devices": critical_path_devices,
-            "critical_alert_count": critical_alert_count,
-        })
+        return format_response(
+            {
+                "device_id": device_id,
+                "depth": depth,
+                "total_affected_devices": affected_count,
+                "blast_radius_score": blast_radius_score,
+                "affected_devices": affected_devices,
+                "critical_path_devices": critical_path_devices,
+                "critical_alert_count": critical_alert_count,
+            }
+        )
     except Exception as e:
         return handle_error(e)

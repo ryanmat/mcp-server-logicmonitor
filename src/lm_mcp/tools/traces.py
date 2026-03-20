@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
+    SEVERITY_MAP,
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
@@ -18,17 +19,9 @@ from lm_mcp.tools import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
-# Severity mapping for alert filtering (matches alerts.py)
-SEVERITY_MAP = {
-    "critical": 4,
-    "error": 3,
-    "warning": 2,
-    "info": 1,
-}
-
 
 async def get_trace_services(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     namespace: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -49,9 +42,7 @@ async def get_trace_services(
         if namespace:
             clean, was_modified = sanitize_filter_value(namespace)
             wildcards_stripped = was_modified
-            params["filter"] += (
-                f",displayName~{quote_filter_value(clean)}"
-            )
+            params["filter"] += f",displayName~{quote_filter_value(clean)}"
 
         result = await client.get("/device/devices", params=params)
 
@@ -79,7 +70,7 @@ async def get_trace_services(
 
 
 async def get_trace_service(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific APM service.
@@ -99,7 +90,7 @@ async def get_trace_service(
 
 
 async def get_trace_service_alerts(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
     severity: str | None = None,
     limit: int = 50,
@@ -119,13 +110,9 @@ async def get_trace_service_alerts(
         params: dict = {"size": limit}
 
         if severity and severity.lower() in SEVERITY_MAP:
-            params["filter"] = (
-                f"severity:{SEVERITY_MAP[severity.lower()]}"
-            )
+            params["filter"] = f"severity:{SEVERITY_MAP[severity.lower()]}"
 
-        result = await client.get(
-            f"/device/devices/{service_id}/alerts", params=params
-        )
+        result = await client.get(f"/device/devices/{service_id}/alerts", params=params)
 
         alerts = []
         for item in result.get("items", []):
@@ -152,7 +139,7 @@ async def get_trace_service_alerts(
 
 
 async def get_trace_service_datasources(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
     name_filter: str | None = None,
     limit: int = 50,
@@ -175,9 +162,7 @@ async def get_trace_service_datasources(
         if name_filter:
             clean, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = was_modified
-            params["filter"] = (
-                f"dataSourceName~{quote_filter_value(clean)}"
-            )
+            params["filter"] = f"dataSourceName~{quote_filter_value(clean)}"
 
         result = await client.get(
             f"/device/devices/{service_id}/devicedatasources",
@@ -192,9 +177,7 @@ async def get_trace_service_datasources(
                     "datasource_id": item.get("dataSourceId"),
                     "name": item.get("dataSourceName"),
                     "instance_count": item.get("instanceNumber"),
-                    "monitoring_count": item.get(
-                        "monitoringInstanceNumber"
-                    ),
+                    "monitoring_count": item.get("monitoringInstanceNumber"),
                 }
             )
 
@@ -212,7 +195,7 @@ async def get_trace_service_datasources(
 
 
 async def get_trace_operations(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
     device_datasource_id: int,
     name_filter: str | None = None,
@@ -237,9 +220,7 @@ async def get_trace_operations(
         if name_filter:
             clean, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = was_modified
-            params["filter"] = (
-                f"displayName~{quote_filter_value(clean)}"
-            )
+            params["filter"] = f"displayName~{quote_filter_value(clean)}"
 
         result = await client.get(
             f"/device/devices/{service_id}/devicedatasources/{device_datasource_id}/instances",
@@ -273,7 +254,7 @@ async def get_trace_operations(
 
 
 async def get_trace_service_metrics(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -325,7 +306,7 @@ async def get_trace_service_metrics(
 
 
 async def get_trace_operation_metrics(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -377,7 +358,7 @@ async def get_trace_operation_metrics(
 
 
 async def get_trace_service_properties(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     service_id: int,
     name_filter: str | None = None,
     limit: int = 50,
@@ -402,9 +383,7 @@ async def get_trace_service_properties(
             wildcards_stripped = was_modified
             params["filter"] = f"name~{quote_filter_value(clean)}"
 
-        result = await client.get(
-            f"/device/devices/{service_id}/properties", params=params
-        )
+        result = await client.get(f"/device/devices/{service_id}/properties", params=params)
 
         properties = []
         for item in result.get("items", []):

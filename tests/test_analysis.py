@@ -37,9 +37,7 @@ class TestAnalysisRequest:
         """AnalysisRequest serializes to dict."""
         from lm_mcp.analysis import AnalysisRequest
 
-        req = AnalysisRequest(
-            id="test-1", workflow="rca", arguments={"device_id": 42}
-        )
+        req = AnalysisRequest(id="test-1", workflow="rca", arguments={"device_id": 42})
         d = req.to_dict()
         assert d["id"] == "test-1"
         assert d["workflow"] == "rca"
@@ -203,6 +201,7 @@ class TestCapacityForecastWorkflow:
         async def mock_execute(tool_name, args):
             calls.append(tool_name)
             from mcp.types import TextContent
+
             return [TextContent(type="text", text='{"result": "ok"}')]
 
         result = await _dispatch_workflow(
@@ -235,6 +234,7 @@ class TestDeviceHealthAssessmentWorkflow:
         async def mock_execute(tool_name, args):
             calls.append(tool_name)
             from mcp.types import TextContent
+
             return [TextContent(type="text", text='{"result": "ok"}')]
 
         result = await _dispatch_workflow(

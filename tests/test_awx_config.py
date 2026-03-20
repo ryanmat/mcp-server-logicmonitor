@@ -1,6 +1,7 @@
 # Description: Tests for Ansible Automation Platform configuration loading.
 # Description: Verifies pydantic-settings env var handling and optional singleton.
 
+
 class TestAwxConfig:
     def test_loads_from_env(self, monkeypatch):
         from lm_mcp.awx_config import AwxConfig

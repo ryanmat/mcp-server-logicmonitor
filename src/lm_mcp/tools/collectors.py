@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_collectors(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hostname_filter: str | None = None,
     collector_group_id: int | None = None,
     filter: str | None = None,
@@ -57,7 +57,7 @@ async def get_collectors(
             if hostname_filter:
                 clean_hostname, was_modified = sanitize_filter_value(hostname_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'hostname~{quote_filter_value(clean_hostname)}')
+                filters.append(f"hostname~{quote_filter_value(clean_hostname)}")
             if collector_group_id is not None:
                 filters.append(f"collectorGroupId:{collector_group_id}")
 
@@ -95,7 +95,7 @@ async def get_collectors(
 
 
 async def get_collector(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     collector_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific collector.
@@ -115,7 +115,7 @@ async def get_collector(
 
 
 async def get_collector_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     filter: str | None = None,
     limit: int = 50,
@@ -147,7 +147,7 @@ async def get_collector_groups(
         elif name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/setting/collector/groups", params=params)
 
@@ -177,7 +177,7 @@ async def get_collector_groups(
 
 
 async def get_collector_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific collector group.

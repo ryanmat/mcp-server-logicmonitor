@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_reports(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     group_id: int | None = None,
     report_type: str | None = None,
@@ -60,13 +60,13 @@ async def get_reports(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'name~{quote_filter_value(clean_name)}')
+                filters.append(f"name~{quote_filter_value(clean_name)}")
             if group_id is not None:
                 filters.append(f"groupId:{group_id}")
             if report_type:
                 clean_type, was_modified = sanitize_filter_value(report_type)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'type~{quote_filter_value(clean_type)}')
+                filters.append(f"type~{quote_filter_value(clean_type)}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -107,7 +107,7 @@ async def get_reports(
 
 
 async def get_report(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     report_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific report.
@@ -153,7 +153,7 @@ async def get_report(
 
 
 async def get_report_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -174,7 +174,7 @@ async def get_report_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/report/groups", params=params)
 
@@ -203,7 +203,7 @@ async def get_report_groups(
 
 @require_write_permission
 async def run_report(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     report_id: int,
     notify_email: str | None = None,
 ) -> list[TextContent]:
@@ -241,7 +241,7 @@ async def run_report(
 
 
 async def get_scheduled_reports(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     enabled_only: bool = False,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -293,7 +293,7 @@ async def get_scheduled_reports(
 
 @require_write_permission
 async def update_report_schedule(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     report_id: int,
     enabled: bool | None = None,
     schedule_type: str | None = None,
@@ -349,7 +349,7 @@ async def update_report_schedule(
 
 @require_write_permission
 async def create_report(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     report_type: str,
     group_id: int = 1,
@@ -410,7 +410,7 @@ async def create_report(
 
 @require_write_permission
 async def delete_report(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     report_id: int,
 ) -> list[TextContent]:
     """Delete a report.

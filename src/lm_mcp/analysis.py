@@ -33,8 +33,7 @@ def validate_workflow(workflow: str) -> None:
     """
     if workflow not in VALID_WORKFLOWS:
         raise ValueError(
-            f"Unknown workflow: {workflow}. "
-            f"Valid workflows: {sorted(VALID_WORKFLOWS)}"
+            f"Unknown workflow: {workflow}. Valid workflows: {sorted(VALID_WORKFLOWS)}"
         )
 
 
@@ -72,9 +71,7 @@ class AnalysisStore:
         self._store: dict[str, AnalysisRequest] = {}
         self._ttl_seconds = ttl_minutes * 60
 
-    def create(
-        self, workflow: str, arguments: dict[str, Any]
-    ) -> AnalysisRequest:
+    def create(self, workflow: str, arguments: dict[str, Any]) -> AnalysisRequest:
         """Create a new analysis request.
 
         Args:
@@ -140,9 +137,7 @@ class AnalysisStore:
         """
         now = time.time()
         expired = [
-            aid
-            for aid, req in self._store.items()
-            if (now - req.created_at) > self._ttl_seconds
+            aid for aid, req in self._store.items() if (now - req.created_at) > self._ttl_seconds
         ]
         for aid in expired:
             del self._store[aid]
@@ -165,9 +160,7 @@ class AnalysisStore:
         return items[:limit]
 
 
-async def run_analysis(
-    store: AnalysisStore, analysis_id: str
-) -> None:
+async def run_analysis(store: AnalysisStore, analysis_id: str) -> None:
     """Execute an analysis workflow asynchronously.
 
     Updates the store with running/completed/failed status.
@@ -185,9 +178,7 @@ async def run_analysis(
     try:
         from lm_mcp.server import execute_tool
 
-        result = await _dispatch_workflow(
-            req.workflow, req.arguments, execute_tool
-        )
+        result = await _dispatch_workflow(req.workflow, req.arguments, execute_tool)
         store.update(analysis_id, status="completed", result=result)
     except Exception as e:
         logger.exception("Analysis %s failed", analysis_id)
@@ -248,17 +239,11 @@ async def _extract_result(execute_tool: Any, tool_name: str, args: dict) -> Any:
     return None
 
 
-async def _run_alert_correlation(
-    arguments: dict[str, Any], execute_tool: Any
-) -> dict[str, Any]:
+async def _run_alert_correlation(arguments: dict[str, Any], execute_tool: Any) -> dict[str, Any]:
     """Run alert correlation workflow."""
     hours = arguments.get("hours_back", 4)
-    correlation = await _extract_result(
-        execute_tool, "correlate_alerts", {"hours_back": hours}
-    )
-    stats = await _extract_result(
-        execute_tool, "get_alert_statistics", {"hours_back": hours}
-    )
+    correlation = await _extract_result(execute_tool, "correlate_alerts", {"hours_back": hours})
+    stats = await _extract_result(execute_tool, "get_alert_statistics", {"hours_back": hours})
     return {
         "workflow": "alert_correlation",
         "correlation": correlation,
@@ -266,16 +251,12 @@ async def _run_alert_correlation(
     }
 
 
-async def _run_rca_workflow(
-    arguments: dict[str, Any], execute_tool: Any
-) -> dict[str, Any]:
+async def _run_rca_workflow(arguments: dict[str, Any], execute_tool: Any) -> dict[str, Any]:
     """Run root cause analysis workflow."""
     hours = arguments.get("hours_back", 4)
     device_id = arguments.get("device_id")
 
-    correlation = await _extract_result(
-        execute_tool, "correlate_alerts", {"hours_back": hours}
-    )
+    correlation = await _extract_result(execute_tool, "correlate_alerts", {"hours_back": hours})
 
     neighbors = None
     if device_id:
@@ -283,9 +264,7 @@ async def _run_rca_workflow(
             execute_tool, "get_device_neighbors", {"device_id": device_id}
         )
 
-    changes = await _extract_result(
-        execute_tool, "get_change_audit", {"limit": 20}
-    )
+    changes = await _extract_result(execute_tool, "get_change_audit", {"limit": 20})
 
     return {
         "workflow": "rca_workflow",
@@ -295,33 +274,21 @@ async def _run_rca_workflow(
     }
 
 
-async def _run_top_talkers(
-    arguments: dict[str, Any], execute_tool: Any
-) -> dict[str, Any]:
+async def _run_top_talkers(arguments: dict[str, Any], execute_tool: Any) -> dict[str, Any]:
     """Run top talkers workflow."""
     hours = arguments.get("hours_back", 24)
-    stats = await _extract_result(
-        execute_tool, "get_alert_statistics", {"hours_back": hours}
-    )
+    stats = await _extract_result(execute_tool, "get_alert_statistics", {"hours_back": hours})
     return {
         "workflow": "top_talkers",
         "statistics": stats,
     }
 
 
-async def _run_health_check(
-    arguments: dict[str, Any], execute_tool: Any
-) -> dict[str, Any]:
+async def _run_health_check(arguments: dict[str, Any], execute_tool: Any) -> dict[str, Any]:
     """Run health check workflow."""
-    alerts = await _extract_result(
-        execute_tool, "get_alerts", {"limit": 50}
-    )
-    devices = await _extract_result(
-        execute_tool, "get_devices", {"limit": 50}
-    )
-    collectors = await _extract_result(
-        execute_tool, "get_collectors", {"limit": 50}
-    )
+    alerts = await _extract_result(execute_tool, "get_alerts", {"limit": 50})
+    devices = await _extract_result(execute_tool, "get_devices", {"limit": 50})
+    collectors = await _extract_result(execute_tool, "get_collectors", {"limit": 50})
     return {
         "workflow": "health_check",
         "alerts": alerts,
@@ -330,9 +297,7 @@ async def _run_health_check(
     }
 
 
-async def _run_capacity_forecast(
-    arguments: dict[str, Any], execute_tool: Any
-) -> dict[str, Any]:
+async def _run_capacity_forecast(arguments: dict[str, Any], execute_tool: Any) -> dict[str, Any]:
     """Run capacity forecast workflow.
 
     Combines forecast_metric and classify_trend for a device instance.

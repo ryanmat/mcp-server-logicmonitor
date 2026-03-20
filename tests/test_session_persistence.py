@@ -142,9 +142,7 @@ class TestLoadVariables:
         """Variables are loaded from file when session is created."""
         from lm_mcp.session import set_persistence_path
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".json", mode="w", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
             json.dump({"loaded_key": "loaded_value"}, f)
             path = f.name
 
@@ -170,9 +168,7 @@ class TestLoadVariables:
         """Corrupt JSON file does not cause error."""
         from lm_mcp.session import set_persistence_path
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".json", mode="w", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
             f.write("not valid json {{{")
             path = f.name
 
@@ -188,9 +184,7 @@ class TestLoadVariables:
         """Loaded variables can be retrieved via get_variable."""
         from lm_mcp.session import set_persistence_path
 
-        with tempfile.NamedTemporaryFile(
-            suffix=".json", mode="w", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
             json.dump({"count": 42, "name": "test"}, f)
             path = f.name
 

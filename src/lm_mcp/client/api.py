@@ -2,6 +2,7 @@
 # Description: Handles HTTP communication, error mapping, and response parsing.
 
 import asyncio
+import contextlib
 import json
 import random
 import time
@@ -101,10 +102,8 @@ class LogicMonitorClient:
 
         retry_after = None
         if "Retry-After" in response.headers:
-            try:
+            with contextlib.suppress(ValueError):
                 retry_after = int(response.headers["Retry-After"])
-            except ValueError:
-                pass
 
         return message, retry_after
 
@@ -216,7 +215,7 @@ class LogicMonitorClient:
                     headers=headers,
                 )
             except httpx.ConnectError as e:
-                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}")
+                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}") from e
 
             # Retry on rate limit (429) or server errors (5xx)
             if response.status_code == 429 or response.status_code >= 500:
@@ -295,10 +294,7 @@ class LogicMonitorClient:
         """
         url = f"{self.base_url}{path}"
         # Handle string definitions to prevent double-serialization
-        if isinstance(definition, str):
-            json_str = definition
-        else:
-            json_str = json.dumps(definition)
+        json_str = definition if isinstance(definition, str) else json.dumps(definition)
 
         # Build headers without Content-Type (httpx sets multipart boundary)
         headers = {
@@ -324,7 +320,7 @@ class LogicMonitorClient:
                     headers=headers,
                 )
             except httpx.ConnectError as e:
-                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}")
+                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}") from e
 
             # Retry on rate limit (429) or server errors (5xx)
             if response.status_code == 429 or response.status_code >= 500:
@@ -437,7 +433,7 @@ class LogicMonitorClient:
                     headers=headers,
                 )
             except httpx.ConnectError as e:
-                raise LMConnectionError(f"Failed to connect to {self.ingest_url}: {e}")
+                raise LMConnectionError(f"Failed to connect to {self.ingest_url}: {e}") from e
 
             # Retry on rate limit (429) or server errors (5xx)
             if response.status_code == 429 or response.status_code >= 500:

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_audit_logs(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     username: str | None = None,
     action: str | None = None,
     resource_type: str | None = None,
@@ -52,15 +52,15 @@ async def get_audit_logs(
         if username:
             clean_username, was_modified = sanitize_filter_value(username)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'username:{quote_filter_value(clean_username)}')
+            filters.append(f"username:{quote_filter_value(clean_username)}")
         if action:
             clean_action, was_modified = sanitize_filter_value(action)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'happenedOn:{quote_filter_value(clean_action)}')
+            filters.append(f"happenedOn:{quote_filter_value(clean_action)}")
         if resource_type:
             clean_type, was_modified = sanitize_filter_value(resource_type)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'description~{quote_filter_value(clean_type)}')
+            filters.append(f"description~{quote_filter_value(clean_type)}")
         if start_time:
             filters.append(f"happenedOnLocal>:{start_time}")
         if end_time:
@@ -103,7 +103,7 @@ async def get_audit_logs(
 
 
 async def get_api_token_audit(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     token_id: int | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -153,7 +153,7 @@ async def get_api_token_audit(
 
 
 async def get_login_audit(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     username: str | None = None,
     success_only: bool = False,
     failed_only: bool = False,
@@ -176,11 +176,11 @@ async def get_login_audit(
 
         wildcards_stripped = False
 
-        filters = [f'happenedOn:{quote_filter_value("login")}']
+        filters = [f"happenedOn:{quote_filter_value('login')}"]
         if username:
             clean_username, was_modified = sanitize_filter_value(username)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'username:{quote_filter_value(clean_username)}')
+            filters.append(f"username:{quote_filter_value(clean_username)}")
 
         params["filter"] = ",".join(filters)
 
@@ -221,7 +221,7 @@ async def get_login_audit(
 
 
 async def get_change_audit(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     resource_type: str | None = None,
     change_type: str | None = None,
     limit: int = 50,
@@ -245,11 +245,11 @@ async def get_change_audit(
         if change_type:
             clean_type, was_modified = sanitize_filter_value(change_type)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'happenedOn:{quote_filter_value(clean_type)}')
+            filters.append(f"happenedOn:{quote_filter_value(clean_type)}")
         if resource_type:
             clean_type, was_modified = sanitize_filter_value(resource_type)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'description~{quote_filter_value(clean_type)}')
+            filters.append(f"description~{quote_filter_value(clean_type)}")
 
         if filters:
             params["filter"] = ",".join(filters)

@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from pydantic_settings import BaseSettings
 
-_cached_awx_config: "AwxConfig | None" = None
+_cached_awx_config: AwxConfig | None = None
 
 
-def get_awx_config() -> "AwxConfig | None":
+def get_awx_config() -> AwxConfig | None:
     """Get the cached AwxConfig singleton.
 
     Returns None if AWX_URL is not configured. This allows the server
@@ -37,10 +37,10 @@ class AwxConfig(BaseSettings):
     get_awx_config() returns None and ansible tools are excluded.
     """
 
-    url: str              # AWX_URL
-    token: str            # AWX_TOKEN
-    verify_ssl: bool = True   # AWX_VERIFY_SSL
-    timeout: int = 30         # AWX_TIMEOUT
-    max_retries: int = 3      # AWX_MAX_RETRIES
+    url: str  # AWX_URL
+    token: str  # AWX_TOKEN
+    verify_ssl: bool = True  # AWX_VERIFY_SSL
+    timeout: int = 30  # AWX_TIMEOUT
+    max_retries: int = 3  # AWX_MAX_RETRIES
 
     model_config = {"env_prefix": "AWX_"}

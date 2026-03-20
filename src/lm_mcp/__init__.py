@@ -16,16 +16,16 @@ from lm_mcp.exceptions import (
 __version__ = "2.1.1"
 
 __all__ = [
-    "LMConfig",
-    "get_config",
-    "reset_config",
-    "LMError",
-    "ConfigurationError",
     "AuthenticationError",
+    "ConfigurationError",
+    "LMConfig",
+    "LMConnectionError",
+    "LMError",
     "LMPermissionError",
     "NotFoundError",
     "RateLimitError",
     "ServerError",
-    "LMConnectionError",
     "__version__",
+    "get_config",
+    "reset_config",
 ]

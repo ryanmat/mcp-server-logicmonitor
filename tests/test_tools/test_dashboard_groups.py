@@ -82,9 +82,7 @@ class TestCreateDashboardGroup:
             )
         )
 
-        result = await create_dashboard_group(
-            client, name="Production Dashboards"
-        )
+        result = await create_dashboard_group(client, name="Production Dashboards")
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -93,15 +91,11 @@ class TestCreateDashboardGroup:
         assert "Production Dashboards" in data["message"]
 
     @respx.mock
-    async def test_create_dashboard_group_with_parent_and_description(
-        self, client, enable_writes
-    ):
+    async def test_create_dashboard_group_with_parent_and_description(self, client, enable_writes):
         """create_dashboard_group passes parent_id and description."""
         from lm_mcp.tools.dashboard_groups import create_dashboard_group
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/groups"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/groups").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -159,9 +153,9 @@ class TestDeleteDashboardGroup:
         """delete_dashboard_group deletes the group successfully."""
         from lm_mcp.tools.dashboard_groups import delete_dashboard_group
 
-        respx.delete(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/groups/42"
-        ).mock(return_value=httpx.Response(200, json={}))
+        respx.delete("https://test.logicmonitor.com/santaba/rest/dashboard/groups/42").mock(
+            return_value=httpx.Response(200, json={})
+        )
 
         result = await delete_dashboard_group(client, group_id=42)
 
@@ -175,12 +169,8 @@ class TestDeleteDashboardGroup:
         """delete_dashboard_group handles 404 gracefully."""
         from lm_mcp.tools.dashboard_groups import delete_dashboard_group
 
-        respx.delete(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/groups/999"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Dashboard group not found"}
-            )
+        respx.delete("https://test.logicmonitor.com/santaba/rest/dashboard/groups/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Dashboard group not found"})
         )
 
         result = await delete_dashboard_group(client, group_id=999)

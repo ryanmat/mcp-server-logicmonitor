@@ -192,4 +192,4 @@ class TestListToolsWithAwx:
         from lm_mcp.server import AWX_TOOL_NAMES
 
         expected = {t.name for t in AWX_TOOLS}
-        assert AWX_TOOL_NAMES == expected
+        assert expected == AWX_TOOL_NAMES

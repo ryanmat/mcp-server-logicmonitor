@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_alert_rules(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     priority_filter: int | None = None,
     limit: int = 50,
@@ -45,7 +45,7 @@ async def get_alert_rules(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'name~{quote_filter_value(clean_name)}')
+            filters.append(f"name~{quote_filter_value(clean_name)}")
         if priority_filter is not None:
             filters.append(f"priority:{priority_filter}")
 
@@ -85,7 +85,7 @@ async def get_alert_rules(
 
 
 async def get_alert_rule(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     rule_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific alert rule.
@@ -128,7 +128,7 @@ async def get_alert_rule(
 
 @require_write_permission
 async def create_alert_rule(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     priority: int,
     escalation_chain_id: int,
@@ -198,7 +198,7 @@ async def create_alert_rule(
 
 @require_write_permission
 async def update_alert_rule(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     rule_id: int,
     name: str | None = None,
     priority: int | None = None,
@@ -262,7 +262,7 @@ async def update_alert_rule(
 
 @require_write_permission
 async def delete_alert_rule(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     rule_id: int,
 ) -> list[TextContent]:
     """Delete an alert rule from LogicMonitor.

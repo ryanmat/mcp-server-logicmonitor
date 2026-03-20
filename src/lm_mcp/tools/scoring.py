@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, quote_filter_value
+from lm_mcp.tools import SEVERITY_MAP, format_response, handle_error, quote_filter_value
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
     shannon_entropy,
@@ -19,12 +19,9 @@ from lm_mcp.tools.stats_helpers import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
-# Severity name-to-integer mapping
-SEVERITY_MAP = {"critical": 4, "error": 3, "warning": 2, "info": 1}
-
 
 async def score_alert_noise(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hours_back: int = 24,
     device: str | None = None,
     group_id: int | None = None,
@@ -64,16 +61,18 @@ async def score_alert_noise(
         alerts = result.get("items", [])
 
         if not alerts:
-            return format_response({
-                "noise_score": 0,
-                "entropy": 0.0,
-                "total_alerts": 0,
-                "flapping_alerts": [],
-                "top_noisy_devices": [],
-                "top_noisy_datasources": [],
-                "recommendations": ["No alerts in the time window."],
-                "hours_back": hours_back,
-            })
+            return format_response(
+                {
+                    "noise_score": 0,
+                    "entropy": 0.0,
+                    "total_alerts": 0,
+                    "flapping_alerts": [],
+                    "top_noisy_devices": [],
+                    "top_noisy_datasources": [],
+                    "recommendations": ["No alerts in the time window."],
+                    "hours_back": hours_back,
+                }
+            )
 
         # Count alerts by datasource+datapoint combo for entropy
         combo_counts: dict[str, int] = defaultdict(int)
@@ -118,11 +117,13 @@ async def score_alert_noise(
                 if prev_end > 0 and curr_start - prev_end < 1800:
                     flap_count += 1
                     if len(flapping_alerts) < 10:
-                        flapping_alerts.append({
-                            "key": key,
-                            "gap_seconds": curr_start - prev_end,
-                            "alert_id": curr.get("id"),
-                        })
+                        flapping_alerts.append(
+                            {
+                                "key": key,
+                                "gap_seconds": curr_start - prev_end,
+                                "alert_id": curr.get("id"),
+                            }
+                        )
 
         # Repeat ratio: alerts from same combo appearing 3+ times
         repeat_count = sum(1 for c in combo_counts.values() if c >= 3)
@@ -131,19 +132,13 @@ async def score_alert_noise(
         flap_ratio = flap_count / len(alerts) if alerts else 0.0
 
         # Noise score: weighted combination
-        noise_score = min(100, int(
-            normalized_entropy * 40
-            + flap_ratio * 100 * 30
-            + repeat_ratio * 100 * 30
-        ))
+        noise_score = min(
+            100, int(normalized_entropy * 40 + flap_ratio * 100 * 30 + repeat_ratio * 100 * 30)
+        )
 
         # Top noisy devices and datasources
-        top_devices = sorted(
-            device_counts.items(), key=lambda x: x[1], reverse=True
-        )[:5]
-        top_datasources = sorted(
-            ds_counts.items(), key=lambda x: x[1], reverse=True
-        )[:5]
+        top_devices = sorted(device_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        top_datasources = sorted(ds_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
         # Recommendations
         recommendations = []
@@ -154,8 +149,7 @@ async def score_alert_noise(
             )
         if repeat_ratio > 0.5:
             recommendations.append(
-                "High repeat ratio. Review alert thresholds and "
-                "consider consolidation rules."
+                "High repeat ratio. Review alert thresholds and consider consolidation rules."
             )
         if noise_score > 70:
             recommendations.append(
@@ -184,12 +178,8 @@ async def score_alert_noise(
             "flap_count": flap_count,
             "flapping_alerts": flapping_alerts,
             "repeat_ratio": round(repeat_ratio, 4),
-            "top_noisy_devices": [
-                {"device": d, "count": c} for d, c in top_devices
-            ],
-            "top_noisy_datasources": [
-                {"datasource": ds, "count": c} for ds, c in top_datasources
-            ],
+            "top_noisy_devices": [{"device": d, "count": c} for d, c in top_devices],
+            "top_noisy_datasources": [{"datasource": ds, "count": c} for ds, c in top_datasources],
             "recommendations": recommendations,
             "structured_recommendations": structured_recs,
             "hours_back": hours_back,
@@ -203,7 +193,7 @@ async def score_alert_noise(
 
 
 async def calculate_availability(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     group_id: int | None = None,
     hours_back: int = 720,
@@ -254,17 +244,19 @@ async def calculate_availability(
         alerts = result.get("items", [])
 
         if not alerts:
-            return format_response({
-                "availability_percent": 100.0,
-                "total_downtime_minutes": 0,
-                "total_uptime_minutes": total_window_minutes,
-                "mttr_minutes": 0,
-                "incident_count": 0,
-                "longest_incident_minutes": 0,
-                "by_device": {},
-                "hours_back": hours_back,
-                "severity_threshold": severity_threshold,
-            })
+            return format_response(
+                {
+                    "availability_percent": 100.0,
+                    "total_downtime_minutes": 0,
+                    "total_uptime_minutes": total_window_minutes,
+                    "mttr_minutes": 0,
+                    "incident_count": 0,
+                    "longest_incident_minutes": 0,
+                    "by_device": {},
+                    "hours_back": hours_back,
+                    "severity_threshold": severity_threshold,
+                }
+            )
 
         # Group alerts by device and compute downtime windows
         device_alerts: dict[str, list[tuple[int, int]]] = defaultdict(list)
@@ -312,16 +304,11 @@ async def calculate_availability(
         # Aggregate availability across all devices
         # Use worst-device availability as the aggregate
         if by_device:
-            worst_availability = min(
-                d["availability_percent"] for d in by_device.values()
-            )
+            worst_availability = min(d["availability_percent"] for d in by_device.values())
         else:
             worst_availability = 100.0
 
-        mttr = (
-            sum(incident_durations) / len(incident_durations)
-            if incident_durations else 0
-        )
+        mttr = sum(incident_durations) / len(incident_durations) if incident_durations else 0
 
         # Measurement window context for low availability
         measurement_context: dict = {}
@@ -336,22 +323,22 @@ async def calculate_availability(
                 "anti_patterns": bp.get("anti_patterns", []),
             }
 
-        return format_response({
-            "availability_percent": round(worst_availability, 4),
-            "total_downtime_minutes": round(
-                total_downtime_seconds / 60.0, 2
-            ),
-            "total_uptime_minutes": round(
-                total_window_minutes - total_downtime_seconds / 60.0, 2
-            ),
-            "mttr_minutes": round(mttr, 2),
-            "incident_count": incident_count,
-            "longest_incident_minutes": round(longest_incident, 2),
-            "by_device": by_device,
-            "hours_back": hours_back,
-            "severity_threshold": severity_threshold,
-            "measurement_window_context": measurement_context,
-        })
+        return format_response(
+            {
+                "availability_percent": round(worst_availability, 4),
+                "total_downtime_minutes": round(total_downtime_seconds / 60.0, 2),
+                "total_uptime_minutes": round(
+                    total_window_minutes - total_downtime_seconds / 60.0, 2
+                ),
+                "mttr_minutes": round(mttr, 2),
+                "incident_count": incident_count,
+                "longest_incident_minutes": round(longest_incident, 2),
+                "by_device": by_device,
+                "hours_back": hours_back,
+                "severity_threshold": severity_threshold,
+                "measurement_window_context": measurement_context,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
@@ -384,7 +371,7 @@ def _merge_intervals(
 
 
 async def score_device_health(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -412,19 +399,25 @@ async def score_device_health(
     """
     try:
         series = await fetch_metric_series(
-            client, device_id, device_datasource_id, instance_id,
-            datapoints=datapoints, hours_back=hours_back,
+            client,
+            device_id,
+            device_datasource_id,
+            instance_id,
+            datapoints=datapoints,
+            hours_back=hours_back,
         )
 
         if not series:
-            return format_response({
-                "device_id": device_id,
-                "health_score": 100,
-                "status": "unknown",
-                "message": "No metric data available",
-                "contributing_factors": [],
-                "anomaly_count": 0,
-            })
+            return format_response(
+                {
+                    "device_id": device_id,
+                    "health_score": 100,
+                    "status": "unknown",
+                    "message": "No metric data available",
+                    "contributing_factors": [],
+                    "anomaly_count": 0,
+                }
+            )
 
         factors = []
         anomaly_count = 0
@@ -441,10 +434,7 @@ async def score_device_health(
 
             latest = values[-1]
 
-            if stddev > 0:
-                z_score = abs(latest - mean) / stddev
-            else:
-                z_score = 0.0
+            z_score = abs(latest - mean) / stddev if stddev > 0 else 0.0
 
             weight = 1.0
             if weights and dp_name in weights:
@@ -453,15 +443,17 @@ async def score_device_health(
             if z_score > 2.0:
                 anomaly_count += 1
 
-            factors.append({
-                "datapoint": dp_name,
-                "latest_value": round(latest, 4),
-                "mean": round(mean, 4),
-                "stddev": round(stddev, 4),
-                "z_score": round(z_score, 2),
-                "weight": weight,
-                "weighted_impact": round(z_score * weight, 4),
-            })
+            factors.append(
+                {
+                    "datapoint": dp_name,
+                    "latest_value": round(latest, 4),
+                    "mean": round(mean, 4),
+                    "stddev": round(stddev, 4),
+                    "z_score": round(z_score, 2),
+                    "weight": weight,
+                    "weighted_impact": round(z_score * weight, 4),
+                }
+            )
 
         # Sort by weighted impact (most impactful first)
         factors.sort(key=lambda f: f["weighted_impact"], reverse=True)
@@ -469,9 +461,7 @@ async def score_device_health(
         # Health score: start at 100, subtract weighted z-scores
         if factors:
             total_weight = sum(f["weight"] for f in factors)
-            weighted_z_sum = sum(
-                f["z_score"] * f["weight"] for f in factors
-            )
+            weighted_z_sum = sum(f["z_score"] * f["weight"] for f in factors)
             avg_weighted_z = weighted_z_sum / total_weight if total_weight > 0 else 0
             health_score = max(0, int(100 - avg_weighted_z * 15))
         else:
@@ -495,11 +485,13 @@ async def score_device_health(
             structured_recs = bp.get("recommended_actions", [])
             anti_patterns = bp.get("anti_patterns", [])
         elif health_score < 80:
-            structured_recs = [{
-                "action": "Monitor trend",
-                "how": "Re-check health score in 1-2 hours to detect worsening",
-                "priority": "low",
-            }]
+            structured_recs = [
+                {
+                    "action": "Monitor trend",
+                    "how": "Re-check health score in 1-2 hours to detect worsening",
+                    "priority": "low",
+                }
+            ]
 
         result_data: dict = {
             "device_id": device_id,
@@ -521,7 +513,7 @@ async def score_device_health(
 
 
 async def calculate_error_budget(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     group_id: int | None = None,
     target_slo: float = 99.9,
@@ -564,30 +556,22 @@ async def calculate_error_budget(
 
         # Burn rate: how fast we are consuming the budget
         if elapsed_days > 0 and total_budget_minutes > 0:
-            burn_rate = consumed_minutes / (
-                elapsed_days * (total_budget_minutes / period_days)
-            )
+            burn_rate = consumed_minutes / (elapsed_days * (total_budget_minutes / period_days))
         else:
             burn_rate = 0.0
 
         # Projected exhaustion
         if burn_rate > 0 and remaining_minutes > 0:
-            daily_consumption = (
-                consumed_minutes / elapsed_days if elapsed_days > 0 else 0
-            )
+            daily_consumption = consumed_minutes / elapsed_days if elapsed_days > 0 else 0
             projected_exhaustion_days = (
-                remaining_minutes / daily_consumption
-                if daily_consumption > 0
-                else None
+                remaining_minutes / daily_consumption if daily_consumption > 0 else None
             )
         else:
             projected_exhaustion_days = None
 
         # Budget consumption percentage
         budget_consumed_percent = (
-            (consumed_minutes / total_budget_minutes * 100)
-            if total_budget_minutes > 0
-            else 0.0
+            (consumed_minutes / total_budget_minutes * 100) if total_budget_minutes > 0 else 0.0
         )
 
         # Status classification
@@ -604,24 +588,24 @@ async def calculate_error_budget(
         else:
             status = "healthy"
 
-        return format_response({
-            "target_slo": target_slo,
-            "period_days": period_days,
-            "actual_availability": avail_data.get(
-                "availability_percent", 100.0
-            ),
-            "total_budget_minutes": round(total_budget_minutes, 2),
-            "consumed_minutes": round(consumed_minutes, 2),
-            "remaining_minutes": round(remaining_minutes, 2),
-            "budget_consumed_percent": round(budget_consumed_percent, 2),
-            "burn_rate": round(burn_rate, 4),
-            "projected_exhaustion_days": (
-                round(projected_exhaustion_days, 1)
-                if projected_exhaustion_days is not None
-                else None
-            ),
-            "status": status,
-            "incident_count": avail_data.get("incident_count", 0),
-        })
+        return format_response(
+            {
+                "target_slo": target_slo,
+                "period_days": period_days,
+                "actual_availability": avail_data.get("availability_percent", 100.0),
+                "total_budget_minutes": round(total_budget_minutes, 2),
+                "consumed_minutes": round(consumed_minutes, 2),
+                "remaining_minutes": round(remaining_minutes, 2),
+                "budget_consumed_percent": round(budget_consumed_percent, 2),
+                "burn_rate": round(burn_rate, 4),
+                "projected_exhaustion_days": (
+                    round(projected_exhaustion_days, 1)
+                    if projected_exhaustion_days is not None
+                    else None
+                ),
+                "status": status,
+                "incident_count": avail_data.get("incident_count", 0),
+            }
+        )
     except Exception as e:
         return handle_error(e)

@@ -339,9 +339,7 @@ class TestCreateDatasource:
             "dataPoints": [{"name": "dp1", "type": 0}],
         }
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -392,9 +390,7 @@ class TestCreateDatasource:
         """create_datasource strips id from definition before POST."""
         from lm_mcp.tools.datasources import create_datasource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 5003, "name": "ClonedDS", "displayName": "Cloned DS"},
@@ -413,14 +409,10 @@ class TestCreateDatasource:
         from lm_mcp.tools.datasources import create_datasource
 
         respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
-            return_value=httpx.Response(
-                400, json={"errorMessage": "Invalid DataSource definition"}
-            )
+            return_value=httpx.Response(400, json={"errorMessage": "Invalid DataSource definition"})
         )
 
-        result = await create_datasource(
-            client, definition={"name": "Bad"}
-        )
+        result = await create_datasource(client, definition={"name": "Bad"})
 
         assert "Error:" in result[0].text
 
@@ -504,18 +496,14 @@ class TestCreateDatasourceOverwrite:
         """create_datasource without overwrite flag does not look up existing."""
         from lm_mcp.tools.datasources import create_datasource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 503, "name": "PlainDS", "displayName": "Plain DS"},
             )
         )
 
-        result = await create_datasource(
-            client, definition={"name": "PlainDS"}, overwrite=False
-        )
+        result = await create_datasource(client, definition={"name": "PlainDS"}, overwrite=False)
 
         data = json.loads(result[0].text)
         assert data["success"] is True
@@ -539,9 +527,7 @@ class TestUpdateDatasource:
 
         reload(lm_mcp.config)
 
-        result = await update_datasource(
-            client, datasource_id=100, definition={"name": "Updated"}
-        )
+        result = await update_datasource(client, datasource_id=100, definition={"name": "Updated"})
 
         assert "Write operations are disabled" in result[0].text
 
@@ -589,9 +575,7 @@ class TestUpdateDatasource:
             )
         )
 
-        await update_datasource(
-            client, datasource_id=100, definition={"id": 999, "name": "DS"}
-        )
+        await update_datasource(client, datasource_id=100, definition={"id": 999, "name": "DS"})
 
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
@@ -601,17 +585,11 @@ class TestUpdateDatasource:
         """update_datasource handles API errors."""
         from lm_mcp.tools.datasources import update_datasource
 
-        respx.put(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources/999"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "DataSource not found"}
-            )
+        respx.put("https://test.logicmonitor.com/santaba/rest/setting/datasources/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "DataSource not found"})
         )
 
-        result = await update_datasource(
-            client, datasource_id=999, definition={"name": "Missing"}
-        )
+        result = await update_datasource(client, datasource_id=999, definition={"name": "Missing"})
 
         assert "Error:" in result[0].text
 
@@ -642,17 +620,15 @@ class TestDeleteDatasource:
         from lm_mcp.tools.datasources import delete_datasource
 
         # GET for confirmation info
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources/100"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources/100").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 100, "name": "OldDS", "displayName": "Old DataSource"},
             )
         )
-        respx.delete(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources/100"
-        ).mock(return_value=httpx.Response(200, json={}))
+        respx.delete("https://test.logicmonitor.com/santaba/rest/setting/datasources/100").mock(
+            return_value=httpx.Response(200, json={})
+        )
 
         result = await delete_datasource(client, datasource_id=100)
 
@@ -666,12 +642,8 @@ class TestDeleteDatasource:
         """delete_datasource handles 404 errors."""
         from lm_mcp.tools.datasources import delete_datasource
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources/999"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "DataSource not found"}
-            )
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "DataSource not found"})
         )
 
         result = await delete_datasource(client, datasource_id=999)

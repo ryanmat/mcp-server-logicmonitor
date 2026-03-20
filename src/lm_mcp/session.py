@@ -1,12 +1,13 @@
 # Description: Session context module for tracking operation results across tool calls.
 # Description: Enables conversational workflows like "update the device" without re-specifying IDs.
 
+import contextlib
 import json
 import logging
 import os
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -135,7 +136,7 @@ class SessionContext:
         summary = self._summarize_result(result) if success else None
         entry = HistoryEntry(
             tool_name=tool_name,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             arguments=arguments,
             success=success,
             result_summary=summary,
@@ -387,19 +388,15 @@ def _save_variables(session: SessionContext) -> None:
 
     try:
         dir_name = os.path.dirname(_persistence_path) or "."
-        fd, tmp_path = tempfile.mkstemp(
-            suffix=".tmp", dir=dir_name
-        )
+        fd, tmp_path = tempfile.mkstemp(suffix=".tmp", dir=dir_name)
         try:
             with os.fdopen(fd, "w") as f:
                 json.dump(session.variables, f)
             os.replace(tmp_path, _persistence_path)
         except BaseException:
             # Clean up temp file on any failure
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_path)
-            except OSError:
-                pass
             raise
     except Exception:
         logger.warning(

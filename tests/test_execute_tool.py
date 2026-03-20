@@ -14,9 +14,7 @@ class TestExecuteToolMiddleware:
     @pytest.fixture
     def mock_handler(self):
         """Create a mock tool handler returning TextContent."""
-        return AsyncMock(
-            return_value=[TextContent(type="text", text=json.dumps({"id": 1}))]
-        )
+        return AsyncMock(return_value=[TextContent(type="text", text=json.dumps({"id": 1}))])
 
     @pytest.fixture
     def mock_client(self):
@@ -24,9 +22,7 @@ class TestExecuteToolMiddleware:
         return MagicMock()
 
     @pytest.mark.asyncio
-    async def test_calls_handler_with_client(
-        self, monkeypatch, mock_handler, mock_client
-    ):
+    async def test_calls_handler_with_client(self, monkeypatch, mock_handler, mock_client):
         """execute_tool passes client and arguments to the handler."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -44,9 +40,7 @@ class TestExecuteToolMiddleware:
         assert json.loads(result[0].text) == {"id": 1}
 
     @pytest.mark.asyncio
-    async def test_session_tool_called_without_client(
-        self, monkeypatch, mock_handler
-    ):
+    async def test_session_tool_called_without_client(self, monkeypatch, mock_handler):
         """execute_tool calls session tools without the LM client."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -86,9 +80,7 @@ class TestExecuteToolMiddleware:
         assert "not enabled" in result[0].text.lower()
 
     @pytest.mark.asyncio
-    async def test_allows_enabled_tool(
-        self, monkeypatch, mock_handler, mock_client
-    ):
+    async def test_allows_enabled_tool(self, monkeypatch, mock_handler, mock_client):
         """execute_tool allows tools in the enabled_tools list."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -106,9 +98,7 @@ class TestExecuteToolMiddleware:
         assert json.loads(result[0].text) == {"id": 1}
 
     @pytest.mark.asyncio
-    async def test_logs_write_operation_on_success(
-        self, monkeypatch, mock_handler, mock_client
-    ):
+    async def test_logs_write_operation_on_success(self, monkeypatch, mock_handler, mock_client):
         """execute_tool logs successful write operations."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -145,9 +135,7 @@ class TestExecuteToolMiddleware:
         assert "error" in result[0].text.lower()
 
     @pytest.mark.asyncio
-    async def test_records_session_when_enabled(
-        self, monkeypatch, mock_handler, mock_client
-    ):
+    async def test_records_session_when_enabled(self, monkeypatch, mock_handler, mock_client):
         """execute_tool records results in session when session is enabled."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -169,9 +157,7 @@ class TestExecuteToolMiddleware:
         )
 
     @pytest.mark.asyncio
-    async def test_skips_session_for_session_tools(
-        self, monkeypatch, mock_handler
-    ):
+    async def test_skips_session_for_session_tools(self, monkeypatch, mock_handler):
         """execute_tool does not record session tools in session history."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -190,9 +176,7 @@ class TestExecuteToolMiddleware:
         mock_session.record_result.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_handler_value_error_returns_error_text(
-        self, monkeypatch, mock_client
-    ):
+    async def test_handler_value_error_returns_error_text(self, monkeypatch, mock_client):
         """execute_tool catches ValueError and returns error message."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")

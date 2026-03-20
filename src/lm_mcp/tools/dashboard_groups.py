@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 async def get_dashboard_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -42,7 +42,7 @@ async def get_dashboard_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'name~{quote_filter_value(clean_name)}'
+            params["filter"] = f"name~{quote_filter_value(clean_name)}"
 
         result = await client.get("/dashboard/groups", params=params)
 
@@ -74,7 +74,7 @@ async def get_dashboard_groups(
 
 
 async def get_dashboard_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific dashboard group.
@@ -108,7 +108,7 @@ async def get_dashboard_group(
 
 @require_write_permission
 async def create_dashboard_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     parent_id: int | None = None,
     description: str | None = None,
@@ -148,7 +148,7 @@ async def create_dashboard_group(
 
 @require_write_permission
 async def delete_dashboard_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
 ) -> list[TextContent]:
     """Delete a dashboard group from LogicMonitor.

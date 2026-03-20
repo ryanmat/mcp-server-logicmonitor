@@ -35,8 +35,14 @@ ALERT_URL = "https://test.logicmonitor.com/santaba/rest/alert/alerts"
 
 
 def _make_alert(
-    alert_id, device, datasource, datapoint="value",
-    severity=4, start_epoch=None, end_epoch=0, cleared=False,
+    alert_id,
+    device,
+    datasource,
+    datapoint="value",
+    severity=4,
+    start_epoch=None,
+    end_epoch=0,
+    cleared=False,
 ):
     """Helper to create mock alert data."""
     return {
@@ -60,9 +66,7 @@ class TestScoreAlertNoise:
         """No alerts produces noise score of 0."""
         from lm_mcp.tools.scoring import score_alert_noise
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await score_alert_noise(client)
 
@@ -95,19 +99,26 @@ class TestScoreAlertNoise:
 
         alerts = [
             _make_alert(
-                1, "s1", "CPU", "value",
+                1,
+                "s1",
+                "CPU",
+                "value",
                 start_epoch=BASE_EPOCH,
                 end_epoch=BASE_EPOCH + 300,
                 cleared=True,
             ),
             _make_alert(
-                2, "s1", "CPU", "value",
+                2,
+                "s1",
+                "CPU",
+                "value",
                 start_epoch=BASE_EPOCH + 600,
             ),
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 2},
+                200,
+                json={"items": alerts, "total": 2},
             )
         )
 
@@ -123,12 +134,12 @@ class TestScoreAlertNoise:
         from lm_mcp.tools.scoring import score_alert_noise
 
         alerts = [
-            _make_alert(i, "s1", "CPU", "value", start_epoch=BASE_EPOCH + i * 60)
-            for i in range(10)
+            _make_alert(i, "s1", "CPU", "value", start_epoch=BASE_EPOCH + i * 60) for i in range(10)
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 10},
+                200,
+                json={"items": alerts, "total": 10},
             )
         )
 
@@ -151,7 +162,8 @@ class TestScoreAlertNoise:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 4},
+                200,
+                json={"items": alerts, "total": 4},
             )
         )
 
@@ -174,7 +186,8 @@ class TestScoreAlertNoise:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 4},
+                200,
+                json={"items": alerts, "total": 4},
             )
         )
 
@@ -189,9 +202,7 @@ class TestScoreAlertNoise:
         """Response always includes recommendations."""
         from lm_mcp.tools.scoring import score_alert_noise
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await score_alert_noise(client)
 
@@ -232,9 +243,7 @@ class TestScoreAlertNoise:
         """Response includes hours_back parameter."""
         from lm_mcp.tools.scoring import score_alert_noise
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await score_alert_noise(client, hours_back=48)
 
@@ -260,13 +269,11 @@ class TestScoreAlertNoise:
         from lm_mcp.tools.scoring import score_alert_noise
 
         # Many diverse alerts to push entropy up
-        alerts = [
-            _make_alert(i, f"server{i}", f"DS{i}", f"dp{i}")
-            for i in range(50)
-        ]
+        alerts = [_make_alert(i, f"server{i}", f"DS{i}", f"dp{i}") for i in range(50)]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 50},
+                200,
+                json={"items": alerts, "total": 50},
             )
         )
 
@@ -284,9 +291,7 @@ class TestCalculateAvailability:
         """No alerts means 100% availability."""
         from lm_mcp.tools.scoring import calculate_availability
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await calculate_availability(client)
 
@@ -304,7 +309,10 @@ class TestCalculateAvailability:
         recent = now - 3600  # 1 hour ago
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 1800,
                 cleared=True,
@@ -312,7 +320,8 @@ class TestCalculateAvailability:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 1},
+                200,
+                json={"items": alerts, "total": 1},
             )
         )
 
@@ -332,13 +341,19 @@ class TestCalculateAvailability:
         recent = now - 7200
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 3600,
                 cleared=True,
             ),
             _make_alert(
-                2, "server01", "Memory", severity=3,
+                2,
+                "server01",
+                "Memory",
+                severity=3,
                 start_epoch=recent + 1800,
                 end_epoch=recent + 5400,
                 cleared=True,
@@ -346,7 +361,8 @@ class TestCalculateAvailability:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 2},
+                200,
+                json={"items": alerts, "total": 2},
             )
         )
 
@@ -365,14 +381,18 @@ class TestCalculateAvailability:
         recent = now - 3600
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=0,
             ),
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 1},
+                200,
+                json={"items": alerts, "total": 1},
             )
         )
 
@@ -390,13 +410,19 @@ class TestCalculateAvailability:
         recent = now - 14400  # 4 hours ago
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 1800,
                 cleared=True,
             ),
             _make_alert(
-                2, "server01", "Memory", severity=3,
+                2,
+                "server01",
+                "Memory",
+                severity=3,
                 start_epoch=recent + 7200,
                 end_epoch=recent + 9000,
                 cleared=True,
@@ -404,7 +430,8 @@ class TestCalculateAvailability:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 2},
+                200,
+                json={"items": alerts, "total": 2},
             )
         )
 
@@ -422,13 +449,19 @@ class TestCalculateAvailability:
         recent = now - 7200
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 1800,
                 cleared=True,
             ),
             _make_alert(
-                2, "server02", "CPU", severity=3,
+                2,
+                "server02",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 3600,
                 cleared=True,
@@ -436,7 +469,8 @@ class TestCalculateAvailability:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 2},
+                200,
+                json={"items": alerts, "total": 2},
             )
         )
 
@@ -451,13 +485,9 @@ class TestCalculateAvailability:
         """Severity threshold is included in response."""
         from lm_mcp.tools.scoring import calculate_availability
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        result = await calculate_availability(
-            client, severity_threshold="critical"
-        )
+        result = await calculate_availability(client, severity_threshold="critical")
 
         data = json.loads(result[0].text)
         assert data["severity_threshold"] == "critical"
@@ -471,7 +501,10 @@ class TestCalculateAvailability:
         recent = now - 14400
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 7200,
                 cleared=True,
@@ -479,7 +512,8 @@ class TestCalculateAvailability:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 1},
+                200,
+                json={"items": alerts, "total": 1},
             )
         )
 
@@ -493,9 +527,7 @@ class TestCalculateAvailability:
         """Response includes hours_back parameter."""
         from lm_mcp.tools.scoring import calculate_availability
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await calculate_availability(client, hours_back=48)
 
@@ -508,9 +540,7 @@ class TestCalculateAvailability:
         from lm_mcp.tools.scoring import calculate_availability
 
         respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(
-                500, json={"errorMessage": "Server error"}
-            )
+            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
         )
 
         result = await calculate_availability(client)
@@ -555,15 +585,16 @@ class TestScoreDeviceHealth:
                 json={
                     "dataPoints": ["cpu"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -583,15 +614,16 @@ class TestScoreDeviceHealth:
                 json={
                     "dataPoints": ["cpu"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -611,7 +643,10 @@ class TestScoreDeviceHealth:
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -629,15 +664,16 @@ class TestScoreDeviceHealth:
                 json={
                     "dataPoints": ["cpu", "memory"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -656,15 +692,16 @@ class TestScoreDeviceHealth:
                 json={
                     "dataPoints": ["cpu", "memory"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -683,15 +720,16 @@ class TestScoreDeviceHealth:
                 json={
                     "dataPoints": ["cpu"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(10)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(10)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -714,15 +752,16 @@ class TestScoreDeviceHealth:
                 json={
                     "dataPoints": ["cpu"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -733,12 +772,13 @@ class TestScoreDeviceHealth:
         """API errors are returned as error response."""
         from lm_mcp.tools.scoring import score_device_health
 
-        respx.get(DATA_URL).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "error"})
-        )
+        respx.get(DATA_URL).mock(return_value=httpx.Response(500, json={"errorMessage": "error"}))
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         assert "Error:" in result[0].text
@@ -755,20 +795,31 @@ class TestScoringGuardrails:
         # Many repeated alerts from same device+datasource to push noise up
         alerts = []
         for i in range(20):
-            alerts.append(_make_alert(
-                i, "server01", "CPU", "value",
-                start_epoch=BASE_EPOCH + i * 60,
-                end_epoch=BASE_EPOCH + i * 60 + 30,
-                cleared=True,
-            ))
+            alerts.append(
+                _make_alert(
+                    i,
+                    "server01",
+                    "CPU",
+                    "value",
+                    start_epoch=BASE_EPOCH + i * 60,
+                    end_epoch=BASE_EPOCH + i * 60 + 30,
+                    cleared=True,
+                )
+            )
             # Re-fire quickly for flapping
-            alerts.append(_make_alert(
-                100 + i, "server01", "CPU", "value",
-                start_epoch=BASE_EPOCH + i * 60 + 60,
-            ))
+            alerts.append(
+                _make_alert(
+                    100 + i,
+                    "server01",
+                    "CPU",
+                    "value",
+                    start_epoch=BASE_EPOCH + i * 60 + 60,
+                )
+            )
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": len(alerts)},
+                200,
+                json={"items": alerts, "total": len(alerts)},
             )
         )
 
@@ -816,15 +867,16 @@ class TestScoringGuardrails:
                 json={
                     "dataPoints": ["cpu"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -848,15 +900,16 @@ class TestScoringGuardrails:
                 json={
                     "dataPoints": ["cpu"],
                     "values": values,
-                    "time": [
-                        (METRIC_BASE + i * 300) * 1000 for i in range(20)
-                    ],
+                    "time": [(METRIC_BASE + i * 300) * 1000 for i in range(20)],
                 },
             )
         )
 
         result = await score_device_health(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -873,7 +926,10 @@ class TestScoringGuardrails:
         recent = now - 3600
         alerts = [
             _make_alert(
-                1, "server01", "CPU", severity=3,
+                1,
+                "server01",
+                "CPU",
+                severity=3,
                 start_epoch=recent,
                 end_epoch=recent + 1800,
                 cleared=True,
@@ -881,7 +937,8 @@ class TestScoringGuardrails:
         ]
         respx.get(ALERT_URL).mock(
             return_value=httpx.Response(
-                200, json={"items": alerts, "total": 1},
+                200,
+                json={"items": alerts, "total": 1},
             )
         )
 
@@ -905,9 +962,7 @@ class TestCalculateErrorBudget:
         """Zero downtime gives healthy status with full budget remaining."""
         from lm_mcp.tools.scoring import calculate_error_budget
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
 
@@ -994,7 +1049,9 @@ class TestCalculateErrorBudget:
                 return_value=httpx.Response(200, json={"items": [], "total": 0})
             )
             result = await calculate_error_budget(
-                client, target_slo=100.0, period_days=30,
+                client,
+                target_slo=100.0,
+                period_days=30,
             )
 
         data = json.loads(result[0].text)

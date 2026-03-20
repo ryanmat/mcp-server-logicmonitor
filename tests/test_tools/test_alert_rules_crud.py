@@ -131,7 +131,6 @@ class TestCreateAlertRule:
         assert request_body["priority"] == 50
         assert "deviceGroups" in request_body
 
-
     @respx.mock
     async def test_create_alert_rule_with_datapoint_instance(self, client, monkeypatch):
         """create_alert_rule passes datapoint and instance to API."""
@@ -293,7 +292,6 @@ class TestUpdateAlertRule:
         assert request_body["priority"] == 200
         assert request_body["escalatingChainId"] == 2
         assert request_body["suppressAlertClear"] is True
-
 
     @respx.mock
     async def test_update_alert_rule_with_suppress_ack_sdt(self, client, monkeypatch):

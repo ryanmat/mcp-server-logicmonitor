@@ -32,9 +32,7 @@ def client(auth):
 BASE_EPOCH = 1705276800
 
 
-def _make_alert(
-    alert_id, device, datasource, severity=4, start_epoch=None
-):
+def _make_alert(alert_id, device, datasource, severity=4, start_epoch=None):
     """Helper to create mock alert data."""
     return {
         "id": f"LMA{alert_id}",
@@ -78,12 +76,8 @@ class TestCorrelateAlerts:
         assert data["cluster_count"] > 0
 
         # Find the server01 device cluster
-        device_clusters = [
-            c for c in data["clusters"] if c["type"] == "device"
-        ]
-        server01_cluster = [
-            c for c in device_clusters if c["key"] == "server01"
-        ]
+        device_clusters = [c for c in data["clusters"] if c["type"] == "device"]
+        server01_cluster = [c for c in device_clusters if c["key"] == "server01"]
         assert len(server01_cluster) == 1
         assert server01_cluster[0]["count"] == 2
 
@@ -109,9 +103,7 @@ class TestCorrelateAlerts:
         result = await correlate_alerts(client)
 
         data = json.loads(result[0].text)
-        ds_clusters = [
-            c for c in data["clusters"] if c["type"] == "datasource"
-        ]
+        ds_clusters = [c for c in data["clusters"] if c["type"] == "datasource"]
         cpu_cluster = [c for c in ds_clusters if c["key"] == "CPU"]
         assert len(cpu_cluster) == 1
         assert cpu_cluster[0]["count"] == 3
@@ -139,9 +131,7 @@ class TestCorrelateAlerts:
         result = await correlate_alerts(client)
 
         data = json.loads(result[0].text)
-        temporal_clusters = [
-            c for c in data["clusters"] if c["type"] == "temporal"
-        ]
+        temporal_clusters = [c for c in data["clusters"] if c["type"] == "temporal"]
         # Should have at least one temporal cluster for the first two alerts
         assert len(temporal_clusters) >= 1
 
@@ -485,8 +475,16 @@ class TestGetMetricAnomalies:
                 json={
                     "dataPoints": ["cpu"],
                     "values": [
-                        [50.0], [51.0], [49.0], [50.0], [50.5],
-                        [49.5], [50.2], [50.1], [49.8], [200.0],
+                        [50.0],
+                        [51.0],
+                        [49.0],
+                        [50.0],
+                        [50.5],
+                        [49.5],
+                        [50.2],
+                        [50.1],
+                        [49.8],
+                        [200.0],
                     ],
                     "time": [BASE_EPOCH + i * 300 for i in range(10)],
                 },
@@ -547,8 +545,11 @@ class TestGetMetricAnomalies:
                 json={
                     "dataPoints": ["cpu", "memory"],
                     "values": [
-                        [50.0, 70.0], [51.0, 71.0], [49.0, 69.0],
-                        [50.0, 70.0], [50.5, 70.5],
+                        [50.0, 70.0],
+                        [51.0, 71.0],
+                        [49.0, 69.0],
+                        [50.0, 70.0],
+                        [50.5, 70.5],
                     ],
                     "time": [BASE_EPOCH + i * 300 for i in range(5)],
                 },
@@ -649,9 +650,7 @@ class TestGetMetricAnomalies:
         respx.get(
             "https://test.logicmonitor.com/santaba/rest"
             "/device/devices/1/devicedatasources/10/instances/100/data"
-        ).mock(
-            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await get_metric_anomalies(
             client, device_id=1, device_datasource_id=10, instance_id=100
@@ -721,8 +720,16 @@ class TestGetMetricAnomalies:
                 json={
                     "dataPoints": ["cpu"],
                     "values": [
-                        [50.0], [50.0], [50.0], [50.0], [50.0],
-                        [50.0], [50.0], [50.0], [50.0], [200.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [50.0],
+                        [200.0],
                     ],
                     "time": [BASE_EPOCH + i * 300 for i in range(10)],
                 },
@@ -766,7 +773,10 @@ class TestGetMetricAnomaliesMethod:
         )
 
         result = await get_metric_anomalies(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -788,8 +798,16 @@ class TestGetMetricAnomaliesMethod:
                 json={
                     "dataPoints": ["cpu"],
                     "values": [
-                        [50.0], [51.0], [49.0], [50.0], [50.5],
-                        [49.5], [50.2], [50.1], [49.8], [200.0],
+                        [50.0],
+                        [51.0],
+                        [49.0],
+                        [50.0],
+                        [50.5],
+                        [49.5],
+                        [50.2],
+                        [50.1],
+                        [49.8],
+                        [200.0],
                     ],
                     "time": [BASE_EPOCH + i * 300 for i in range(10)],
                 },
@@ -797,7 +815,10 @@ class TestGetMetricAnomaliesMethod:
         )
 
         result = await get_metric_anomalies(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
             method="iqr",
         )
 
@@ -820,8 +841,16 @@ class TestGetMetricAnomaliesMethod:
                 json={
                     "dataPoints": ["cpu"],
                     "values": [
-                        [50.0], [52.0], [48.0], [51.0], [49.0],
-                        [50.5], [49.5], [51.5], [48.5], [200.0],
+                        [50.0],
+                        [52.0],
+                        [48.0],
+                        [51.0],
+                        [49.0],
+                        [50.5],
+                        [49.5],
+                        [51.5],
+                        [48.5],
+                        [200.0],
                     ],
                     "time": [BASE_EPOCH + i * 300 for i in range(10)],
                 },
@@ -829,7 +858,10 @@ class TestGetMetricAnomaliesMethod:
         )
 
         result = await get_metric_anomalies(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
             method="mad",
         )
 
@@ -857,7 +889,10 @@ class TestGetMetricAnomaliesMethod:
         )
 
         result = await get_metric_anomalies(
-            client, device_id=1, device_datasource_id=10, instance_id=100,
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
         )
 
         data = json.loads(result[0].text)
@@ -1097,9 +1132,7 @@ class TestCorrelateMetrics:
         respx.get(
             "https://test.logicmonitor.com/santaba/rest"
             "/device/devices/1/devicedatasources/10/instances/100/data"
-        ).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "error"})
-        )
+        ).mock(return_value=httpx.Response(500, json={"errorMessage": "error"}))
 
         sources = [
             {"device_id": 1, "device_datasource_id": 10, "instance_id": 100, "datapoint": "cpu"},

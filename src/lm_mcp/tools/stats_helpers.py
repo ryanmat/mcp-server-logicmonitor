@@ -11,9 +11,7 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-def linear_regression(
-    x: list[float], y: list[float]
-) -> tuple[float, float, float]:
+def linear_regression(x: list[float], y: list[float]) -> tuple[float, float, float]:
     """Compute simple linear regression (ordinary least squares).
 
     Args:
@@ -34,7 +32,7 @@ def linear_regression(
 
     sum_x = sum(x)
     sum_y = sum(y)
-    sum_xy = sum(xi * yi for xi, yi in zip(x, y))
+    sum_xy = sum(xi * yi for xi, yi in zip(x, y, strict=True))
     sum_x2 = sum(xi * xi for xi in x)
 
     denom = n * sum_x2 - sum_x * sum_x
@@ -48,7 +46,7 @@ def linear_regression(
     # R-squared: coefficient of determination
     y_mean = sum_y / n
     ss_tot = sum((yi - y_mean) ** 2 for yi in y)
-    ss_res = sum((yi - (slope * xi + intercept)) ** 2 for xi, yi in zip(x, y))
+    ss_res = sum((yi - (slope * xi + intercept)) ** 2 for xi, yi in zip(x, y, strict=True))
 
     r_squared = 1.0 - (ss_res / ss_tot) if ss_tot != 0 else 0.0
 
@@ -77,7 +75,7 @@ def pearson_correlation(x: list[float], y: list[float]) -> float:
     mean_x = sum(x) / n
     mean_y = sum(y) / n
 
-    cov = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y))
+    cov = sum((xi - mean_x) * (yi - mean_y) for xi, yi in zip(x, y, strict=True))
     var_x = sum((xi - mean_x) ** 2 for xi in x)
     var_y = sum((yi - mean_y) ** 2 for yi in y)
 
@@ -108,10 +106,7 @@ def autocorrelation(values: list[float], lag: int) -> float:
     if variance == 0:
         return 0.0
 
-    cov = sum(
-        (values[i] - mean) * (values[i + lag] - mean)
-        for i in range(n - lag)
-    ) / (n - lag)
+    cov = sum((values[i] - mean) * (values[i + lag] - mean) for i in range(n - lag)) / (n - lag)
 
     return cov / variance
 
@@ -156,19 +151,23 @@ def cusum(
         s_neg = max(0.0, s_neg - deviation - stddev * 0.5)
 
         if s_pos > threshold:
-            change_points.append({
-                "index": i,
-                "direction": "increase",
-                "magnitude": round(s_pos, 4),
-            })
+            change_points.append(
+                {
+                    "index": i,
+                    "direction": "increase",
+                    "magnitude": round(s_pos, 4),
+                }
+            )
             s_pos = 0.0
 
         if s_neg > threshold:
-            change_points.append({
-                "index": i,
-                "direction": "decrease",
-                "magnitude": round(s_neg, 4),
-            })
+            change_points.append(
+                {
+                    "index": i,
+                    "direction": "decrease",
+                    "magnitude": round(s_neg, 4),
+                }
+            )
             s_neg = 0.0
 
     return change_points
@@ -250,9 +249,9 @@ def holt_winters(
 
     # Initialize level and trend from first two seasons
     level = sum(values[:season_length]) / season_length
-    trend = sum(
-        values[season_length + i] - values[i] for i in range(season_length)
-    ) / (season_length * season_length)
+    trend = sum(values[season_length + i] - values[i] for i in range(season_length)) / (
+        season_length * season_length
+    )
 
     # Initialize seasonal components from first season
     seasonals = [values[i] - level for i in range(season_length)]
@@ -381,23 +380,17 @@ def iqr_anomalies(values: list[float], multiplier: float = 1.5) -> dict:
 
     q1_low = int(q1_pos)
     q1_frac = q1_pos - q1_low
-    q1 = sorted_vals[q1_low] + q1_frac * (
-        sorted_vals[min(q1_low + 1, n - 1)] - sorted_vals[q1_low]
-    )
+    q1 = sorted_vals[q1_low] + q1_frac * (sorted_vals[min(q1_low + 1, n - 1)] - sorted_vals[q1_low])
 
     q3_low = int(q3_pos)
     q3_frac = q3_pos - q3_low
-    q3 = sorted_vals[q3_low] + q3_frac * (
-        sorted_vals[min(q3_low + 1, n - 1)] - sorted_vals[q3_low]
-    )
+    q3 = sorted_vals[q3_low] + q3_frac * (sorted_vals[min(q3_low + 1, n - 1)] - sorted_vals[q3_low])
 
     iqr = q3 - q1
     lower_fence = q1 - multiplier * iqr
     upper_fence = q3 + multiplier * iqr
 
-    anomaly_indices = [
-        i for i, v in enumerate(values) if v < lower_fence or v > upper_fence
-    ]
+    anomaly_indices = [i for i, v in enumerate(values) if v < lower_fence or v > upper_fence]
 
     return {
         "q1": round(q1, 4),
@@ -451,9 +444,7 @@ def mad_anomalies(values: list[float], threshold: float = 3.0) -> dict:
 
     # Modified z-score: 0.6745 * (x - median) / MAD
     modified_z_scores = [round(0.6745 * (v - median) / mad, 4) for v in values]
-    anomaly_indices = [
-        i for i, z in enumerate(modified_z_scores) if abs(z) > threshold
-    ]
+    anomaly_indices = [i for i, z in enumerate(modified_z_scores) if abs(z) > threshold]
 
     return {
         "median": round(median, 4),
@@ -464,7 +455,7 @@ def mad_anomalies(values: list[float], threshold: float = 3.0) -> dict:
 
 
 async def fetch_metric_series(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     device_datasource_id: int,
     instance_id: int,
@@ -507,9 +498,7 @@ async def fetch_metric_series(
     dp_names = result.get("datapoints", result.get("dataPoints", []))
     value_rows = result.get("values", [])
     raw_timestamps = result.get("time", [])
-    timestamps = [
-        int(t / 1000) if t > 1e12 else int(t) for t in raw_timestamps
-    ]
+    timestamps = [int(t / 1000) if t > 1e12 else int(t) for t in raw_timestamps]
 
     series: dict[str, dict[str, Any]] = {}
     for dp_idx, dp_name in enumerate(dp_names):
@@ -518,9 +507,7 @@ async def fetch_metric_series(
         for i, row in enumerate(value_rows):
             if dp_idx < len(row) and row[dp_idx] != "No Data":
                 val = row[dp_idx]
-                if val is not None and not (
-                    isinstance(val, float) and math.isnan(val)
-                ):
+                if val is not None and not (isinstance(val, float) and math.isnan(val)):
                     dp_values.append(float(val))
                     if i < len(timestamps):
                         dp_timestamps.append(timestamps[i])

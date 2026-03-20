@@ -357,9 +357,7 @@ TOOL_CATEGORIES = {
             ],
         },
         "remediation": {
-            "description": (
-                "Diagnostic sources, remediation sources, and remediation execution."
-            ),
+            "description": ("Diagnostic sources, remediation sources, and remediation execution."),
             "tools": [
                 "get_diagnosticsources",
                 "get_diagnosticsource",
@@ -388,7 +386,7 @@ COMMON_QUERY_EXAMPLES = {
         {
             "description": "Find dead devices",
             "tool": "get_devices",
-            "filter": 'hostStatus:1',
+            "filter": "hostStatus:1",
             "notes": "hostStatus 1 = dead. Use get_devices with status='dead'.",
         },
         {

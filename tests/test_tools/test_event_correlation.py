@@ -42,12 +42,8 @@ class TestCorrelateChanges:
         """No alerts and no changes produce empty results."""
         from lm_mcp.tools.event_correlation import correlate_changes
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-        respx.get(AUDIT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await correlate_changes(client)
 
@@ -79,14 +75,16 @@ class TestCorrelateChanges:
         ]
         # Add a few baseline alerts spread over time
         for i in range(5):
-            alerts.append({
-                "id": f"LMA_bg{i}",
-                "severity": 2,
-                "monitorObjectName": f"bg{i}",
-                "startEpoch": now - 7200 + i * 600,
-                "endEpoch": 0,
-                "cleared": False,
-            })
+            alerts.append(
+                {
+                    "id": f"LMA_bg{i}",
+                    "severity": 2,
+                    "monitorObjectName": f"bg{i}",
+                    "startEpoch": now - 7200 + i * 600,
+                    "endEpoch": 0,
+                    "cleared": False,
+                }
+            )
 
         changes = [
             {
@@ -98,14 +96,10 @@ class TestCorrelateChanges:
         ]
 
         respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(
-                200, json={"items": alerts, "total": len(alerts)}
-            )
+            return_value=httpx.Response(200, json={"items": alerts, "total": len(alerts)})
         )
         respx.get(AUDIT_URL).mock(
-            return_value=httpx.Response(
-                200, json={"items": changes, "total": 1}
-            )
+            return_value=httpx.Response(200, json={"items": changes, "total": 1})
         )
 
         result = await correlate_changes(client)
@@ -160,12 +154,8 @@ class TestCorrelateChanges:
         """Audit API failure is handled gracefully."""
         from lm_mcp.tools.event_correlation import correlate_changes
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-        respx.get(AUDIT_URL).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "error"})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(500, json={"errorMessage": "error"}))
 
         result = await correlate_changes(client)
 
@@ -177,12 +167,8 @@ class TestCorrelateChanges:
         """Response includes hours_back parameter."""
         from lm_mcp.tools.event_correlation import correlate_changes
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-        respx.get(AUDIT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await correlate_changes(client, hours_back=48)
 
@@ -195,16 +181,10 @@ class TestCorrelateChanges:
         """Custom correlation window is reflected in response."""
         from lm_mcp.tools.event_correlation import correlate_changes
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-        respx.get(AUDIT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        result = await correlate_changes(
-            client, correlation_window_minutes=60
-        )
+        result = await correlate_changes(client, correlation_window_minutes=60)
 
         data = json.loads(result[0].text)
         assert data["correlation_window_minutes"] == 60
@@ -214,12 +194,8 @@ class TestCorrelateChanges:
         """Response has all expected fields."""
         from lm_mcp.tools.event_correlation import correlate_changes
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-        respx.get(AUDIT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         result = await correlate_changes(client)
 
@@ -236,9 +212,7 @@ class TestCorrelateChanges:
         """Alert API errors are returned as error response."""
         from lm_mcp.tools.event_correlation import correlate_changes
 
-        respx.get(ALERT_URL).mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.get(ALERT_URL).mock(side_effect=httpx.ConnectError("Connection refused"))
 
         result = await correlate_changes(client)
 
@@ -250,9 +224,7 @@ class TestCorrelateChanges:
         from lm_mcp.tools.event_correlation import correlate_changes
 
         now = int(time.time())
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
         respx.get(AUDIT_URL).mock(
             return_value=httpx.Response(
                 200,

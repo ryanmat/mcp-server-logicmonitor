@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 async def ingest_logs(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     logs: list[dict],
 ) -> list[TextContent]:
     """Ingest log entries into LogicMonitor.
@@ -50,7 +50,7 @@ async def ingest_logs(
 
 
 async def push_metrics(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     metrics: dict,
 ) -> list[TextContent]:
     """Push custom metrics into LogicMonitor.

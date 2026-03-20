@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_topology_map(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_group_id: int | None = None,
     include_connections: bool = True,
     limit: int = 100,
@@ -67,7 +67,7 @@ async def get_topology_map(
 
 
 async def get_device_neighbors(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     depth: int = 1,
 ) -> list[TextContent]:
@@ -114,7 +114,7 @@ async def get_device_neighbors(
 
 
 async def get_device_interfaces(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     limit: int = 100,
 ) -> list[TextContent]:
@@ -161,7 +161,7 @@ async def get_device_interfaces(
 
 
 async def get_network_flows(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int | None = None,
     source_ip: str | None = None,
     dest_ip: str | None = None,
@@ -189,11 +189,11 @@ async def get_network_flows(
         if source_ip:
             clean_ip, was_modified = sanitize_filter_value(source_ip)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'srcIP:{quote_filter_value(clean_ip)}')
+            filters.append(f"srcIP:{quote_filter_value(clean_ip)}")
         if dest_ip:
             clean_ip, was_modified = sanitize_filter_value(dest_ip)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'dstIP:{quote_filter_value(clean_ip)}')
+            filters.append(f"dstIP:{quote_filter_value(clean_ip)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -229,7 +229,7 @@ async def get_network_flows(
 
 
 async def get_device_connections(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
 ) -> list[TextContent]:
     """Get all connections/relationships for a device.

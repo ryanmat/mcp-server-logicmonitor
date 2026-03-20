@@ -31,7 +31,7 @@ DEVICE_STATUS_MAP = {
 
 
 async def get_devices(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int | None = None,
     name_filter: str | None = None,
     hostname_filter: str | None = None,
@@ -75,11 +75,11 @@ async def get_devices(
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'displayName~{quote_filter_value(clean_name)}')
+                filters.append(f"displayName~{quote_filter_value(clean_name)}")
             if hostname_filter:
                 clean_host, was_modified = sanitize_filter_value(hostname_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f'name~{quote_filter_value(clean_host)}')
+                filters.append(f"name~{quote_filter_value(clean_host)}")
             if status and status.lower() in DEVICE_STATUS_MAP:
                 filters.append(f"hostStatus:{DEVICE_STATUS_MAP[status.lower()]}")
 
@@ -119,7 +119,7 @@ async def get_devices(
 
 
 async def get_device(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific device.
@@ -139,7 +139,7 @@ async def get_device(
 
 
 async def get_device_groups(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     parent_id: int | None = None,
     name_filter: str | None = None,
     limit: int = 50,
@@ -165,7 +165,7 @@ async def get_device_groups(
         if name_filter:
             clean_name, was_modified = sanitize_filter_value(name_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f'name~{quote_filter_value(clean_name)}')
+            filters.append(f"name~{quote_filter_value(clean_name)}")
 
         if filters:
             params["filter"] = ",".join(filters)
@@ -198,7 +198,7 @@ async def get_device_groups(
 
 @require_write_permission
 async def create_device(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     display_name: str,
     preferred_collector_id: int,
@@ -257,7 +257,7 @@ async def create_device(
 
 @require_write_permission
 async def update_device(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     display_name: str | None = None,
     description: str | None = None,
@@ -297,15 +297,10 @@ async def update_device(
         if custom_properties is not None:
             # Fetch existing properties to merge (prevents silent data loss)
             existing = await client.get(f"/device/devices/{device_id}")
-            existing_props = {
-                p["name"]: p["value"]
-                for p in existing.get("customProperties", [])
-            }
+            existing_props = {p["name"]: p["value"] for p in existing.get("customProperties", [])}
             # Merge: new values override existing, existing values preserved
             existing_props.update(custom_properties)
-            body["customProperties"] = [
-                {"name": k, "value": v} for k, v in existing_props.items()
-            ]
+            body["customProperties"] = [{"name": k, "value": v} for k, v in existing_props.items()]
 
         if not body:
             return format_response(
@@ -334,7 +329,7 @@ async def update_device(
 
 @require_write_permission
 async def delete_device(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     device_id: int,
     delete_hard: bool = False,
 ) -> list[TextContent]:
@@ -377,7 +372,7 @@ async def delete_device(
 
 @require_write_permission
 async def create_device_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     name: str,
     parent_id: int = 1,
     description: str | None = None,
@@ -431,7 +426,7 @@ async def create_device_group(
 
 @require_write_permission
 async def update_device_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
     name: str | None = None,
     description: str | None = None,
@@ -470,14 +465,9 @@ async def update_device_group(
             body["disableAlerting"] = disable_alerting
         if custom_properties is not None:
             existing = await client.get(f"/device/groups/{group_id}")
-            existing_props = {
-                p["name"]: p["value"]
-                for p in existing.get("customProperties", [])
-            }
+            existing_props = {p["name"]: p["value"] for p in existing.get("customProperties", [])}
             existing_props.update(custom_properties)
-            body["customProperties"] = [
-                {"name": k, "value": v} for k, v in existing_props.items()
-            ]
+            body["customProperties"] = [{"name": k, "value": v} for k, v in existing_props.items()]
 
         if not body:
             return format_response(
@@ -508,7 +498,7 @@ async def update_device_group(
 
 @require_write_permission
 async def delete_device_group(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     group_id: int,
     delete_children: bool = False,
     delete_hard: bool = False,

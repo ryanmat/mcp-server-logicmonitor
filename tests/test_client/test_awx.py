@@ -130,9 +130,7 @@ class TestAwxClientPost:
     @respx.mock
     async def test_post_empty_body(self, client):
         """POST with no body succeeds."""
-        respx.post(f"{AWX_API}/jobs/42/cancel/").mock(
-            return_value=Response(202, json={})
-        )
+        respx.post(f"{AWX_API}/jobs/42/cancel/").mock(return_value=Response(202, json={}))
         result = await client.post("/jobs/42/cancel/")
         assert result == {}
 
@@ -144,9 +142,7 @@ class TestAwxClientDelete:
     @respx.mock
     async def test_delete_success(self, client):
         """Successful DELETE returns empty dict for 204."""
-        respx.delete(f"{AWX_API}/jobs/42/").mock(
-            return_value=Response(204, text="")
-        )
+        respx.delete(f"{AWX_API}/jobs/42/").mock(return_value=Response(204, text=""))
         result = await client.delete("/jobs/42/")
         assert result == {}
 
@@ -223,14 +219,10 @@ class TestAwxClientErrorMapping:
     async def test_400_raises_lm_error(self, client):
         """400 response raises LMError with HTTP code."""
         respx.post(f"{AWX_API}/job_templates/42/launch/").mock(
-            return_value=Response(
-                400, json={"extra_vars": ["This field may not be blank."]}
-            )
+            return_value=Response(400, json={"extra_vars": ["This field may not be blank."]})
         )
         with pytest.raises(LMError) as exc_info:
-            await client.post(
-                "/job_templates/42/launch/", json_body={"extra_vars": ""}
-            )
+            await client.post("/job_templates/42/launch/", json_body={"extra_vars": ""})
         assert exc_info.value.code == "HTTP_400"
 
     @pytest.mark.asyncio
@@ -314,9 +306,7 @@ class TestAwxClientConnectionError:
         """Connection failure raises LMConnectionError."""
         import httpx
 
-        respx.get(f"{AWX_API}/ping/").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.get(f"{AWX_API}/ping/").mock(side_effect=httpx.ConnectError("Connection refused"))
         with pytest.raises(LMConnectionError):
             await client.get("/ping/")
 

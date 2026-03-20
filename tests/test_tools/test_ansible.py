@@ -26,9 +26,7 @@ def _reload_config(monkeypatch, *, writes_enabled: bool = False):
     """Set LM env vars and reload config to pick up changes."""
     monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-12345")
-    monkeypatch.setenv(
-        "LM_ENABLE_WRITE_OPERATIONS", str(writes_enabled).lower()
-    )
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", str(writes_enabled).lower())
     from importlib import reload
 
     import lm_mcp.config
@@ -103,9 +101,7 @@ class TestAwxConnection:
     async def test_handles_connection_failure(self, awx_client):
         from lm_mcp.tools.ansible import test_awx_connection
 
-        respx.get(f"{BASE}/api/v2/ping/").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.get(f"{BASE}/api/v2/ping/").mock(side_effect=httpx.ConnectError("Connection refused"))
 
         result = await test_awx_connection(awx_client)
         assert "Error" in result[0].text
@@ -343,9 +339,7 @@ class TestCancelJob:
         _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.ansible import cancel_job
 
-        respx.post(f"{BASE}/api/v2/jobs/99/cancel/").mock(
-            return_value=httpx.Response(202, json={})
-        )
+        respx.post(f"{BASE}/api/v2/jobs/99/cancel/").mock(return_value=httpx.Response(202, json={}))
 
         result = await cancel_job(awx_client, job_id=99)
         data = json.loads(result[0].text)
@@ -460,9 +454,7 @@ class TestLaunchWorkflow:
         from lm_mcp.tools.ansible import launch_workflow
 
         respx.post(f"{BASE}/api/v2/workflow_job_templates/10/launch/").mock(
-            return_value=httpx.Response(
-                201, json={"workflow_job": 200, "status": "pending"}
-            )
+            return_value=httpx.Response(201, json={"workflow_job": 200, "status": "pending"})
         )
 
         result = await launch_workflow(awx_client, template_id=10)

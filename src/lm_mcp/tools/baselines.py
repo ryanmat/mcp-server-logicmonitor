@@ -64,8 +64,7 @@ async def save_baseline(
         baseline_data: dict = {}
         for dp_idx, dp_name in enumerate(dp_names):
             raw_values = [
-                row[dp_idx] for row in value_rows
-                if dp_idx < len(row) and row[dp_idx] != "No Data"
+                row[dp_idx] for row in value_rows if dp_idx < len(row) and row[dp_idx] != "No Data"
             ]
             nums = [v for v in raw_values if v is not None]
             if not nums:
@@ -101,13 +100,15 @@ async def save_baseline(
         }
         session.set_variable(f"baseline_{baseline_name}", stored)
 
-        return format_response({
-            "success": True,
-            "baseline_name": baseline_name,
-            "datapoints": baseline_data,
-            "hours_back": hours_back,
-            "device_id": device_id,
-        })
+        return format_response(
+            {
+                "success": True,
+                "baseline_name": baseline_name,
+                "datapoints": baseline_data,
+                "hours_back": hours_back,
+                "device_id": device_id,
+            }
+        )
 
     except Exception as e:
         return [TextContent(type="text", text=f"Error: {e}")]
@@ -143,13 +144,15 @@ async def compare_to_baseline(
         baseline = session.get_variable(f"baseline_{baseline_name}")
 
         if baseline is None:
-            return format_response({
-                "error": True,
-                "message": (
-                    f"Baseline '{baseline_name}' not found. "
-                    "Use save_baseline to create one first."
-                ),
-            })
+            return format_response(
+                {
+                    "error": True,
+                    "message": (
+                        f"Baseline '{baseline_name}' not found. "
+                        "Use save_baseline to create one first."
+                    ),
+                }
+            )
 
         # Use baseline IDs unless explicitly overridden
         d_id = device_id if device_id is not None else baseline["device_id"]
@@ -158,24 +161,19 @@ async def compare_to_baseline(
             if device_datasource_id is not None
             else baseline["device_datasource_id"]
         )
-        i_id = (
-            instance_id
-            if instance_id is not None
-            else baseline["instance_id"]
-        )
+        i_id = instance_id if instance_id is not None else baseline["instance_id"]
 
         now = int(time.time())
         start = now - (hours_back * 3600)
 
-        path = (
-            f"/device/devices/{d_id}"
-            f"/devicedatasources/{dds_id}"
-            f"/instances/{i_id}/data"
+        path = f"/device/devices/{d_id}/devicedatasources/{dds_id}/instances/{i_id}/data"
+        resp = await client.get(
+            path,
+            params={
+                "start": str(start),
+                "end": str(now),
+            },
         )
-        resp = await client.get(path, params={
-            "start": str(start),
-            "end": str(now),
-        })
 
         if isinstance(resp, dict) and "errorMessage" in resp:
             return handle_error(resp)
@@ -195,8 +193,7 @@ async def compare_to_baseline(
                 continue
 
             raw_values = [
-                row[dp_idx] for row in value_rows
-                if dp_idx < len(row) and row[dp_idx] != "No Data"
+                row[dp_idx] for row in value_rows if dp_idx < len(row) and row[dp_idx] != "No Data"
             ]
             nums = [v for v in raw_values if v is not None]
             if not nums:
@@ -212,13 +209,9 @@ async def compare_to_baseline(
 
             # Calculate deviation as percentage of baseline mean
             if bl_mean != 0:
-                deviation_pct = abs(
-                    (current_mean - bl_mean) / bl_mean
-                ) * 100
+                deviation_pct = abs((current_mean - bl_mean) / bl_mean) * 100
             else:
-                deviation_pct = (
-                    0.0 if current_mean == 0 else float("inf")
-                )
+                deviation_pct = 0.0 if current_mean == 0 else float("inf")
 
             # Classify deviation
             if deviation_pct <= 20:
@@ -235,11 +228,13 @@ async def compare_to_baseline(
                 "deviation_percent": round(deviation_pct, 2),
             }
 
-        return format_response({
-            "baseline_name": baseline_name,
-            "comparisons": comparisons,
-            "hours_compared": hours_back,
-        })
+        return format_response(
+            {
+                "baseline_name": baseline_name,
+                "comparisons": comparisons,
+                "hours_compared": hours_back,
+            }
+        )
 
     except Exception as e:
         return [TextContent(type="text", text=f"Error: {e}")]

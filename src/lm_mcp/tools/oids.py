@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 async def get_oids(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     oid_filter: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
@@ -41,7 +41,7 @@ async def get_oids(
         if oid_filter:
             clean_oid, was_modified = sanitize_filter_value(oid_filter)
             wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f'oid~{quote_filter_value(clean_oid)}'
+            params["filter"] = f"oid~{quote_filter_value(clean_oid)}"
 
         result = await client.get("/setting/oids", params=params)
 
@@ -71,7 +71,7 @@ async def get_oids(
 
 
 async def get_oid(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     oid_id: int,
 ) -> list[TextContent]:
     """Get detailed information about a specific OID.

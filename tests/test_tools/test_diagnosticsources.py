@@ -37,8 +37,7 @@ class TestGetDiagnosticSources:
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeDiagnosticSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeDiagnosticSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -82,8 +81,7 @@ class TestGetDiagnosticSources:
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeDiagnosticSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeDiagnosticSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -121,8 +119,7 @@ class TestGetDiagnosticSources:
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeDiagnosticSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeDiagnosticSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -160,8 +157,7 @@ class TestGetDiagnosticSources:
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeDiagnosticSources"
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeDiagnosticSources"
         ).mock(
             return_value=httpx.Response(
                 200,
@@ -181,11 +177,8 @@ class TestGetDiagnosticSources:
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
         respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeDiagnosticSources"
-        ).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
-        )
+            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeDiagnosticSources"
+        ).mock(return_value=httpx.Response(500, json={"errorMessage": "Server error"}))
 
         result = await get_diagnosticsources(client)
 
@@ -272,9 +265,7 @@ class TestGetDiagnosticSource:
         respx.post(
             "https://test.logicmonitor.com/santaba/rest"
             "/exchange/toolbox/exchangeDiagnosticSources/999"
-        ).mock(
-            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await get_diagnosticsource(client, source_id=999)
 

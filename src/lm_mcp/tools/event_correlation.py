@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 async def correlate_changes(
-    client: "LogicMonitorClient",
+    client: LogicMonitorClient,
     hours_back: int = 24,
     correlation_window_minutes: int = 30,
 ) -> list[TextContent]:
@@ -56,9 +56,7 @@ async def correlate_changes(
             "sort": "-happenedOn",
         }
         try:
-            audit_result = await client.get(
-                "/setting/accesslogs", params=audit_params
-            )
+            audit_result = await client.get("/setting/accesslogs", params=audit_params)
             changes = audit_result.get("items", [])
         except Exception:
             changes = []
@@ -77,9 +75,7 @@ async def correlate_changes(
             counts = list(buckets.values())
             mean_count = sum(counts) / len(counts)
             if len(counts) > 1:
-                variance = sum(
-                    (c - mean_count) ** 2 for c in counts
-                ) / (len(counts) - 1)
+                variance = sum((c - mean_count) ** 2 for c in counts) / (len(counts) - 1)
                 stddev_count = math.sqrt(variance)
             else:
                 stddev_count = 0.0
@@ -87,10 +83,12 @@ async def correlate_changes(
             spike_threshold = mean_count + stddev_count
             for bucket_ts, count in sorted(buckets.items()):
                 if count > spike_threshold and count > 1:
-                    spike_buckets.append({
-                        "timestamp": bucket_ts,
-                        "alert_count": count,
-                    })
+                    spike_buckets.append(
+                        {
+                            "timestamp": bucket_ts,
+                            "alert_count": count,
+                        }
+                    )
 
         # Correlate changes with alert spikes
         correlated_events = []
@@ -118,32 +116,30 @@ async def correlate_changes(
                     if change_id not in correlated_change_ids:
                         correlated_change_ids.add(change_id)
                         correlated_spike_ts.add(spike_ts)
-                        correlated_events.append({
-                            "change": {
-                                "timestamp": change_ts,
-                                "user": change.get(
-                                    "username",
-                                    change.get("userName", "unknown"),
-                                ),
-                                "description": change.get(
-                                    "description", "unknown"
-                                ),
-                            },
-                            "spike": {
-                                "timestamp": spike_ts,
-                                "alert_count": spike["alert_count"],
-                            },
-                            "time_gap_minutes": round(time_diff / 60.0, 1),
-                            "confidence": round(confidence, 2),
-                        })
+                        correlated_events.append(
+                            {
+                                "change": {
+                                    "timestamp": change_ts,
+                                    "user": change.get(
+                                        "username",
+                                        change.get("userName", "unknown"),
+                                    ),
+                                    "description": change.get("description", "unknown"),
+                                },
+                                "spike": {
+                                    "timestamp": spike_ts,
+                                    "alert_count": spike["alert_count"],
+                                },
+                                "time_gap_minutes": round(time_diff / 60.0, 1),
+                                "confidence": round(confidence, 2),
+                            }
+                        )
 
         # Uncorrelated items
         uncorrelated_changes = [
             {
                 "timestamp": c.get("happenedOn", 0),
-                "user": c.get(
-                    "username", c.get("userName", "unknown")
-                ),
+                "user": c.get("username", c.get("userName", "unknown")),
                 "description": c.get("description", "unknown"),
             }
             for c in changes
@@ -151,19 +147,20 @@ async def correlate_changes(
         ][:20]
 
         uncorrelated_spikes = [
-            s for s in spike_buckets
-            if s["timestamp"] not in correlated_spike_ts
+            s for s in spike_buckets if s["timestamp"] not in correlated_spike_ts
         ]
 
-        return format_response({
-            "total_alerts": len(alerts),
-            "total_changes": len(changes),
-            "total_spikes": len(spike_buckets),
-            "correlated_events": correlated_events,
-            "uncorrelated_changes": uncorrelated_changes[:10],
-            "uncorrelated_spikes": uncorrelated_spikes[:10],
-            "hours_back": hours_back,
-            "correlation_window_minutes": correlation_window_minutes,
-        })
+        return format_response(
+            {
+                "total_alerts": len(alerts),
+                "total_changes": len(changes),
+                "total_spikes": len(spike_buckets),
+                "correlated_events": correlated_events,
+                "uncorrelated_changes": uncorrelated_changes[:10],
+                "uncorrelated_spikes": uncorrelated_spikes[:10],
+                "hours_back": hours_back,
+                "correlation_window_minutes": correlation_window_minutes,
+            }
+        )
     except Exception as e:
         return handle_error(e)

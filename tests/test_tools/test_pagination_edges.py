@@ -35,9 +35,7 @@ class TestPaginationEdgeCases:
         from lm_mcp.tools.devices import get_devices
 
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
-            return_value=httpx.Response(
-                200, json={"items": [], "total": 0}
-            )
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
         result = await get_devices(client)
@@ -51,9 +49,7 @@ class TestPaginationEdgeCases:
         from lm_mcp.tools.alerts import get_alerts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
-            return_value=httpx.Response(
-                200, json={"items": [], "total": 5}
-            )
+            return_value=httpx.Response(200, json={"items": [], "total": 5})
         )
 
         result = await get_alerts(client, offset=9999)
@@ -91,9 +87,7 @@ class TestPaginationEdgeCases:
         """get_collectors with limit=1 returns exactly one item."""
         from lm_mcp.tools.collectors import get_collectors
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
             return_value=httpx.Response(
                 200,
                 json={

@@ -129,9 +129,7 @@ BEST_PRACTICES: dict[str, dict] = {
             },
             {
                 "action": "Confirm collector version supports execution",
-                "how": (
-                    "Collector build must be >= 39.200 for remediation execution support"
-                ),
+                "how": ("Collector build must be >= 39.200 for remediation execution support"),
                 "priority": "high",
             },
         ],

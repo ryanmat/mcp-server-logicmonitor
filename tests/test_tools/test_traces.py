@@ -39,9 +39,7 @@ class TestGetTraceServices:
         """get_trace_services returns APM service devices."""
         from lm_mcp.tools.traces import get_trace_services
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -78,9 +76,7 @@ class TestGetTraceServices:
         """get_trace_services sends deviceType:6 filter."""
         from lm_mcp.tools.traces import get_trace_services
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices"
-        ).mock(
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
@@ -94,9 +90,7 @@ class TestGetTraceServices:
         """get_trace_services applies namespace filter."""
         from lm_mcp.tools.traces import get_trace_services
 
-        route = respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices"
-        ).mock(
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
@@ -111,9 +105,7 @@ class TestGetTraceServices:
         """get_trace_services handles empty result set."""
         from lm_mcp.tools.traces import get_trace_services
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
@@ -128,12 +120,8 @@ class TestGetTraceServices:
         """get_trace_services handles API error."""
         from lm_mcp.tools.traces import get_trace_services
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices"
-        ).mock(
-            return_value=httpx.Response(
-                500, json={"errorMessage": "Internal error"}
-            )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "Internal error"})
         )
 
         result = await get_trace_services(client)
@@ -152,9 +140,7 @@ class TestGetTraceService:
         """get_trace_service returns full device detail."""
         from lm_mcp.tools.traces import get_trace_service
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/101"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/101").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -179,12 +165,8 @@ class TestGetTraceService:
         """get_trace_service handles 404 for missing service."""
         from lm_mcp.tools.traces import get_trace_service
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/999"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Device not found"}
-            )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
         )
 
         result = await get_trace_service(client, service_id=999)
@@ -203,9 +185,7 @@ class TestGetTraceServiceAlerts:
         """get_trace_service_alerts returns active alerts."""
         from lm_mcp.tools.traces import get_trace_service_alerts
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/101/alerts"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/101/alerts").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -238,13 +218,9 @@ class TestGetTraceServiceAlerts:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/101/alerts"
-        ).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        await get_trace_service_alerts(
-            client, service_id=101, severity="critical"
-        )
+        await get_trace_service_alerts(client, service_id=101, severity="critical")
 
         params = route.calls[0].request.url.params
         assert "filter" in params
@@ -255,9 +231,7 @@ class TestGetTraceServiceAlerts:
         """get_trace_service_alerts handles no alerts."""
         from lm_mcp.tools.traces import get_trace_service_alerts
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/101/alerts"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/101/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
@@ -272,12 +246,8 @@ class TestGetTraceServiceAlerts:
         """get_trace_service_alerts handles API error."""
         from lm_mcp.tools.traces import get_trace_service_alerts
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/999/alerts"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Device not found"}
-            )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/999/alerts").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
         )
 
         result = await get_trace_service_alerts(client, service_id=999)
@@ -323,9 +293,7 @@ class TestGetTraceServiceDatasources:
             )
         )
 
-        result = await get_trace_service_datasources(
-            client, service_id=101
-        )
+        result = await get_trace_service_datasources(client, service_id=101)
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -341,13 +309,9 @@ class TestGetTraceServiceDatasources:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/101/devicedatasources"
-        ).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        await get_trace_service_datasources(
-            client, service_id=101, name_filter="APM"
-        )
+        await get_trace_service_datasources(client, service_id=101, name_filter="APM")
 
         params = route.calls[0].request.url.params
         assert "filter" in params
@@ -359,13 +323,9 @@ class TestGetTraceServiceDatasources:
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/101/devicedatasources"
-        ).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        result = await get_trace_service_datasources(
-            client, service_id=101
-        )
+        result = await get_trace_service_datasources(client, service_id=101)
 
         data = json.loads(result[0].text)
         assert data["total"] == 0
@@ -378,15 +338,9 @@ class TestGetTraceServiceDatasources:
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/999/devicedatasources"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Device not found"}
-            )
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Device not found"}))
 
-        result = await get_trace_service_datasources(
-            client, service_id=999
-        )
+        result = await get_trace_service_datasources(client, service_id=999)
 
         assert "Error:" in result[0].text
 
@@ -431,9 +385,7 @@ class TestGetTraceOperations:
             )
         )
 
-        result = await get_trace_operations(
-            client, service_id=101, device_datasource_id=2002
-        )
+        result = await get_trace_operations(client, service_id=101, device_datasource_id=2002)
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -450,9 +402,7 @@ class TestGetTraceOperations:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/101/devicedatasources/2002/instances"
-        ).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
         await get_trace_operations(
             client,
@@ -471,13 +421,9 @@ class TestGetTraceOperations:
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/101/devicedatasources/2002/instances"
-        ).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        result = await get_trace_operations(
-            client, service_id=101, device_datasource_id=2002
-        )
+        result = await get_trace_operations(client, service_id=101, device_datasource_id=2002)
 
         data = json.loads(result[0].text)
         assert data["total"] == 0
@@ -490,15 +436,9 @@ class TestGetTraceOperations:
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/999/devicedatasources/9999/instances"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Not found"}
-            )
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
-        result = await get_trace_operations(
-            client, service_id=999, device_datasource_id=9999
-        )
+        result = await get_trace_operations(client, service_id=999, device_datasource_id=9999)
 
         assert "Error:" in result[0].text
 
@@ -607,11 +547,7 @@ class TestGetTraceServiceMetrics:
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/999/devicedatasources/9999/instances/8888/data"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Not found"}
-            )
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await get_trace_service_metrics(
             client,
@@ -722,11 +658,7 @@ class TestGetTraceOperationMetrics:
 
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/999/devicedatasources/9999/instances/8888/data"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Not found"}
-            )
-        )
+        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await get_trace_operation_metrics(
             client,
@@ -749,9 +681,7 @@ class TestGetTraceServiceProperties:
         """get_trace_service_properties returns device properties."""
         from lm_mcp.tools.traces import get_trace_service_properties
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/101/properties"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/101/properties").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -772,9 +702,7 @@ class TestGetTraceServiceProperties:
             )
         )
 
-        result = await get_trace_service_properties(
-            client, service_id=101
-        )
+        result = await get_trace_service_properties(client, service_id=101)
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -790,13 +718,9 @@ class TestGetTraceServiceProperties:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/101/properties"
-        ).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        await get_trace_service_properties(
-            client, service_id=101, name_filter="namespace"
-        )
+        await get_trace_service_properties(client, service_id=101, name_filter="namespace")
 
         params = route.calls[0].request.url.params
         assert "filter" in params
@@ -806,15 +730,11 @@ class TestGetTraceServiceProperties:
         """get_trace_service_properties handles empty results."""
         from lm_mcp.tools.traces import get_trace_service_properties
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/101/properties"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/101/properties").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        result = await get_trace_service_properties(
-            client, service_id=101
-        )
+        result = await get_trace_service_properties(client, service_id=101)
 
         data = json.loads(result[0].text)
         assert data["total"] == 0
@@ -825,16 +745,10 @@ class TestGetTraceServiceProperties:
         """get_trace_service_properties handles API error."""
         from lm_mcp.tools.traces import get_trace_service_properties
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/999/properties"
-        ).mock(
-            return_value=httpx.Response(
-                404, json={"errorMessage": "Device not found"}
-            )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/999/properties").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
         )
 
-        result = await get_trace_service_properties(
-            client, service_id=999
-        )
+        result = await get_trace_service_properties(client, service_id=999)
 
         assert "Error:" in result[0].text

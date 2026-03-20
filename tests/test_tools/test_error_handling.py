@@ -75,9 +75,9 @@ class TestTopologyToolErrors:
         """get_device_neighbors handles 404 for invalid device."""
         from lm_mcp.tools.topology import get_device_neighbors
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/9999/neighbors"
-        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Device not found"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/9999/neighbors").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
+        )
 
         result = await get_device_neighbors(client, device_id=9999)
         assert "Error" in result[0].text or "error" in result[0].text.lower()
@@ -103,9 +103,9 @@ class TestBatchjobToolErrors:
         """get_batchjob handles 404 for invalid job ID."""
         from lm_mcp.tools.batchjobs import get_batchjob
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/batchjobs/9999"
-        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/batchjobs/9999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
 
         result = await get_batchjob(client, batchjob_id=9999)
         assert "Error" in result[0].text or "error" in result[0].text.lower()
@@ -127,9 +127,9 @@ class TestBatchjobToolErrors:
         """get_device_batchjobs handles 404 for invalid device."""
         from lm_mcp.tools.batchjobs import get_device_batchjobs
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/9999/batchjobs"
-        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Device not found"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/9999/batchjobs").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
+        )
 
         result = await get_device_batchjobs(client, device_id=9999)
         assert "Error" in result[0].text or "error" in result[0].text.lower()
@@ -139,7 +139,7 @@ class TestAuditToolErrors:
     """Tests for audit tool bug fix where happenedOn is epoch int, not string."""
 
     @respx.mock
-    async def test_get_change_audit_handles_int_happenedOn(self, client):
+    async def test_get_change_audit_handles_int_happened_on(self, client):
         """get_change_audit handles happenedOn as epoch integer."""
         from lm_mcp.tools.audit import get_change_audit
 
