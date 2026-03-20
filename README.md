@@ -44,7 +44,13 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.1.1 (Current)
+### v2.2.0 (Current)
+- **Breaking**: CORS default changed from `*` to empty. HTTP transport users must now set `LM_CORS_ORIGINS` explicitly.
+- **Fix**: Setup script auto-detects project root instead of hardcoded path
+- **Infra**: uv pinned to 0.9.27, Docker layer caching, expanded lint rules, mypy added to CI
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.1.1
 - **Fix**: `create_sdt` and `bulk_create_device_sdt` now map `Device*` SDT types to `Resource*` for LM API v3 POST endpoints (fixes `400 "Invalid type"` errors)
 - **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-20
+
+### Changed
+
+- CORS default changed from `*` (allow all) to empty string (no CORS by default). HTTP transport users must now explicitly set `LM_CORS_ORIGINS` to enable cross-origin requests.
+- `AWX_VERIFY_SSL` default changed from `false` to `true` in setup script
+- Expanded ruff lint rules to full recommended set (E/F/I/N/W/UP/B/SIM/RUF)
+- Added mypy type checking to CI (non-blocking)
+- Pinned uv to 0.9.27 in Dockerfile and CI workflows
+- Added Docker layer caching to release workflow
+
+### Fixed
+
+- Setup script (`scripts/add-mcp-to-project.sh`) no longer uses hardcoded path; auto-detects project root
+
 ## [2.1.1] - 2026-03-17
 
 ### Fixed
@@ -487,6 +502,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[2.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.0.0...v2.0.1
