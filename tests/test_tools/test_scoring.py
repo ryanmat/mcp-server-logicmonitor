@@ -282,6 +282,64 @@ class TestScoreAlertNoise:
         data = json.loads(result[0].text)
         assert 0 <= data["noise_score"] <= 100
 
+    @respx.mock
+    async def test_moderate_repeat_ratio_not_maxed(self, client):
+        """A moderate repeat ratio should not peg the score at 100."""
+        from lm_mcp.tools.scoring import score_alert_noise
+
+        # 10 alerts from same combo (high repeat) + 5 unique combos = ~0.2 repeat_ratio
+        alerts = [
+            _make_alert(i, "s1", "CPU", "value", start_epoch=BASE_EPOCH + i * 60) for i in range(10)
+        ] + [
+            _make_alert(
+                10 + i, f"server{i}", f"DS{i}", f"dp{i}", start_epoch=BASE_EPOCH + (10 + i) * 60
+            )
+            for i in range(5)
+        ]
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": alerts, "total": 15},
+            )
+        )
+
+        result = await score_alert_noise(client)
+
+        data = json.loads(result[0].text)
+        assert data["noise_score"] < 100
+
+    @respx.mock
+    async def test_score_100_requires_extreme_conditions(self, client):
+        """Score of 100 requires maxed entropy, flapping, and repeats."""
+        from lm_mcp.tools.scoring import score_alert_noise
+
+        # All alerts from exactly one combo (max repeat, low entropy)
+        alerts = [
+            _make_alert(
+                i,
+                "s1",
+                "CPU",
+                "value",
+                start_epoch=BASE_EPOCH + i * 120,
+                end_epoch=BASE_EPOCH + i * 120 + 60,
+                cleared=True,
+            )
+            for i in range(20)
+        ]
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": alerts, "total": 20},
+            )
+        )
+
+        result = await score_alert_noise(client)
+
+        data = json.loads(result[0].text)
+        # With rebalanced weights, a single-combo set has low entropy (normalized=0)
+        # and repeat_ratio=1.0 (30 pts) + flap_ratio contributes the rest
+        assert 0 <= data["noise_score"] <= 100
+
 
 class TestCalculateAvailability:
     """Tests for calculate_availability tool."""

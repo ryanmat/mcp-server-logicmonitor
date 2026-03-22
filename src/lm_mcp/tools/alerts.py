@@ -14,6 +14,7 @@ from lm_mcp.tools import (
     handle_error,
     quote_filter_value,
     require_write_permission,
+    safe_total,
     sanitize_filter_value,
 )
 
@@ -141,7 +142,7 @@ async def get_alerts(
                 }
             )
 
-        total = result.get("total", 0)
+        total = safe_total(result)
         has_more = (offset + len(alerts)) < total
 
         response = {

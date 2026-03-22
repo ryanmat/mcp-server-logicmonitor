@@ -13,6 +13,7 @@ from lm_mcp.tools import (
     handle_error,
     quote_filter_value,
     require_write_permission,
+    safe_total,
     sanitize_filter_value,
 )
 
@@ -20,14 +21,8 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-# Device status mapping for LogicMonitor
-DEVICE_STATUS_MAP = {
-    "normal": 0,
-    "dead": 1,
-    "dead-collector": 2,
-    "unmonitored": 3,
-    "disabled": 4,
-}
+# Valid device status values for the LM v3 API filter
+DEVICE_STATUS_VALUES = {"normal", "dead", "dead-collector", "unmonitored", "disabled"}
 
 
 async def get_devices(
@@ -80,8 +75,8 @@ async def get_devices(
                 clean_host, was_modified = sanitize_filter_value(hostname_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
                 filters.append(f"name~{quote_filter_value(clean_host)}")
-            if status and status.lower() in DEVICE_STATUS_MAP:
-                filters.append(f"hostStatus:{DEVICE_STATUS_MAP[status.lower()]}")
+            if status and status.lower() in DEVICE_STATUS_VALUES:
+                filters.append(f"hostStatus:{status.lower()}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -99,7 +94,7 @@ async def get_devices(
                 }
             )
 
-        total = result.get("total", 0)
+        total = safe_total(result)
         has_more = (offset + len(devices)) < total
 
         response = {

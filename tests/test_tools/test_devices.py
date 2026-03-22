@@ -103,7 +103,7 @@ class TestGetDevices:
 
     @respx.mock
     async def test_get_devices_with_status_filter(self, client):
-        """get_devices filters by device status."""
+        """get_devices filters by device status using string values."""
         from lm_mcp.tools.devices import get_devices
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
@@ -114,7 +114,48 @@ class TestGetDevices:
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
-        assert "hostStatus" in params["filter"]
+        assert "hostStatus:dead" in params["filter"]
+
+    @respx.mock
+    async def test_get_devices_status_dead_collector(self, client):
+        """get_devices filters by dead-collector status."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, status="dead-collector")
+
+        params = dict(route.calls[0].request.url.params)
+        assert "filter" in params
+        assert "hostStatus:dead-collector" in params["filter"]
+
+    @respx.mock
+    async def test_get_devices_negative_total_sanitized(self, client):
+        """get_devices converts negative API total to positive."""
+        from lm_mcp.tools.devices import get_devices
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "displayName": "srv",
+                            "hostStatus": "normal",
+                            "currentCollectorId": 1,
+                        }
+                    ],
+                    "total": -51,
+                },
+            )
+        )
+
+        result = await get_devices(client, limit=50)
+        data = json.loads(result[0].text)
+        assert data["total"] == 51
 
     @respx.mock
     async def test_get_devices_combined_filters(self, client):
