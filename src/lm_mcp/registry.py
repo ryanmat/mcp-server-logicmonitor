@@ -2132,6 +2132,48 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="get_device_eventsources",
+            description=(
+                "Get EventSources applied to a device (resource)."
+                " Returns device-level EventSource associations."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+                "required": ["device_id"],
+            },
+        ),
+        Tool(
+            name="update_device_eventsource",
+            description=(
+                "Update a device-level EventSource association"
+                " (requires write permission). Use to enable or disable"
+                " alerting for an EventSource on a specific device."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_eventsource_id": {
+                        "type": "integer",
+                        "description": (
+                            "Device-EventSource association ID (from get_device_eventsources)"
+                        ),
+                    },
+                    "disable_alerting": {
+                        "type": "boolean",
+                        "description": "Set true to disable alerting, false to enable",
+                    },
+                },
+                "required": ["device_id", "device_eventsource_id"],
+            },
+        ),
+        Tool(
             name="get_propertysources",
             description="List PropertySources",
             annotations=_READ_ONLY,
@@ -3534,9 +3576,9 @@ TOOLS.extend(
         Tool(
             name="score_device_health",
             description=(
-                "Compute a composite health score (0-100) for a device "
-                "instance. Uses z-score analysis of latest values against "
-                "historical data with configurable weights."
+                "Score health of a specific device-datasource instance using "
+                "z-score analysis. For full device health reports across all "
+                "datasources, use the health_check composite tool instead."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4839,6 +4881,8 @@ def get_tool_handler(tool_name: str) -> Any:
         # EventSources
         "get_eventsources": eventsources.get_eventsources,
         "get_eventsource": eventsources.get_eventsource,
+        "get_device_eventsources": eventsources.get_device_eventsources,
+        "update_device_eventsource": eventsources.update_device_eventsource,
         # PropertySources
         "get_propertysources": propertysources.get_propertysources,
         "get_propertysource": propertysources.get_propertysource,

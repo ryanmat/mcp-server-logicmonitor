@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -132,5 +133,103 @@ async def get_eventsource(
         }
 
         return format_response(source)
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_device_eventsources(
+    client: LogicMonitorClient,
+    device_id: int,
+    limit: int = 50,
+) -> list[TextContent]:
+    """Get EventSources applied to a device.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID.
+        limit: Maximum results.
+
+    Returns:
+        List of TextContent with device EventSource associations or error.
+    """
+    try:
+        params: dict = {"size": limit}
+        result = await client.get(f"/device/devices/{device_id}/deviceeventsources", params=params)
+
+        eventsources = []
+        for item in result.get("items", []):
+            eventsources.append(
+                {
+                    "id": item.get("id"),
+                    "eventsource_id": item.get("eventSourceId"),
+                    "name": item.get("eventSourceDisplayName")
+                    or item.get("dataSourceDisplayName", ""),
+                    "alerting_disabled": item.get("alertDisableStatus", "none"),
+                    "alert_status": item.get("alertStatus", "none"),
+                }
+            )
+
+        return format_response(
+            {
+                "device_id": device_id,
+                "total": result.get("total", 0),
+                "count": len(eventsources),
+                "eventsources": eventsources,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_device_eventsource(
+    client: LogicMonitorClient,
+    device_id: int,
+    device_eventsource_id: int,
+    disable_alerting: bool | None = None,
+) -> list[TextContent]:
+    """Update a device-level EventSource association.
+
+    Allows enabling or disabling alerting for an EventSource on a specific device.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID.
+        device_eventsource_id: Device-EventSource association ID (from get_device_eventsources).
+        disable_alerting: Set True to disable alerting, False to enable.
+
+    Returns:
+        List of TextContent with updated association or error.
+    """
+    try:
+        body: dict = {}
+
+        if disable_alerting is not None:
+            body["disableAlerting"] = disable_alerting
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(
+            f"/device/devices/{device_id}/deviceeventsources/{device_eventsource_id}",
+            json_body=body,
+        )
+
+        return format_response(
+            {
+                "message": "Device EventSource updated successfully",
+                "device_id": device_id,
+                "device_eventsource_id": device_eventsource_id,
+                "name": result.get("eventSourceDisplayName")
+                or result.get("dataSourceDisplayName", ""),
+                "alerting_disabled": result.get("alertDisableStatus", ""),
+            }
+        )
     except Exception as e:
         return handle_error(e)
