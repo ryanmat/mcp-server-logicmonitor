@@ -644,3 +644,129 @@ class TestDeleteDeviceGroup:
         assert data["success"] is True
         assert "Test Group" in data["message"]
         assert data["recoverable"] is True
+
+
+class TestGetDeviceGroup:
+    """Tests for get_device_group tool."""
+
+    @respx.mock
+    async def test_get_device_group_returns_full_detail(self, client):
+        """get_device_group returns full group details including appliesTo."""
+        from lm_mcp.tools.devices import get_device_group
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/493").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 493,
+                    "name": "OpenShift",
+                    "parentId": 106,
+                    "appliesTo": "",
+                    "numOfHosts": 1911,
+                    "description": "OpenShift clusters",
+                },
+            )
+        )
+
+        result = await get_device_group(client, group_id=493)
+        data = json.loads(result[0].text)
+        assert data["id"] == 493
+        assert data["parentId"] == 106
+        assert "appliesTo" in data
+
+
+class TestRecoverDevice:
+    """Tests for recover_device tool."""
+
+    @respx.mock
+    async def test_recover_device_success(self, client, monkeypatch):
+        """recover_device restores a soft-deleted device."""
+        from lm_mcp.tools.devices import recover_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.patch("https://test.logicmonitor.com/santaba/rest/device/devices/12345").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 12345, "displayName": "restored-server", "hostStatus": "normal"},
+            )
+        )
+
+        result = await recover_device(client, device_id=12345)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["device_name"] == "restored-server"
+
+
+class TestDeleteDeviceGuardrails:
+    """Tests for delete_device guardrails."""
+
+    @respx.mock
+    async def test_delete_k8s_device_warns(self, client, monkeypatch):
+        """delete_device warns when deleting a Kubernetes-managed device."""
+        from lm_mcp.tools.devices import delete_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/999").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 999,
+                    "displayName": "k8s-pod",
+                    "deviceType": 8,
+                    "hostStatus": "normal",
+                    "currentCollectorId": 94,
+                    "hostGroupIds": "1977,120",
+                },
+            )
+        )
+        respx.delete("https://test.logicmonitor.com/santaba/rest/device/devices/999").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_device(client, device_id=999)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "warnings" in data
+        assert any("Kubernetes" in w for w in data["warnings"])
+        assert data["deleted_device"]["type"] == 8
+
+
+class TestUpdateDeviceK8sWarning:
+    """Tests for update_device K8S group change warning."""
+
+    @respx.mock
+    async def test_update_k8s_device_group_warns(self, client, monkeypatch):
+        """update_device warns when group change fails on K8S device."""
+        from lm_mcp.tools.devices import update_device
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        # Mock the property fetch for custom_properties merge
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/999").mock(
+            return_value=httpx.Response(200, json={"customProperties": []})
+        )
+        respx.patch("https://test.logicmonitor.com/santaba/rest/device/devices/999").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 999,
+                    "displayName": "k8s-pod",
+                    "description": "",
+                    "deviceType": 8,
+                    "hostGroupIds": "1977,2015,120",
+                },
+            )
+        )
+
+        result = await update_device(client, device_id=999, host_group_ids=[1977, 120])
+        data = json.loads(result[0].text)
+        assert "warning" in data
+        assert "Kubernetes" in data["warning"]

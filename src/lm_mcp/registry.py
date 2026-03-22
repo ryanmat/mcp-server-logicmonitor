@@ -102,6 +102,21 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="get_device_group",
+            description=(
+                "Get detailed information about a specific device/resource group,"
+                " including appliesTo expression and parent ID"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Device group ID"},
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
             name="create_device",
             description="Create a new device/resource (requires write permission)",
             annotations=_WRITE,
@@ -163,6 +178,21 @@ TOOLS.extend(
                         "default": False,
                         "description": "Permanently delete",
                     },
+                },
+                "required": ["device_id"],
+            },
+        ),
+        Tool(
+            name="recover_device",
+            description=(
+                "Recover a soft-deleted device/resource (requires write permission)."
+                " Only works within the recovery window."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID to recover"},
                 },
                 "required": ["device_id"],
             },
@@ -4616,9 +4646,11 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_devices": devices.get_devices,
         "get_device": devices.get_device,
         "get_device_groups": devices.get_device_groups,
+        "get_device_group": devices.get_device_group,
         "create_device": devices.create_device,
         "update_device": devices.update_device,
         "delete_device": devices.delete_device,
+        "recover_device": devices.recover_device,
         "create_device_group": devices.create_device_group,
         "update_device_group": devices.update_device_group,
         "delete_device_group": devices.delete_device_group,
