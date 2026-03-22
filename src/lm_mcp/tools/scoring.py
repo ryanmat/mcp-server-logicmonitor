@@ -193,6 +193,7 @@ async def score_alert_noise(
 async def calculate_availability(
     client: LogicMonitorClient,
     device_id: int | None = None,
+    device_name: str | None = None,
     group_id: int | None = None,
     hours_back: int = 720,
     severity_threshold: str = "error",
@@ -206,6 +207,7 @@ async def calculate_availability(
     Args:
         client: LogicMonitor API client.
         device_id: Optional device ID filter.
+        device_name: Optional device display name filter.
         group_id: Optional device group ID filter.
         hours_back: Hours to look back (default: 720 = 30 days).
         severity_threshold: Minimum severity to count as downtime
@@ -240,6 +242,19 @@ async def calculate_availability(
 
         result = await client.get("/alert/alerts", params=params)
         alerts = result.get("items", [])
+
+        # Post-filter: ensure alerts match the requested device
+        if device_id is not None:
+            try:
+                device_info = await client.get(f"/device/devices/{device_id}")
+                target_name = device_info.get("displayName", "")
+                if target_name:
+                    alerts = [a for a in alerts if a.get("monitorObjectName") == target_name]
+            except Exception:
+                pass  # If device lookup fails, proceed with unfiltered alerts
+
+        if device_name is not None and device_id is None:
+            alerts = [a for a in alerts if a.get("monitorObjectName") == device_name]
 
         if not alerts:
             return format_response(
@@ -326,7 +341,7 @@ async def calculate_availability(
                 "availability_percent": round(worst_availability, 4),
                 "total_downtime_minutes": round(total_downtime_seconds / 60.0, 2),
                 "total_uptime_minutes": round(
-                    total_window_minutes - total_downtime_seconds / 60.0, 2
+                    max(0.0, total_window_minutes - total_downtime_seconds / 60.0), 2
                 ),
                 "mttr_minutes": round(mttr, 2),
                 "incident_count": incident_count,

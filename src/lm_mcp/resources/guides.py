@@ -215,6 +215,8 @@ TOOL_CATEGORIES = {
                 "get_configsource",
                 "get_eventsources",
                 "get_eventsource",
+                "get_device_eventsources",
+                "update_device_eventsource",
                 "get_propertysources",
                 "get_propertysource",
                 "get_topologysources",

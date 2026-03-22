@@ -619,6 +619,50 @@ class TestCalculateAvailability:
         params = dict(route.calls[0].request.url.params)
         assert "monitorObjectId:42" in params.get("filter", "")
 
+    @respx.mock
+    async def test_availability_filters_by_device_id(self, client):
+        """calculate_availability only includes alerts for the target device."""
+        from lm_mcp.tools.scoring import calculate_availability
+
+        now = int(time.time())
+        recent = now - 3600  # 1 hour ago
+
+        # Mock device lookup
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 100, "displayName": "target-server"},
+            )
+        )
+
+        # Return alerts from target AND a different device
+        alerts = [
+            {
+                "id": "A1",
+                "severity": 3,
+                "monitorObjectName": "target-server",
+                "startEpoch": recent,
+                "endEpoch": recent + 300,
+            },
+            {
+                "id": "A2",
+                "severity": 3,
+                "monitorObjectName": "other-server",
+                "startEpoch": recent,
+                "endEpoch": recent + 300,
+            },
+        ]
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(200, json={"items": alerts, "total": 2})
+        )
+
+        result = await calculate_availability(client, device_id=100, hours_back=24)
+        data = json.loads(result[0].text)
+
+        # Should only include target-server, not other-server
+        assert "target-server" in data.get("by_device", {})
+        assert "other-server" not in data.get("by_device", {})
+
 
 # Base epoch for metric data
 METRIC_BASE = 1705276800
