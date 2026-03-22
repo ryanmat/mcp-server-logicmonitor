@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 225 structured tools, 15 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 223 structured tools, 15 workflow prompts, and 26 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,21 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.2.0 (Current)
+### v2.3.0 (Current)
+- **New**: `update_collector`, `delete_collector` — collector write operations with device-count guardrails
+- **New**: `bulk_delete_devices` — batch delete up to 100 devices with K8S warnings
+- **New**: `get_device_group` — single group detail with appliesTo and parentId
+- **New**: `recover_device` — restore soft-deleted devices
+- **New**: `get_device_eventsources`, `update_device_eventsource` — EventSource visibility and alerting control
+- **Fix**: `get_devices` status filter now uses string values (was numeric, returned 0 results)
+- **Fix**: Negative API total sentinel values handled with `safe_total()` helper
+- **Fix**: `score_alert_noise` weights rebalanced (was pegging at 100 with normal alert volume)
+- **Fix**: `calculate_availability` now filters to target device only
+- **Guardrail**: `delete_device` warns on K8S-managed devices, includes audit trail
+- **Guardrail**: `update_device` warns when group changes fail on Argus-managed devices
+- **Counts**: 223 tools (205 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.2.0
 - **Breaking**: CORS default changed from `*` to empty. HTTP transport users must now set `LM_CORS_ORIGINS` explicitly.
 - **Fix**: Setup script auto-detects project root instead of hardcoded path
 - **Infra**: uv pinned to 0.9.27, Docker layer caching, expanded lint rules, mypy added to CI
