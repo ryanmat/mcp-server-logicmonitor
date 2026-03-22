@@ -460,6 +460,86 @@ async def recover_device(
         return handle_error(e)
 
 
+# Maximum items for bulk operations to prevent accidental mass changes
+BULK_OPERATION_LIMIT = 100
+
+
+@require_write_permission
+async def bulk_delete_devices(
+    client: LogicMonitorClient,
+    device_ids: list[int],
+    delete_hard: bool = False,
+) -> list[TextContent]:
+    """Delete multiple devices in a single operation.
+
+    Soft deletes by default (recoverable). Includes audit context for each
+    deleted device including device type warnings for Kubernetes-managed devices.
+
+    Args:
+        client: LogicMonitor API client.
+        device_ids: List of device IDs to delete (max 100).
+        delete_hard: If True, permanently delete. Default: soft delete.
+
+    Returns:
+        List of TextContent with results summary or error.
+    """
+    if not device_ids:
+        return format_response(
+            {
+                "error": True,
+                "code": "VALIDATION_ERROR",
+                "message": "No device IDs provided",
+                "suggestion": "Provide at least one device ID",
+            }
+        )
+
+    if len(device_ids) > BULK_OPERATION_LIMIT:
+        return format_response(
+            {
+                "error": True,
+                "code": "BULK_LIMIT_EXCEEDED",
+                "message": f"Too many devices ({len(device_ids)}). Max {BULK_OPERATION_LIMIT}.",
+                "suggestion": "Split into smaller batches",
+            }
+        )
+
+    results: dict = {"success": [], "failed": [], "warnings": []}
+
+    params = {"deleteHard": "true"} if delete_hard else {}
+
+    for device_id in device_ids:
+        try:
+            device = await client.get(f"/device/devices/{device_id}")
+            device_name = device.get("displayName") or device.get("name", f"ID:{device_id}")
+            device_type = device.get("deviceType", 0)
+
+            await client.delete(f"/device/devices/{device_id}", params=params or None)
+
+            results["success"].append({"id": device_id, "name": device_name})
+
+            if device_type == 8:
+                results["warnings"].append(
+                    f"Device {device_id} ({device_name}) was Kubernetes-managed "
+                    "(deviceType=8). Argus may recreate it on the next sync cycle."
+                )
+        except Exception as e:
+            results["failed"].append({"id": device_id, "error": str(e)})
+
+    response: dict = {
+        "total": len(device_ids),
+        "succeeded": len(results["success"]),
+        "failed": len(results["failed"]),
+        "hard_delete": delete_hard,
+        "success_ids": [r["id"] for r in results["success"]],
+        "failures": results["failed"],
+    }
+
+    if results["warnings"]:
+        response["warnings"] = results["warnings"]
+
+    return format_response(response)
+
+
 @require_write_permission
 async def create_device_group(
     client: LogicMonitorClient,

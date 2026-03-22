@@ -1,5 +1,5 @@
 # Description: Tests for collector MCP tools.
-# Description: Validates get_collectors, get_collector functions.
+# Description: Validates collector read, update, and delete functions.
 
 import json
 
@@ -229,3 +229,95 @@ class TestGetCollectorGroupsFilters:
 
         params = dict(route.calls[0].request.url.params)
         assert params["offset"] == "25"
+
+
+class TestUpdateCollector:
+    """Tests for update_collector tool."""
+
+    @respx.mock
+    async def test_update_collector_group(self, client, monkeypatch):
+        """update_collector sends correct PATCH body for group change."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.collectors import update_collector
+
+        respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/121"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 121,
+                    "hostname": "argus-0",
+                    "collectorGroupId": 34,
+                    "collectorGroupName": "AKS Cluster",
+                    "description": "",
+                },
+            )
+        )
+
+        result = await update_collector(client, collector_id=121, collector_group_id=34)
+        data = json.loads(result[0].text)
+        assert data["message"] == "Collector updated successfully"
+        assert data["collector"]["collector_group_id"] == 34
+
+    @respx.mock
+    async def test_update_collector_no_changes(self, client, monkeypatch):
+        """update_collector returns error when no updates provided."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.collectors import update_collector
+
+        result = await update_collector(client, collector_id=121)
+        assert "No updates provided" in result[0].text
+
+
+class TestDeleteCollector:
+    """Tests for delete_collector tool."""
+
+    @respx.mock
+    async def test_delete_collector_blocked_with_devices(self, client, monkeypatch):
+        """delete_collector blocks when collector has devices."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.collectors import delete_collector
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/121"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 121, "hostname": "argus-0", "numberOfHosts": 50},
+            )
+        )
+
+        result = await delete_collector(client, collector_id=121)
+        assert "50 devices assigned" in result[0].text
+        assert "Move or delete devices" in result[0].text
+
+    @respx.mock
+    async def test_delete_collector_succeeds_empty(self, client, monkeypatch):
+        """delete_collector succeeds when collector has no devices."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.collectors import delete_collector
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/121"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 121, "hostname": "argus-0", "numberOfHosts": 0},
+            )
+        )
+        respx.delete(
+            "https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/121"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        result = await delete_collector(client, collector_id=121)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
