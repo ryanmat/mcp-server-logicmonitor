@@ -131,10 +131,8 @@ async def score_alert_noise(
 
         flap_ratio = flap_count / len(alerts) if alerts else 0.0
 
-        # Noise score: weighted combination
-        noise_score = min(
-            100, int(normalized_entropy * 40 + flap_ratio * 100 * 30 + repeat_ratio * 100 * 30)
-        )
+        # Noise score: weighted combination (entropy 40%, flap 30%, repeat 30%)
+        noise_score = min(100, int(normalized_entropy * 40 + flap_ratio * 30 + repeat_ratio * 30))
 
         # Top noisy devices and datasources
         top_devices = sorted(device_counts.items(), key=lambda x: x[1], reverse=True)[:5]

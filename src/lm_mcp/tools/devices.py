@@ -13,6 +13,7 @@ from lm_mcp.tools import (
     handle_error,
     quote_filter_value,
     require_write_permission,
+    safe_total,
     sanitize_filter_value,
 )
 
@@ -20,14 +21,8 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-# Device status mapping for LogicMonitor
-DEVICE_STATUS_MAP = {
-    "normal": 0,
-    "dead": 1,
-    "dead-collector": 2,
-    "unmonitored": 3,
-    "disabled": 4,
-}
+# Valid device status values for the LM v3 API filter
+DEVICE_STATUS_VALUES = {"normal", "dead", "dead-collector", "unmonitored", "disabled"}
 
 
 async def get_devices(
@@ -80,8 +75,8 @@ async def get_devices(
                 clean_host, was_modified = sanitize_filter_value(hostname_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
                 filters.append(f"name~{quote_filter_value(clean_host)}")
-            if status and status.lower() in DEVICE_STATUS_MAP:
-                filters.append(f"hostStatus:{DEVICE_STATUS_MAP[status.lower()]}")
+            if status and status.lower() in DEVICE_STATUS_VALUES:
+                filters.append(f"hostStatus:{status.lower()}")
 
             if filters:
                 params["filter"] = ",".join(filters)
@@ -99,7 +94,7 @@ async def get_devices(
                 }
             )
 
-        total = result.get("total", 0)
+        total = safe_total(result)
         has_more = (offset + len(devices)) < total
 
         response = {
@@ -174,13 +169,16 @@ async def get_device_groups(
 
         groups = []
         for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "device_count": item.get("numOfHosts"),
-                }
-            )
+            group = {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "parent_id": item.get("parentId"),
+                "device_count": item.get("numOfHosts"),
+            }
+            applies_to = item.get("appliesTo")
+            if applies_to:
+                group["applies_to"] = applies_to
+            groups.append(group)
 
         response = {
             "total": result.get("total", 0),
@@ -192,6 +190,26 @@ async def get_device_groups(
             response["note"] = WILDCARD_STRIP_NOTE
 
         return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_device_group(
+    client: LogicMonitorClient,
+    group_id: int,
+) -> list[TextContent]:
+    """Get detailed information about a specific device group.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Device group ID.
+
+    Returns:
+        List of TextContent with group details or error.
+    """
+    try:
+        result = await client.get(f"/device/groups/{group_id}")
+        return format_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -313,16 +331,27 @@ async def update_device(
 
         result = await client.patch(f"/device/devices/{device_id}", json_body=body)
 
-        return format_response(
-            {
-                "message": "Device updated successfully",
-                "device": {
-                    "id": result.get("id"),
-                    "name": result.get("displayName"),
-                    "description": result.get("description"),
-                },
-            }
-        )
+        response = {
+            "message": "Device updated successfully",
+            "device": {
+                "id": result.get("id"),
+                "name": result.get("displayName"),
+                "description": result.get("description"),
+            },
+        }
+
+        # Warn if group change was requested on a K8S-managed device
+        if host_group_ids is not None and result.get("deviceType") == 8:
+            actual_groups = result.get("hostGroupIds", "")
+            requested = ",".join(str(gid) for gid in host_group_ids)
+            if actual_groups != requested:
+                response["warning"] = (
+                    "host_group_ids change may not persist. This is a Kubernetes-managed "
+                    "device (deviceType=8) and Argus controls group membership. "
+                    f"Requested: [{requested}], actual: [{actual_groups}]"
+                )
+
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -350,6 +379,10 @@ async def delete_device(
         # Get device info first for confirmation
         device = await client.get(f"/device/devices/{device_id}")
         device_name = device.get("displayName") or device.get("name", f"ID:{device_id}")
+        device_type = device.get("deviceType", 0)
+        host_status = device.get("hostStatus", "unknown")
+        collector_id = device.get("currentCollectorId")
+        group_ids = device.get("hostGroupIds", "")
 
         params = {}
         if delete_hard:
@@ -357,13 +390,70 @@ async def delete_device(
 
         await client.delete(f"/device/devices/{device_id}", params=params or None)
 
+        response = {
+            "success": True,
+            "message": f"Device '{device_name}' deleted",
+            "device_id": device_id,
+            "hard_delete": delete_hard,
+            "recoverable": not delete_hard,
+        }
+
+        # Include context about what was deleted for audit trail
+        warnings = []
+        if device_type == 8:
+            warnings.append(
+                "This was a Kubernetes-managed device (deviceType=8). "
+                "Argus may recreate it on the next sync cycle."
+            )
+        if host_status == "normal":
+            warnings.append("Device was in normal/healthy state when deleted.")
+        if warnings:
+            response["warnings"] = warnings
+
+        response["deleted_device"] = {
+            "name": device_name,
+            "type": device_type,
+            "status": host_status,
+            "collector_id": collector_id,
+            "group_ids": group_ids,
+        }
+
+        return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def recover_device(
+    client: LogicMonitorClient,
+    device_id: int,
+) -> list[TextContent]:
+    """Recover a soft-deleted device from LogicMonitor.
+
+    Restores a device that was previously soft-deleted. Only works within
+    the recovery window (before the device is permanently purged).
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID to recover.
+
+    Returns:
+        List of TextContent with recovery confirmation or error.
+    """
+    try:
+        result = await client.request(
+            "PATCH",
+            f"/device/devices/{device_id}",
+            json_body={},
+            params={"recover": "true"},
+        )
+        device_name = result.get("displayName") or result.get("name", f"ID:{device_id}")
         return format_response(
             {
                 "success": True,
-                "message": f"Device '{device_name}' deleted",
-                "device_id": device_id,
-                "hard_delete": delete_hard,
-                "recoverable": not delete_hard,
+                "message": f"Device '{device_name}' recovered",
+                "device_id": result.get("id", device_id),
+                "device_name": device_name,
             }
         )
     except Exception as e:

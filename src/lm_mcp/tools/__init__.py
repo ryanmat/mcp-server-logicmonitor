@@ -19,6 +19,7 @@ __all__ = [
     "handle_error",
     "quote_filter_value",
     "require_write_permission",
+    "safe_total",
     "sanitize_filter_value",
 ]
 
@@ -40,6 +41,21 @@ WILDCARD_STRIP_NOTE = (
     "Wildcard characters were removed from filter value. "
     "The ~ operator performs substring matching automatically — no wildcards needed."
 )
+
+
+def safe_total(result: dict) -> int:
+    """Extract the total count from an LM API response, handling negative sentinels.
+
+    The LogicMonitor API returns negative total values (e.g., -501 for limit=500)
+    as a sentinel when the result set is truncated beyond the requested limit.
+
+    Args:
+        result: The raw API response dict.
+
+    Returns:
+        The absolute value of the total field, defaulting to 0.
+    """
+    return abs(result.get("total", 0))
 
 
 def quote_filter_value(value: str) -> str:
