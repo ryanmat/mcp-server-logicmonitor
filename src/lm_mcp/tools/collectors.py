@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -209,5 +210,113 @@ async def get_collector_group(
         }
 
         return format_response(group)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_collector(
+    client: LogicMonitorClient,
+    collector_id: int,
+    description: str | None = None,
+    collector_group_id: int | None = None,
+    enable_failback: bool | None = None,
+    escalation_chain_id: int | None = None,
+) -> list[TextContent]:
+    """Update a collector in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID to update.
+        description: New description.
+        collector_group_id: New collector group ID.
+        enable_failback: Enable automatic failback.
+        escalation_chain_id: Escalation chain ID for collector down alerts.
+
+    Returns:
+        List of TextContent with updated collector details or error.
+    """
+    try:
+        body: dict = {}
+
+        if description is not None:
+            body["description"] = description
+        if collector_group_id is not None:
+            body["collectorGroupId"] = collector_group_id
+        if enable_failback is not None:
+            body["enableFailBack"] = enable_failback
+        if escalation_chain_id is not None:
+            body["escalatingChainId"] = escalation_chain_id
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(f"/setting/collector/collectors/{collector_id}", json_body=body)
+
+        return format_response(
+            {
+                "message": "Collector updated successfully",
+                "collector": {
+                    "id": result.get("id"),
+                    "hostname": result.get("hostname"),
+                    "collector_group_id": result.get("collectorGroupId"),
+                    "collector_group_name": result.get("collectorGroupName"),
+                    "description": result.get("description"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_collector(
+    client: LogicMonitorClient,
+    collector_id: int,
+) -> list[TextContent]:
+    """Delete a collector from LogicMonitor.
+
+    Blocks deletion if the collector still has devices assigned to prevent
+    orphaning monitored resources.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        collector = await client.get(f"/setting/collector/collectors/{collector_id}")
+        hostname = collector.get("hostname", f"ID:{collector_id}")
+        device_count = collector.get("numberOfHosts", 0)
+
+        if device_count > 0:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "COLLECTOR_HAS_DEVICES",
+                    "message": f"Collector '{hostname}' has {device_count} devices assigned. "
+                    "Move or delete devices before removing the collector.",
+                    "collector_id": collector_id,
+                    "device_count": device_count,
+                }
+            )
+
+        await client.delete(f"/setting/collector/collectors/{collector_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Collector '{hostname}' deleted",
+                "collector_id": collector_id,
+            }
+        )
     except Exception as e:
         return handle_error(e)

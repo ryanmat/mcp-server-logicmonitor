@@ -1,5 +1,5 @@
 # Description: Tests for device MCP tools.
-# Description: Validates device and device group CRUD functions.
+# Description: Validates device and device group CRUD functions, including bulk operations.
 
 import json
 
@@ -770,3 +770,81 @@ class TestUpdateDeviceK8sWarning:
         data = json.loads(result[0].text)
         assert "warning" in data
         assert "Kubernetes" in data["warning"]
+
+
+class TestBulkDeleteDevices:
+    """Tests for bulk_delete_devices tool."""
+
+    @respx.mock
+    async def test_bulk_delete_empty_list(self, client, monkeypatch):
+        """bulk_delete_devices returns error for empty list."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.devices import bulk_delete_devices
+
+        result = await bulk_delete_devices(client, device_ids=[])
+        assert "No device IDs provided" in result[0].text
+
+    @respx.mock
+    async def test_bulk_delete_exceeds_limit(self, client, monkeypatch):
+        """bulk_delete_devices returns error when exceeding 100 device limit."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.devices import bulk_delete_devices
+
+        result = await bulk_delete_devices(client, device_ids=list(range(101)))
+        assert "Too many devices" in result[0].text
+        assert "Max 100" in result[0].text
+
+    @respx.mock
+    async def test_bulk_delete_success_with_k8s_warning(self, client, monkeypatch):
+        """bulk_delete_devices includes K8S warnings for deviceType 8."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.devices import bulk_delete_devices
+
+        base_url = "https://test.logicmonitor.com/santaba/rest"
+        respx.get(f"{base_url}/device/devices/1").mock(
+            return_value=httpx.Response(
+                200, json={"id": 1, "displayName": "k8s-pod", "deviceType": 8}
+            )
+        )
+        respx.delete(f"{base_url}/device/devices/1").mock(return_value=httpx.Response(200, json={}))
+        respx.get(f"{base_url}/device/devices/2").mock(
+            return_value=httpx.Response(
+                200, json={"id": 2, "displayName": "normal-srv", "deviceType": 0}
+            )
+        )
+        respx.delete(f"{base_url}/device/devices/2").mock(return_value=httpx.Response(200, json={}))
+
+        result = await bulk_delete_devices(client, device_ids=[1, 2])
+        data = json.loads(result[0].text)
+        assert data["succeeded"] == 2
+        assert data["failed"] == 0
+        assert len(data["warnings"]) == 1
+        assert "Kubernetes" in data["warnings"][0]
+
+    @respx.mock
+    async def test_bulk_delete_partial_failure(self, client, monkeypatch):
+        """bulk_delete_devices handles partial failures."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.devices import bulk_delete_devices
+
+        base_url = "https://test.logicmonitor.com/santaba/rest"
+        respx.get(f"{base_url}/device/devices/1").mock(
+            return_value=httpx.Response(200, json={"id": 1, "displayName": "srv1", "deviceType": 0})
+        )
+        respx.delete(f"{base_url}/device/devices/1").mock(return_value=httpx.Response(200, json={}))
+        respx.get(f"{base_url}/device/devices/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
+
+        result = await bulk_delete_devices(client, device_ids=[1, 999])
+        data = json.loads(result[0].text)
+        assert data["succeeded"] == 1
+        assert data["failed"] == 1

@@ -198,6 +198,30 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="bulk_delete_devices",
+            description=(
+                "Delete multiple devices/resources in one operation"
+                " (max 100, requires write permission). Soft delete by default."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Device IDs to delete (max 100)",
+                    },
+                    "delete_hard": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Permanently delete (default: soft delete)",
+                    },
+                },
+                "required": ["device_ids"],
+            },
+        ),
+        Tool(
             name="create_device_group",
             description="Create a new device/resource group (requires write permission)",
             annotations=_WRITE,
@@ -662,6 +686,49 @@ TOOLS.extend(
                     "group_id": {"type": "integer", "description": "Collector group ID"},
                 },
                 "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="update_collector",
+            description=(
+                "Update a collector (requires write permission)."
+                " Change group, description, failback, or escalation chain."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID to update"},
+                    "description": {"type": "string", "description": "New description"},
+                    "collector_group_id": {
+                        "type": "integer",
+                        "description": "New collector group ID",
+                    },
+                    "enable_failback": {
+                        "type": "boolean",
+                        "description": "Enable automatic failback",
+                    },
+                    "escalation_chain_id": {
+                        "type": "integer",
+                        "description": "Escalation chain ID for collector down alerts",
+                    },
+                },
+                "required": ["collector_id"],
+            },
+        ),
+        Tool(
+            name="delete_collector",
+            description=(
+                "Delete a collector (requires write permission)."
+                " Blocks if devices are still assigned."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID to delete"},
+                },
+                "required": ["collector_id"],
             },
         ),
     ]
@@ -4651,6 +4718,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_device": devices.update_device,
         "delete_device": devices.delete_device,
         "recover_device": devices.recover_device,
+        "bulk_delete_devices": devices.bulk_delete_devices,
         "create_device_group": devices.create_device_group,
         "update_device_group": devices.update_device_group,
         "delete_device_group": devices.delete_device_group,
@@ -4673,6 +4741,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_collector": collectors.get_collector,
         "get_collector_groups": collectors.get_collector_groups,
         "get_collector_group": collectors.get_collector_group,
+        "update_collector": collectors.update_collector,
+        "delete_collector": collectors.delete_collector,
         # Metrics
         "get_device_datasources": metrics.get_device_datasources,
         "get_device_instances": metrics.get_device_instances,
