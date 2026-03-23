@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-22
+
+### Added
+
+- `get_device_group` — Fetch full device group detail including `appliesTo` expression and `parentId`
+- `get_device_eventsources` — List EventSources applied to a device with alerting status
+- `update_device_eventsource` — Enable/disable alerting for an EventSource on a device (write-protected)
+- `bulk_delete_devices` — Batch delete up to 100 devices with K8S warnings, soft or hard delete (write-protected)
+- `update_collector` — Update collector group, description, failback, and escalation chain (write-protected)
+- `delete_collector` — Delete a collector with guardrail blocking deletion if devices are still assigned (write-protected)
+- `recover_device` — Restore soft-deleted devices via PATCH with `recover=true` parameter (write-protected)
+- `safe_total()` helper for handling LM API negative total sentinel values in paginated responses
+
+### Fixed
+
+- `get_devices` status filter restored to numeric codes (`hostStatus:1` for dead) — the v3 API rejects string values like `hostStatus:dead` with "invalid filter"
+- `get_devices` and `get_alerts` no longer return negative totals when the API response is truncated — `safe_total()` applies `abs()` to sentinel values
+- `score_alert_noise` weight formula corrected from `repeat_ratio * 3000` / `flap_ratio * 3000` to `* 30` — scores were pegged at 100 for any normal alert volume
+
+### Changed
+
+- `calculate_availability` now post-filters results to the target device, preventing unrelated devices from polluting calculations; added optional `device_name` parameter and safe uptime floor (`max(0.0, ...)`)
+- `delete_device` warns when deleting K8S-managed devices (deviceType=8) since Argus may recreate them; includes deleted device audit context
+- `update_device` warns when `host_group_ids` changes may not persist on K8S-managed devices
+- `get_device_groups` now includes `parentId` and `appliesTo` in list results
+- Tool count: 216 -> 223 (205 LM + 18 AAP)
+
 ## [2.2.0] - 2026-03-20
 
 ### Changed
@@ -502,6 +529,7 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[2.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.0.1...v2.1.0

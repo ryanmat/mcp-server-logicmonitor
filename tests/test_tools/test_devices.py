@@ -114,7 +114,7 @@ class TestGetDevices:
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
-        assert "hostStatus:dead" in params["filter"]
+        assert "hostStatus:1" in params["filter"]
 
     @respx.mock
     async def test_get_devices_status_dead_collector(self, client):
@@ -129,7 +129,7 @@ class TestGetDevices:
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
-        assert "hostStatus:dead-collector" in params["filter"]
+        assert "hostStatus:2" in params["filter"]
 
     @respx.mock
     async def test_get_devices_negative_total_sanitized(self, client):
