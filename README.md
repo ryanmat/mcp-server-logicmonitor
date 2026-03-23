@@ -44,10 +44,11 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.3.1 (Current)
+### v2.3.2 (Current)
 - **New**: `get_alerts` now supports `group_id` and `device_id` parameters for reliable Kubernetes cluster alert filtering
+- **Fix**: Group filtering uses `monitorObjectGroups~` (resolves group path) instead of broken `hostGroupIds~`
 - **Fix**: `correlate_alerts` and `score_alert_noise` now sanitize device filter wildcards consistently
-- **Docs**: Alert filter documentation expanded with `hostGroupIds`, `monitorObjectId`, `monitorObjectGroups` fields
+- **Docs**: Alert filter documentation expanded with `monitorObjectId`, `monitorObjectGroups` fields
 
 ### v2.3.0
 - **New**: `update_collector`, `delete_collector` — collector write operations with device-count guardrails
