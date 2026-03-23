@@ -185,7 +185,7 @@ class TestCorrelationSanitization:
         """correlate_alerts strips wildcards from device parameter."""
         from lm_mcp.tools.correlation import _build_alert_filter
 
-        result = _build_alert_filter(hours_back=4, device="server*")
+        result = await _build_alert_filter(client, hours_back=4, device="server*")
 
         assert 'monitorObjectName~"server"' in result
         assert "*" not in result

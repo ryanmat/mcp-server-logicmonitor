@@ -19,6 +19,7 @@ __all__ = [
     "handle_error",
     "quote_filter_value",
     "require_write_permission",
+    "resolve_group_filter",
     "safe_total",
     "sanitize_filter_value",
 ]
@@ -93,6 +94,29 @@ def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]:
     cleaned = value.replace("*", "").replace("?", "")
     was_modified = cleaned != value
     return cleaned, was_modified
+
+
+async def resolve_group_filter(client: Any, group_id: int) -> str:
+    """Resolve a device group ID to a monitorObjectGroups filter clause.
+
+    The LM API hostGroupIds~ filter does not reliably restrict alerts to a
+    specific group. The monitorObjectGroups~ filter (which uses the group
+    fullPath) works correctly.  This helper fetches the group fullPath from
+    the API and returns the ready-to-use filter clause.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Device group ID to resolve.
+
+    Returns:
+        Filter clause string, e.g. monitorObjectGroups~"My Group/Sub".
+
+    Raises:
+        LMError: If the group cannot be found.
+    """
+    result = await client.get(f"/device/groups/{group_id}")
+    full_path = result.get("fullPath", "")
+    return f"monitorObjectGroups~{quote_filter_value(full_path)}"
 
 
 def format_response(data: Any) -> list[TextContent]:

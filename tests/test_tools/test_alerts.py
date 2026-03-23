@@ -212,11 +212,18 @@ class TestGetAlerts:
 class TestGetAlertsGroupAndDeviceId:
     """Tests for group_id and device_id filter parameters on get_alerts."""
 
+    GROUP_PATH = "Dev Portal/AKS/Kubernetes Cluster: rm-aks-cluster"
+
     @respx.mock
     async def test_get_alerts_with_group_id(self, client):
-        """get_alerts filters by device group ID using hostGroupIds."""
+        """get_alerts resolves group_id to monitorObjectGroups filter."""
         from lm_mcp.tools.alerts import get_alerts
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
+            return_value=httpx.Response(
+                200, json={"id": 1977, "fullPath": self.GROUP_PATH}
+            )
+        )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
@@ -224,7 +231,7 @@ class TestGetAlertsGroupAndDeviceId:
         await get_alerts(client, group_id=1977)
 
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "hostGroupIds~1977"
+        assert params["filter"] == f'monitorObjectGroups~"{self.GROUP_PATH}"'
 
     @respx.mock
     async def test_get_alerts_with_device_id(self, client):
@@ -245,6 +252,11 @@ class TestGetAlertsGroupAndDeviceId:
         """get_alerts combines group_id with severity filter."""
         from lm_mcp.tools.alerts import get_alerts
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
+            return_value=httpx.Response(
+                200, json={"id": 1977, "fullPath": self.GROUP_PATH}
+            )
+        )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
@@ -255,13 +267,18 @@ class TestGetAlertsGroupAndDeviceId:
         filt = params["filter"]
         assert "severity:2" in filt
         assert "cleared:false" in filt
-        assert "hostGroupIds~1977" in filt
+        assert f'monitorObjectGroups~"{self.GROUP_PATH}"' in filt
 
     @respx.mock
     async def test_get_alerts_group_id_and_device_id_together(self, client):
         """get_alerts combines group_id and device_id filters."""
         from lm_mcp.tools.alerts import get_alerts
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
+            return_value=httpx.Response(
+                200, json={"id": 1977, "fullPath": self.GROUP_PATH}
+            )
+        )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
@@ -270,7 +287,7 @@ class TestGetAlertsGroupAndDeviceId:
 
         params = dict(route.calls[0].request.url.params)
         filt = params["filter"]
-        assert "hostGroupIds~1977" in filt
+        assert f'monitorObjectGroups~"{self.GROUP_PATH}"' in filt
         assert "monitorObjectId:9269" in filt
 
     @respx.mock

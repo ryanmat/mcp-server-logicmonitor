@@ -9,13 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `get_alerts` now supports `group_id` parameter to filter alerts by device group using `hostGroupIds~` filter. This is the recommended approach for Kubernetes cluster alert queries where `monitorObjectName~` substring matching may not work reliably.
+- `get_alerts` now supports `group_id` parameter to filter alerts by device group. Resolves the group ID to its `fullPath` and uses the `monitorObjectGroups~` filter, which works reliably for Kubernetes clusters and all other device groups.
 - `get_alerts` now supports `device_id` parameter to filter alerts by device/resource ID using `monitorObjectId:` filter.
+- `resolve_group_filter()` shared helper resolves a group ID to a `monitorObjectGroups~` filter clause via a single API call.
 - Alert filter documentation (`filters.py`) now includes `hostGroupIds`, `monitorObjectId`, and `monitorObjectGroups` fields with examples.
 
 ### Fixed
 
-- `correlate_alerts` and `score_alert_noise` now sanitize the `device` parameter through `sanitize_filter_value()`, matching `get_alerts` behavior. Previously wildcards in device names were passed through raw to the API filter.
+- `correlate_alerts`, `get_alert_statistics`, and `score_alert_noise` now use `monitorObjectGroups~` instead of `hostGroupIds~` for group filtering. The `hostGroupIds~` filter does not reliably restrict results to the target group in the LM API.
+- `correlate_alerts` and `score_alert_noise` now sanitize the `device` parameter through `sanitize_filter_value()`, matching `get_alerts` behavior.
 
 ## [2.3.0] - 2026-03-22
 

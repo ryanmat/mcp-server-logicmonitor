@@ -226,9 +226,14 @@ class TestScoreAlertNoise:
 
     @respx.mock
     async def test_group_id_filter_passed(self, client):
-        """Group ID filter is passed to the API."""
+        """Group ID filter resolves to monitorObjectGroups in the API call."""
         from lm_mcp.tools.scoring import score_alert_noise
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/5").mock(
+            return_value=httpx.Response(
+                200, json={"id": 5, "fullPath": "Dev Portal/Test Group"}
+            )
+        )
         route = respx.get(ALERT_URL).mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
@@ -236,7 +241,7 @@ class TestScoreAlertNoise:
         await score_alert_noise(client, group_id=5)
 
         params = dict(route.calls[0].request.url.params)
-        assert "hostGroupIds" in params.get("filter", "")
+        assert 'monitorObjectGroups~"Dev Portal/Test Group"' in params.get("filter", "")
 
     @respx.mock
     async def test_hours_back_in_response(self, client):

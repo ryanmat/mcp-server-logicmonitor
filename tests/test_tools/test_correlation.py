@@ -165,9 +165,14 @@ class TestCorrelateAlerts:
 
     @respx.mock
     async def test_with_group_id_filter(self, client):
-        """Group ID filter is passed to the API."""
+        """Group ID filter resolves to monitorObjectGroups in the API call."""
         from lm_mcp.tools.correlation import correlate_alerts
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/5").mock(
+            return_value=httpx.Response(
+                200, json={"id": 5, "fullPath": "Dev Portal/Test Group"}
+            )
+        )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
@@ -175,7 +180,7 @@ class TestCorrelateAlerts:
         await correlate_alerts(client, group_id=5)
 
         params = dict(route.calls[0].request.url.params)
-        assert "hostGroupIds" in params.get("filter", "")
+        assert 'monitorObjectGroups~"Dev Portal/Test Group"' in params.get("filter", "")
 
     @respx.mock
     async def test_empty_alerts(self, client):

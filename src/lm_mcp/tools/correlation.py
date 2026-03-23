@@ -17,6 +17,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    resolve_group_filter,
     sanitize_filter_value,
 )
 from lm_mcp.tools.stats_helpers import (
@@ -33,7 +34,8 @@ if TYPE_CHECKING:
 TEMPORAL_WINDOW_SECONDS = 300  # 5 minutes
 
 
-def _build_alert_filter(
+async def _build_alert_filter(
+    client: Any,
     hours_back: int,
     severity: str | None = None,
     device: str | None = None,
@@ -42,6 +44,7 @@ def _build_alert_filter(
     """Build a filter string for alert queries.
 
     Args:
+        client: LogicMonitor API client (needed for group_id resolution).
         hours_back: Number of hours to look back from now.
         severity: Optional severity name filter.
         device: Optional device name filter.
@@ -61,7 +64,7 @@ def _build_alert_filter(
         clean_val, _ = sanitize_filter_value(device)
         filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
     if group_id is not None:
-        filters.append(f"hostGroupIds~{group_id}")
+        filters.append(await resolve_group_filter(client, group_id))
 
     return ",".join(filters)
 
@@ -214,7 +217,7 @@ async def correlate_alerts(
         List of TextContent with correlation clusters or error.
     """
     try:
-        filter_str = _build_alert_filter(hours_back, severity, device, group_id)
+        filter_str = await _build_alert_filter(client, hours_back, severity, device, group_id)
         params: dict[str, Any] = {
             "size": min(limit, 1000),
             "filter": filter_str,
@@ -264,7 +267,7 @@ async def get_alert_statistics(
         List of TextContent with statistical summary or error.
     """
     try:
-        filter_str = _build_alert_filter(hours_back, device=device, group_id=group_id)
+        filter_str = await _build_alert_filter(client, hours_back, device=device, group_id=group_id)
         params: dict[str, Any] = {
             "size": min(limit, 1000),
             "filter": filter_str,

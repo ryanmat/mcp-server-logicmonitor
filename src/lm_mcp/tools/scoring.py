@@ -15,6 +15,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    resolve_group_filter,
     sanitize_filter_value,
 )
 from lm_mcp.tools.stats_helpers import (
@@ -57,7 +58,7 @@ async def score_alert_noise(
             clean_val, _ = sanitize_filter_value(device)
             filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
         if group_id is not None:
-            filters.append(f"hostGroupIds~{group_id}")
+            filters.append(await resolve_group_filter(client, group_id))
 
         params: dict[str, Any] = {
             "size": 1000,
@@ -240,7 +241,7 @@ async def calculate_availability(
         if device_id is not None:
             filters.append(f"monitorObjectId:{device_id}")
         if group_id is not None:
-            filters.append(f"hostGroupIds~{group_id}")
+            filters.append(await resolve_group_filter(client, group_id))
 
         params: dict[str, Any] = {
             "size": 1000,

@@ -14,6 +14,7 @@ from lm_mcp.tools import (
     handle_error,
     quote_filter_value,
     require_write_permission,
+    resolve_group_filter,
     safe_total,
     sanitize_filter_value,
 )
@@ -129,7 +130,7 @@ async def get_alerts(
                 wildcards_stripped = wildcards_stripped or was_modified
                 filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
             if group_id is not None:
-                filters.append(f"hostGroupIds~{group_id}")
+                filters.append(await resolve_group_filter(client, group_id))
             if device_id is not None:
                 filters.append(f"monitorObjectId:{device_id}")
 
