@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-03-23
+
+### Added
+
+- `get_alerts` now supports `group_id` parameter to filter alerts by device group using `hostGroupIds~` filter. This is the recommended approach for Kubernetes cluster alert queries where `monitorObjectName~` substring matching may not work reliably.
+- `get_alerts` now supports `device_id` parameter to filter alerts by device/resource ID using `monitorObjectId:` filter.
+- Alert filter documentation (`filters.py`) now includes `hostGroupIds`, `monitorObjectId`, and `monitorObjectGroups` fields with examples.
+
+### Fixed
+
+- `correlate_alerts` and `score_alert_noise` now sanitize the `device` parameter through `sanitize_filter_value()`, matching `get_alerts` behavior. Previously wildcards in device names were passed through raw to the API filter.
+
 ## [2.3.0] - 2026-03-22
 
 ### Added

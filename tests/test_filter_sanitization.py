@@ -177,6 +177,35 @@ class TestWildcardNoteInResponse:
         assert params["filter"] == 'hostname~"coll"'
 
 
+class TestCorrelationSanitization:
+    """Tests that correlation and scoring tools sanitize device filter values."""
+
+    @respx.mock
+    async def test_correlate_alerts_strips_wildcard(self, client):
+        """correlate_alerts strips wildcards from device parameter."""
+        from lm_mcp.tools.correlation import _build_alert_filter
+
+        result = _build_alert_filter(hours_back=4, device="server*")
+
+        assert 'monitorObjectName~"server"' in result
+        assert "*" not in result
+
+    @respx.mock
+    async def test_score_alert_noise_strips_wildcard(self, client):
+        """score_alert_noise strips wildcards from device parameter."""
+        from lm_mcp.tools.scoring import score_alert_noise
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await score_alert_noise(client, device="prod*")
+
+        params = dict(route.calls[0].request.url.params)
+        assert 'monitorObjectName~"prod"' in params["filter"]
+        assert "*" not in params["filter"]
+
+
 class TestFilterValueSentToApi:
     """Tests that the actual filter value sent to the LM API is correct."""
 
