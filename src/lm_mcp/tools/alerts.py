@@ -49,6 +49,8 @@ async def get_alerts(
     instance: str | None = None,
     datasource: str | None = None,
     device: str | None = None,
+    group_id: int | None = None,
+    device_id: int | None = None,
     filter: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -68,6 +70,8 @@ async def get_alerts(
         instance: Filter by instance name (supports wildcards).
         datasource: Filter by datasource/template name (supports wildcards).
         device: Filter by device/monitor object name (supports wildcards).
+        group_id: Filter by device group ID (matches all devices in the group).
+        device_id: Filter by device/resource ID.
         filter: Raw filter expression for advanced queries (overrides other filters).
             Supports LogicMonitor filter syntax with operators:
             : (equal), !: (not equal), > < >: <: (comparisons),
@@ -124,6 +128,10 @@ async def get_alerts(
                 clean_val, was_modified = sanitize_filter_value(device)
                 wildcards_stripped = wildcards_stripped or was_modified
                 filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
+            if group_id is not None:
+                filters.append(f"hostGroupIds~{group_id}")
+            if device_id is not None:
+                filters.append(f"monitorObjectId:{device_id}")
 
             if filters:
                 params["filter"] = ",".join(filters)

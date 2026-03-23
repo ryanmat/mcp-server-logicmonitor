@@ -146,6 +146,29 @@ ALERT_FILTERS = {
             "operators": [":", "~"],
             "examples": ["ackedBy~admin"],
         },
+        "hostGroupIds": {
+            "type": "string",
+            "description": "Device group IDs (comma-separated internally). "
+            "Use ~ operator to match devices belonging to a group.",
+            "operators": ["~"],
+            "examples": ["hostGroupIds~1234"],
+        },
+        "monitorObjectId": {
+            "type": "integer",
+            "description": "Device/resource ID",
+            "operators": [":"],
+            "examples": ["monitorObjectId:9269"],
+        },
+        "monitorObjectGroups": {
+            "type": "string",
+            "description": "Device group full path. Use | for multiple groups, "
+            "append * for subgroups.",
+            "operators": [":", "~"],
+            "examples": [
+                'monitorObjectGroups:"Kubernetes Cluster: rm-aks-cluster/*"',
+                'monitorObjectGroups:"Devices by Type/Linux Servers"',
+            ],
+        },
     },
     "common_queries": [
         {
@@ -163,6 +186,10 @@ ALERT_FILTERS = {
         {
             "description": "CPU-related alerts",
             "filter": "dataPointName~CPU,cleared:false",
+        },
+        {
+            "description": "Alerts for devices in a group (e.g., K8s cluster)",
+            "filter": "hostGroupIds~1977,cleared:false",
         },
     ],
 }

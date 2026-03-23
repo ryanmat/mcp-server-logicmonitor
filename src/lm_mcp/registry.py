@@ -354,6 +354,14 @@ TOOLS.extend(
                         "type": "string",
                         "description": "Filter by device name (substring match)",
                     },
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Filter by device group ID (matches all devices in the group)",
+                    },
+                    "device_id": {
+                        "type": "integer",
+                        "description": "Filter by device/resource ID",
+                    },
                     "filter": {
                         "type": "string",
                         "description": "Raw filter expression (overrides other filters). "

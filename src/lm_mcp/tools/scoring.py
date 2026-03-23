@@ -10,7 +10,13 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import SEVERITY_MAP, format_response, handle_error, quote_filter_value
+from lm_mcp.tools import (
+    SEVERITY_MAP,
+    format_response,
+    handle_error,
+    quote_filter_value,
+    sanitize_filter_value,
+)
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
     shannon_entropy,
@@ -48,7 +54,8 @@ async def score_alert_noise(
         # Fetch all alerts (active + cleared) in the time window
         filters = [f"startEpoch>:{start_epoch}"]
         if device:
-            filters.append(f"monitorObjectName~{quote_filter_value(device)}")
+            clean_val, _ = sanitize_filter_value(device)
+            filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
         if group_id is not None:
             filters.append(f"hostGroupIds~{group_id}")
 

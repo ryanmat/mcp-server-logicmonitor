@@ -17,6 +17,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    sanitize_filter_value,
 )
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
@@ -57,7 +58,8 @@ def _build_alert_filter(
     if severity and severity.lower() in SEVERITY_MAP:
         filters.append(f"severity:{SEVERITY_MAP[severity.lower()]}")
     if device:
-        filters.append(f"monitorObjectName~{quote_filter_value(device)}")
+        clean_val, _ = sanitize_filter_value(device)
+        filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
     if group_id is not None:
         filters.append(f"hostGroupIds~{group_id}")
 

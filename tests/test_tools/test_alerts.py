@@ -209,6 +209,111 @@ class TestGetAlerts:
         assert "dataPointName" in params["filter"]
 
 
+class TestGetAlertsGroupAndDeviceId:
+    """Tests for group_id and device_id filter parameters on get_alerts."""
+
+    @respx.mock
+    async def test_get_alerts_with_group_id(self, client):
+        """get_alerts filters by device group ID using hostGroupIds."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, group_id=1977)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "hostGroupIds~1977"
+
+    @respx.mock
+    async def test_get_alerts_with_device_id(self, client):
+        """get_alerts filters by device ID using monitorObjectId."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, device_id=9269)
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "monitorObjectId:9269"
+
+    @respx.mock
+    async def test_get_alerts_group_id_with_severity(self, client):
+        """get_alerts combines group_id with severity filter."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, group_id=1977, severity="warning", cleared=False)
+
+        params = dict(route.calls[0].request.url.params)
+        filt = params["filter"]
+        assert "severity:2" in filt
+        assert "cleared:false" in filt
+        assert "hostGroupIds~1977" in filt
+
+    @respx.mock
+    async def test_get_alerts_group_id_and_device_id_together(self, client):
+        """get_alerts combines group_id and device_id filters."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(client, group_id=1977, device_id=9269)
+
+        params = dict(route.calls[0].request.url.params)
+        filt = params["filter"]
+        assert "hostGroupIds~1977" in filt
+        assert "monitorObjectId:9269" in filt
+
+    @respx.mock
+    async def test_get_alerts_k8s_device_name(self, client):
+        """get_alerts handles K8s-style hyphenated device names."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(
+            client,
+            device="azure-vote-back-6dff9db5bb-8dqxc-pod-azure-vote-rm-aks-cluster",
+        )
+
+        params = dict(route.calls[0].request.url.params)
+        expected = (
+            'monitorObjectName~"azure-vote-back-6dff9db5bb-8dqxc-pod-azure-vote-rm-aks-cluster"'
+        )
+        assert params["filter"] == expected
+
+    @respx.mock
+    async def test_get_alerts_raw_filter_overrides_group_id(self, client):
+        """Raw filter takes precedence over group_id and device_id."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_alerts(
+            client,
+            group_id=1977,
+            device_id=9269,
+            filter="severity:4,cleared:false",
+        )
+
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "severity:4,cleared:false"
+        assert "hostGroupIds" not in params["filter"]
+
+
 class TestGetAlertDetails:
     """Tests for get_alert_details tool."""
 
