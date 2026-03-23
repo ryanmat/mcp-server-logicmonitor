@@ -309,6 +309,9 @@ TOOLS.extend(
             name="get_alerts",
             description=(
                 "Get alerts from LogicMonitor with optional filtering"
+                "\n\nFor Kubernetes clusters, use group_id (from "
+                "get_device_groups) instead of device — the device name "
+                "filter does not work reliably for K8s resources."
                 "\n\nCommon mistakes: startEpoch/endEpoch use SECONDS not "
                 "milliseconds. String filter values need double quotes "
                 '(e.g., monitorObjectName:"hostname").'
