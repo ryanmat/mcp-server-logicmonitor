@@ -359,7 +359,7 @@ TOOLS.extend(
                     },
                     "group_id": {
                         "type": "integer",
-                        "description": "Filter by device group ID (matches all devices in the group)",
+                        "description": "Filter by device group ID (matches all devices)",
                     },
                     "device_id": {
                         "type": "integer",
