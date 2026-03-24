@@ -336,17 +336,27 @@ async def create_http_server() -> None:
     # Create ASGI app
     app = create_asgi_app()
 
-    # Configure Uvicorn
+    # Configure Uvicorn (with optional TLS)
+    ssl_kwargs: dict = {}
+    if config.http_ssl_certfile:
+        ssl_kwargs["ssl_certfile"] = config.http_ssl_certfile
+    if config.http_ssl_keyfile:
+        ssl_kwargs["ssl_keyfile"] = config.http_ssl_keyfile
+    if config.http_ssl_keyfile_password:
+        ssl_kwargs["ssl_keyfile_password"] = config.http_ssl_keyfile_password
+
     uvicorn_config = uvicorn.Config(
         app,
         host=config.http_host,
         port=config.http_port,
         log_level="info",
+        **ssl_kwargs,
     )
 
     server = uvicorn.Server(uvicorn_config)
 
-    logger.info(f"Starting HTTP server on {config.http_host}:{config.http_port}")
+    scheme = "https" if config.http_ssl_certfile else "http"
+    logger.info(f"Starting {scheme} server on {config.http_host}:{config.http_port}")
 
     try:
         await server.serve()

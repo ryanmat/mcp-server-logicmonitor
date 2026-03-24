@@ -78,6 +78,9 @@ class LMConfig(BaseSettings):
     http_host: str = "0.0.0.0"
     http_port: int = 8080
     cors_origins: str = ""
+    http_ssl_certfile: str | None = None
+    http_ssl_keyfile: str | None = None
+    http_ssl_keyfile_password: str | None = None
 
     # Session settings
     session_enabled: bool = True

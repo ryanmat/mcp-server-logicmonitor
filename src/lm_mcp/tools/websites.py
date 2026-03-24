@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    portal_url,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -129,6 +130,7 @@ async def get_website(
             "polling_interval": result.get("pollingInterval"),
             "use_default_alert_setting": result.get("useDefaultAlertSetting"),
             "use_default_location_setting": result.get("useDefaultLocationSetting"),
+            "portal_url": portal_url("website", website_id),
             "checkpoints": [
                 {
                     "id": cp.get("id"),

@@ -129,3 +129,120 @@ class TestHandleError:
         assert isinstance(result, list)
         assert len(result) == 1
         assert isinstance(result[0], TextContent)
+
+
+class TestPortalUrl:
+    """Tests for portal_url helper function."""
+
+    def test_device_url(self, monkeypatch):
+        """portal_url builds correct device URL."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("device", 123) == "https://test.logicmonitor.com/santaba/uiv4/devices/123"
+
+    def test_alert_url(self, monkeypatch):
+        """portal_url builds correct alert URL."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("alert", "456") == "https://test.logicmonitor.com/santaba/uiv4/alerts/456"
+
+    def test_dashboard_url(self, monkeypatch):
+        """portal_url builds correct dashboard URL."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("dashboard", 789) == (
+            "https://test.logicmonitor.com/santaba/uiv4/dashboard/789"
+        )
+
+    def test_device_group_url(self, monkeypatch):
+        """portal_url builds correct device group URL."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("device_group", 42) == (
+            "https://test.logicmonitor.com/santaba/uiv4/device/groups/42"
+        )
+
+    def test_website_url(self, monkeypatch):
+        """portal_url builds correct website URL."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("website", 55) == (
+            "https://test.logicmonitor.com/santaba/uiv4/setting/websites/55"
+        )
+
+    def test_alert_rule_url(self, monkeypatch):
+        """portal_url builds correct alert rule URL."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("alert_rule", 10) == (
+            "https://test.logicmonitor.com/santaba/uiv4/setting/alert/rules/10"
+        )
+
+    def test_unknown_type_returns_empty(self, monkeypatch):
+        """portal_url returns empty string for unknown resource types."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        assert portal_url("nonexistent", 1) == ""
+
+    def test_string_id(self, monkeypatch):
+        """portal_url works with string IDs."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+        from lm_mcp.tools import portal_url
+
+        url = portal_url("device", "999")
+        assert url == "https://test.logicmonitor.com/santaba/uiv4/devices/999"

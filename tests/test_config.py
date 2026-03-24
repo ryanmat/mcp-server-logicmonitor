@@ -300,3 +300,44 @@ class TestToolFilterConfig:
         config = LMConfig()
         assert config.enabled_tools is None
         assert config.disabled_tools is None
+
+
+class TestLMConfigSSL:
+    """Tests for SSL/TLS transport configuration."""
+
+    def test_ssl_fields_default_to_none(self, monkeypatch):
+        """SSL fields default to None (no TLS)."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+
+        config = LMConfig()
+        assert config.http_ssl_certfile is None
+        assert config.http_ssl_keyfile is None
+        assert config.http_ssl_keyfile_password is None
+
+    def test_ssl_certfile_from_env(self, monkeypatch):
+        """SSL cert path loads from environment."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_HTTP_SSL_CERTFILE", "/path/to/cert.pem")
+
+        config = LMConfig()
+        assert config.http_ssl_certfile == "/path/to/cert.pem"
+
+    def test_ssl_keyfile_from_env(self, monkeypatch):
+        """SSL key path loads from environment."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_HTTP_SSL_KEYFILE", "/path/to/key.pem")
+
+        config = LMConfig()
+        assert config.http_ssl_keyfile == "/path/to/key.pem"
+
+    def test_ssl_keyfile_password_from_env(self, monkeypatch):
+        """SSL key password loads from environment."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_HTTP_SSL_KEYFILE_PASSWORD", "s3cret")
+
+        config = LMConfig()
+        assert config.http_ssl_keyfile_password == "s3cret"

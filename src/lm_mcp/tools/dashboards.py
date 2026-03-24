@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    portal_url,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -130,6 +131,7 @@ async def get_dashboard(
     """
     try:
         result = await client.get(f"/dashboard/dashboards/{dashboard_id}")
+        result["portal_url"] = portal_url("dashboard", dashboard_id)
         return format_response(result)
     except Exception as e:
         return handle_error(e)

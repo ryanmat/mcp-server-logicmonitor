@@ -17,6 +17,7 @@ __all__ = [
     "SEVERITY_NAMES",
     "format_response",
     "handle_error",
+    "portal_url",
     "quote_filter_value",
     "require_write_permission",
     "resolve_group_filter",
@@ -94,6 +95,42 @@ def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]:
     cleaned = value.replace("*", "").replace("?", "")
     was_modified = cleaned != value
     return cleaned, was_modified
+
+
+def portal_url(resource_type: str, resource_id: int | str) -> str:
+    """Build a clickable LM portal URL for a single resource.
+
+    Args:
+        resource_type: Resource type key (device, alert, dashboard,
+            alert_rule, device_group, website).
+        resource_id: Numeric resource ID.
+
+    Returns:
+        Full HTTPS URL to the resource in the LM portal UI,
+        or empty string if the resource type is unknown or config
+        is unavailable.
+    """
+    try:
+        from lm_mcp.config import get_config
+
+        config = get_config()
+    except Exception:
+        return ""
+
+    path_map: dict[str, str] = {
+        "device": f"devices/{resource_id}",
+        "alert": f"alerts/{resource_id}",
+        "dashboard": f"dashboard/{resource_id}",
+        "alert_rule": f"setting/alert/rules/{resource_id}",
+        "device_group": f"device/groups/{resource_id}",
+        "website": f"setting/websites/{resource_id}",
+    }
+
+    path = path_map.get(resource_type)
+    if path is None:
+        return ""
+
+    return f"https://{config.portal}/santaba/uiv4/{path}"
 
 
 async def resolve_group_filter(client: Any, group_id: int) -> str:

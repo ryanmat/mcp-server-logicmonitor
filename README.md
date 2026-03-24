@@ -44,7 +44,11 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.3.2 (Current)
+### v2.4.0 (Current)
+- **New**: Portal URL links in detail tool responses (`get_device`, `get_alert_details`, `get_dashboard`, `get_device_group`, `get_website`)
+- **New**: HTTPS transport support via `LM_HTTP_SSL_CERTFILE`/`LM_HTTP_SSL_KEYFILE` env vars
+
+### v2.3.2
 - **New**: `get_alerts` now supports `group_id` and `device_id` parameters for reliable Kubernetes cluster alert filtering
 - **Fix**: Group filtering uses `monitorObjectGroups~` (resolves group path) instead of broken `hostGroupIds~`
 - **Fix**: `correlate_alerts` and `score_alert_noise` now sanitize device filter wildcards consistently

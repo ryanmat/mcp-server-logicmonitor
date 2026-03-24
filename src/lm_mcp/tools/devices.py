@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    portal_url,
     quote_filter_value,
     require_write_permission,
     safe_total,
@@ -134,6 +135,7 @@ async def get_device(
     """
     try:
         result = await client.get(f"/device/devices/{device_id}")
+        result["portal_url"] = portal_url("device", device_id)
         return format_response(result)
     except Exception as e:
         return handle_error(e)
@@ -215,6 +217,7 @@ async def get_device_group(
     """
     try:
         result = await client.get(f"/device/groups/{group_id}")
+        result["portal_url"] = portal_url("device_group", group_id)
         return format_response(result)
     except Exception as e:
         return handle_error(e)
