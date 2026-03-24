@@ -1,5 +1,5 @@
 # Description: Tests for SDT (Scheduled Downtime) MCP tools.
-# Description: Validates list_sdts, create_sdt, delete_sdt functions.
+# Description: Validates SDT list, create, update, and delete functions.
 
 import json
 
@@ -414,3 +414,126 @@ class TestDeleteSdt:
         assert "Error:" not in result[0].text
         data = json.loads(result[0].text)
         assert data["success"] is True
+
+
+class TestUpdateSdt:
+    """Tests for update_sdt tool."""
+
+    @respx.mock
+    async def test_update_sdt_blocked_without_write(self, client, monkeypatch):
+        """update_sdt is blocked when write operations disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import update_sdt
+
+        result = await update_sdt(client, sdt_id="SDT_1", comment="Updated")
+        assert "Error:" in result[0].text
+        assert "write" in result[0].text.lower()
+
+    @respx.mock
+    async def test_update_sdt_no_changes(self, client, monkeypatch):
+        """update_sdt returns error when no updates provided."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import update_sdt
+
+        result = await update_sdt(client, sdt_id="SDT_1")
+        assert "No updates provided" in result[0].text
+
+    @respx.mock
+    async def test_update_sdt_success(self, client, monkeypatch):
+        """update_sdt fetches current SDT and PUTs with modifications."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import update_sdt
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts/SDT_1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "SDT_1",
+                    "type": "ResourceSDT",
+                    "deviceId": 42,
+                    "startDateTime": 1702400000000,
+                    "endDateTime": 1702403600000,
+                    "comment": "Original",
+                },
+            )
+        )
+
+        route = respx.put("https://test.logicmonitor.com/santaba/rest/sdt/sdts/SDT_1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "SDT_1",
+                    "type": "ResourceSDT",
+                    "startDateTime": 1702400000000,
+                    "endDateTime": 1702500000000,
+                    "comment": "Extended",
+                },
+            )
+        )
+
+        result = await update_sdt(
+            client,
+            sdt_id="SDT_1",
+            end_date_time=1702500000000,
+            comment="Extended",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["sdt"]["comment"] == "Extended"
+        assert data["sdt"]["end_time"] == 1702500000000
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["deviceId"] == 42
+        assert body["endDateTime"] == 1702500000000
+        assert body["comment"] == "Extended"
+        assert body["startDateTime"] == 1702400000000
+
+    @respx.mock
+    async def test_update_sdt_not_found(self, client, monkeypatch):
+        """update_sdt handles 404 on fetch."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import update_sdt
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts/GONE").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "SDT not found"})
+        )
+
+        result = await update_sdt(client, sdt_id="GONE", comment="Won't work")
+        assert "Error:" in result[0].text

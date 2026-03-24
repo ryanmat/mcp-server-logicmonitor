@@ -555,6 +555,30 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="update_sdt",
+            description=(
+                "Update a scheduled downtime (requires write permission)."
+                " Uses fetch-modify-PUT to preserve unmodified fields."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "sdt_id": {"type": "string", "description": "SDT ID to update"},
+                    "end_date_time": {
+                        "type": "integer",
+                        "description": "New end time in epoch milliseconds",
+                    },
+                    "start_date_time": {
+                        "type": "integer",
+                        "description": "New start time in epoch milliseconds",
+                    },
+                    "comment": {"type": "string", "description": "New SDT comment"},
+                },
+                "required": ["sdt_id"],
+            },
+        ),
+        Tool(
             name="bulk_create_device_sdt",
             description=(
                 "Create SDT for multiple devices/resources (max 100, requires write permission)"
@@ -740,6 +764,78 @@ TOOLS.extend(
                     "collector_id": {"type": "integer", "description": "Collector ID to delete"},
                 },
                 "required": ["collector_id"],
+            },
+        ),
+        Tool(
+            name="create_collector_group",
+            description="Create a collector group (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Group name"},
+                    "description": {"type": "string", "description": "Description"},
+                    "auto_balance": {
+                        "type": "boolean",
+                        "description": "Enable auto-balancing",
+                    },
+                    "auto_balance_strategy": {
+                        "type": "string",
+                        "description": "Auto-balance strategy (e.g., roundRobin)",
+                    },
+                    "custom_properties": {
+                        "type": "object",
+                        "description": "Custom properties as key-value pairs",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="update_collector_group",
+            description="Update a collector group (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Collector group ID to update",
+                    },
+                    "name": {"type": "string", "description": "New group name"},
+                    "description": {"type": "string", "description": "New description"},
+                    "auto_balance": {
+                        "type": "boolean",
+                        "description": "Enable/disable auto-balancing",
+                    },
+                    "auto_balance_strategy": {
+                        "type": "string",
+                        "description": "New auto-balance strategy",
+                    },
+                    "custom_properties": {
+                        "type": "object",
+                        "description": "Custom properties to merge",
+                    },
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="delete_collector_group",
+            description=(
+                "Delete a collector group (requires write permission)."
+                " Blocks if collectors are still assigned."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Collector group ID to delete",
+                    },
+                },
+                "required": ["group_id"],
             },
         ),
     ]
@@ -1188,6 +1284,27 @@ TOOLS.extend(
                     "group_id": {
                         "type": "integer",
                         "description": "Dashboard group ID to delete",
+                    },
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="update_dashboard_group",
+            description="Update a dashboard group (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Dashboard group ID to update",
+                    },
+                    "name": {"type": "string", "description": "New group name"},
+                    "description": {"type": "string", "description": "New description"},
+                    "parent_id": {
+                        "type": "integer",
+                        "description": "New parent group ID",
                     },
                 },
                 "required": ["group_id"],
@@ -1855,6 +1972,77 @@ TOOLS.extend(
                 "required": ["role_id"],
             },
         ),
+        Tool(
+            name="create_user",
+            description="Create a user in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "username": {"type": "string", "description": "Login username"},
+                    "email": {"type": "string", "description": "Email address"},
+                    "first_name": {"type": "string", "description": "First name"},
+                    "last_name": {"type": "string", "description": "Last name"},
+                    "roles": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Role IDs to assign",
+                    },
+                    "password": {"type": "string", "description": "Initial password"},
+                    "phone": {"type": "string", "description": "Phone number"},
+                    "sms_email": {"type": "string", "description": "SMS email"},
+                    "note": {"type": "string", "description": "Admin note"},
+                    "api_only": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "API-only user (no portal access)",
+                    },
+                    "two_fa_enabled": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Require two-factor auth",
+                    },
+                },
+                "required": ["username", "email", "first_name", "last_name", "roles"],
+            },
+        ),
+        Tool(
+            name="update_user",
+            description="Update a user in LogicMonitor (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID to update"},
+                    "email": {"type": "string", "description": "New email"},
+                    "first_name": {"type": "string", "description": "New first name"},
+                    "last_name": {"type": "string", "description": "New last name"},
+                    "roles": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "New role IDs (replaces existing)",
+                    },
+                    "phone": {"type": "string", "description": "New phone number"},
+                    "sms_email": {"type": "string", "description": "New SMS email"},
+                    "note": {"type": "string", "description": "New admin note"},
+                    "api_only": {"type": "boolean", "description": "API-only flag"},
+                    "two_fa_enabled": {"type": "boolean", "description": "Two-factor flag"},
+                },
+                "required": ["user_id"],
+            },
+        ),
+        Tool(
+            name="delete_user",
+            description="Delete a user from LogicMonitor (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "user_id": {"type": "integer", "description": "User ID to delete"},
+                },
+                "required": ["user_id"],
+            },
+        ),
     ]
 )
 
@@ -2460,6 +2648,46 @@ TOOLS.extend(
                     },
                 },
                 "required": ["note"],
+            },
+        ),
+        Tool(
+            name="update_ops_note",
+            description="Update an ops note (requires write permission)",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "note_id": {"type": "string", "description": "Ops note ID to update"},
+                    "note": {"type": "string", "description": "New note text"},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "New tags (replaces existing)",
+                    },
+                    "device_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "New device IDs to scope the note to",
+                    },
+                    "group_ids": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "New device group IDs to scope the note to",
+                    },
+                },
+                "required": ["note_id"],
+            },
+        ),
+        Tool(
+            name="delete_ops_note",
+            description="Delete an ops note (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "note_id": {"type": "string", "description": "Ops note ID to delete"},
+                },
+                "required": ["note_id"],
             },
         ),
     ]
@@ -4785,6 +5013,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "list_sdts": sdts.list_sdts,
         "create_sdt": sdts.create_sdt,
         "delete_sdt": sdts.delete_sdt,
+        "update_sdt": sdts.update_sdt,
         "bulk_create_device_sdt": sdts.bulk_create_device_sdt,
         "bulk_delete_sdt": sdts.bulk_delete_sdt,
         "get_active_sdts": sdts.get_active_sdts,
@@ -4796,6 +5025,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_collector_group": collectors.get_collector_group,
         "update_collector": collectors.update_collector,
         "delete_collector": collectors.delete_collector,
+        "create_collector_group": collectors.create_collector_group,
+        "update_collector_group": collectors.update_collector_group,
+        "delete_collector_group": collectors.delete_collector_group,
         # Metrics
         "get_device_datasources": metrics.get_device_datasources,
         "get_device_instances": metrics.get_device_instances,
@@ -4820,6 +5052,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_dashboard_group": dashboard_groups.get_dashboard_group,
         "create_dashboard_group": dashboard_groups.create_dashboard_group,
         "delete_dashboard_group": dashboard_groups.delete_dashboard_group,
+        "update_dashboard_group": dashboard_groups.update_dashboard_group,
         # Websites
         "get_websites": websites.get_websites,
         "get_website": websites.get_website,
@@ -4870,6 +5103,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_user": users.get_user,
         "get_roles": users.get_roles,
         "get_role": users.get_role,
+        "create_user": users.create_user,
+        "update_user": users.update_user,
+        "delete_user": users.delete_user,
         # Access Groups
         "get_access_groups": access_groups.get_access_groups,
         "get_access_group": access_groups.get_access_group,
@@ -4919,6 +5155,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_ops_notes": ops.get_ops_notes,
         "get_ops_note": ops.get_ops_note,
         "add_ops_note": ops.add_ops_note,
+        "update_ops_note": ops.update_ops_note,
+        "delete_ops_note": ops.delete_ops_note,
         # Audit (ops module has get_audit_logs too, but audit module is more specific)
         "get_audit_logs": audit.get_audit_logs,
         "get_api_token_audit": audit.get_api_token_audit,

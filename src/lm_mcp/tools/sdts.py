@@ -1,5 +1,5 @@
 # Description: SDT (Scheduled Downtime) tools for LogicMonitor MCP server.
-# Description: Provides list_sdts, create_sdt, delete_sdt functions.
+# Description: Provides SDT list, create, update, and delete functions.
 
 from __future__ import annotations
 
@@ -213,6 +213,68 @@ async def delete_sdt(
             {
                 "success": True,
                 "message": f"SDT {sdt_id} deleted",
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_sdt(
+    client: LogicMonitorClient,
+    sdt_id: str,
+    end_date_time: int | None = None,
+    start_date_time: int | None = None,
+    comment: str | None = None,
+) -> list[TextContent]:
+    """Update a scheduled downtime in LogicMonitor.
+
+    Uses fetch-modify-PUT pattern: fetches the current SDT, applies changes,
+    and PUTs the full object back. This preserves all fields not being updated.
+
+    Args:
+        client: LogicMonitor API client.
+        sdt_id: SDT ID to update.
+        end_date_time: New end time in epoch milliseconds.
+        start_date_time: New start time in epoch milliseconds.
+        comment: New SDT comment.
+
+    Returns:
+        List of TextContent with updated SDT info or error.
+    """
+    try:
+        if end_date_time is None and start_date_time is None and comment is None:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        current = await client.get(f"/sdt/sdts/{sdt_id}")
+        payload = dict(current)
+
+        if end_date_time is not None:
+            payload["endDateTime"] = end_date_time
+        if start_date_time is not None:
+            payload["startDateTime"] = start_date_time
+        if comment is not None:
+            payload["comment"] = comment
+
+        result = await client.put(f"/sdt/sdts/{sdt_id}", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"SDT {sdt_id} updated",
+                "sdt": {
+                    "id": result.get("id"),
+                    "type": result.get("type"),
+                    "start_time": result.get("startDateTime"),
+                    "end_time": result.get("endDateTime"),
+                    "comment": result.get("comment"),
+                },
             }
         )
     except Exception as e:

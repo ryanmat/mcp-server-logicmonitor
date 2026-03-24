@@ -1,5 +1,5 @@
 # Description: Tests for user and role MCP tools.
-# Description: Covers list and get operations for user accounts and role definitions.
+# Description: Covers CRUD operations for user accounts and role definitions.
 
 import json
 
@@ -227,3 +227,190 @@ class TestGetRolesFilters:
 
         params = dict(route.calls[0].request.url.params)
         assert params["offset"] == "10"
+
+
+class TestCreateUser:
+    """Tests for create_user tool."""
+
+    @respx.mock
+    async def test_create_user_blocked_without_write(self, client, monkeypatch):
+        """create_user is blocked when write operations disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from lm_mcp.tools.users import create_user
+
+        result = await create_user(
+            client,
+            username="new@example.com",
+            email="new@example.com",
+            first_name="New",
+            last_name="User",
+            roles=[1],
+        )
+        assert "Error:" in result[0].text
+        assert "disabled" in result[0].text.lower()
+
+    @respx.mock
+    async def test_create_user_success(self, client, monkeypatch):
+        """create_user creates a user with correct body."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.users import create_user
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/admins").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 99,
+                    "username": "new@example.com",
+                    "email": "new@example.com",
+                    "firstName": "New",
+                    "lastName": "User",
+                },
+            )
+        )
+
+        result = await create_user(
+            client,
+            username="new@example.com",
+            email="new@example.com",
+            first_name="New",
+            last_name="User",
+            roles=[1, 2],
+            phone="555-9999",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["user_id"] == 99
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["username"] == "new@example.com"
+        assert body["firstName"] == "New"
+        assert body["lastName"] == "User"
+        assert body["roles"] == [{"id": 1}, {"id": 2}]
+        assert body["phone"] == "555-9999"
+
+    @respx.mock
+    async def test_create_user_api_error(self, client, monkeypatch):
+        """create_user handles API errors."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.users import create_user
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/admins").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "Internal error"})
+        )
+
+        result = await create_user(
+            client,
+            username="fail@example.com",
+            email="fail@example.com",
+            first_name="Fail",
+            last_name="User",
+            roles=[1],
+        )
+        assert "Error:" in result[0].text
+
+
+class TestUpdateUser:
+    """Tests for update_user tool."""
+
+    @respx.mock
+    async def test_update_user_blocked_without_write(self, client, monkeypatch):
+        """update_user is blocked when write operations disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from lm_mcp.tools.users import update_user
+
+        result = await update_user(client, user_id=1, email="updated@example.com")
+        assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_update_user_no_changes(self, client, monkeypatch):
+        """update_user returns error when no updates provided."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.users import update_user
+
+        result = await update_user(client, user_id=1)
+        assert "No updates provided" in result[0].text
+
+    @respx.mock
+    async def test_update_user_success(self, client, monkeypatch):
+        """update_user sends correct PATCH body."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.users import update_user
+
+        route = respx.patch("https://test.logicmonitor.com/santaba/rest/setting/admins/1").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 1, "email": "updated@example.com", "firstName": "Updated"},
+            )
+        )
+
+        result = await update_user(client, user_id=1, email="updated@example.com", roles=[3])
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["email"] == "updated@example.com"
+        assert body["roles"] == [{"id": 3}]
+
+
+class TestDeleteUser:
+    """Tests for delete_user tool."""
+
+    @respx.mock
+    async def test_delete_user_blocked_without_write(self, client, monkeypatch):
+        """delete_user is blocked when write operations disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from lm_mcp.tools.users import delete_user
+
+        result = await delete_user(client, user_id=1)
+        assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_delete_user_success(self, client, monkeypatch):
+        """delete_user fetches user info then deletes."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.users import delete_user
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/admins/5").mock(
+            return_value=httpx.Response(200, json={"id": 5, "username": "gone@example.com"})
+        )
+        respx.delete("https://test.logicmonitor.com/santaba/rest/setting/admins/5").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_user(client, user_id=5)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "gone@example.com" in data["message"]
+
+    @respx.mock
+    async def test_delete_user_not_found(self, client, monkeypatch):
+        """delete_user handles 404."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.users import delete_user
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/admins/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "User not found"})
+        )
+
+        result = await delete_user(client, user_id=999)
+        assert "Error:" in result[0].text

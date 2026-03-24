@@ -1,5 +1,5 @@
 # Description: Tests for ops notes and audit log MCP tools.
-# Description: Validates audit log and ops note query/creation functions.
+# Description: Validates audit log and ops note CRUD functions.
 
 import json
 
@@ -287,3 +287,119 @@ class TestAddOpsNote:
 
         assert "Error:" in result[0].text
         assert "disabled" in result[0].text.lower()
+
+
+class TestUpdateOpsNote:
+    """Tests for update_ops_note tool."""
+
+    @respx.mock
+    async def test_update_ops_note_blocked_without_write(self, client, monkeypatch):
+        """update_ops_note is blocked when write operations disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from lm_mcp.tools.ops import update_ops_note
+
+        result = await update_ops_note(client, note_id="note1", note="Updated text")
+        assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_update_ops_note_no_changes(self, client, monkeypatch):
+        """update_ops_note returns error when no updates provided."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.ops import update_ops_note
+
+        result = await update_ops_note(client, note_id="note1")
+        assert "No updates provided" in result[0].text
+
+    @respx.mock
+    async def test_update_ops_note_success(self, client, monkeypatch):
+        """update_ops_note sends correct PATCH body."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.ops import update_ops_note
+
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/setting/opsnotes/note1"
+        ).mock(return_value=httpx.Response(200, json={"id": "note1", "note": "Updated text"}))
+
+        result = await update_ops_note(
+            client,
+            note_id="note1",
+            note="Updated text",
+            tags=["updated", "important"],
+            device_ids=[100],
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["note"] == "Updated text"
+        assert body["tags"] == [{"name": "updated"}, {"name": "important"}]
+        assert {"type": "device", "deviceId": 100} in body["scopes"]
+
+    @respx.mock
+    async def test_update_ops_note_api_error(self, client, monkeypatch):
+        """update_ops_note handles API errors."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.ops import update_ops_note
+
+        respx.patch("https://test.logicmonitor.com/santaba/rest/setting/opsnotes/bad").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Note not found"})
+        )
+
+        result = await update_ops_note(client, note_id="bad", note="Won't work")
+        assert "Error:" in result[0].text
+
+
+class TestDeleteOpsNote:
+    """Tests for delete_ops_note tool."""
+
+    @respx.mock
+    async def test_delete_ops_note_blocked_without_write(self, client, monkeypatch):
+        """delete_ops_note is blocked when write operations disabled."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from lm_mcp.tools.ops import delete_ops_note
+
+        result = await delete_ops_note(client, note_id="note1")
+        assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_delete_ops_note_success(self, client, monkeypatch):
+        """delete_ops_note deletes the note."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.ops import delete_ops_note
+
+        respx.delete("https://test.logicmonitor.com/santaba/rest/setting/opsnotes/note1").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_ops_note(client, note_id="note1")
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "note1" in data["message"]
+
+    @respx.mock
+    async def test_delete_ops_note_not_found(self, client, monkeypatch):
+        """delete_ops_note handles 404."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.tools.ops import delete_ops_note
+
+        respx.delete("https://test.logicmonitor.com/santaba/rest/setting/opsnotes/missing").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Note not found"})
+        )
+
+        result = await delete_ops_note(client, note_id="missing")
+        assert "Error:" in result[0].text

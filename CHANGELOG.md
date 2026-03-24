@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-24
+
+### Added
+
+- `create_user`, `update_user`, `delete_user` -- full CRUD for user accounts via `/setting/admins` API. Delete fetches username before removal for audit-friendly responses.
+- `create_collector_group`, `update_collector_group`, `delete_collector_group` -- collector group management. Delete blocks if collectors are still assigned. Update merges custom properties with existing values.
+- `update_ops_note`, `delete_ops_note` -- ops note write operations. Update supports note text, tags, and device/group scopes.
+- `update_dashboard_group` -- update dashboard group name, description, or parent ID via PATCH.
+- `update_sdt` -- modify scheduled downtimes using fetch-modify-PUT pattern to preserve unmodified fields.
+- Tool categories index updated to include all new tools.
+
 ## [2.4.0] - 2026-03-24
 
 ### Added

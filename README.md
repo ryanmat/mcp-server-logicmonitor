@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 223 structured tools, 15 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 233 structured tools, 15 workflow prompts, and 26 resources.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,7 +44,14 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.4.0 (Current)
+### v2.5.0 (Current)
+- **New**: `create_user`, `update_user`, `delete_user` -- full user account CRUD
+- **New**: `create_collector_group`, `update_collector_group`, `delete_collector_group` -- collector group management with safety guards
+- **New**: `update_ops_note`, `delete_ops_note` -- ops note write operations
+- **New**: `update_dashboard_group` -- dashboard group updates
+- **New**: `update_sdt` -- modify scheduled downtimes (fetch-modify-PUT)
+
+### v2.4.0
 - **New**: Portal URL links in detail tool responses (`get_device`, `get_alert_details`, `get_dashboard`, `get_device_group`, `get_website`)
 - **New**: HTTPS transport support via `LM_HTTP_SSL_CERTFILE`/`LM_HTTP_SSL_KEYFILE` env vars
 
@@ -650,6 +657,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `delete_widget` | Delete a widget from a dashboard | Yes |
 | `export_dashboard` | Export dashboard as JSON | No |
 | `create_dashboard_group` | Create a dashboard group | Yes |
+| `update_dashboard_group` | Update a dashboard group | Yes |
 | `delete_dashboard_group` | Delete a dashboard group | Yes |
 
 ### SDT Tools
@@ -660,6 +668,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_active_sdts` | Get currently active SDTs | No |
 | `get_upcoming_sdts` | Get SDTs scheduled within a time window | No |
 | `create_sdt` | Create a new SDT for a device or group | Yes |
+| `update_sdt` | Update an existing SDT (fetch-modify-PUT) | Yes |
 | `delete_sdt` | Delete an existing SDT | Yes |
 | `bulk_create_device_sdt` | Create SDT for multiple devices (max 100) | Yes |
 | `bulk_delete_sdt` | Delete multiple SDTs at once (max 100) | Yes |
@@ -672,6 +681,9 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_collector` | Get detailed information about a specific collector | No |
 | `get_collector_groups` | List collector groups | No |
 | `get_collector_group` | Get detailed collector group info | No |
+| `create_collector_group` | Create a collector group | Yes |
+| `update_collector_group` | Update a collector group | Yes |
+| `delete_collector_group` | Delete a collector group (blocks if collectors assigned) | Yes |
 
 ### Website Tools
 
@@ -813,6 +825,8 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_ops_notes` | List ops notes | No |
 | `get_ops_note` | Get detailed ops note information | No |
 | `add_ops_note` | Add a new ops note | Yes |
+| `update_ops_note` | Update an existing ops note | Yes |
+| `delete_ops_note` | Delete an ops note | Yes |
 
 ### User & Access Tools
 
@@ -820,6 +834,9 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 |------|-------------|-------|
 | `get_users` | List users | No |
 | `get_user` | Get detailed user information | No |
+| `create_user` | Create a new user | Yes |
+| `update_user` | Update an existing user | Yes |
+| `delete_user` | Delete a user | Yes |
 | `get_roles` | List roles | No |
 | `get_role` | Get detailed role information | No |
 | `get_access_groups` | List access groups (RBAC) | No |
