@@ -220,9 +220,7 @@ class TestGetAlertsGroupAndDeviceId:
         from lm_mcp.tools.alerts import get_alerts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
-            return_value=httpx.Response(
-                200, json={"id": 1977, "fullPath": self.GROUP_PATH}
-            )
+            return_value=httpx.Response(200, json={"id": 1977, "fullPath": self.GROUP_PATH})
         )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
@@ -253,9 +251,7 @@ class TestGetAlertsGroupAndDeviceId:
         from lm_mcp.tools.alerts import get_alerts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
-            return_value=httpx.Response(
-                200, json={"id": 1977, "fullPath": self.GROUP_PATH}
-            )
+            return_value=httpx.Response(200, json={"id": 1977, "fullPath": self.GROUP_PATH})
         )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
@@ -275,9 +271,7 @@ class TestGetAlertsGroupAndDeviceId:
         from lm_mcp.tools.alerts import get_alerts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
-            return_value=httpx.Response(
-                200, json={"id": 1977, "fullPath": self.GROUP_PATH}
-            )
+            return_value=httpx.Response(200, json={"id": 1977, "fullPath": self.GROUP_PATH})
         )
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})

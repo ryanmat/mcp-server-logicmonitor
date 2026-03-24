@@ -230,9 +230,7 @@ class TestScoreAlertNoise:
         from lm_mcp.tools.scoring import score_alert_noise
 
         respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/5").mock(
-            return_value=httpx.Response(
-                200, json={"id": 5, "fullPath": "Dev Portal/Test Group"}
-            )
+            return_value=httpx.Response(200, json={"id": 5, "fullPath": "Dev Portal/Test Group"})
         )
         route = respx.get(ALERT_URL).mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
