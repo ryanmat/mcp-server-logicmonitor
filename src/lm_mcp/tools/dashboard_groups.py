@@ -1,5 +1,5 @@
 # Description: Dashboard group tools for LogicMonitor MCP server.
-# Description: Provides dashboard group query functions.
+# Description: Provides dashboard group CRUD functions.
 
 from __future__ import annotations
 
@@ -167,6 +167,58 @@ async def delete_dashboard_group(
             {
                 "success": True,
                 "message": f"Dashboard group {group_id} deleted",
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_dashboard_group(
+    client: LogicMonitorClient,
+    group_id: int,
+    name: str | None = None,
+    description: str | None = None,
+    parent_id: int | None = None,
+) -> list[TextContent]:
+    """Update a dashboard group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Dashboard group ID to update.
+        name: New group name.
+        description: New description.
+        parent_id: New parent group ID.
+
+    Returns:
+        List of TextContent with updated group info or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+        if parent_id is not None:
+            body["parentId"] = parent_id
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(f"/dashboard/groups/{group_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Dashboard group {group_id} updated",
+                "result": result,
             }
         )
     except Exception as e:

@@ -68,6 +68,7 @@ TOOL_CATEGORIES = {
             "tools": [
                 "list_sdts",
                 "create_sdt",
+                "update_sdt",
                 "delete_sdt",
                 "bulk_create_device_sdt",
                 "bulk_delete_sdt",
@@ -84,6 +85,9 @@ TOOL_CATEGORIES = {
                 "get_collector_group",
                 "update_collector",
                 "delete_collector",
+                "create_collector_group",
+                "update_collector_group",
+                "delete_collector_group",
             ],
         },
         "datasources": {
@@ -119,6 +123,7 @@ TOOL_CATEGORIES = {
                 "get_dashboard_groups",
                 "get_dashboard_group",
                 "create_dashboard_group",
+                "update_dashboard_group",
                 "delete_dashboard_group",
             ],
         },
@@ -169,6 +174,9 @@ TOOL_CATEGORIES = {
             "tools": [
                 "get_users",
                 "get_user",
+                "create_user",
+                "update_user",
+                "delete_user",
                 "get_roles",
                 "get_role",
                 "get_access_groups",
@@ -245,6 +253,8 @@ TOOL_CATEGORIES = {
                 "get_ops_notes",
                 "get_ops_note",
                 "add_ops_note",
+                "update_ops_note",
+                "delete_ops_note",
             ],
         },
         "batchjobs": {

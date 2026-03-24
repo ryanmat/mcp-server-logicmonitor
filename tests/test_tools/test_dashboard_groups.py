@@ -1,5 +1,5 @@
 # Description: Tests for dashboard group MCP tools.
-# Description: Validates create_dashboard_group and delete_dashboard_group tools.
+# Description: Validates dashboard group CRUD tools.
 
 import json
 
@@ -175,4 +175,88 @@ class TestDeleteDashboardGroup:
 
         result = await delete_dashboard_group(client, group_id=999)
 
+        assert "Error:" in result[0].text
+
+
+class TestUpdateDashboardGroup:
+    """Tests for update_dashboard_group tool."""
+
+    @respx.mock
+    async def test_update_dashboard_group_blocked_by_default(self, client, monkeypatch):
+        """update_dashboard_group requires write permission."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.dashboard_groups import update_dashboard_group
+
+        result = await update_dashboard_group(client, group_id=42, name="Updated")
+
+        assert len(result) == 1
+        assert "error" in result[0].text.lower()
+        assert "write" in result[0].text.lower()
+
+    @respx.mock
+    async def test_update_dashboard_group_no_changes(self, client, enable_writes):
+        """update_dashboard_group returns error when no updates provided."""
+        from lm_mcp.tools.dashboard_groups import update_dashboard_group
+
+        result = await update_dashboard_group(client, group_id=42)
+
+        assert "No updates provided" in result[0].text
+
+    @respx.mock
+    async def test_update_dashboard_group_success(self, client, enable_writes):
+        """update_dashboard_group sends correct PATCH body."""
+        from lm_mcp.tools.dashboard_groups import update_dashboard_group
+
+        route = respx.patch("https://test.logicmonitor.com/santaba/rest/dashboard/groups/42").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 42, "name": "Renamed", "description": "New desc"},
+            )
+        )
+
+        result = await update_dashboard_group(
+            client, group_id=42, name="Renamed", description="New desc"
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "42" in data["message"]
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["name"] == "Renamed"
+        assert body["description"] == "New desc"
+
+    @respx.mock
+    async def test_update_dashboard_group_parent_id(self, client, enable_writes):
+        """update_dashboard_group passes parent_id as parentId."""
+        from lm_mcp.tools.dashboard_groups import update_dashboard_group
+
+        route = respx.patch("https://test.logicmonitor.com/santaba/rest/dashboard/groups/42").mock(
+            return_value=httpx.Response(200, json={"id": 42, "parentId": 5})
+        )
+
+        await update_dashboard_group(client, group_id=42, parent_id=5)
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["parentId"] == 5
+
+    @respx.mock
+    async def test_update_dashboard_group_not_found(self, client, enable_writes):
+        """update_dashboard_group handles 404."""
+        from lm_mcp.tools.dashboard_groups import update_dashboard_group
+
+        respx.patch("https://test.logicmonitor.com/santaba/rest/dashboard/groups/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Group not found"})
+        )
+
+        result = await update_dashboard_group(client, group_id=999, name="Gone")
         assert "Error:" in result[0].text

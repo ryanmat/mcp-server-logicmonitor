@@ -1,5 +1,5 @@
 # Description: Collector management tools for LogicMonitor MCP server.
-# Description: Provides collector and collector group query functions.
+# Description: Provides collector and collector group CRUD functions.
 
 from __future__ import annotations
 
@@ -316,6 +316,167 @@ async def delete_collector(
                 "success": True,
                 "message": f"Collector '{hostname}' deleted",
                 "collector_id": collector_id,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_collector_group(
+    client: LogicMonitorClient,
+    name: str,
+    description: str | None = None,
+    auto_balance: bool | None = None,
+    auto_balance_strategy: str | None = None,
+    custom_properties: dict[str, str] | None = None,
+) -> list[TextContent]:
+    """Create a collector group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        name: Name of the collector group.
+        description: Optional description.
+        auto_balance: Enable auto-balancing of devices across collectors.
+        auto_balance_strategy: Strategy for auto-balance (e.g., roundRobin).
+        custom_properties: Optional custom properties as key-value pairs.
+
+    Returns:
+        List of TextContent with created group info or error.
+    """
+    try:
+        body: dict = {"name": name}
+
+        if description is not None:
+            body["description"] = description
+        if auto_balance is not None:
+            body["autoBalance"] = auto_balance
+        if auto_balance_strategy is not None:
+            body["autoBalanceStrategy"] = auto_balance_strategy
+        if custom_properties is not None:
+            body["customProperties"] = [
+                {"name": k, "value": v} for k, v in custom_properties.items()
+            ]
+
+        result = await client.post("/setting/collector/groups", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Collector group '{name}' created",
+                "group_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_collector_group(
+    client: LogicMonitorClient,
+    group_id: int,
+    name: str | None = None,
+    description: str | None = None,
+    auto_balance: bool | None = None,
+    auto_balance_strategy: str | None = None,
+    custom_properties: dict[str, str] | None = None,
+) -> list[TextContent]:
+    """Update a collector group in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Collector group ID to update.
+        name: New group name.
+        description: New description.
+        auto_balance: Enable/disable auto-balancing.
+        auto_balance_strategy: New auto-balance strategy.
+        custom_properties: Custom properties to merge (adds/updates, does not remove).
+
+    Returns:
+        List of TextContent with updated group info or error.
+    """
+    try:
+        body: dict = {}
+
+        if name is not None:
+            body["name"] = name
+        if description is not None:
+            body["description"] = description
+        if auto_balance is not None:
+            body["autoBalance"] = auto_balance
+        if auto_balance_strategy is not None:
+            body["autoBalanceStrategy"] = auto_balance_strategy
+        if custom_properties is not None:
+            existing = await client.get(f"/setting/collector/groups/{group_id}")
+            existing_props = {p["name"]: p["value"] for p in existing.get("customProperties", [])}
+            existing_props.update(custom_properties)
+            body["customProperties"] = [{"name": k, "value": v} for k, v in existing_props.items()]
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(f"/setting/collector/groups/{group_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Collector group {group_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_collector_group(
+    client: LogicMonitorClient,
+    group_id: int,
+) -> list[TextContent]:
+    """Delete a collector group from LogicMonitor.
+
+    Blocks deletion if collectors are still assigned to the group.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Collector group ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        group = await client.get(f"/setting/collector/groups/{group_id}")
+        group_name = group.get("name", f"ID:{group_id}")
+        collector_count = group.get("numOfCollectors", 0)
+
+        if collector_count > 0:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "GROUP_HAS_COLLECTORS",
+                    "message": (
+                        f"Collector group '{group_name}' has {collector_count} "
+                        "collectors assigned. Move collectors before deleting the group."
+                    ),
+                    "group_id": group_id,
+                    "collector_count": collector_count,
+                }
+            )
+
+        await client.delete(f"/setting/collector/groups/{group_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Collector group '{group_name}' deleted",
+                "group_id": group_id,
             }
         )
     except Exception as e:

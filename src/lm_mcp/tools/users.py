@@ -1,5 +1,5 @@
 # Description: User and role management tools for LogicMonitor MCP server.
-# Description: Provides user and role query functions.
+# Description: Provides user/role query, create, update, and delete functions.
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -217,5 +218,182 @@ async def get_role(
         }
 
         return format_response(role)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_user(
+    client: LogicMonitorClient,
+    username: str,
+    email: str,
+    first_name: str,
+    last_name: str,
+    roles: list[int],
+    password: str | None = None,
+    phone: str | None = None,
+    sms_email: str | None = None,
+    note: str | None = None,
+    api_only: bool = False,
+    two_fa_enabled: bool = False,
+) -> list[TextContent]:
+    """Create a new user in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        username: Login username (typically email address).
+        email: User email address.
+        first_name: First name.
+        last_name: Last name.
+        roles: List of role IDs to assign.
+        password: Initial password (omit for SSO-only users).
+        phone: Phone number.
+        sms_email: SMS email address for notifications.
+        note: Admin note about the user.
+        api_only: Whether user is API-only (no portal access).
+        two_fa_enabled: Whether to require two-factor authentication.
+
+    Returns:
+        List of TextContent with created user info or error.
+    """
+    try:
+        body: dict = {
+            "username": username,
+            "email": email,
+            "firstName": first_name,
+            "lastName": last_name,
+            "roles": [{"id": rid} for rid in roles],
+            "apionly": api_only,
+            "twoFAEnabled": two_fa_enabled,
+        }
+
+        if password is not None:
+            body["password"] = password
+        if phone is not None:
+            body["phone"] = phone
+        if sms_email is not None:
+            body["smsEmail"] = sms_email
+        if note is not None:
+            body["note"] = note
+
+        result = await client.post("/setting/admins", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"User '{username}' created",
+                "user_id": result.get("id"),
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_user(
+    client: LogicMonitorClient,
+    user_id: int,
+    email: str | None = None,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    roles: list[int] | None = None,
+    phone: str | None = None,
+    sms_email: str | None = None,
+    note: str | None = None,
+    api_only: bool | None = None,
+    two_fa_enabled: bool | None = None,
+) -> list[TextContent]:
+    """Update an existing user in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        user_id: User ID to update.
+        email: New email address.
+        first_name: New first name.
+        last_name: New last name.
+        roles: New list of role IDs to assign (replaces existing).
+        phone: New phone number.
+        sms_email: New SMS email address.
+        note: New admin note.
+        api_only: Whether user is API-only.
+        two_fa_enabled: Whether to require two-factor authentication.
+
+    Returns:
+        List of TextContent with updated user info or error.
+    """
+    try:
+        body: dict = {}
+
+        if email is not None:
+            body["email"] = email
+        if first_name is not None:
+            body["firstName"] = first_name
+        if last_name is not None:
+            body["lastName"] = last_name
+        if roles is not None:
+            body["roles"] = [{"id": rid} for rid in roles]
+        if phone is not None:
+            body["phone"] = phone
+        if sms_email is not None:
+            body["smsEmail"] = sms_email
+        if note is not None:
+            body["note"] = note
+        if api_only is not None:
+            body["apionly"] = api_only
+        if two_fa_enabled is not None:
+            body["twoFAEnabled"] = two_fa_enabled
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(f"/setting/admins/{user_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"User {user_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_user(
+    client: LogicMonitorClient,
+    user_id: int,
+) -> list[TextContent]:
+    """Delete a user from LogicMonitor.
+
+    WARNING: This permanently removes the user account.
+
+    Args:
+        client: LogicMonitor API client.
+        user_id: User ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        user = await client.get(f"/setting/admins/{user_id}")
+        username = user.get("username", f"ID:{user_id}")
+
+        await client.delete(f"/setting/admins/{user_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"User '{username}' deleted",
+                "user_id": user_id,
+            }
+        )
     except Exception as e:
         return handle_error(e)

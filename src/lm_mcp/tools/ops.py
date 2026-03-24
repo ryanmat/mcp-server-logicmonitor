@@ -1,5 +1,5 @@
 # Description: Ops notes and audit log tools for LogicMonitor MCP server.
-# Description: Provides get_audit_logs, get_ops_notes, get_ops_note, add_ops_note.
+# Description: Provides ops note CRUD and audit log query functions.
 
 from __future__ import annotations
 
@@ -214,6 +214,95 @@ async def add_ops_note(
                 "id": result.get("id"),
                 "note": result.get("note"),
                 "tags": result.get("tags", []),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_ops_note(
+    client: LogicMonitorClient,
+    note_id: str,
+    note: str | None = None,
+    tags: list[str] | None = None,
+    device_ids: list[int] | None = None,
+    group_ids: list[int] | None = None,
+) -> list[TextContent]:
+    """Update an existing ops note in LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        note_id: Ops note ID to update.
+        note: New note text.
+        tags: New list of tags (replaces existing).
+        device_ids: New list of device IDs to scope the note to.
+        group_ids: New list of device group IDs to scope the note to.
+
+    Returns:
+        List of TextContent with updated note info or error.
+    """
+    try:
+        body: dict = {}
+
+        if note is not None:
+            body["note"] = note
+        if tags is not None:
+            body["tags"] = [{"name": t} for t in tags]
+
+        scopes = []
+        if device_ids is not None:
+            for did in device_ids:
+                scopes.append({"type": "device", "deviceId": did})
+        if group_ids is not None:
+            for gid in group_ids:
+                scopes.append({"type": "deviceGroup", "groupId": gid})
+        if device_ids is not None or group_ids is not None:
+            body["scopes"] = scopes
+
+        if not body:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "NO_CHANGES",
+                    "message": "No updates provided",
+                }
+            )
+
+        result = await client.patch(f"/setting/opsnotes/{note_id}", json_body=body)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Ops note {note_id} updated",
+                "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_ops_note(
+    client: LogicMonitorClient,
+    note_id: str,
+) -> list[TextContent]:
+    """Delete an ops note from LogicMonitor.
+
+    Args:
+        client: LogicMonitor API client.
+        note_id: Ops note ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        await client.delete(f"/setting/opsnotes/{note_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"Ops note {note_id} deleted",
             }
         )
     except Exception as e:
