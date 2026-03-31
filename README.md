@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 233 structured tools, 15 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 234+ structured tools, 15 workflow prompts, and 26 resources. Optional IBM watsonx.ai integration for Granite TTM forecasting and NL analysis summaries.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -44,13 +44,15 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.6.0 (Current)
+### v3.0.0 (Current)
 - **New**: IBM watsonx.ai integration (optional, requires `WATSONX_API_KEY`)
-- **New**: Granite TTM time series forecasting via `method="ttm"` on `forecast_metric`
-- **New**: Granite NL summaries via `summarize=true` on `triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`
+- **New**: Granite TTM time series forecasting via `method="ttm"` on `forecast_metric` -- ML-powered breach prediction using IBM Granite Tiny Time Mixer
+- **New**: Granite NL summaries via `summarize=true` on `triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview` -- plain-English shift-handoff analysis powered by Granite 4.0
 - **New**: `watsonx_summarize` standalone tool for ad-hoc data summarization via Granite LLM
 - **New**: `[ibm]` optional dependency group (`ibm-watsonx-ai`, `pandas`)
 - **Architecture**: 4-way dispatch (Session, AWX, WatsonX, LM) with graceful degradation
+- **Fix**: SDK import paths corrected for ibm-watsonx-ai 1.5.5 (TSModelInference, TSForecastParameters)
+- **Fix**: TTM response parsing updated for dict format (results[0].value)
 
 ### v2.5.0
 - **New**: `create_user`, `update_user`, `delete_user` -- full user account CRUD
