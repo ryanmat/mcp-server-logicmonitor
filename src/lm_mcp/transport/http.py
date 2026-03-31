@@ -66,8 +66,8 @@ def create_asgi_app() -> Starlette:
         ensuring consistent behavior (filtering, validation, audit logging,
         session recording) across stdio and HTTP transports.
         """
-        from lm_mcp.registry import AWX_TOOLS, TOOLS
-        from lm_mcp.server import _awx_client, _filter_tools, execute_tool
+        from lm_mcp.registry import AWX_TOOLS, TOOLS, WATSONX_TOOLS
+        from lm_mcp.server import _awx_client, _filter_tools, _watsonx_client, execute_tool
 
         try:
             body = await request.json()
@@ -86,6 +86,8 @@ def create_asgi_app() -> Starlette:
                 all_tools = list(TOOLS)
                 if _awx_client is not None:
                     all_tools.extend(AWX_TOOLS)
+                if _watsonx_client is not None:
+                    all_tools.extend(WATSONX_TOOLS)
                 filtered = _filter_tools(all_tools, config)
                 result = [{"name": t.name, "description": t.description} for t in filtered]
                 return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})
@@ -296,7 +298,7 @@ async def create_http_server() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_awx_client, _set_client
+    from lm_mcp.server import _set_awx_client, _set_client, _set_watsonx_client
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -327,6 +329,28 @@ async def create_http_server() -> None:
             verify_ssl=awx_config.verify_ssl,
         )
         _set_awx_client(awx_client)
+
+    # Initialize watsonx client if configured
+    watsonx_client = None
+    from lm_mcp.ibm_config import get_watsonx_config
+
+    watsonx_config = get_watsonx_config()
+    if watsonx_config is not None:
+        try:
+            from lm_mcp.client.watsonx import WatsonxClient
+
+            watsonx_client = WatsonxClient(
+                api_key=watsonx_config.api_key,
+                url=watsonx_config.url,
+                project_id=watsonx_config.project_id,
+                timeout=watsonx_config.timeout,
+            )
+            _set_watsonx_client(watsonx_client)
+        except ImportError:
+            logger.warning(
+                "ibm-watsonx-ai not installed; watsonx tools disabled. "
+                "Install with: uv add 'lm-mcp[ibm]'"
+            )
 
     # Initialize session with config settings
     if config.session_enabled:
@@ -361,6 +385,8 @@ async def create_http_server() -> None:
     try:
         await server.serve()
     finally:
+        if watsonx_client is not None:
+            await watsonx_client.close()
         if awx_client is not None:
             await awx_client.close()
         await client.close()

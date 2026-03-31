@@ -36,6 +36,10 @@ http = [
     "starlette>=0.40.0",
     "uvicorn[standard]>=0.30.0",
 ]
+ibm = [
+    "ibm-watsonx-ai>=1.1.0",
+    "pandas>=2.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/ryanmat/mcp-server-logicmonitor"
@@ -52,6 +56,8 @@ dev = [
     "respx>=0.21.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
+    "ibm-watsonx-ai>=1.1.0",
+    "pandas>=2.0.0",
 ]
 
 [build-system]

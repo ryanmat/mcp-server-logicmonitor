@@ -3563,10 +3563,12 @@ TOOLS.extend(
                     },
                     "method": {
                         "type": "string",
-                        "enum": ["auto", "linear", "holt_winters"],
+                        "enum": ["auto", "linear", "holt_winters", "ttm"],
                         "default": "auto",
                         "description": (
-                            "Forecasting method (auto selects based on data characteristics)"
+                            "Forecasting method. 'ttm' uses IBM Granite TTM via "
+                            "watsonx.ai (requires WATSONX_API_KEY). 'auto' selects "
+                            "based on data and watsonx availability."
                         ),
                     },
                 },
@@ -4422,6 +4424,14 @@ TOOLS.extend(
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
                     },
+                    "summarize": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Append plain-English NL summary via IBM Granite "
+                            "(requires WATSONX_API_KEY)"
+                        ),
+                    },
                 },
             },
         ),
@@ -4446,6 +4456,14 @@ TOOLS.extend(
                         "enum": ["summary", "full"],
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
+                    },
+                    "summarize": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Append plain-English NL summary via IBM Granite "
+                            "(requires WATSONX_API_KEY)"
+                        ),
                     },
                 },
             },
@@ -4481,6 +4499,14 @@ TOOLS.extend(
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
                     },
+                    "summarize": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Append plain-English NL summary via IBM Granite "
+                            "(requires WATSONX_API_KEY)"
+                        ),
+                    },
                 },
             },
         ),
@@ -4505,6 +4531,14 @@ TOOLS.extend(
                         "enum": ["summary", "full"],
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
+                    },
+                    "summarize": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Append plain-English NL summary via IBM Granite "
+                            "(requires WATSONX_API_KEY)"
+                        ),
                     },
                 },
             },
@@ -4536,6 +4570,14 @@ TOOLS.extend(
                         "enum": ["summary", "full"],
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
+                    },
+                    "summarize": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Append plain-English NL summary via IBM Granite "
+                            "(requires WATSONX_API_KEY)"
+                        ),
                     },
                 },
             },
@@ -4930,6 +4972,40 @@ AWX_TOOLS: list[Tool] = [
 ]
 
 
+# IBM watsonx.ai tools — only registered when WATSONX_API_KEY is configured
+WATSONX_TOOLS: list[Tool] = [
+    Tool(
+        name="watsonx_summarize",
+        description=(
+            "Generate a plain-English summary of structured data using IBM "
+            "Granite LLM via watsonx.ai. Takes JSON output from any tool and "
+            "produces a concise, shift-handoff-ready analysis summary."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "string",
+                    "description": "JSON string of structured data to summarize",
+                },
+                "context": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Context hint (e.g., 'triage report', 'capacity plan')",
+                },
+                "max_tokens": {
+                    "type": "integer",
+                    "default": 500,
+                    "description": "Maximum tokens in the generated summary",
+                },
+            },
+            "required": ["data"],
+        },
+    ),
+]
+
+
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
     """Get the handler function for a tool.
@@ -4985,6 +5061,7 @@ def get_tool_handler(tool_name: str) -> Any:
         topologysources,
         traces,
         users,
+        watsonx,
         websites,
         workflows,
     )
@@ -5263,6 +5340,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "portal_overview": workflows.portal_overview,
         "diagnose": workflows.diagnose,
         "search_tools": workflows.search_tools,
+        # IBM watsonx.ai
+        "watsonx_summarize": watsonx.watsonx_summarize,
     }
 
     if tool_name not in handlers:

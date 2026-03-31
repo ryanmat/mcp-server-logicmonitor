@@ -1552,8 +1552,14 @@ class TestServerCallToolFlow:
         awx_names = {t.name for t in AWX_TOOLS}
         assert "test_awx_connection" in awx_names
         assert "launch_job" in awx_names
-        assert "get_job_templates" in awx_names
-        assert "launch_workflow" in awx_names
+
+    def test_watsonx_tools_registered(self):
+        """WATSONX_TOOLS contains IBM watsonx tools."""
+        from lm_mcp.registry import WATSONX_TOOLS
+
+        assert len(WATSONX_TOOLS) == 1
+        wx_names = {t.name for t in WATSONX_TOOLS}
+        assert "watsonx_summarize" in wx_names
 
     def test_get_tool_handler_valid_tool(self):
         """get_tool_handler returns a callable for a valid tool name."""

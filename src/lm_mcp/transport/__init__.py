@@ -23,7 +23,7 @@ async def run_stdio() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_awx_client, _set_client, server
+    from lm_mcp.server import _set_awx_client, _set_client, _set_watsonx_client, server
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -55,6 +55,30 @@ async def run_stdio() -> None:
         )
         _set_awx_client(awx_client)
 
+    # Initialize watsonx client if configured
+    watsonx_client = None
+    from lm_mcp.ibm_config import get_watsonx_config
+
+    watsonx_config = get_watsonx_config()
+    if watsonx_config is not None:
+        try:
+            from lm_mcp.client.watsonx import WatsonxClient
+
+            watsonx_client = WatsonxClient(
+                api_key=watsonx_config.api_key,
+                url=watsonx_config.url,
+                project_id=watsonx_config.project_id,
+                timeout=watsonx_config.timeout,
+            )
+            _set_watsonx_client(watsonx_client)
+        except ImportError:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "ibm-watsonx-ai not installed; watsonx tools disabled. "
+                "Install with: uv add 'lm-mcp[ibm]'"
+            )
+
     # Initialize session with config settings
     if config.session_enabled:
         session = get_session()
@@ -68,6 +92,8 @@ async def run_stdio() -> None:
                 server.create_initialization_options(),
             )
     finally:
+        if watsonx_client is not None:
+            await watsonx_client.close()
         if awx_client is not None:
             await awx_client.close()
         await client.close()

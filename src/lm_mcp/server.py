@@ -14,7 +14,7 @@ from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
 from lm_mcp.logging import is_write_tool, log_write_operation
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import AWX_TOOLS, TOOLS, get_tool_handler
+from lm_mcp.registry import AWX_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
@@ -83,6 +83,35 @@ def _set_awx_client(client) -> None:
     _awx_client = client
 
 
+# Global watsonx client (initialized when WATSONX_API_KEY is set)
+_watsonx_client = None
+
+# Set of watsonx tool names for dispatch routing
+WATSONX_TOOL_NAMES = {t.name for t in WATSONX_TOOLS}
+
+
+def get_watsonx_client():
+    """Get the initialized watsonx client.
+
+    Returns:
+        The WatsonxClient instance, or None if not configured.
+    """
+    return _watsonx_client
+
+
+def _set_watsonx_client(client) -> None:
+    """Set the global watsonx client.
+
+    Called by transport runners during initialization when watsonx
+    credentials are available.
+
+    Args:
+        client: The WatsonxClient instance, or None to clear.
+    """
+    global _watsonx_client
+    _watsonx_client = client
+
+
 def _filter_tools(tools: list, config) -> list:
     """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
 
@@ -116,6 +145,8 @@ async def list_tools():
     tools = list(TOOLS)
     if _awx_client is not None:
         tools.extend(AWX_TOOLS)
+    if _watsonx_client is not None:
+        tools.extend(WATSONX_TOOLS)
     return _filter_tools(tools, config)
 
 
@@ -250,6 +281,18 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                     )
                 ]
             result = await handler(_awx_client, **arguments)
+        elif name in WATSONX_TOOL_NAMES:
+            # WatsonX tools use the watsonx client
+            if _watsonx_client is None:
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: IBM watsonx not configured. "
+                        "Set WATSONX_API_KEY, WATSONX_URL, and "
+                        "WATSONX_PROJECT_ID environment variables.",
+                    )
+                ]
+            result = await handler(_watsonx_client, **arguments)
         else:
             client = get_client()
             result = await handler(client, **arguments)

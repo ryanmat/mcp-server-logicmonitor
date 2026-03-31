@@ -5,7 +5,7 @@ import inspect
 
 import pytest
 
-from lm_mcp.registry import TOOLS, get_tool_handler
+from lm_mcp.registry import TOOLS, WATSONX_TOOLS, get_tool_handler
 
 
 class TestRegistry:
@@ -195,3 +195,9 @@ class TestRegistry:
                 f"Schema: {sorted(schema_props)}, "
                 f"Function: {sorted(func_params)}"
             )
+
+    def test_all_watsonx_tools_have_handlers(self):
+        """All registered watsonx tools have handlers."""
+        for tool in WATSONX_TOOLS:
+            handler = get_tool_handler(tool.name)
+            assert callable(handler)
