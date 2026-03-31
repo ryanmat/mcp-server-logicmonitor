@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Granite model IDs for watsonx.ai inference
 TTM_MODEL_ID = "ibm/granite-ttm-512-96-r2"
-LLM_MODEL_ID = "ibm/granite-3-3-8b-instruct"
+LLM_MODEL_ID = "ibm/granite-4-h-small"
 
 
 class WatsonxClient:
@@ -55,7 +55,7 @@ class WatsonxClient:
     def _get_ts_model(self) -> Any:
         """Lazy-initialize the time series model."""
         if self._ts_model is None:
-            from ibm_watsonx_ai.foundation_models.extensions.timeseries import (
+            from ibm_watsonx_ai.foundation_models.inference.ts_model_inference import (
                 TSModelInference,
             )
 
@@ -90,11 +90,16 @@ class WatsonxClient:
     ) -> dict:
         """Synchronous TTM forecast call (runs in thread)."""
         import pandas as pd
-        from ibm_watsonx_ai.foundation_models.extensions.timeseries import (
+        from ibm_watsonx_ai.foundation_models.schema import (
             TSForecastParameters,
         )
 
-        dates = pd.to_datetime(timestamps, unit="s", utc=True)
+        # SDK requires string timestamps, not pandas Timestamps (serialization bug)
+        dates = pd.date_range(
+            start=pd.to_datetime(timestamps[0], unit="s", utc=True),
+            periods=len(timestamps),
+            freq=f"{max(1, (timestamps[-1] - timestamps[0]) // max(1, len(timestamps) - 1))}s",
+        ).strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
         df = pd.DataFrame({"timestamp": dates, "value": values})
 
         params = TSForecastParameters(
@@ -102,8 +107,10 @@ class WatsonxClient:
             target_columns=["value"],
         )
 
-        result_df = self._get_ts_model().forecast(data=df, params=params)
-        forecast_values = result_df["value"].tolist()
+        result = self._get_ts_model().forecast(data=df, params=params)
+
+        # SDK returns dict: {results: [{value: [...]}], input_data_points, output_data_points}
+        forecast_values = result["results"][0]["value"]
 
         return {
             "forecast_values": forecast_values,
