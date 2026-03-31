@@ -44,7 +44,15 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v2.5.0 (Current)
+### v2.6.0 (Current)
+- **New**: IBM watsonx.ai integration (optional, requires `WATSONX_API_KEY`)
+- **New**: Granite TTM time series forecasting via `method="ttm"` on `forecast_metric`
+- **New**: Granite NL summaries via `summarize=true` on `triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`
+- **New**: `watsonx_summarize` standalone tool for ad-hoc data summarization via Granite LLM
+- **New**: `[ibm]` optional dependency group (`ibm-watsonx-ai`, `pandas`)
+- **Architecture**: 4-way dispatch (Session, AWX, WatsonX, LM) with graceful degradation
+
+### v2.5.0
 - **New**: `create_user`, `update_user`, `delete_user` -- full user account CRUD
 - **New**: `create_collector_group`, `update_collector_group`, `delete_collector_group` -- collector group management with safety guards
 - **New**: `update_ops_note`, `delete_ops_note` -- ops note write operations
