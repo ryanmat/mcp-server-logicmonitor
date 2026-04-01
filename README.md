@@ -74,25 +74,6 @@ recommendations and anti-patterns when thresholds are breached.
 - `get_remediation_status` — current execution state
 - `get_remediation_history` — past executions from audit logs
 
-**Other:**
-- Enriched all 15 MCP prompts with composite tool shortcuts and argument parsing guidance
-- New `remediation` prompt for execution workflows
-- 2 new resources: `lm://guide/best-practices`, `lm://guide/example-responses`
-- Common mistake notes added to 6 frequently misused tool descriptions
-- DataSource datapoints now include `post_processor_method` and `post_processor_param`
-- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
-
-### v1.9.5
-- **New**: Action Sources integration — 14 tools for diagnostic/remediation workflows
-  (action chains, action rules, diagnostic sources, remediation sources)
-- **Preview**: Action Sources API endpoints are not yet GA in LogicMonitor portals.
-  Tools are implemented and tested but will return errors until the feature is released.
-  Tool descriptions are marked with [PREVIEW] to indicate this status.
-- **Removed**: Event-Driven Ansible (EDA) tools removed from deployed package.
-  EDA required standalone infrastructure not available via LM Portal.
-  Source code preserved in `contrib/eda/` for future reference.
-- **Counts**: 215 tools (197 LM + 18 AAP), 14 prompts, 6 skills
-
 ## Features
 
 **226 Tools** across comprehensive LogicMonitor API coverage (198 LM + 18 AAP):
