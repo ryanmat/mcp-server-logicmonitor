@@ -95,11 +95,15 @@ class WatsonxClient:
         )
 
         # SDK requires string timestamps, not pandas Timestamps (serialization bug)
-        dates = pd.date_range(
-            start=pd.to_datetime(timestamps[0], unit="s", utc=True),
-            periods=len(timestamps),
-            freq=f"{max(1, (timestamps[-1] - timestamps[0]) // max(1, len(timestamps) - 1))}s",
-        ).strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
+        dates = (
+            pd.date_range(
+                start=pd.to_datetime(timestamps[0], unit="s", utc=True),
+                periods=len(timestamps),
+                freq=f"{max(1, (timestamps[-1] - timestamps[0]) // max(1, len(timestamps) - 1))}s",
+            )
+            .strftime("%Y-%m-%dT%H:%M:%SZ")
+            .tolist()
+        )
         df = pd.DataFrame({"timestamp": dates, "value": values})
 
         params = TSForecastParameters(
