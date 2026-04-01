@@ -54,69 +54,6 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **Fix**: SDK import paths corrected for ibm-watsonx-ai 1.5.5 (TSModelInference, TSForecastParameters)
 - **Fix**: TTM response parsing updated for dict format (results[0].value)
 
-### v2.5.0
-- **New**: `create_user`, `update_user`, `delete_user` -- full user account CRUD
-- **New**: `create_collector_group`, `update_collector_group`, `delete_collector_group` -- collector group management with safety guards
-- **New**: `update_ops_note`, `delete_ops_note` -- ops note write operations
-- **New**: `update_dashboard_group` -- dashboard group updates
-- **New**: `update_sdt` -- modify scheduled downtimes (fetch-modify-PUT)
-
-### v2.4.0
-- **New**: Portal URL links in detail tool responses (`get_device`, `get_alert_details`, `get_dashboard`, `get_device_group`, `get_website`)
-- **New**: HTTPS transport support via `LM_HTTP_SSL_CERTFILE`/`LM_HTTP_SSL_KEYFILE` env vars
-
-### v2.3.2
-- **New**: `get_alerts` now supports `group_id` and `device_id` parameters for reliable Kubernetes cluster alert filtering
-- **Fix**: Group filtering uses `monitorObjectGroups~` (resolves group path) instead of broken `hostGroupIds~`
-- **Fix**: `correlate_alerts` and `score_alert_noise` now sanitize device filter wildcards consistently
-- **Docs**: Alert filter documentation expanded with `monitorObjectId`, `monitorObjectGroups` fields
-
-### v2.3.0
-- **New**: `update_collector`, `delete_collector` — collector write operations with device-count guardrails
-- **New**: `bulk_delete_devices` — batch delete up to 100 devices with K8S warnings
-- **New**: `get_device_group` — single group detail with appliesTo and parentId
-- **New**: `recover_device` — restore soft-deleted devices
-- **New**: `get_device_eventsources`, `update_device_eventsource` — EventSource visibility and alerting control
-- **Fix**: `get_devices` status filter now uses string values (was numeric, returned 0 results)
-- **Fix**: Negative API total sentinel values handled with `safe_total()` helper
-- **Fix**: `score_alert_noise` weights rebalanced (was pegging at 100 with normal alert volume)
-- **Fix**: `calculate_availability` now filters to target device only
-- **Guardrail**: `delete_device` warns on K8S-managed devices, includes audit trail
-- **Guardrail**: `update_device` warns when group changes fail on Argus-managed devices
-- **Counts**: 223 tools (205 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
-
-### v2.2.0
-- **Breaking**: CORS default changed from `*` to empty. HTTP transport users must now set `LM_CORS_ORIGINS` explicitly.
-- **Fix**: Setup script auto-detects project root instead of hardcoded path
-- **Infra**: uv pinned to 0.9.27, Docker layer caching, expanded lint rules, mypy added to CI
-- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
-
-### v2.1.1
-- **Fix**: `create_sdt` and `bulk_create_device_sdt` now map `Device*` SDT types to `Resource*` for LM API v3 POST endpoints (fixes `400 "Invalid type"` errors)
-- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
-
-### v2.1.0
-- **Improved**: `create_sdt` — expanded from 2 to all 13 SDT types (DeviceDataSourceSDT, CollectorSDT, WebsiteSDT, etc.)
-- **New parameter**: `datasource_id` on `create_sdt` for DeviceDataSourceSDT scheduling
-- **Fix**: `create_sdt` now maps `deviceId` for all Device-prefixed SDT types, not just DeviceSDT
-- **Improved**: SDT error messages include sent type and cloud resource workaround guidance
-- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
-
-### v2.0.1
-- **New**: `update_device_group` — update device group name, description, AppliesTo, properties, alerting
-- **Removed**: 10 Action Sources preview tools (action chains, action rules) — not on v3 API swagger
-- **Renamed**: Action Sources category to Remediation (7 tools retained)
-- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
-
-### v2.0.0
-
-**Composite Workflows** — 5 multi-step tools that replace manual orchestration:
-- `triage` — alert correlation, noise scoring, blast radius, change correlation in one call
-- `health_check` — device health score, anomalies, alerts, availability in one call
-- `capacity_plan` — forecasting, trend classification, seasonality, change points per datasource
-- `portal_overview` — alert stats, collector health, active SDTs, down devices for shift handoff
-- `diagnose` — alert details, device context, correlation, blast radius, root cause analysis
-
 **Progressive Discovery** — `search_tools` for keyword-based tool search across 216 tools.
 
 **ML/Statistical Improvements:**
@@ -1332,6 +1269,60 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v2.5.0
+- **New**: `create_user`, `update_user`, `delete_user` -- full user account CRUD
+- **New**: `create_collector_group`, `update_collector_group`, `delete_collector_group` -- collector group management with safety guards
+- **New**: `update_ops_note`, `delete_ops_note` -- ops note write operations
+- **New**: `update_dashboard_group` -- dashboard group updates
+- **New**: `update_sdt` -- modify scheduled downtimes (fetch-modify-PUT)
+
+### v2.4.0
+- **New**: Portal URL links in detail tool responses (`get_device`, `get_alert_details`, `get_dashboard`, `get_device_group`, `get_website`)
+- **New**: HTTPS transport support via `LM_HTTP_SSL_CERTFILE`/`LM_HTTP_SSL_KEYFILE` env vars
+
+### v2.3.2
+- **New**: `get_alerts` now supports `group_id` and `device_id` parameters for reliable Kubernetes cluster alert filtering
+- **Fix**: Group filtering uses `monitorObjectGroups~` (resolves group path) instead of broken `hostGroupIds~`
+- **Fix**: `correlate_alerts` and `score_alert_noise` now sanitize device filter wildcards consistently
+- **Docs**: Alert filter documentation expanded with `monitorObjectId`, `monitorObjectGroups` fields
+
+### v2.3.0
+- **New**: `update_collector`, `delete_collector` — collector write operations with device-count guardrails
+- **New**: `bulk_delete_devices` — batch delete up to 100 devices with K8S warnings
+- **New**: `get_device_group` — single group detail with appliesTo and parentId
+- **New**: `recover_device` — restore soft-deleted devices
+- **New**: `get_device_eventsources`, `update_device_eventsource` — EventSource visibility and alerting control
+- **Fix**: `get_devices` status filter now uses string values (was numeric, returned 0 results)
+- **Fix**: Negative API total sentinel values handled with `safe_total()` helper
+- **Fix**: `score_alert_noise` weights rebalanced (was pegging at 100 with normal alert volume)
+- **Fix**: `calculate_availability` now filters to target device only
+- **Guardrail**: `delete_device` warns on K8S-managed devices, includes audit trail
+- **Guardrail**: `update_device` warns when group changes fail on Argus-managed devices
+- **Counts**: 223 tools (205 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.2.0
+- **Breaking**: CORS default changed from `*` to empty. HTTP transport users must now set `LM_CORS_ORIGINS` explicitly.
+- **Fix**: Setup script auto-detects project root instead of hardcoded path
+- **Infra**: uv pinned to 0.9.27, Docker layer caching, expanded lint rules, mypy added to CI
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.1.1
+- **Fix**: `create_sdt` and `bulk_create_device_sdt` now map `Device*` SDT types to `Resource*` for LM API v3 POST endpoints (fixes `400 "Invalid type"` errors)
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.1.0
+- **Improved**: `create_sdt` — expanded from 2 to all 13 SDT types (DeviceDataSourceSDT, CollectorSDT, WebsiteSDT, etc.)
+- **New parameter**: `datasource_id` on `create_sdt` for DeviceDataSourceSDT scheduling
+- **Fix**: `create_sdt` now maps `deviceId` for all Device-prefixed SDT types, not just DeviceSDT
+- **Improved**: SDT error messages include sent type and cloud resource workaround guidance
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
+
+### v2.0.1
+- **New**: `update_device_group` — update device group name, description, AppliesTo, properties, alerting
+- **Removed**: 10 Action Sources preview tools (action chains, action rules) — not on v3 API swagger
+- **Renamed**: Action Sources category to Remediation (7 tools retained)
+- **Counts**: 216 tools (198 LM + 18 AAP), 15 prompts, 26 resources, 6 skills
 
 ### v2.0.0
 - **New**: 5 composite workflow tools (`triage`, `health_check`, `capacity_plan`, `portal_overview`, `diagnose`) for multi-step analysis in a single call
