@@ -14,7 +14,7 @@ from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
 from lm_mcp.logging import is_write_tool, log_write_operation
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import AWX_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
+from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
@@ -112,6 +112,35 @@ def _set_watsonx_client(client) -> None:
     _watsonx_client = client
 
 
+# Global Terraform runner (initialized when TF_WORKSPACE_DIR is set)
+_tf_runner = None
+
+# Set of Terraform tool names for dispatch routing
+TF_TOOL_NAMES = {t.name for t in TF_TOOLS}
+
+
+def get_tf_runner():
+    """Get the initialized Terraform runner.
+
+    Returns:
+        The TerraformRunner instance, or None if not configured.
+    """
+    return _tf_runner
+
+
+def _set_tf_runner(runner) -> None:
+    """Set the global Terraform runner.
+
+    Called by transport runners during initialization when Terraform
+    workspace directory is configured.
+
+    Args:
+        runner: The TerraformRunner instance, or None to clear.
+    """
+    global _tf_runner
+    _tf_runner = runner
+
+
 def _filter_tools(tools: list, config) -> list:
     """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
 
@@ -147,6 +176,8 @@ async def list_tools():
         tools.extend(AWX_TOOLS)
     if _watsonx_client is not None:
         tools.extend(WATSONX_TOOLS)
+    if _tf_runner is not None:
+        tools.extend(TF_TOOLS)
     return _filter_tools(tools, config)
 
 
@@ -293,6 +324,17 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                     )
                 ]
             result = await handler(_watsonx_client, **arguments)
+        elif name in TF_TOOL_NAMES:
+            # Terraform tools use the Terraform runner
+            if _tf_runner is None:
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: Terraform not configured. "
+                        "Set TF_WORKSPACE_DIR environment variable.",
+                    )
+                ]
+            result = await handler(_tf_runner, **arguments)
         else:
             client = get_client()
             result = await handler(client, **arguments)

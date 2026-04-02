@@ -1536,7 +1536,7 @@ class TestServerCallToolFlow:
         """list_tools returns the full set of registered tools."""
         from lm_mcp.registry import TOOLS
 
-        assert len(TOOLS) == 215
+        assert len(TOOLS) == 216
         tool_names = {t.name for t in TOOLS}
         assert "get_devices" in tool_names
         assert "get_alerts" in tool_names
@@ -1560,6 +1560,16 @@ class TestServerCallToolFlow:
         assert len(WATSONX_TOOLS) == 1
         wx_names = {t.name for t in WATSONX_TOOLS}
         assert "watsonx_summarize" in wx_names
+
+    def test_tf_tools_registered(self):
+        """TF_TOOLS contains all Terraform IaC tools."""
+        from lm_mcp.registry import TF_TOOLS
+
+        assert len(TF_TOOLS) == 10
+        tf_names = {t.name for t in TF_TOOLS}
+        assert "terraform_init" in tf_names
+        assert "terraform_plan" in tf_names
+        assert "terraform_apply" in tf_names
 
     def test_get_tool_handler_valid_tool(self):
         """get_tool_handler returns a callable for a valid tool name."""

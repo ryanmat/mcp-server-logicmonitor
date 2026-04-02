@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 216 tools organized by domain category (198 LM + 18 AAP).
+# All 227 tools organized by domain category (198 LM + 18 AAP + 10 TF + 1 WX).
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -371,6 +371,22 @@ TOOL_CATEGORIES = {
                 "get_organizations",
                 "get_job_events",
                 "get_hosts",
+            ],
+        },
+        "terraform": {
+            "description": "Terraform Infrastructure as Code management for any provider",
+            "tools": [
+                "terraform_init",
+                "terraform_validate",
+                "terraform_plan",
+                "terraform_state_list",
+                "terraform_state_show",
+                "terraform_output",
+                "terraform_apply",
+                "terraform_destroy",
+                "terraform_import",
+                "terraform_write_config",
+                "terraform_generate",
             ],
         },
         "remediation": {

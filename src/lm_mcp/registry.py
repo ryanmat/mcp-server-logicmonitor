@@ -4616,6 +4616,41 @@ TOOLS.extend(
     ]
 )
 
+# Terraform HCL generator (always available, uses LM client)
+TOOLS.extend(
+    [
+        Tool(
+            name="terraform_generate",
+            description=(
+                "Export an existing LogicMonitor resource as Terraform HCL configuration "
+                "using the logicmonitor/logicmonitor provider. Supports device, device_group, "
+                "collector, alert_rule, escalation_chain, dashboard, datasource, sdt, website, "
+                "role, and report_group resource types."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "resource_type": {
+                        "type": "string",
+                        "description": (
+                            "LM resource type to export (device, device_group, collector, "
+                            "collector_group, alert_rule, escalation_chain, dashboard, "
+                            "dashboard_group, datasource, sdt, website, website_group, "
+                            "role, report_group)"
+                        ),
+                    },
+                    "resource_id": {
+                        "type": "integer",
+                        "description": "LogicMonitor resource ID to export",
+                    },
+                },
+                "required": ["resource_type", "resource_id"],
+            },
+        ),
+    ]
+)
+
 
 # Ansible Automation Platform tools (conditionally included)
 AWX_TOOLS: list[Tool] = [
@@ -5006,6 +5041,254 @@ WATSONX_TOOLS: list[Tool] = [
 ]
 
 
+# Terraform IaC tools (visible only when TF_WORKSPACE_DIR is set)
+TF_TOOLS: list[Tool] = [
+    Tool(
+        name="terraform_init",
+        description=(
+            "Initialize a Terraform workspace and download required providers. "
+            "Run this before plan, apply, or any other terraform operation."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name (subdirectory of TF_WORKSPACE_DIR)",
+                },
+                "backend_config": {
+                    "type": "string",
+                    "description": "Optional backend config (key=value)",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_validate",
+        description=(
+            "Validate Terraform configuration syntax in a workspace. "
+            "Returns validation diagnostics as structured JSON."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_plan",
+        description=(
+            "Preview Terraform changes without applying. Shows what resources "
+            "will be created, modified, or destroyed. Returns structured JSON plan."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+                "var": {
+                    "type": "string",
+                    "description": "Variable assignment (key=value)",
+                },
+                "var_file": {
+                    "type": "string",
+                    "description": "Path to a .tfvars file relative to workspace",
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Target a specific resource address",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_state_list",
+        description=(
+            "List all resources currently tracked in Terraform state for a workspace."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_state_show",
+        description=(
+            "Show detailed Terraform state for a specific resource, "
+            "including all attributes and metadata."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+                "address": {
+                    "type": "string",
+                    "description": "Resource address (e.g., logicmonitor_device.web01)",
+                },
+            },
+            "required": ["workspace", "address"],
+        },
+    ),
+    Tool(
+        name="terraform_output",
+        description=(
+            "Show Terraform output values defined in the configuration."
+        ),
+        annotations=_READ_ONLY,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_apply",
+        description=(
+            "Apply Terraform configuration changes. Creates, updates, or destroys "
+            "infrastructure as defined in the configuration. Triple-gated: requires "
+            "LM_ENABLE_WRITE_OPERATIONS=true, TF_AUTO_APPROVE_ENABLED=true, and "
+            "confirm=true parameter."
+        ),
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+                "var": {
+                    "type": "string",
+                    "description": "Variable assignment (key=value)",
+                },
+                "var_file": {
+                    "type": "string",
+                    "description": "Path to a .tfvars file relative to workspace",
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Target a specific resource address",
+                },
+                "confirm": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true to proceed. Safety gate for apply operations.",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_destroy",
+        description=(
+            "Destroy all Terraform-managed infrastructure in a workspace. "
+            "Triple-gated: requires LM_ENABLE_WRITE_OPERATIONS=true, "
+            "TF_AUTO_APPROVE_ENABLED=true, and confirm=true parameter."
+        ),
+        annotations=_DELETE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+                "target": {
+                    "type": "string",
+                    "description": "Target a specific resource address to destroy",
+                },
+                "confirm": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Must be true to proceed. Safety gate for destroy operations.",
+                },
+            },
+            "required": ["workspace"],
+        },
+    ),
+    Tool(
+        name="terraform_import",
+        description=(
+            "Import an existing resource into Terraform state. Maps a real-world "
+            "resource (by ID) to a Terraform resource address for state tracking."
+        ),
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+                "address": {
+                    "type": "string",
+                    "description": "Terraform resource address (e.g., logicmonitor_device.web01)",
+                },
+                "resource_id": {
+                    "type": "string",
+                    "description": "Real-world resource ID to import",
+                },
+            },
+            "required": ["workspace", "address", "resource_id"],
+        },
+    ),
+    Tool(
+        name="terraform_write_config",
+        description=(
+            "Write HCL configuration content to a file in a Terraform workspace. "
+            "Use this to create or update .tf files that define infrastructure."
+        ),
+        annotations=_WRITE,
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Filename (must end with .tf or .tf.json)",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "HCL or JSON content to write to the file",
+                },
+            },
+            "required": ["workspace", "filename", "content"],
+        },
+    ),
+]
+
+
 # Map tool names to their handler functions
 def get_tool_handler(tool_name: str) -> Any:
     """Get the handler function for a tool.
@@ -5056,6 +5339,7 @@ def get_tool_handler(tool_name: str) -> Any:
         sdts,
         services,
         session,
+        terraform,
         topology,
         topology_analysis,
         topologysources,
@@ -5342,6 +5626,18 @@ def get_tool_handler(tool_name: str) -> Any:
         "search_tools": workflows.search_tools,
         # IBM watsonx.ai
         "watsonx_summarize": watsonx.watsonx_summarize,
+        # Terraform IaC
+        "terraform_init": terraform.terraform_init,
+        "terraform_validate": terraform.terraform_validate,
+        "terraform_plan": terraform.terraform_plan,
+        "terraform_state_list": terraform.terraform_state_list,
+        "terraform_state_show": terraform.terraform_state_show,
+        "terraform_output": terraform.terraform_output,
+        "terraform_apply": terraform.terraform_apply,
+        "terraform_destroy": terraform.terraform_destroy,
+        "terraform_import": terraform.terraform_import_resource,
+        "terraform_write_config": terraform.terraform_write_config,
+        "terraform_generate": terraform.terraform_generate,
     }
 
     if tool_name not in handlers:
