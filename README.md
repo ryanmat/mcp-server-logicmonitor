@@ -28,6 +28,17 @@ claude mcp add logicmonitor \
   -- uvx --from lm-mcp lm-mcp-server
 ```
 
+With **IBM watsonx.ai integration** (optional -- adds Granite TTM forecasting and NL summaries):
+```bash
+claude mcp add logicmonitor \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e WATSONX_API_KEY=your-ibm-cloud-api-key \
+  -e WATSONX_URL=https://us-south.ml.cloud.ibm.com \
+  -e WATSONX_PROJECT_ID=your-watsonx-project-id \
+  -- uvx --from "lm-mcp[ibm]" lm-mcp-server
+```
+
 For **Claude Desktop**, add to your config file (see [MCP Client Configuration](#mcp-client-configuration) below).
 
 **3. Verify it's working:**
@@ -76,7 +87,7 @@ recommendations and anti-patterns when thresholds are breached.
 
 ## Features
 
-**226 Tools** across comprehensive LogicMonitor API coverage (198 LM + 18 AAP):
+**234+ Tools** across comprehensive LogicMonitor API coverage (215 LM + 18 AAP + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -108,7 +119,7 @@ Server-side intelligence that transforms raw monitoring data into actionable ins
 
 Pure-Python statistical methods for capacity planning, trend analysis, and operational scoring:
 
-- **Metric Forecasting**: Linear regression and Holt-Winters triple exponential smoothing with auto-selection, confidence intervals, and threshold breach prediction
+- **Metric Forecasting**: Linear regression, Holt-Winters triple exponential smoothing, and IBM Granite TTM (via watsonx.ai, optional) with auto-selection, confidence intervals, and threshold breach prediction
 - **Metric Correlation**: Pearson correlation matrix across multiple metric series with strong-correlation highlighting
 - **Error Budget Tracking**: SLO-based error budget calculation with burn rate, projected exhaustion, and status classification
 - **Change Point Detection**: CUSUM algorithm for identifying regime shifts and mean-level changes
@@ -122,7 +133,7 @@ Pure-Python statistical methods for capacity planning, trend analysis, and opera
 
 ### Composite Workflow Tools
 
-Multi-step analysis tools that combine several sub-tools into a single call. Each supports `detail_level` ("summary" or "full") and handles sub-tool failures gracefully with partial results.
+Multi-step analysis tools that combine several sub-tools into a single call. Each supports `detail_level` ("summary" or "full"), optional `summarize=true` for plain-English NL summaries via IBM Granite (requires watsonx.ai), and handles sub-tool failures gracefully with partial results.
 
 - **Triage**: Correlates active alerts, scores noise, analyzes blast radius, and cross-references recent changes
 - **Health Check**: Device health score, monitoring coverage, anomaly detection, active alerts, and 30-day availability
@@ -154,6 +165,23 @@ Service discovery and RED metrics for LogicMonitor APM (Application Performance 
 - **Jinja2 Safety**: All extra_vars inputs are validated to prevent template injection
 
 AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are configured. See [Example Playbooks](examples/playbooks/) for remediation templates.
+
+### IBM watsonx.ai Integration
+
+Optional AI-powered enhancements using IBM Granite foundation models via watsonx.ai. Requires an IBM Cloud account with a watsonx.ai project (Lite/free tier supported).
+
+- **Granite TTM Forecasting**: ML-powered time series forecasting using IBM Granite Tiny Time Mixer (TTM). Use `method="ttm"` on `forecast_metric` for 96-step predictions that detect seasonality and non-linear patterns. Requires 512+ data points. Gracefully falls back to statistical methods when data is insufficient.
+- **Granite NL Summaries**: Plain-English shift-handoff summaries on composite workflow tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`). Pass `summarize=true` to append an IBM Granite-generated analysis summary to the structured output.
+- **watsonx_summarize**: Standalone tool that takes any JSON data and generates a concise NL summary via Granite 4.0. Useful for summarizing output from any MCP tool.
+
+watsonx tools are optional — they only appear when `WATSONX_API_KEY` and `WATSONX_PROJECT_ID` are configured. Install with `lm-mcp[ibm]` to include the IBM SDK dependencies.
+
+**Setup:**
+1. Create a free IBM Cloud account at [cloud.ibm.com](https://cloud.ibm.com)
+2. Provision **watsonx.ai Runtime** (Lite plan, free) from the IBM Cloud catalog
+3. Create a watsonx.ai project and associate the Runtime instance
+4. Generate an IBM Cloud API key at [cloud.ibm.com/iam/apikeys](https://cloud.ibm.com/iam/apikeys)
+5. Configure the MCP server with `WATSONX_API_KEY`, `WATSONX_URL`, and `WATSONX_PROJECT_ID`
 
 ### LogicModules
 - **DataSources**: Query and export datasource definitions
@@ -268,6 +296,10 @@ The server exposes health endpoints for container orchestration:
 | `AWX_VERIFY_SSL` | No | `true` | Verify SSL certificates for AAP connections |
 | `AWX_TIMEOUT` | No | `30` | Request timeout in seconds for AAP API calls |
 | `AWX_MAX_RETRIES` | No | `3` | Max retries for failed AAP API requests |
+| `WATSONX_API_KEY` | No | - | IBM Cloud API key for watsonx.ai (enables Granite TTM + NL summaries) |
+| `WATSONX_URL` | No | `https://us-south.ml.cloud.ibm.com` | IBM watsonx.ai endpoint URL |
+| `WATSONX_PROJECT_ID` | No | - | IBM watsonx.ai project ID |
+| `WATSONX_TIMEOUT` | No | `60` | Request timeout in seconds for watsonx.ai API calls |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -308,6 +340,8 @@ claude mcp add logicmonitor \
 ```
 
 > **Note:** Remove `-e LM_ENABLE_WRITE_OPERATIONS=true` if you want read-only access.
+>
+> **IBM watsonx.ai:** To enable Granite TTM forecasting and NL summaries, add `-e WATSONX_API_KEY=... -e WATSONX_URL=... -e WATSONX_PROJECT_ID=...` and change `--from lm-mcp` to `--from "lm-mcp[ibm]"`.
 
 Verify the connection:
 ```bash
