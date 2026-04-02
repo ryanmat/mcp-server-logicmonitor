@@ -296,9 +296,7 @@ class TestGuideResources:
 
         # Collect all registered tool names (LM + AWX + TF)
         registered_tools = (
-            {t.name for t in TOOLS}
-            | {t.name for t in AWX_TOOLS}
-            | {t.name for t in TF_TOOLS}
+            {t.name for t in TOOLS} | {t.name for t in AWX_TOOLS} | {t.name for t in TF_TOOLS}
         )
 
         # Every registered tool should be in some category

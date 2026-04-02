@@ -5115,9 +5115,7 @@ TF_TOOLS: list[Tool] = [
     ),
     Tool(
         name="terraform_state_list",
-        description=(
-            "List all resources currently tracked in Terraform state for a workspace."
-        ),
+        description=("List all resources currently tracked in Terraform state for a workspace."),
         annotations=_READ_ONLY,
         inputSchema={
             "type": "object",
@@ -5154,9 +5152,7 @@ TF_TOOLS: list[Tool] = [
     ),
     Tool(
         name="terraform_output",
-        description=(
-            "Show Terraform output values defined in the configuration."
-        ),
+        description=("Show Terraform output values defined in the configuration."),
         annotations=_READ_ONLY,
         inputSchema={
             "type": "object",

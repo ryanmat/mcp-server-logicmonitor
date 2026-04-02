@@ -116,9 +116,7 @@ class TestTerraformPlan:
     async def test_no_changes(self, mock_runner):
         from lm_mcp.tools.terraform import terraform_plan
 
-        mock_runner.run = AsyncMock(
-            return_value=TerraformResult(exit_code=0, stdout="", stderr="")
-        )
+        mock_runner.run = AsyncMock(return_value=TerraformResult(exit_code=0, stdout="", stderr=""))
         result = await terraform_plan(mock_runner, workspace="prod")
         data = json.loads(result[0].text)
         assert data["status"] == "no_changes"
@@ -236,9 +234,7 @@ class TestTerraformApply:
         _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.terraform import terraform_apply
 
-        mock_runner.run = AsyncMock(
-            return_value=TerraformResult(exit_code=0, stdout="", stderr="")
-        )
+        mock_runner.run = AsyncMock(return_value=TerraformResult(exit_code=0, stdout="", stderr=""))
         result = await terraform_apply(mock_runner, workspace="prod", confirm=True)
         data = json.loads(result[0].text)
         assert data["success"] is True
@@ -420,9 +416,7 @@ class TestTerraformGenerate:
                 "appliesTo": 'system.displayname =~ "prod"',
             }
         )
-        result = await terraform_generate(
-            mock_client, resource_type="device_group", resource_id=10
-        )
+        result = await terraform_generate(mock_client, resource_type="device_group", resource_id=10)
         data = json.loads(result[0].text)
         assert "logicmonitor_device_group" in data["hcl"]
         assert "Production Servers" in data["hcl"]
@@ -432,9 +426,7 @@ class TestTerraformGenerate:
         from lm_mcp.tools.terraform import terraform_generate
 
         mock_client = AsyncMock()
-        result = await terraform_generate(
-            mock_client, resource_type="invalid_type", resource_id=1
-        )
+        result = await terraform_generate(mock_client, resource_type="invalid_type", resource_id=1)
         assert "unsupported resource type" in result[0].text.lower()
 
     @pytest.mark.asyncio
