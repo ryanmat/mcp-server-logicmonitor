@@ -85,6 +85,30 @@ async def run_stdio() -> None:
                 "Install with: uv add 'lm-mcp[ibm]'"
             )
 
+    # HuggingFace local fallback when watsonx API is not configured
+    if watsonx_client is None:
+        from lm_mcp.hf_config import get_hf_config
+
+        hf_config = get_hf_config()
+        if hf_config is not None:
+            try:
+                from lm_mcp.client.huggingface import HuggingFaceClient
+
+                watsonx_client = HuggingFaceClient(
+                    ttm_model=hf_config.ttm_model,
+                    llm_model=hf_config.llm_model,
+                    device=hf_config.device,
+                    cache_dir=hf_config.cache_dir,
+                )
+                _set_watsonx_client(watsonx_client)
+            except ImportError:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "torch/transformers not installed; HuggingFace fallback disabled. "
+                    "Install with: uv add 'lm-mcp[huggingface]'"
+                )
+
     # Initialize Terraform runner if configured
     tf_runner = None
     from lm_mcp.terraform_config import get_terraform_config

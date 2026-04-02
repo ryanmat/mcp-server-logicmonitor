@@ -40,6 +40,12 @@ ibm = [
     "ibm-watsonx-ai>=1.1.0",
     "pandas>=2.0.0",
 ]
+huggingface = [
+    "torch>=2.0.0",
+    "transformers>=4.40.0",
+    "granite-tsfm>=0.2.19",
+    "accelerate>=0.25.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/ryanmat/mcp-server-logicmonitor"
