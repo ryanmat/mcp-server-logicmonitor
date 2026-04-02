@@ -632,11 +632,18 @@ def _render_alert_rule(data: dict) -> str:
         lines.append(f"  escalation_chain_id = {data['escalatingChainId']}")
     if data.get("levelStr"):
         lines.append(f'  level_str = "{data["levelStr"]}"')
+    # devices and deviceGroups come from the API as lists, not strings
     if data.get("devices"):
-        devs = data["devices"].replace('"', '\\"')
+        devs = data["devices"]
+        if isinstance(devs, list):
+            devs = ",".join(str(d) for d in devs)
+        devs = str(devs).replace('"', '\\"')
         lines.append(f'  devices   = "{devs}"')
     if data.get("deviceGroups"):
-        groups = data["deviceGroups"].replace('"', '\\"')
+        groups = data["deviceGroups"]
+        if isinstance(groups, list):
+            groups = ",".join(str(g) for g in groups)
+        groups = str(groups).replace('"', '\\"')
         lines.append(f'  device_groups = "{groups}"')
     if data.get("datasource"):
         lines.append(f'  datasource = "{data["datasource"]}"')
@@ -655,6 +662,32 @@ def _render_escalation_chain(data: dict) -> str:
         lines.append(f"  throttling_period = {data['throttlingPeriod']}")
     if data.get("throttlingAlerts"):
         lines.append(f"  throttling_alerts = {data['throttlingAlerts']}")
+    # destinations is required by the TF provider
+    destinations = data.get("destinations", [])
+    if destinations:
+        for dest in destinations:
+            lines.append("")
+            lines.append("  destination {")
+            if dest.get("type"):
+                lines.append(f'    type   = "{dest["type"]}"')
+            if dest.get("addr"):
+                addr = str(dest["addr"]).replace('"', '\\"')
+                lines.append(f'    addr   = "{addr}"')
+            if dest.get("method"):
+                lines.append(f'    method = "{dest["method"]}"')
+            if dest.get("period") is not None:
+                lines.append(f"    period = {dest['period']}")
+            if dest.get("stages"):
+                stages = dest["stages"]
+                if isinstance(stages, list):
+                    stages_str = ", ".join(str(s) for s in stages)
+                    lines.append(f'    stages = "{stages_str}"')
+            lines.append("  }")
+    else:
+        # Provider requires at least one destination block
+        lines.append("")
+        lines.append("  # WARNING: no destinations found in API response")
+        lines.append("  # Add at least one destination block before applying")
     lines.append("}")
     return "\n".join(lines)
 
