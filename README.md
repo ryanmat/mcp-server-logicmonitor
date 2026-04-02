@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 234+ structured tools, 15 workflow prompts, and 26 resources. Optional IBM watsonx.ai integration for Granite TTM forecasting and NL analysis summaries.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 245+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -39,6 +39,23 @@ claude mcp add logicmonitor \
   -- uvx --from "lm-mcp[ibm]" lm-mcp-server
 ```
 
+With **Terraform IaC** (optional -- adds terraform plan/apply/generate tools):
+```bash
+claude mcp add logicmonitor \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e TF_WORKSPACE_DIR=/path/to/terraform/workspaces \
+  -- uvx --from lm-mcp lm-mcp-server
+```
+
+With **HuggingFace local models** (optional -- local Granite TTM + NL summaries, no cloud API needed):
+```bash
+claude mcp add logicmonitor \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=your-bearer-token \
+  -- uvx --from "lm-mcp[huggingface]" lm-mcp-server
+```
+
 For **Claude Desktop**, add to your config file (see [MCP Client Configuration](#mcp-client-configuration) below).
 
 **3. Verify it's working:**
@@ -55,39 +72,41 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v3.0.0 (Current)
-- **New**: IBM watsonx.ai integration (optional, requires `WATSONX_API_KEY`)
-- **New**: Granite TTM time series forecasting via `method="ttm"` on `forecast_metric` -- ML-powered breach prediction using IBM Granite Tiny Time Mixer
-- **New**: Granite NL summaries via `summarize=true` on `triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview` -- plain-English shift-handoff analysis powered by Granite 4.0
-- **New**: `watsonx_summarize` standalone tool for ad-hoc data summarization via Granite LLM
-- **New**: `[ibm]` optional dependency group (`ibm-watsonx-ai`, `pandas`)
-- **Architecture**: 4-way dispatch (Session, AWX, WatsonX, LM) with graceful degradation
-- **Fix**: SDK import paths corrected for ibm-watsonx-ai 1.5.5 (TSModelInference, TSForecastParameters)
-- **Fix**: TTM response parsing updated for dict format (results[0].value)
+### v3.1.0 (Current)
+- **New**: Terraform IaC integration -- 11 tools for plan, apply, state, import, and HCL generation for any Terraform provider. Includes `terraform_generate` to export existing LM resources as HCL.
+- **New**: HuggingFace local Granite fallback -- TTM forecasting and NL summaries via local models when watsonx.ai API is not configured. Install with `lm-mcp[huggingface]`.
+- **New**: `[huggingface]` optional dependency group (torch, transformers, granite-tsfm, accelerate)
+- **Architecture**: 5-way dispatch (Session, AWX, WatsonX, Terraform, LM) with graceful degradation
+- **Architecture**: AI inference priority chain: watsonx.ai API > HuggingFace local > statistical/linear
 
-**Progressive Discovery** — `search_tools` for keyword-based tool search across 216 tools.
+### Changelog
 
-**ML/Statistical Improvements:**
-- Holt-Winters triple exponential smoothing for seasonal forecasting
-- IQR and MAD anomaly detection methods alongside existing z-score
-- Prediction intervals with confidence levels on forecasts
-- Auto-selection of forecasting/anomaly methods based on data characteristics
-- `calculate_error_budget` — SLO tracking with burn rate and projected exhaustion
+<details>
+<summary>v3.0.0 — IBM watsonx.ai integration</summary>
 
-**Best Practices Guardrails** — scoring tools now return structured remediation
-recommendations and anti-patterns when thresholds are breached.
+- IBM watsonx.ai integration (optional, requires `WATSONX_API_KEY`)
+- Granite TTM time series forecasting via `method="ttm"` on `forecast_metric`
+- Granite NL summaries via `summarize=true` on composite workflow tools
+- `watsonx_summarize` standalone tool for ad-hoc data summarization
+- `[ibm]` optional dependency group (`ibm-watsonx-ai`, `pandas`)
+- 4-way dispatch (Session, AWX, WatsonX, LM)
+</details>
 
-**Metric Presets** — automatic parameter defaults based on datapoint name detection
-(CPU, memory, disk, latency, error rate, token usage).
+<details>
+<summary>v2.0.0–v2.6.0 — Composite workflows, ML analysis, AAP integration</summary>
 
-**RemediationSource Execution** — 3 tools for running LogicMonitor remediation scripts:
-- `execute_remediation` — 8-point pre-execution safety checklist, script preview, state mutation warnings
-- `get_remediation_status` — current execution state
-- `get_remediation_history` — past executions from audit logs
+- Progressive discovery via `search_tools`
+- Holt-Winters, IQR/MAD anomaly detection, prediction intervals
+- `calculate_error_budget` SLO tracking
+- RemediationSource execution with 8-point safety checklist
+- 18 Ansible Automation Platform tools
+- User/role CRUD, collector group management, ops notes
+- Portal URL links, HTTPS transport
+</details>
 
 ## Features
 
-**234+ Tools** across comprehensive LogicMonitor API coverage (215 LM + 18 AAP + 1 watsonx):
+**245+ Tools** across comprehensive LogicMonitor API coverage (216 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -182,6 +201,39 @@ watsonx tools are optional — they only appear when `WATSONX_API_KEY` and `WATS
 3. Create a watsonx.ai project and associate the Runtime instance
 4. Generate an IBM Cloud API key at [cloud.ibm.com/iam/apikeys](https://cloud.ibm.com/iam/apikeys)
 5. Configure the MCP server with `WATSONX_API_KEY`, `WATSONX_URL`, and `WATSONX_PROJECT_ID`
+
+### Terraform Integration
+
+11 tools for Infrastructure as Code workflows with any Terraform provider. AI agents can author HCL, use pre-made scripts, or reverse-engineer existing LM resources.
+
+- **terraform_init**: Initialize workspace and download providers
+- **terraform_validate**: Syntax-check HCL configuration
+- **terraform_plan**: Preview changes with structured JSON output
+- **terraform_apply**: Apply changes (triple-gated: write perms + config flag + confirm param)
+- **terraform_destroy**: Destroy infrastructure (same triple gate)
+- **terraform_import**: Import existing resources into Terraform state
+- **terraform_state_list / terraform_state_show**: Inspect current state
+- **terraform_output**: View Terraform outputs
+- **terraform_write_config**: Write HCL files to workspace directories
+- **terraform_generate**: Export existing LM portal resources as HCL using the `logicmonitor/logicmonitor` provider
+
+Terraform tools are optional -- they only appear when `TF_WORKSPACE_DIR` is configured. Requires the `terraform` CLI installed separately.
+
+**Three entry points:**
+1. **Agent-authored**: AI generates HCL from natural language, writes to workspace, plans, applies
+2. **Pre-made scripts**: Point `TF_WORKSPACE_DIR` at existing `.tf` files, agent operates on them
+3. **Reverse-engineer**: `terraform_generate` exports LM resources as HCL, then import into state
+
+### HuggingFace Local Fallback
+
+When watsonx.ai API credentials are not configured, TTM forecasting and NL summaries automatically fall back to local Granite models via HuggingFace transformers. Install with `lm-mcp[huggingface]`.
+
+**Priority chain:** watsonx.ai API (remote) > HuggingFace local > statistical/linear
+
+- **TTM Model**: `ibm-granite/granite-timeseries-ttm-r2` (512 context, 96 forecast)
+- **LLM Model**: `ibm-granite/granite-3.3-2b-instruct` (2B params, runs on CPU)
+- Models lazy-load on first inference call (initial download: ~500MB TTM, ~4GB LLM)
+- Same interface as WatsonxClient -- all existing watsonx tools work with either backend
 
 ### LogicModules
 - **DataSources**: Query and export datasource definitions
@@ -300,6 +352,14 @@ The server exposes health endpoints for container orchestration:
 | `WATSONX_URL` | No | `https://us-south.ml.cloud.ibm.com` | IBM watsonx.ai endpoint URL |
 | `WATSONX_PROJECT_ID` | No | - | IBM watsonx.ai project ID |
 | `WATSONX_TIMEOUT` | No | `60` | Request timeout in seconds for watsonx.ai API calls |
+| `TF_WORKSPACE_DIR` | No | - | Root directory for Terraform workspaces (enables Terraform tools) |
+| `TF_TERRAFORM_BINARY` | No | `terraform` | Path to the terraform binary |
+| `TF_TIMEOUT` | No | `300` | Terraform command timeout in seconds |
+| `TF_AUTO_APPROVE_ENABLED` | No | `false` | Enable terraform apply/destroy operations |
+| `HF_TTM_MODEL` | No | `ibm-granite/granite-timeseries-ttm-r2` | HuggingFace TTM model name or path |
+| `HF_LLM_MODEL` | No | `ibm-granite/granite-3.3-2b-instruct` | HuggingFace LLM model name or path |
+| `HF_DEVICE` | No | `auto` | Torch device for inference (cpu, cuda, mps, auto) |
+| `HF_CACHE_DIR` | No | - | HuggingFace model cache directory |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 

@@ -298,7 +298,7 @@ async def create_http_server() -> None:
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
-    from lm_mcp.server import _set_awx_client, _set_client, _set_watsonx_client
+    from lm_mcp.server import _set_awx_client, _set_client, _set_tf_runner, _set_watsonx_client
     from lm_mcp.session import get_session
 
     # Load config and create client
@@ -352,6 +352,44 @@ async def create_http_server() -> None:
                 "Install with: uv add 'lm-mcp[ibm]'"
             )
 
+    # HuggingFace local fallback when watsonx API is not configured
+    if watsonx_client is None:
+        from lm_mcp.hf_config import get_hf_config
+
+        hf_config = get_hf_config()
+        if hf_config is not None:
+            try:
+                from lm_mcp.client.huggingface import HuggingFaceClient
+
+                watsonx_client = HuggingFaceClient(
+                    ttm_model=hf_config.ttm_model,
+                    llm_model=hf_config.llm_model,
+                    device=hf_config.device,
+                    cache_dir=hf_config.cache_dir,
+                )
+                _set_watsonx_client(watsonx_client)
+            except ImportError:
+                logger.warning(
+                    "torch/transformers not installed; HuggingFace fallback disabled. "
+                    "Install with: uv add 'lm-mcp[huggingface]'"
+                )
+
+    # Initialize Terraform runner if configured
+    tf_runner = None
+    from lm_mcp.terraform_config import get_terraform_config
+
+    tf_config = get_terraform_config()
+    if tf_config is not None:
+        from lm_mcp.client.terraform import TerraformRunner
+
+        tf_runner = TerraformRunner(
+            workspace_dir=tf_config.workspace_dir,
+            terraform_binary=tf_config.terraform_binary,
+            timeout=tf_config.timeout,
+            auto_approve_enabled=tf_config.auto_approve_enabled,
+        )
+        _set_tf_runner(tf_runner)
+
     # Initialize session with config settings
     if config.session_enabled:
         session = get_session()
@@ -385,6 +423,8 @@ async def create_http_server() -> None:
     try:
         await server.serve()
     finally:
+        if tf_runner is not None:
+            await tf_runner.close()
         if watsonx_client is not None:
             await watsonx_client.close()
         if awx_client is not None:
