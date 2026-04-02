@@ -24,7 +24,10 @@ if TYPE_CHECKING:
 def _lm_env_vars() -> dict[str, str]:
     """Build LM provider env vars from current config for subprocess.
 
-    Returns TF_VAR_* variables that the logicmonitor provider can consume.
+    Sets both native provider env vars (LM_API_ID, LM_API_KEY, LM_COMPANY)
+    and TF_VAR_* equivalents for HCL variable blocks. The native vars are
+    what the logicmonitor provider reads directly; TF_VAR_* are for configs
+    that use variable blocks for credentials.
     Returns an empty dict if config is unavailable (e.g., in tests).
     """
     try:
@@ -34,10 +37,14 @@ def _lm_env_vars() -> dict[str, str]:
         env: dict[str, str] = {}
         portal = config.portal if hasattr(config, "portal") else ""
         if portal:
-            env["TF_VAR_lm_company"] = portal.split(".")[0]
+            company = portal.split(".")[0]
+            env["LM_COMPANY"] = company
+            env["TF_VAR_lm_company"] = company
         if hasattr(config, "access_id") and config.access_id:
+            env["LM_API_ID"] = config.access_id
             env["TF_VAR_lm_api_id"] = config.access_id
         if hasattr(config, "access_key") and config.access_key:
+            env["LM_API_KEY"] = config.access_key
             env["TF_VAR_lm_api_key"] = config.access_key
         return env
     except Exception:
