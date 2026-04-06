@@ -177,9 +177,7 @@ async def update_configsource(
         payload = dict(definition)
         payload.pop("id", None)
 
-        result = await client.put(
-            f"/setting/configsources/{configsource_id}", json_body=payload
-        )
+        result = await client.put(f"/setting/configsources/{configsource_id}", json_body=payload)
 
         return format_response(
             {

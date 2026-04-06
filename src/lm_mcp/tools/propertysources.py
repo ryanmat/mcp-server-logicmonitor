@@ -175,9 +175,7 @@ async def update_propertysource(
         payload = dict(definition)
         payload.pop("id", None)
 
-        result = await client.put(
-            f"/setting/propertyrules/{propertysource_id}", json_body=payload
-        )
+        result = await client.put(f"/setting/propertyrules/{propertysource_id}", json_body=payload)
 
         return format_response(
             {

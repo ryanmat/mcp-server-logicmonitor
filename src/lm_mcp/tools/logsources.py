@@ -177,9 +177,7 @@ async def update_logsource(
         payload = dict(definition)
         payload.pop("id", None)
 
-        result = await client.put(
-            f"/setting/logsources/{logsource_id}", json_body=payload
-        )
+        result = await client.put(f"/setting/logsources/{logsource_id}", json_body=payload)
 
         return format_response(
             {

@@ -176,9 +176,7 @@ async def update_eventsource(
         payload = dict(definition)
         payload.pop("id", None)
 
-        result = await client.put(
-            f"/setting/eventsources/{eventsource_id}", json_body=payload
-        )
+        result = await client.put(f"/setting/eventsources/{eventsource_id}", json_body=payload)
 
         return format_response(
             {

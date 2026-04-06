@@ -61,12 +61,8 @@ class TestCreatePropertysource:
     async def test_create_propertysource_posts_definition(self, client, enable_writes):
         from lm_mcp.tools.propertysources import create_propertysource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/propertyrules"
-        ).mock(
-            return_value=httpx.Response(
-                200, json={"id": 7001, "name": "CustomPS"}
-            )
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/propertyrules").mock(
+            return_value=httpx.Response(200, json={"id": 7001, "name": "CustomPS"})
         )
 
         result = await create_propertysource(
@@ -82,9 +78,7 @@ class TestCreatePropertysource:
     async def test_create_propertysource_strips_id(self, client, enable_writes):
         from lm_mcp.tools.propertysources import create_propertysource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/propertyrules"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/propertyrules").mock(
             return_value=httpx.Response(200, json={"id": 7002, "name": "PS"}),
         )
 
@@ -119,9 +113,7 @@ class TestUpdatePropertysource:
 
         route = respx.put(
             "https://test.logicmonitor.com/santaba/rest/setting/propertyrules/100"
-        ).mock(
-            return_value=httpx.Response(200, json={"id": 100, "name": "UpdatedPS"})
-        )
+        ).mock(return_value=httpx.Response(200, json={"id": 100, "name": "UpdatedPS"}))
 
         result = await update_propertysource(
             client, propertysource_id=100, definition={"name": "UpdatedPS"}

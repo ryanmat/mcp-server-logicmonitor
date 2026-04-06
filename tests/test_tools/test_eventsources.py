@@ -255,9 +255,7 @@ class TestCreateEventsource:
     async def test_create_eventsource_posts_definition(self, client, enable_writes):
         from lm_mcp.tools.eventsources import create_eventsource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/eventsources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/eventsources").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 9001, "name": "CustomES", "displayName": "Custom EventSource"},
@@ -281,9 +279,7 @@ class TestCreateEventsource:
     async def test_create_eventsource_strips_id(self, client, enable_writes):
         from lm_mcp.tools.eventsources import create_eventsource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/eventsources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/eventsources").mock(
             return_value=httpx.Response(200, json={"id": 9002, "name": "ES"}),
         )
 
@@ -346,8 +342,6 @@ class TestUpdateEventsource:
             return_value=httpx.Response(200, json={"id": 100, "name": "ES"}),
         )
 
-        await update_eventsource(
-            client, eventsource_id=100, definition={"id": 999, "name": "ES"}
-        )
+        await update_eventsource(client, eventsource_id=100, definition={"id": 999, "name": "ES"})
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body

@@ -61,9 +61,7 @@ class TestCreateConfigsource:
     async def test_create_configsource_posts_definition(self, client, enable_writes):
         from lm_mcp.tools.configsources import create_configsource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/configsources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/configsources").mock(
             return_value=httpx.Response(
                 200,
                 json={"id": 6001, "name": "CustomCS", "displayName": "Custom ConfigSource"},
@@ -84,9 +82,7 @@ class TestCreateConfigsource:
     async def test_create_configsource_strips_id(self, client, enable_writes):
         from lm_mcp.tools.configsources import create_configsource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/configsources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/configsources").mock(
             return_value=httpx.Response(200, json={"id": 6002, "name": "CS"}),
         )
 
@@ -149,8 +145,6 @@ class TestUpdateConfigsource:
             return_value=httpx.Response(200, json={"id": 100, "name": "CS"}),
         )
 
-        await update_configsource(
-            client, configsource_id=100, definition={"id": 999, "name": "CS"}
-        )
+        await update_configsource(client, configsource_id=100, definition={"id": 999, "name": "CS"})
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body

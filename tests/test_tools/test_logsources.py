@@ -243,12 +243,8 @@ class TestCreateLogsource:
     async def test_create_logsource_posts_definition(self, client, enable_writes):
         from lm_mcp.tools.logsources import create_logsource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/logsources"
-        ).mock(
-            return_value=httpx.Response(
-                200, json={"id": 10001, "name": "CustomLS"}
-            )
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/logsources").mock(
+            return_value=httpx.Response(200, json={"id": 10001, "name": "CustomLS"})
         )
 
         result = await create_logsource(
@@ -264,9 +260,7 @@ class TestCreateLogsource:
     async def test_create_logsource_strips_id(self, client, enable_writes):
         from lm_mcp.tools.logsources import create_logsource
 
-        route = respx.post(
-            "https://test.logicmonitor.com/santaba/rest/setting/logsources"
-        ).mock(
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/logsources").mock(
             return_value=httpx.Response(200, json={"id": 10002, "name": "LS"}),
         )
 
@@ -290,24 +284,18 @@ class TestUpdateLogsource:
 
         reload(lm_mcp.config)
 
-        result = await update_logsource(
-            client, logsource_id=100, definition={"name": "Updated"}
-        )
+        result = await update_logsource(client, logsource_id=100, definition={"name": "Updated"})
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
     async def test_update_logsource_puts_definition(self, client, enable_writes):
         from lm_mcp.tools.logsources import update_logsource
 
-        route = respx.put(
-            "https://test.logicmonitor.com/santaba/rest/setting/logsources/100"
-        ).mock(
+        route = respx.put("https://test.logicmonitor.com/santaba/rest/setting/logsources/100").mock(
             return_value=httpx.Response(200, json={"id": 100, "name": "UpdatedLS"})
         )
 
-        result = await update_logsource(
-            client, logsource_id=100, definition={"name": "UpdatedLS"}
-        )
+        result = await update_logsource(client, logsource_id=100, definition={"name": "UpdatedLS"})
 
         assert route.called
         data = json.loads(result[0].text)
@@ -318,14 +306,10 @@ class TestUpdateLogsource:
     async def test_update_logsource_strips_id(self, client, enable_writes):
         from lm_mcp.tools.logsources import update_logsource
 
-        route = respx.put(
-            "https://test.logicmonitor.com/santaba/rest/setting/logsources/100"
-        ).mock(
+        route = respx.put("https://test.logicmonitor.com/santaba/rest/setting/logsources/100").mock(
             return_value=httpx.Response(200, json={"id": 100, "name": "LS"}),
         )
 
-        await update_logsource(
-            client, logsource_id=100, definition={"id": 999, "name": "LS"}
-        )
+        await update_logsource(client, logsource_id=100, definition={"id": 999, "name": "LS"})
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
