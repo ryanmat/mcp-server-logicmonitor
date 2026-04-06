@@ -2355,8 +2355,9 @@ TOOLS.extend(
                     },
                     "start_epoch": {
                         "type": "integer",
-                        "description": "Compare against config from this epoch timestamp "
-                        "instead of the previous version",
+                        "default": 0,
+                        "description": "Epoch to compare against. "
+                        "Use 0 to compare with previous version.",
                     },
                 },
                 "required": ["device_id", "device_datasource_id", "instance_id", "config_id"],

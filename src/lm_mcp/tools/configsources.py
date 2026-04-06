@@ -275,7 +275,7 @@ async def get_device_config_version(
     device_datasource_id: int,
     instance_id: int,
     config_id: str,
-    start_epoch: int | None = None,
+    start_epoch: int = 0,
 ) -> list[TextContent]:
     """Get a specific config version with full content and diffs.
 
@@ -288,22 +288,21 @@ async def get_device_config_version(
         device_datasource_id: Device-DataSource ID for the ConfigSource.
         instance_id: Instance ID.
         config_id: Config version ID (from get_device_config).
-        start_epoch: Compare against config from this epoch timestamp
-            instead of the immediately previous version.
+        start_epoch: Epoch timestamp to compare against. Use 0 to compare
+            against the immediately previous version. Use a specific epoch
+            to see diffs relative to a point in time.
 
     Returns:
         List of TextContent with config content, diffs, and alerts or error.
     """
     try:
-        params: dict = {}
-        if start_epoch is not None:
-            params["startEpoch"] = start_epoch
+        params: dict = {"startEpoch": start_epoch}
 
         base = (
             f"/device/devices/{device_id}/devicedatasources"
             f"/{device_datasource_id}/instances/{instance_id}/config/{config_id}"
         )
-        result = await client.get(base, params=params if params else None)
+        result = await client.get(base, params=params)
 
         # Extract diff entries
         diffs = []
