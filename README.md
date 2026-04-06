@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 245+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 249+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -106,7 +106,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**245+ Tools** across comprehensive LogicMonitor API coverage (216 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**249+ Tools** across comprehensive LogicMonitor API coverage (220 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -159,7 +159,7 @@ Multi-step analysis tools that combine several sub-tools into a single call. Eac
 - **Capacity Plan**: Per-datasource forecasting, trend classification, seasonality detection, and change point analysis
 - **Portal Overview**: Alert statistics, collector health, active SDTs, alert clusters, noise assessment, and down devices
 - **Diagnose**: Alert details, device context, correlation, blast radius, health scoring, and root cause analysis
-- **Search Tools**: Keyword search across all 216 tools by name and description with category filtering
+- **Search Tools**: Keyword search across all 220 tools by name and description with category filtering
 
 ### APM Trace Tools
 
@@ -237,7 +237,7 @@ When watsonx.ai API credentials are not configured, TTM forecasting and NL summa
 
 ### LogicModules
 - **DataSources**: Query and export datasource definitions
-- **ConfigSources**: Query and export configuration collection modules
+- **ConfigSources**: Query definitions, retrieve device config data from the Config Archive, view diffs, trigger on-demand collection, and audit change history
 - **EventSources**: Query and export event detection modules
 - **PropertySources**: Query and export property collection modules
 - **TopologySources**: Query and export topology mapping modules
@@ -776,6 +776,10 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 |------|-------------|-------|
 | `get_configsources` | List ConfigSources | No |
 | `get_configsource` | Get ConfigSource details | No |
+| `get_configsource_update_reasons` | Get ConfigSource change audit trail | No |
+| `get_device_config` | List config versions for a device instance | No |
+| `get_device_config_version` | Get config content with diffs and alerts | No |
+| `collect_device_config` | Trigger on-demand config collection | Yes |
 | `export_configsource` | Export ConfigSource as JSON | No |
 | `import_configsource` | Import ConfigSource from JSON | Yes |
 | `get_eventsources` | List EventSources | No |
@@ -1064,7 +1068,7 @@ The server exposes 26 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 216 tools organized by domain category |
+| `lm://guide/tool-categories` | All 220 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
@@ -1156,6 +1160,9 @@ Start with these to verify the connection is working:
 - "List all ConfigSources"
 - "Show me EventSources that apply to Windows"
 - "Import this datasource JSON definition"
+- "Show me the running config for device 42"
+- "What changed in the last config collection for this switch?"
+- "Trigger a config collection on device 100"
 
 ### Log & Metric Ingestion
 - "Push this log entry to LogicMonitor: 'Application started successfully'"
@@ -1344,6 +1351,13 @@ The server automatically retries rate-limited requests with exponential backoff.
 Verify your bearer token is correct and has appropriate permissions. API tokens can be managed in LogicMonitor under **Settings** → **Users and Roles** → **API Tokens**.
 
 ## Changelog
+
+### v3.2.0
+- **New**: `get_device_config` -- list config versions collected for a device instance from the Config Archive
+- **New**: `get_device_config_version` -- retrieve full config text, line-by-line diffs, and triggered alerts
+- **New**: `collect_device_config` -- trigger on-demand config collection (write operation)
+- **New**: `get_configsource_update_reasons` -- audit trail of ConfigSource definition changes
+- **Counts**: 249 tools (220 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
 
 ### v2.5.0
 - **New**: `create_user`, `update_user`, `delete_user` -- full user account CRUD

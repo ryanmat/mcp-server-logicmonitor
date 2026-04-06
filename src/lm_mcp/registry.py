@@ -2297,6 +2297,89 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="get_configsource_update_reasons",
+            description="Get update history and audit trail for a ConfigSource",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "configsource_id": {"type": "integer", "description": "ConfigSource ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["configsource_id"],
+            },
+        ),
+        Tool(
+            name="get_device_config",
+            description="List config versions collected for a device instance",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID for the ConfigSource",
+                    },
+                    "instance_id": {
+                        "type": "integer",
+                        "description": "Instance ID (e.g. Running-Config)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Max config versions to return",
+                    },
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["device_id", "device_datasource_id", "instance_id"],
+            },
+        ),
+        Tool(
+            name="get_device_config_version",
+            description="Get a specific config version with full content and diffs",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID for the ConfigSource",
+                    },
+                    "instance_id": {"type": "integer", "description": "Instance ID"},
+                    "config_id": {
+                        "type": "string",
+                        "description": "Config version ID (from get_device_config)",
+                    },
+                    "start_epoch": {
+                        "type": "integer",
+                        "description": "Compare against config from this epoch timestamp "
+                        "instead of the previous version",
+                    },
+                },
+                "required": ["device_id", "device_datasource_id", "instance_id", "config_id"],
+            },
+        ),
+        Tool(
+            name="collect_device_config",
+            description="Trigger an on-demand config collection for a device instance",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID for the ConfigSource",
+                    },
+                    "instance_id": {"type": "integer", "description": "Instance ID"},
+                },
+                "required": ["device_id", "device_datasource_id", "instance_id"],
+            },
+        ),
+        Tool(
             name="get_eventsources",
             description="List EventSources",
             annotations=_READ_ONLY,
@@ -5482,6 +5565,10 @@ def get_tool_handler(tool_name: str) -> Any:
         # ConfigSources
         "get_configsources": configsources.get_configsources,
         "get_configsource": configsources.get_configsource,
+        "get_configsource_update_reasons": configsources.get_configsource_update_reasons,
+        "get_device_config": configsources.get_device_config,
+        "get_device_config_version": configsources.get_device_config_version,
+        "collect_device_config": configsources.collect_device_config,
         # EventSources
         "get_eventsources": eventsources.get_eventsources,
         "get_eventsource": eventsources.get_eventsource,

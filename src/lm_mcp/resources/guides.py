@@ -221,6 +221,10 @@ TOOL_CATEGORIES = {
             "tools": [
                 "get_configsources",
                 "get_configsource",
+                "get_configsource_update_reasons",
+                "get_device_config",
+                "get_device_config_version",
+                "collect_device_config",
                 "get_eventsources",
                 "get_eventsource",
                 "get_device_eventsources",

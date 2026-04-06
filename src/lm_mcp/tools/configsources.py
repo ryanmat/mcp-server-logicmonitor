@@ -1,5 +1,5 @@
 # Description: ConfigSource tools for LogicMonitor MCP server.
-# Description: Provides configuration source query functions.
+# Description: Provides ConfigSource definitions and device config data retrieval.
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -134,5 +135,257 @@ async def get_configsource(
         }
 
         return format_response(source)
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_configsource_update_reasons(
+    client: LogicMonitorClient,
+    configsource_id: int,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """Get the update history and reasons for a ConfigSource.
+
+    Returns an audit trail of changes made to the ConfigSource definition,
+    including timestamps and reason descriptions.
+
+    Args:
+        client: LogicMonitor API client.
+        configsource_id: ConfigSource ID.
+        limit: Maximum number of entries to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with update reason entries or error.
+    """
+    try:
+        params: dict = {"size": limit, "offset": offset}
+        result = await client.get(
+            f"/setting/configsources/{configsource_id}/updatereasons",
+            params=params,
+        )
+
+        reasons = []
+        for item in result.get("items", []):
+            reasons.append(
+                {
+                    "version": item.get("version"),
+                    "reason": item.get("reason"),
+                    "date_time": item.get("dateTime"),
+                    "user_name": item.get("userName"),
+                }
+            )
+
+        total = result.get("total", 0)
+        has_more = (offset + len(reasons)) < total
+
+        return format_response(
+            {
+                "configsource_id": configsource_id,
+                "total": total,
+                "count": len(reasons),
+                "offset": offset,
+                "has_more": has_more,
+                "update_reasons": reasons,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+# -- Device config data (instance-level) --------------------------------------
+
+
+async def get_device_config(
+    client: LogicMonitorClient,
+    device_id: int,
+    device_datasource_id: int,
+    instance_id: int,
+    limit: int = 10,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List config versions collected for a device instance.
+
+    Returns paginated config snapshots from the LM Config Archive, including
+    timestamps and change status. Use get_device_config_version to retrieve
+    the full config text and diffs for a specific version.
+
+    Typical workflow: get_device_datasources (filter by ConfigSource name) ->
+    get_device_instances -> get_device_config -> get_device_config_version.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID.
+        device_datasource_id: Device-DataSource ID for the ConfigSource
+            (from get_device_datasources).
+        instance_id: Instance ID (e.g. Running-Config instance).
+        limit: Maximum number of config versions to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with config version summaries or error.
+    """
+    try:
+        params: dict = {"size": limit, "offset": offset}
+        base = (
+            f"/device/devices/{device_id}/devicedatasources"
+            f"/{device_datasource_id}/instances/{instance_id}/config"
+        )
+        result = await client.get(base, params=params)
+
+        configs = []
+        for item in result.get("items", []):
+            configs.append(
+                {
+                    "id": item.get("id"),
+                    "version": item.get("version"),
+                    "poll_timestamp": item.get("pollTimestamp"),
+                    "change_status": item.get("changeStatus"),
+                    "config_status": item.get("configStatus"),
+                    "config_error_message": item.get("configErrMsg"),
+                    "device_display_name": item.get("deviceDisplayName"),
+                    "instance_name": item.get("instanceName"),
+                    "datasource_name": item.get("dataSourceName"),
+                }
+            )
+
+        total = result.get("total", 0)
+        has_more = (offset + len(configs)) < total
+
+        return format_response(
+            {
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+                "total": total,
+                "count": len(configs),
+                "offset": offset,
+                "has_more": has_more,
+                "configs": configs,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_device_config_version(
+    client: LogicMonitorClient,
+    device_id: int,
+    device_datasource_id: int,
+    instance_id: int,
+    config_id: str,
+    start_epoch: int | None = None,
+) -> list[TextContent]:
+    """Get a specific config version with full content and diffs.
+
+    Returns the complete configuration text, line-by-line diffs from the
+    previous version, and any alerts triggered by the config change.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID.
+        device_datasource_id: Device-DataSource ID for the ConfigSource.
+        instance_id: Instance ID.
+        config_id: Config version ID (from get_device_config).
+        start_epoch: Compare against config from this epoch timestamp
+            instead of the immediately previous version.
+
+    Returns:
+        List of TextContent with config content, diffs, and alerts or error.
+    """
+    try:
+        params: dict = {}
+        if start_epoch is not None:
+            params["startEpoch"] = start_epoch
+
+        base = (
+            f"/device/devices/{device_id}/devicedatasources"
+            f"/{device_datasource_id}/instances/{instance_id}/config/{config_id}"
+        )
+        result = await client.get(base, params=params if params else None)
+
+        # Extract diff entries
+        diffs = []
+        for diff in result.get("deltaConfig", []):
+            diffs.append(
+                {
+                    "row_number": diff.get("rowNo"),
+                    "type": diff.get("type"),
+                    "content": diff.get("content"),
+                }
+            )
+
+        # Extract associated alerts
+        alerts = []
+        for alert in result.get("alerts", []):
+            alerts.append(
+                {
+                    "alert_id": alert.get("alertId"),
+                    "alert_level": alert.get("alertLevel"),
+                    "alert_summary": alert.get("alertSummary"),
+                    "timestamp": alert.get("timestamp"),
+                }
+            )
+
+        return format_response(
+            {
+                "device_id": device_id,
+                "instance_id": instance_id,
+                "config_id": config_id,
+                "version": result.get("version"),
+                "poll_timestamp": result.get("pollTimestamp"),
+                "change_status": result.get("changeStatus"),
+                "compared_with": result.get("comparedWith"),
+                "config": result.get("config"),
+                "delta_config": diffs,
+                "alerts": alerts,
+                "device_display_name": result.get("deviceDisplayName"),
+                "instance_name": result.get("instanceName"),
+                "datasource_name": result.get("dataSourceName"),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def collect_device_config(
+    client: LogicMonitorClient,
+    device_id: int,
+    device_datasource_id: int,
+    instance_id: int,
+) -> list[TextContent]:
+    """Trigger an on-demand config collection for a device instance.
+
+    Forces the collector to immediately gather a new config snapshot,
+    rather than waiting for the next scheduled collection interval.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID.
+        device_datasource_id: Device-DataSource ID for the ConfigSource.
+        instance_id: Instance ID.
+
+    Returns:
+        List of TextContent with collection confirmation or error.
+    """
+    try:
+        base = (
+            f"/device/devices/{device_id}/devicedatasources"
+            f"/{device_datasource_id}/instances/{instance_id}"
+            "/config/configCollection"
+        )
+        await client.post(base)
+
+        return format_response(
+            {
+                "success": True,
+                "message": "Config collection triggered",
+                "device_id": device_id,
+                "device_datasource_id": device_datasource_id,
+                "instance_id": instance_id,
+            }
+        )
     except Exception as e:
         return handle_error(e)
