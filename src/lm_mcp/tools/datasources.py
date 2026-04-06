@@ -214,15 +214,17 @@ async def update_datasource(
     datasource_id: int,
     definition: dict,
 ) -> list[TextContent]:
-    """Update an existing DataSource via REST API.
+    """Update an existing DataSource via REST API (full replace).
 
-    Accepts a definition dict with the fields to update. The id field is
-    stripped from the definition to prevent conflicts with the URL parameter.
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked. The name and displayName fields are required
+    even for targeted changes. Recommended workflow: export_datasource ->
+    modify the export -> update_datasource with the full payload.
 
     Args:
         client: LogicMonitor API client.
         datasource_id: DataSource ID to update.
-        definition: DataSource definition dict with fields to update.
+        definition: Full DataSource definition dict with all fields.
 
     Returns:
         List of TextContent with updated DataSource info or error.

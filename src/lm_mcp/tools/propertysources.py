@@ -151,6 +151,48 @@ async def create_propertysource(
         return handle_error(e)
 
 
+@require_write_permission
+async def update_propertysource(
+    client: LogicMonitorClient,
+    propertysource_id: int,
+    definition: dict,
+) -> list[TextContent]:
+    """Update an existing PropertySource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked. Recommended workflow: export_propertysource ->
+    modify the export -> update_propertysource with the full payload.
+
+    Args:
+        client: LogicMonitor API client.
+        propertysource_id: PropertySource ID to update.
+        definition: Full PropertySource definition dict with all fields.
+
+    Returns:
+        List of TextContent with updated PropertySource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/propertyrules/{propertysource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"PropertySource '{result.get('name')}' updated successfully",
+                "propertysource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
 async def get_propertysource(
     client: LogicMonitorClient,
     propertysource_id: int,

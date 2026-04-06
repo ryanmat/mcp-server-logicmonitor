@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -96,6 +97,100 @@ async def get_topologysources(
         if wildcards_stripped:
             response["note"] = WILDCARD_STRIP_NOTE
         return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_topologysource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create a TopologySource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_topologysource
+    if one exists). Use this for creating TopologySources from definitions.
+    For LM Exchange format imports, use import_topologysource instead.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full TopologySource definition dict in REST API format.
+        overwrite: If True, delete existing TopologySource with the same name
+            before creating.
+
+    Returns:
+        List of TextContent with created TopologySource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/topologysources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/topologysources/{items[0]['id']}")
+
+        result = await client.post("/setting/topologysources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"TopologySource '{result.get('name')}' created successfully",
+                "topologysource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_topologysource(
+    client: LogicMonitorClient,
+    topologysource_id: int,
+    definition: dict,
+) -> list[TextContent]:
+    """Update an existing TopologySource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked. Recommended workflow: export -> modify ->
+    update_topologysource with the full payload.
+
+    Args:
+        client: LogicMonitor API client.
+        topologysource_id: TopologySource ID to update.
+        definition: Full TopologySource definition dict with all fields.
+
+    Returns:
+        List of TextContent with updated TopologySource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/topologysources/{topologysource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"TopologySource '{result.get('name')}' updated successfully",
+                "topologysource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
     except Exception as e:
         return handle_error(e)
 

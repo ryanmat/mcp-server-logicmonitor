@@ -218,3 +218,136 @@ class TestUpdateDeviceEventsource:
         )
         assert "Error:" in result[0].text
         assert "No updates provided" in result[0].text
+
+
+@pytest.fixture
+def enable_writes(monkeypatch):
+    """Enable write operations for testing."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+    from importlib import reload
+
+    import lm_mcp.config
+
+    reload(lm_mcp.config)
+
+
+class TestCreateEventsource:
+    """Tests for create_eventsource tool."""
+
+    async def test_create_eventsource_requires_write_permission(self, client, monkeypatch):
+        from lm_mcp.tools.eventsources import create_eventsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await create_eventsource(client, definition={"name": "TestES"})
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_create_eventsource_posts_definition(self, client, enable_writes):
+        from lm_mcp.tools.eventsources import create_eventsource
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 9001, "name": "CustomES", "displayName": "Custom EventSource"},
+            )
+        )
+
+        result = await create_eventsource(
+            client,
+            definition={
+                "name": "CustomES",
+                "alertEffectiveIval": 60,
+            },
+        )
+
+        assert route.called
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["eventsource"]["id"] == 9001
+
+    @respx.mock
+    async def test_create_eventsource_strips_id(self, client, enable_writes):
+        from lm_mcp.tools.eventsources import create_eventsource
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources"
+        ).mock(
+            return_value=httpx.Response(200, json={"id": 9002, "name": "ES"}),
+        )
+
+        await create_eventsource(client, definition={"id": 999, "name": "ES"})
+        request_body = json.loads(route.calls[0].request.content)
+        assert "id" not in request_body
+
+
+class TestUpdateEventsource:
+    """Tests for update_eventsource tool."""
+
+    async def test_update_eventsource_requires_write_permission(self, client, monkeypatch):
+        from lm_mcp.tools.eventsources import update_eventsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await update_eventsource(
+            client, eventsource_id=100, definition={"name": "Updated"}
+        )
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_update_eventsource_puts_definition(self, client, enable_writes):
+        from lm_mcp.tools.eventsources import update_eventsource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources/100"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 100, "name": "UpdatedES", "displayName": "Updated EventSource"},
+            )
+        )
+
+        result = await update_eventsource(
+            client,
+            eventsource_id=100,
+            definition={"name": "UpdatedES", "displayName": "Updated EventSource"},
+        )
+
+        assert route.called
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["eventsource"]["id"] == 100
+
+    @respx.mock
+    async def test_update_eventsource_strips_id(self, client, enable_writes):
+        from lm_mcp.tools.eventsources import update_eventsource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources/100"
+        ).mock(
+            return_value=httpx.Response(200, json={"id": 100, "name": "ES"}),
+        )
+
+        await update_eventsource(
+            client, eventsource_id=100, definition={"id": 999, "name": "ES"}
+        )
+        request_body = json.loads(route.calls[0].request.content)
+        assert "id" not in request_body

@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -98,6 +99,98 @@ async def get_logsources(
         if wildcards_stripped:
             response["note"] = WILDCARD_STRIP_NOTE
         return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_logsource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create a LogSource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_logsource).
+    Use this for creating LogSources from exported definitions or from
+    scratch. For LM Exchange format imports, use import_logsource instead.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full LogSource definition dict in REST API format.
+        overwrite: If True, delete existing LogSource with the same name
+            before creating.
+
+    Returns:
+        List of TextContent with created LogSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/logsources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/logsources/{items[0]['id']}")
+
+        result = await client.post("/setting/logsources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"LogSource '{result.get('name')}' created successfully",
+                "logsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_logsource(
+    client: LogicMonitorClient,
+    logsource_id: int,
+    definition: dict,
+) -> list[TextContent]:
+    """Update an existing LogSource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked. Recommended workflow: export_logsource ->
+    modify the export -> update_logsource with the full payload.
+
+    Args:
+        client: LogicMonitor API client.
+        logsource_id: LogSource ID to update.
+        definition: Full LogSource definition dict with all fields.
+
+    Returns:
+        List of TextContent with updated LogSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/logsources/{logsource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"LogSource '{result.get('name')}' updated successfully",
+                "logsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                },
+            }
+        )
     except Exception as e:
         return handle_error(e)
 

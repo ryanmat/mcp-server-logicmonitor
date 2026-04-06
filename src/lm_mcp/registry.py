@@ -2222,8 +2222,9 @@ TOOLS.extend(
         ),
         Tool(
             name="update_datasource",
-            description="Update an existing DataSource via REST API "
-            "(requires write permission). Accepts a definition dict with fields to update.",
+            description="Update an existing DataSource via REST API (full replace, "
+            "requires write permission). Workflow: export_datasource -> modify -> "
+            "update_datasource with full payload. name and displayName are required.",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -2234,7 +2235,7 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "DataSource definition with fields to update",
+                        "description": "Full DataSource definition with all fields (full replace)",
                     },
                 },
                 "required": ["datasource_id", "definition"],
@@ -3127,7 +3128,7 @@ TOOLS.extend(
         Tool(
             name="export_datasource",
             description="Export a datasource definition (REST API format). "
-            "Output can be used with create_datasource for round-tripping.",
+            "Output can be used with create_datasource or update_datasource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3178,7 +3179,8 @@ TOOLS.extend(
         ),
         Tool(
             name="export_configsource",
-            description="Export a ConfigSource definition",
+            description="Export a ConfigSource definition (REST API format). "
+            "Output can be used with create_configsource or update_configsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3190,7 +3192,8 @@ TOOLS.extend(
         ),
         Tool(
             name="export_eventsource",
-            description="Export an EventSource definition",
+            description="Export an EventSource definition (REST API format). "
+            "Output can be used with create_eventsource or update_eventsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3202,7 +3205,8 @@ TOOLS.extend(
         ),
         Tool(
             name="export_propertysource",
-            description="Export a PropertySource definition",
+            description="Export a PropertySource definition (REST API format). "
+            "Output can be used with create_propertysource or update_propertysource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3214,7 +3218,8 @@ TOOLS.extend(
         ),
         Tool(
             name="export_logsource",
-            description="Export a LogSource definition",
+            description="Export a LogSource definition (REST API format). "
+            "Output can be used with create_logsource or update_logsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3243,8 +3248,98 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="create_configsource",
+            description="Create a ConfigSource via REST API from a full definition dict "
+            "(requires write permission). Accepts REST API format (same as "
+            "export_configsource output). For LM Exchange format, use import_configsource.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full ConfigSource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, delete existing ConfigSource "
+                        "with same name before creating",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_configsource",
+            description="Update an existing ConfigSource via REST API (full replace, "
+            "requires write permission). Workflow: export_configsource -> modify -> "
+            "update_configsource with full payload.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "configsource_id": {
+                        "type": "integer",
+                        "description": "ConfigSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": "Full ConfigSource definition with all fields",
+                    },
+                },
+                "required": ["configsource_id", "definition"],
+            },
+        ),
+        Tool(
+            name="create_eventsource",
+            description="Create an EventSource via REST API from a full definition dict "
+            "(requires write permission). Accepts REST API format (same as "
+            "export_eventsource output). For LM Exchange format, use import_eventsource.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full EventSource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, delete existing EventSource "
+                        "with same name before creating",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_eventsource",
+            description="Update an existing EventSource via REST API (full replace, "
+            "requires write permission). Workflow: export_eventsource -> modify -> "
+            "update_eventsource with full payload.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "eventsource_id": {
+                        "type": "integer",
+                        "description": "EventSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": "Full EventSource definition with all fields",
+                    },
+                },
+                "required": ["eventsource_id", "definition"],
+            },
+        ),
+        Tool(
             name="import_configsource",
-            description="Import a ConfigSource from JSON (requires write permission)",
+            description="Import a ConfigSource from LM Exchange JSON format via multipart "
+            "upload (requires write permission). For REST API format definitions "
+            "(e.g., from export_configsource), use create_configsource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3256,7 +3351,9 @@ TOOLS.extend(
         ),
         Tool(
             name="import_eventsource",
-            description="Import an EventSource from JSON (requires write permission)",
+            description="Import an EventSource from LM Exchange JSON format via multipart "
+            "upload (requires write permission). For REST API format definitions "
+            "(e.g., from export_eventsource), use create_eventsource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3283,15 +3380,39 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing PropertySource with same name before creating",
+                        "description": "If true, delete existing PropertySource "
+                        "with same name before creating",
                     },
                 },
                 "required": ["definition"],
             },
         ),
         Tool(
+            name="update_propertysource",
+            description="Update an existing PropertySource via REST API (full replace, "
+            "requires write permission). Workflow: export_propertysource -> modify -> "
+            "update_propertysource with full payload.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "propertysource_id": {
+                        "type": "integer",
+                        "description": "PropertySource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": "Full PropertySource definition with all fields",
+                    },
+                },
+                "required": ["propertysource_id", "definition"],
+            },
+        ),
+        Tool(
             name="import_propertysource",
-            description="Import a PropertySource from JSON (requires write permission)",
+            description="Import a PropertySource from LM Exchange JSON format via multipart "
+            "upload (requires write permission). For REST API format definitions "
+            "(e.g., from export_propertysource), use create_propertysource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3302,8 +3423,54 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="create_logsource",
+            description="Create a LogSource via REST API from a full definition dict "
+            "(requires write permission). Accepts REST API format (same as "
+            "export_logsource output). For LM Exchange format, use import_logsource.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full LogSource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, delete existing LogSource "
+                        "with same name before creating",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_logsource",
+            description="Update an existing LogSource via REST API (full replace, "
+            "requires write permission). Workflow: export_logsource -> modify -> "
+            "update_logsource with full payload.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "logsource_id": {
+                        "type": "integer",
+                        "description": "LogSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": "Full LogSource definition with all fields",
+                    },
+                },
+                "required": ["logsource_id", "definition"],
+            },
+        ),
+        Tool(
             name="import_logsource",
-            description="Import a LogSource from JSON (requires write permission)",
+            description="Import a LogSource from LM Exchange JSON format via multipart "
+            "upload (requires write permission). For REST API format definitions "
+            "(e.g., from export_logsource), use create_logsource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3314,8 +3481,54 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="create_topologysource",
+            description="Create a TopologySource via REST API from a full definition dict "
+            "(requires write permission). Accepts REST API format. "
+            "For LM Exchange format, use import_topologysource.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full TopologySource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, delete existing TopologySource "
+                        "with same name before creating",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_topologysource",
+            description="Update an existing TopologySource via REST API (full replace, "
+            "requires write permission). Workflow: export -> modify -> "
+            "update_topologysource with full payload.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topologysource_id": {
+                        "type": "integer",
+                        "description": "TopologySource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": "Full TopologySource definition with all fields",
+                    },
+                },
+                "required": ["topologysource_id", "definition"],
+            },
+        ),
+        Tool(
             name="import_topologysource",
-            description="Import a TopologySource from JSON (requires write permission)",
+            description="Import a TopologySource from LM Exchange JSON format via multipart "
+            "upload (requires write permission). For REST API format definitions, "
+            "use create_topologysource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -5589,6 +5802,8 @@ def get_tool_handler(tool_name: str) -> Any:
         # ConfigSources
         "get_configsources": configsources.get_configsources,
         "get_configsource": configsources.get_configsource,
+        "create_configsource": configsources.create_configsource,
+        "update_configsource": configsources.update_configsource,
         "get_configsource_update_reasons": configsources.get_configsource_update_reasons,
         "get_device_config": configsources.get_device_config,
         "get_device_config_version": configsources.get_device_config_version,
@@ -5596,18 +5811,25 @@ def get_tool_handler(tool_name: str) -> Any:
         # EventSources
         "get_eventsources": eventsources.get_eventsources,
         "get_eventsource": eventsources.get_eventsource,
+        "create_eventsource": eventsources.create_eventsource,
+        "update_eventsource": eventsources.update_eventsource,
         "get_device_eventsources": eventsources.get_device_eventsources,
         "update_device_eventsource": eventsources.update_device_eventsource,
         # PropertySources
         "get_propertysources": propertysources.get_propertysources,
         "get_propertysource": propertysources.get_propertysource,
         "create_propertysource": propertysources.create_propertysource,
+        "update_propertysource": propertysources.update_propertysource,
         # TopologySources
         "get_topologysources": topologysources.get_topologysources,
         "get_topologysource": topologysources.get_topologysource,
+        "create_topologysource": topologysources.create_topologysource,
+        "update_topologysource": topologysources.update_topologysource,
         # LogSources
         "get_logsources": logsources.get_logsources,
         "get_logsource": logsources.get_logsource,
+        "create_logsource": logsources.create_logsource,
+        "update_logsource": logsources.update_logsource,
         "get_device_logsources": logsources.get_device_logsources,
         # Netscans
         "get_netscans": netscans.get_netscans,

@@ -102,6 +102,100 @@ async def get_configsources(
         return handle_error(e)
 
 
+@require_write_permission
+async def create_configsource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create a ConfigSource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_configsource).
+    Use this for creating ConfigSources from exported definitions or from
+    scratch. For LM Exchange format imports, use import_configsource instead.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full ConfigSource definition dict in REST API format.
+        overwrite: If True, delete existing ConfigSource with the same name
+            before creating.
+
+    Returns:
+        List of TextContent with created ConfigSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/configsources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/configsources/{items[0]['id']}")
+
+        result = await client.post("/setting/configsources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"ConfigSource '{result.get('name')}' created successfully",
+                "configsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_configsource(
+    client: LogicMonitorClient,
+    configsource_id: int,
+    definition: dict,
+) -> list[TextContent]:
+    """Update an existing ConfigSource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked. Recommended workflow: export_configsource ->
+    modify the export -> update_configsource with the full payload.
+
+    Args:
+        client: LogicMonitor API client.
+        configsource_id: ConfigSource ID to update.
+        definition: Full ConfigSource definition dict with all fields.
+
+    Returns:
+        List of TextContent with updated ConfigSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/configsources/{configsource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"ConfigSource '{result.get('name')}' updated successfully",
+                "configsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
 async def get_configsource(
     client: LogicMonitorClient,
     configsource_id: int,

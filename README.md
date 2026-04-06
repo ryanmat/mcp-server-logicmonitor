@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 249+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 258+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -72,12 +72,26 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v3.1.0 (Current)
-- **New**: Terraform IaC integration -- 11 tools for plan, apply, state, import, and HCL generation for any Terraform provider. Includes `terraform_generate` to export existing LM resources as HCL.
-- **New**: HuggingFace local Granite fallback -- TTM forecasting and NL summaries via local models when watsonx.ai API is not configured. Install with `lm-mcp[huggingface]`.
-- **New**: `[huggingface]` optional dependency group (torch, transformers, granite-tsfm, accelerate)
-- **Architecture**: 5-way dispatch (Session, AWX, WatsonX, Terraform, LM) with graceful degradation
-- **Architecture**: AI inference priority chain: watsonx.ai API > HuggingFace local > statistical/linear
+### v3.4.0 (Current)
+- **New**: REST API create/update tools for all LogicModule source types -- ConfigSource, EventSource, LogSource, TopologySource, PropertySource. Enables export -> modify -> update workflows without delete/recreate.
+- **Fix**: `update_datasource` description now correctly documents full-replace semantics (name and displayName required).
+- **Fix**: All `import_*` tool descriptions clarify LM Exchange format requirement and direct users to `create_*` for REST API format.
+- **Fix**: All `export_*` tool descriptions reference both `create_*` and `update_*` for round-tripping.
+- **Fix**: Version synced across all locations (was drifted since v3.2.0).
+
+### Changelog
+
+<details>
+<summary>v3.1.0-v3.3.0 — Terraform, HuggingFace, config tools, PropertySource create</summary>
+
+- Terraform IaC integration -- 11 tools for plan, apply, state, import, and HCL generation
+- HuggingFace local Granite fallback -- TTM forecasting and NL summaries via local models
+- `[huggingface]` optional dependency group (torch, transformers, granite-tsfm, accelerate)
+- Device config data retrieval and audit tools (get_device_config, get_device_config_version, collect_device_config)
+- create_propertysource REST API tool
+- 5-way dispatch (Session, AWX, WatsonX, Terraform, LM) with graceful degradation
+- AI inference priority chain: watsonx.ai API > HuggingFace local > statistical/linear
+</details>
 
 ### Changelog
 
@@ -106,7 +120,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**249+ Tools** across comprehensive LogicMonitor API coverage (220 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**258+ Tools** across comprehensive LogicMonitor API coverage (230 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -159,7 +173,7 @@ Multi-step analysis tools that combine several sub-tools into a single call. Eac
 - **Capacity Plan**: Per-datasource forecasting, trend classification, seasonality detection, and change point analysis
 - **Portal Overview**: Alert statistics, collector health, active SDTs, alert clusters, noise assessment, and down devices
 - **Diagnose**: Alert details, device context, correlation, blast radius, health scoring, and root cause analysis
-- **Search Tools**: Keyword search across all 220 tools by name and description with category filtering
+- **Search Tools**: Keyword search across all 230 tools by name and description with category filtering
 
 ### APM Trace Tools
 

@@ -101,6 +101,100 @@ async def get_eventsources(
         return handle_error(e)
 
 
+@require_write_permission
+async def create_eventsource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create an EventSource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_eventsource).
+    Use this for creating EventSources from exported definitions or from
+    scratch. For LM Exchange format imports, use import_eventsource instead.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full EventSource definition dict in REST API format.
+        overwrite: If True, delete existing EventSource with the same name
+            before creating.
+
+    Returns:
+        List of TextContent with created EventSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/eventsources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/eventsources/{items[0]['id']}")
+
+        result = await client.post("/setting/eventsources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"EventSource '{result.get('name')}' created successfully",
+                "eventsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_eventsource(
+    client: LogicMonitorClient,
+    eventsource_id: int,
+    definition: dict,
+) -> list[TextContent]:
+    """Update an existing EventSource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked. Recommended workflow: export_eventsource ->
+    modify the export -> update_eventsource with the full payload.
+
+    Args:
+        client: LogicMonitor API client.
+        eventsource_id: EventSource ID to update.
+        definition: Full EventSource definition dict with all fields.
+
+    Returns:
+        List of TextContent with updated EventSource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/eventsources/{eventsource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"EventSource '{result.get('name')}' updated successfully",
+                "eventsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
 async def get_eventsource(
     client: LogicMonitorClient,
     eventsource_id: int,
