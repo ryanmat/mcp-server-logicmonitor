@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    require_write_permission,
     sanitize_filter_value,
 )
 
@@ -96,6 +97,56 @@ async def get_propertysources(
         if wildcards_stripped:
             response["note"] = WILDCARD_STRIP_NOTE
         return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_propertysource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create a PropertySource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_propertysource).
+    Use this for creating PropertySources from exported definitions or from
+    scratch. For LM Exchange format imports, use import_propertysource instead.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full PropertySource definition dict in REST API format.
+        overwrite: If True, delete existing PropertySource with the same name
+            before creating.
+
+    Returns:
+        List of TextContent with created PropertySource info or error.
+    """
+    try:
+        payload = dict(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/propertyrules",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/propertyrules/{items[0]['id']}")
+
+        result = await client.post("/setting/propertyrules", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"PropertySource '{result.get('name')}' created successfully",
+                "propertysource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                },
+            }
+        )
     except Exception as e:
         return handle_error(e)
 

@@ -3267,6 +3267,29 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="create_propertysource",
+            description="Create a PropertySource via REST API from a full definition dict "
+            "(requires write permission). Accepts REST API format (same as "
+            "export_propertysource output). Use for round-tripping exports or building "
+            "definitions from scratch. For LM Exchange format, use import_propertysource.",
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full PropertySource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "If true, delete existing PropertySource with same name before creating",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
             name="import_propertysource",
             description="Import a PropertySource from JSON (requires write permission)",
             annotations=_IMPORT,
@@ -5578,6 +5601,7 @@ def get_tool_handler(tool_name: str) -> Any:
         # PropertySources
         "get_propertysources": propertysources.get_propertysources,
         "get_propertysource": propertysources.get_propertysource,
+        "create_propertysource": propertysources.create_propertysource,
         # TopologySources
         "get_topologysources": topologysources.get_topologysources,
         "get_topologysource": topologysources.get_topologysource,

@@ -239,7 +239,7 @@ When watsonx.ai API credentials are not configured, TTM forecasting and NL summa
 - **DataSources**: Query and export datasource definitions
 - **ConfigSources**: Query definitions, retrieve device config data from the Config Archive, view diffs, trigger on-demand collection, and audit change history
 - **EventSources**: Query and export event detection modules
-- **PropertySources**: Query and export property collection modules
+- **PropertySources**: Query, create, and export property collection modules
 - **TopologySources**: Query and export topology mapping modules
 - **LogSources**: Query and export log collection modules
 - **Import Support**: Import LogicModules from JSON definitions
@@ -788,6 +788,7 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `import_eventsource` | Import EventSource from JSON | Yes |
 | `get_propertysources` | List PropertySources | No |
 | `get_propertysource` | Get PropertySource details | No |
+| `create_propertysource` | Create PropertySource via REST API | Yes |
 | `export_propertysource` | Export PropertySource as JSON | No |
 | `import_propertysource` | Import PropertySource from JSON | Yes |
 | `get_topologysources` | List TopologySources | No |
