@@ -345,3 +345,49 @@ class TestUpdateEventsource:
         await update_eventsource(client, eventsource_id=100, definition={"id": 999, "name": "ES"})
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+
+class TestDeleteEventsource:
+    """Tests for delete_eventsource tool."""
+
+    async def test_delete_eventsource_requires_write_permission(self, client, monkeypatch):
+        from lm_mcp.tools.eventsources import delete_eventsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await delete_eventsource(client, eventsource_id=1)
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_delete_eventsource_success(self, client, enable_writes):
+        from lm_mcp.tools.eventsources import delete_eventsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/eventsources/1").mock(
+            return_value=httpx.Response(200, json={"id": 1, "name": "OldES"})
+        )
+        respx.delete("https://test.logicmonitor.com/santaba/rest/setting/eventsources/1").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_eventsource(client, eventsource_id=1)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "OldES" in data["message"]
+
+    @respx.mock
+    async def test_delete_eventsource_not_found(self, client, enable_writes):
+        from lm_mcp.tools.eventsources import delete_eventsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/eventsources/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
+
+        result = await delete_eventsource(client, eventsource_id=999)
+        assert "Error" in result[0].text

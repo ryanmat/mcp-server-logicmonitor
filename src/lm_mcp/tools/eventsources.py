@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -123,7 +124,7 @@ async def create_eventsource(
         List of TextContent with created EventSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -173,7 +174,7 @@ async def update_eventsource(
         List of TextContent with updated EventSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         result = await client.put(f"/setting/eventsources/{eventsource_id}", json_body=payload)
@@ -321,6 +322,40 @@ async def update_device_eventsource(
                 "name": result.get("eventSourceDisplayName")
                 or result.get("dataSourceDisplayName", ""),
                 "alerting_disabled": result.get("alertDisableStatus", ""),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_eventsource(
+    client: LogicMonitorClient,
+    eventsource_id: int,
+) -> list[TextContent]:
+    """Delete an EventSource from LogicMonitor.
+
+    Removes the EventSource definition. Existing collected event data
+    is retained on devices but no new events will be collected.
+
+    Args:
+        client: LogicMonitor API client.
+        eventsource_id: EventSource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        es = await client.get(f"/setting/eventsources/{eventsource_id}")
+        es_name = es.get("name", f"ID:{eventsource_id}")
+
+        await client.delete(f"/setting/eventsources/{eventsource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"EventSource '{es_name}' deleted",
+                "eventsource_id": eventsource_id,
             }
         )
     except Exception as e:

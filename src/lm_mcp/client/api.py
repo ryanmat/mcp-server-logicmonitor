@@ -269,7 +269,9 @@ class LogicMonitorClient:
         """
         return await self.request("POST", path, json_body=json_body)
 
-    async def post_multipart(self, path: str, definition: dict | str) -> dict:
+    async def post_multipart(
+        self, path: str, definition: dict | str, params: dict | None = None
+    ) -> dict:
         """Make a multipart/form-data POST request for LogicModule imports.
 
         The LM import endpoints require multipart file upload rather than JSON body.
@@ -279,6 +281,7 @@ class LogicMonitorClient:
         Args:
             path: API resource path (e.g., /setting/datasources/importjson).
             definition: LogicModule definition dict to import.
+            params: Optional query parameters (e.g., handleConflict).
 
         Returns:
             Parsed JSON response as dict.
@@ -318,6 +321,7 @@ class LogicMonitorClient:
                     url=url,
                     files=files,
                     headers=headers,
+                    params=params,
                 )
             except httpx.ConnectError as e:
                 raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}") from e

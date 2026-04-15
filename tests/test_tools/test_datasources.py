@@ -416,6 +416,35 @@ class TestCreateDatasource:
 
         assert "Error:" in result[0].text
 
+    @respx.mock
+    async def test_create_normalizes_snake_case_fields(self, client, enable_writes):
+        """create_datasource normalizes snake_case to camelCase before POST."""
+        from lm_mcp.tools.datasources import create_datasource
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
+            return_value=httpx.Response(
+                200, json={"id": 1, "name": "TestDS", "displayName": "Test"}
+            )
+        )
+
+        await create_datasource(
+            client,
+            definition={
+                "name": "TestDS",
+                "display_name": "Test",
+                "collect_method": "script",
+                "applies_to": "isLinux()",
+            },
+        )
+
+        import json as json_mod
+
+        body = json_mod.loads(route.calls[0].request.content)
+        assert body["displayName"] == "Test"
+        assert body["collectMethod"] == "script"
+        assert body["appliesTo"] == "isLinux()"
+        assert "display_name" not in body
+
 
 class TestCreateDatasourceOverwrite:
     """Tests for create_datasource overwrite parameter."""

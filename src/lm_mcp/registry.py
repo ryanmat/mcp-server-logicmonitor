@@ -3243,6 +3243,15 @@ TOOLS.extend(
                         "type": "object",
                         "description": "DataSource JSON definition in LM Exchange format",
                     },
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3292,6 +3301,22 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="delete_configsource",
+            description="Delete a ConfigSource definition "
+            "(requires write permission). Existing collected data is retained.",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "configsource_id": {
+                        "type": "integer",
+                        "description": "ConfigSource ID to delete",
+                    },
+                },
+                "required": ["configsource_id"],
+            },
+        ),
+        Tool(
             name="create_eventsource",
             description="Create an EventSource via REST API from a full definition dict "
             "(requires write permission). Accepts REST API format (same as "
@@ -3336,6 +3361,22 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="delete_eventsource",
+            description="Delete an EventSource definition "
+            "(requires write permission). Existing collected data is retained.",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "eventsource_id": {
+                        "type": "integer",
+                        "description": "EventSource ID to delete",
+                    },
+                },
+                "required": ["eventsource_id"],
+            },
+        ),
+        Tool(
             name="import_configsource",
             description="Import a ConfigSource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
@@ -3345,6 +3386,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "ConfigSource JSON definition"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3359,6 +3409,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "EventSource JSON definition"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3409,6 +3468,22 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="delete_propertysource",
+            description="Delete a PropertySource definition "
+            "(requires write permission). Existing collected data is retained.",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "propertysource_id": {
+                        "type": "integer",
+                        "description": "PropertySource ID to delete",
+                    },
+                },
+                "required": ["propertysource_id"],
+            },
+        ),
+        Tool(
             name="import_propertysource",
             description="Import a PropertySource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
@@ -3418,6 +3493,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "PropertySource JSON"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3467,6 +3551,22 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="delete_logsource",
+            description="Delete a LogSource definition "
+            "(requires write permission). Existing collected data is retained.",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "logsource_id": {
+                        "type": "integer",
+                        "description": "LogSource ID to delete",
+                    },
+                },
+                "required": ["logsource_id"],
+            },
+        ),
+        Tool(
             name="import_logsource",
             description="Import a LogSource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
@@ -3476,6 +3576,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "LogSource JSON definition"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3525,6 +3634,22 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="delete_topologysource",
+            description="Delete a TopologySource definition "
+            "(requires write permission). Existing collected data is retained.",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "topologysource_id": {
+                        "type": "integer",
+                        "description": "TopologySource ID to delete",
+                    },
+                },
+                "required": ["topologysource_id"],
+            },
+        ),
+        Tool(
             name="import_topologysource",
             description="Import a TopologySource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions, "
@@ -3534,6 +3659,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "TopologySource JSON"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3546,6 +3680,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "JobMonitor JSON definition"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -3558,6 +3701,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "AppliesTo function JSON"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
                 },
                 "required": ["definition"],
             },
@@ -5804,6 +5956,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_configsource": configsources.get_configsource,
         "create_configsource": configsources.create_configsource,
         "update_configsource": configsources.update_configsource,
+        "delete_configsource": configsources.delete_configsource,
         "get_configsource_update_reasons": configsources.get_configsource_update_reasons,
         "get_device_config": configsources.get_device_config,
         "get_device_config_version": configsources.get_device_config_version,
@@ -5813,6 +5966,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_eventsource": eventsources.get_eventsource,
         "create_eventsource": eventsources.create_eventsource,
         "update_eventsource": eventsources.update_eventsource,
+        "delete_eventsource": eventsources.delete_eventsource,
         "get_device_eventsources": eventsources.get_device_eventsources,
         "update_device_eventsource": eventsources.update_device_eventsource,
         # PropertySources
@@ -5820,16 +5974,19 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_propertysource": propertysources.get_propertysource,
         "create_propertysource": propertysources.create_propertysource,
         "update_propertysource": propertysources.update_propertysource,
+        "delete_propertysource": propertysources.delete_propertysource,
         # TopologySources
         "get_topologysources": topologysources.get_topologysources,
         "get_topologysource": topologysources.get_topologysource,
         "create_topologysource": topologysources.create_topologysource,
         "update_topologysource": topologysources.update_topologysource,
+        "delete_topologysource": topologysources.delete_topologysource,
         # LogSources
         "get_logsources": logsources.get_logsources,
         "get_logsource": logsources.get_logsource,
         "create_logsource": logsources.create_logsource,
         "update_logsource": logsources.update_logsource,
+        "delete_logsource": logsources.delete_logsource,
         "get_device_logsources": logsources.get_device_logsources,
         # Netscans
         "get_netscans": netscans.get_netscans,

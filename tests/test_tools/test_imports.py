@@ -615,3 +615,105 @@ class TestImportDatasourceErrorHandling:
 
         assert len(result) == 1
         assert "Error:" in result[0].text
+
+
+class TestImportEnvelope:
+    """Tests for import envelope type injection."""
+
+    @respx.mock
+    async def test_import_injects_type_when_missing(self, client, monkeypatch):
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(return_value=httpx.Response(200, json={"id": 1, "name": "TestDS"}))
+
+        await import_datasource(client, definition={"name": "TestDS"})
+
+        assert route.called
+        # Verify the uploaded file contains the type field
+        request = route.calls[0].request
+        body = request.content.decode()
+        assert '"type"' in body
+        assert '"datasource"' in body
+
+    @respx.mock
+    async def test_import_preserves_explicit_type(self, client, monkeypatch):
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(return_value=httpx.Response(200, json={"id": 1, "name": "TestDS"}))
+
+        await import_datasource(client, definition={"name": "TestDS", "type": "custom"})
+
+        body = route.calls[0].request.content.decode()
+        assert '"custom"' in body
+
+
+class TestImportHandleConflict:
+    """Tests for import handleConflict query parameter."""
+
+    @respx.mock
+    async def test_handle_conflict_sent_as_query_param(self, client, monkeypatch):
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(return_value=httpx.Response(200, json={"id": 1, "name": "TestDS"}))
+
+        await import_datasource(
+            client, definition={"name": "TestDS"}, handle_conflict="overwriteExisting"
+        )
+
+        assert "handleConflict" in str(route.calls[0].request.url)
+
+    @respx.mock
+    async def test_no_params_by_default(self, client, monkeypatch):
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(return_value=httpx.Response(200, json={"id": 1, "name": "TestDS"}))
+
+        await import_datasource(client, definition={"name": "TestDS"})
+
+        url_str = str(route.calls[0].request.url)
+        assert "handleConflict" not in url_str
+        assert "fieldsToPreserve" not in url_str

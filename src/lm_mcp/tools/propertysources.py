@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -123,7 +124,7 @@ async def create_propertysource(
         List of TextContent with created PropertySource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -172,7 +173,7 @@ async def update_propertysource(
         List of TextContent with updated PropertySource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         result = await client.put(f"/setting/propertyrules/{propertysource_id}", json_body=payload)
@@ -185,6 +186,40 @@ async def update_propertysource(
                     "id": result.get("id"),
                     "name": result.get("name"),
                 },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_propertysource(
+    client: LogicMonitorClient,
+    propertysource_id: int,
+) -> list[TextContent]:
+    """Delete a PropertySource from LogicMonitor.
+
+    Removes the PropertySource definition. Existing collected properties
+    are retained on devices but no new properties will be discovered.
+
+    Args:
+        client: LogicMonitor API client.
+        propertysource_id: PropertySource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        ps = await client.get(f"/setting/propertyrules/{propertysource_id}")
+        ps_name = ps.get("name", f"ID:{propertysource_id}")
+
+        await client.delete(f"/setting/propertyrules/{propertysource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"PropertySource '{ps_name}' deleted",
+                "propertysource_id": propertysource_id,
             }
         )
     except Exception as e:

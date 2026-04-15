@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -178,7 +179,7 @@ async def create_datasource(
         List of TextContent with created DataSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -230,7 +231,7 @@ async def update_datasource(
         List of TextContent with updated DataSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         result = await client.put(f"/setting/datasources/{datasource_id}", json_body=payload)

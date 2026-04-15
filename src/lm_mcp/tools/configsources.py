@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -124,7 +125,7 @@ async def create_configsource(
         List of TextContent with created ConfigSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -174,7 +175,7 @@ async def update_configsource(
         List of TextContent with updated ConfigSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         result = await client.put(f"/setting/configsources/{configsource_id}", json_body=payload)
@@ -476,6 +477,40 @@ async def collect_device_config(
                 "device_id": device_id,
                 "device_datasource_id": device_datasource_id,
                 "instance_id": instance_id,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_configsource(
+    client: LogicMonitorClient,
+    configsource_id: int,
+) -> list[TextContent]:
+    """Delete a ConfigSource from LogicMonitor.
+
+    Removes the ConfigSource definition. Existing collected config data
+    is retained on devices but no new configs will be collected.
+
+    Args:
+        client: LogicMonitor API client.
+        configsource_id: ConfigSource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        cs = await client.get(f"/setting/configsources/{configsource_id}")
+        cs_name = cs.get("name", f"ID:{configsource_id}")
+
+        await client.delete(f"/setting/configsources/{configsource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"ConfigSource '{cs_name}' deleted",
+                "configsource_id": configsource_id,
             }
         )
     except Exception as e:

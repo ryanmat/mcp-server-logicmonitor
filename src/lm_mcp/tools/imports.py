@@ -29,6 +29,59 @@ def _ensure_dict(definition: dict | str) -> dict:
     return definition
 
 
+# LM Exchange "type" field values required by /importjson endpoints.
+_IMPORT_TYPE_MAP: dict[str, str] = {
+    "datasource": "datasource",
+    "configsource": "configsource",
+    "eventsource": "eventsource",
+    "propertysource": "propertysource",
+    "logsource": "logsource",
+    "topologysource": "topologysource",
+    "jobmonitor": "batchjob",
+    "appliesto_function": "function",
+}
+
+
+def _ensure_import_envelope(definition: dict, module_type: str) -> dict:
+    """Ensure definition has the required LM Exchange 'type' field.
+
+    The /importjson endpoints require a top-level "type" field with the
+    LM Exchange module type identifier. If absent, this function injects it.
+    If present, it is left as-is so explicit user values are respected.
+
+    Args:
+        definition: The definition dict (already parsed from string if needed).
+        module_type: Key into _IMPORT_TYPE_MAP (e.g., "datasource").
+
+    Returns:
+        Definition dict with "type" field guaranteed present.
+    """
+    if "type" not in definition:
+        definition = dict(definition)
+        definition["type"] = _IMPORT_TYPE_MAP[module_type]
+    return definition
+
+
+def _build_import_params(
+    handle_conflict: str | None, fields_to_preserve: list[str] | None
+) -> dict | None:
+    """Build query params dict for import endpoints.
+
+    Args:
+        handle_conflict: Conflict resolution strategy.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
+
+    Returns:
+        Params dict or None if no params specified.
+    """
+    params: dict = {}
+    if handle_conflict:
+        params["handleConflict"] = handle_conflict
+    if fields_to_preserve:
+        params["fieldsToPreserve"] = ",".join(fields_to_preserve)
+    return params or None
+
+
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
@@ -278,6 +331,8 @@ async def export_escalation_chain(
 async def import_datasource(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import a DataSource from LM Exchange JSON definition via multipart upload.
 
@@ -287,14 +342,19 @@ async def import_datasource(
     Args:
         client: LogicMonitor API client.
         definition: DataSource JSON definition in LM Exchange format to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported DataSource info or error.
     """
     try:
         definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "datasource")
         result = await client.post_multipart(
-            "/setting/datasources/importjson", definition=definition
+            "/setting/datasources/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
         )
 
         # Detect silent failures where the API returns empty or null-id responses
@@ -324,20 +384,27 @@ async def import_datasource(
 async def import_configsource(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import a ConfigSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: ConfigSource JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported ConfigSource info or error.
     """
     try:
         definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "configsource")
         result = await client.post_multipart(
-            "/setting/configsources/importjson", definition=definition
+            "/setting/configsources/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
         )
         return format_response(
             {
@@ -353,20 +420,27 @@ async def import_configsource(
 async def import_eventsource(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import an EventSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: EventSource JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported EventSource info or error.
     """
     try:
         definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "eventsource")
         result = await client.post_multipart(
-            "/setting/eventsources/importjson", definition=definition
+            "/setting/eventsources/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
         )
         return format_response(
             {
@@ -382,20 +456,27 @@ async def import_eventsource(
 async def import_propertysource(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import a PropertySource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: PropertySource JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported PropertySource info or error.
     """
     try:
         definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "propertysource")
         result = await client.post_multipart(
-            "/setting/propertyrules/importjson", definition=definition
+            "/setting/propertyrules/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
         )
         return format_response(
             {
@@ -411,20 +492,27 @@ async def import_propertysource(
 async def import_logsource(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import a LogSource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: LogSource JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported LogSource info or error.
     """
     try:
         definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "logsource")
         result = await client.post_multipart(
-            "/setting/logsources/importjson", definition=definition
+            "/setting/logsources/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
         )
         return format_response(
             {
@@ -440,20 +528,27 @@ async def import_logsource(
 async def import_topologysource(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import a TopologySource from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: TopologySource JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported TopologySource info or error.
     """
     try:
         definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "topologysource")
         result = await client.post_multipart(
-            "/setting/topologysources/importjson", definition=definition
+            "/setting/topologysources/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
         )
         return format_response(
             {
@@ -469,19 +564,28 @@ async def import_topologysource(
 async def import_jobmonitor(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import a JobMonitor from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: JobMonitor JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported JobMonitor info or error.
     """
     try:
         definition = _ensure_dict(definition)
-        result = await client.post_multipart("/setting/batchjobs/importjson", definition=definition)
+        definition = _ensure_import_envelope(definition, "jobmonitor")
+        result = await client.post_multipart(
+            "/setting/batchjobs/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),
@@ -496,19 +600,28 @@ async def import_jobmonitor(
 async def import_appliesto_function(
     client: LogicMonitorClient,
     definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
 ) -> list[TextContent]:
     """Import an AppliesTo function from LM Exchange JSON definition via multipart upload.
 
     Args:
         client: LogicMonitor API client.
         definition: AppliesTo function JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
 
     Returns:
         List of TextContent with imported function info or error.
     """
     try:
         definition = _ensure_dict(definition)
-        result = await client.post_multipart("/setting/functions/importjson", definition=definition)
+        definition = _ensure_import_envelope(definition, "appliesto_function")
+        result = await client.post_multipart(
+            "/setting/functions/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
+        )
         return format_response(
             {
                 "imported_id": result.get("id"),

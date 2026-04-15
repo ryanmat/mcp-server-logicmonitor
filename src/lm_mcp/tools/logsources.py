@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -125,7 +126,7 @@ async def create_logsource(
         List of TextContent with created LogSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -174,7 +175,7 @@ async def update_logsource(
         List of TextContent with updated LogSource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         result = await client.put(f"/setting/logsources/{logsource_id}", json_body=payload)
@@ -268,6 +269,40 @@ async def get_device_logsources(
                 "total": result.get("total", 0),
                 "count": len(logsources),
                 "logsources": logsources,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_logsource(
+    client: LogicMonitorClient,
+    logsource_id: int,
+) -> list[TextContent]:
+    """Delete a LogSource from LogicMonitor.
+
+    Removes the LogSource definition. Existing collected log data
+    is retained but no new logs will be collected by this source.
+
+    Args:
+        client: LogicMonitor API client.
+        logsource_id: LogSource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        ls = await client.get(f"/setting/logsources/{logsource_id}")
+        ls_name = ls.get("name", f"ID:{logsource_id}")
+
+        await client.delete(f"/setting/logsources/{logsource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"LogSource '{ls_name}' deleted",
+                "logsource_id": logsource_id,
             }
         )
     except Exception as e:

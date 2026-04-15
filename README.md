@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 258+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 264+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -72,7 +72,14 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v3.4.0 (Current)
+### v3.5.0 (Current)
+- **New**: `delete_configsource`, `delete_eventsource`, `delete_logsource`, `delete_propertysource`, `delete_topologysource` -- delete operations for all LogicModule source types
+- **New**: `handle_conflict` and `fields_to_preserve` parameters on all import tools
+- **Fix**: create/update tools now auto-normalize field names from LM Exchange format and snake_case to REST API camelCase
+- **Fix**: import tools auto-inject LM Exchange `type` envelope field when missing
+- **Counts**: 264 tools (235 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
+
+### v3.4.0
 - **New**: REST API create/update tools for all LogicModule source types -- ConfigSource, EventSource, LogSource, TopologySource, PropertySource. Enables export -> modify -> update workflows without delete/recreate.
 - **Fix**: `update_datasource` description now correctly documents full-replace semantics (name and displayName required).
 - **Fix**: All `import_*` tool descriptions clarify LM Exchange format requirement and direct users to `create_*` for REST API format.
@@ -120,7 +127,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**258+ Tools** across comprehensive LogicMonitor API coverage (230 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**264+ Tools** across comprehensive LogicMonitor API coverage (235 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -794,25 +801,30 @@ This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
 | `get_device_config` | List config versions for a device instance | No |
 | `get_device_config_version` | Get config content with diffs and alerts | No |
 | `collect_device_config` | Trigger on-demand config collection | Yes |
+| `delete_configsource` | Delete a ConfigSource definition | Yes |
 | `export_configsource` | Export ConfigSource as JSON | No |
 | `import_configsource` | Import ConfigSource from JSON | Yes |
 | `get_eventsources` | List EventSources | No |
 | `get_eventsource` | Get EventSource details | No |
 | `export_eventsource` | Export EventSource as JSON | No |
 | `import_eventsource` | Import EventSource from JSON | Yes |
+| `delete_eventsource` | Delete an EventSource definition | Yes |
 | `get_propertysources` | List PropertySources | No |
 | `get_propertysource` | Get PropertySource details | No |
 | `create_propertysource` | Create PropertySource via REST API | Yes |
 | `export_propertysource` | Export PropertySource as JSON | No |
 | `import_propertysource` | Import PropertySource from JSON | Yes |
+| `delete_propertysource` | Delete a PropertySource definition | Yes |
 | `get_topologysources` | List TopologySources | No |
 | `get_topologysource` | Get TopologySource details | No |
 | `import_topologysource` | Import TopologySource from JSON | Yes |
+| `delete_topologysource` | Delete a TopologySource definition | Yes |
 | `get_logsources` | List LogSources | No |
 | `get_logsource` | Get LogSource details | No |
 | `get_device_logsources` | Get LogSources applied to a device | No |
 | `export_logsource` | Export LogSource as JSON | No |
 | `import_logsource` | Import LogSource from JSON | Yes |
+| `delete_logsource` | Delete a LogSource definition | Yes |
 | `import_jobmonitor` | Import JobMonitor from JSON | Yes |
 | `import_appliesto_function` | Import AppliesTo function from JSON | Yes |
 

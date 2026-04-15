@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 227 tools organized by domain category (198 LM + 18 AAP + 10 TF + 1 WX).
+# All 264 tools organized by domain category (235 LM + 18 AAP + 10 TF + 1 WX).
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -223,6 +223,7 @@ TOOL_CATEGORIES = {
                 "get_configsource",
                 "create_configsource",
                 "update_configsource",
+                "delete_configsource",
                 "get_configsource_update_reasons",
                 "get_device_config",
                 "get_device_config_version",
@@ -231,20 +232,24 @@ TOOL_CATEGORIES = {
                 "get_eventsource",
                 "create_eventsource",
                 "update_eventsource",
+                "delete_eventsource",
                 "get_device_eventsources",
                 "update_device_eventsource",
                 "get_propertysources",
                 "get_propertysource",
                 "create_propertysource",
                 "update_propertysource",
+                "delete_propertysource",
                 "get_topologysources",
                 "get_topologysource",
                 "create_topologysource",
                 "update_topologysource",
+                "delete_topologysource",
                 "get_logsources",
                 "get_logsource",
                 "create_logsource",
                 "update_logsource",
+                "delete_logsource",
                 "get_device_logsources",
             ],
         },
@@ -413,6 +418,12 @@ TOOL_CATEGORIES = {
                 "execute_remediation",
                 "get_remediation_status",
                 "get_remediation_history",
+            ],
+        },
+        "watsonx": {
+            "description": "IBM watsonx.ai summarization and forecasting",
+            "tools": [
+                "watsonx_summarize",
             ],
         },
     },

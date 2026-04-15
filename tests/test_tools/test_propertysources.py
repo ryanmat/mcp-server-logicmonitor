@@ -139,3 +139,49 @@ class TestUpdatePropertysource:
         )
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+
+class TestDeletePropertysource:
+    """Tests for delete_propertysource tool."""
+
+    async def test_delete_propertysource_requires_write_permission(self, client, monkeypatch):
+        from lm_mcp.tools.propertysources import delete_propertysource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await delete_propertysource(client, propertysource_id=1)
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_delete_propertysource_success(self, client, enable_writes):
+        from lm_mcp.tools.propertysources import delete_propertysource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/propertyrules/1").mock(
+            return_value=httpx.Response(200, json={"id": 1, "name": "OldPS"})
+        )
+        respx.delete("https://test.logicmonitor.com/santaba/rest/setting/propertyrules/1").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_propertysource(client, propertysource_id=1)
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "OldPS" in data["message"]
+
+    @respx.mock
+    async def test_delete_propertysource_not_found(self, client, enable_writes):
+        from lm_mcp.tools.propertysources import delete_propertysource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/propertyrules/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
+
+        result = await delete_propertysource(client, propertysource_id=999)
+        assert "Error" in result[0].text

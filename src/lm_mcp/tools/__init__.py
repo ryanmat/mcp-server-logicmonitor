@@ -17,6 +17,7 @@ __all__ = [
     "SEVERITY_NAMES",
     "format_response",
     "handle_error",
+    "normalize_definition_fields",
     "portal_url",
     "quote_filter_value",
     "require_write_permission",
@@ -37,6 +38,69 @@ SEVERITY_MAP: dict[str, int] = {
 SEVERITY_NAMES: dict[int, str] = {v: k for k, v in SEVERITY_MAP.items()}
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+# Mapping of common alternate field names to REST API camelCase equivalents.
+# Covers LM Exchange format names, snake_case variants from get_* output,
+# and common typos. Keys already in correct camelCase pass through unchanged.
+_FIELD_ALIASES: dict[str, str] = {
+    # LM Exchange format -> REST API
+    "displayedAs": "displayName",
+    "collectionMethod": "collectMethod",
+    "collectionAttrs": "collectorAttribute",
+    "datapoints": "dataPoints",
+    # snake_case -> REST API camelCase
+    "display_name": "displayName",
+    "collect_method": "collectMethod",
+    "collector_attribute": "collectorAttribute",
+    "data_points": "dataPoints",
+    "applies_to": "appliesTo",
+    "collect_interval": "collectInterval",
+    "has_multi_instances": "hasMultiInstances",
+    "alert_expr": "alertExpr",
+    "post_processor_method": "postProcessorMethod",
+    "post_processor_param": "postProcessorParam",
+    "auto_discovery_config": "autoDiscoveryConfig",
+    "enable_auto_discovery": "enableAutoDiscovery",
+}
+
+
+def normalize_definition_fields(definition: dict) -> dict:
+    """Normalize field names in a LogicModule definition to REST API camelCase.
+
+    Recursively walks the definition dict, renaming keys that appear in
+    _FIELD_ALIASES to their REST API equivalents. Keys already in the correct
+    camelCase form pass through unchanged for backwards compatibility.
+
+    When both an alias and its canonical key exist in the same dict, the
+    canonical key value wins to prevent silent data loss.
+
+    Args:
+        definition: LogicModule definition dict (may use LM Exchange,
+            snake_case, or REST API field names).
+
+    Returns:
+        New dict with all recognized keys mapped to REST API camelCase names.
+    """
+    result: dict = {}
+    for key, value in definition.items():
+        canonical = _FIELD_ALIASES.get(key, key)
+        # If this key is an alias but the canonical key already exists
+        # in the original dict, skip the alias (canonical wins).
+        if canonical != key and canonical in definition:
+            continue
+        normalized = _normalize_value(value)
+        result[canonical] = normalized
+    return result
+
+
+def _normalize_value(value: Any) -> Any:
+    """Recursively normalize values within a definition structure."""
+    if isinstance(value, dict):
+        return normalize_definition_fields(value)
+    if isinstance(value, list):
+        return [_normalize_value(item) for item in value]
+    return value
+
 
 # Wildcard note appended to response when filter values are sanitized
 WILDCARD_STRIP_NOTE = (

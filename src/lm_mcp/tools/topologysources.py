@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
@@ -123,7 +124,7 @@ async def create_topologysource(
         List of TextContent with created TopologySource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -173,7 +174,7 @@ async def update_topologysource(
         List of TextContent with updated TopologySource info or error.
     """
     try:
-        payload = dict(definition)
+        payload = normalize_definition_fields(definition)
         payload.pop("id", None)
 
         result = await client.put(
@@ -189,6 +190,40 @@ async def update_topologysource(
                     "name": result.get("name"),
                     "display_name": result.get("displayName"),
                 },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_topologysource(
+    client: LogicMonitorClient,
+    topologysource_id: int,
+) -> list[TextContent]:
+    """Delete a TopologySource from LogicMonitor.
+
+    Removes the TopologySource definition. Existing topology data
+    is retained but no new topology will be collected.
+
+    Args:
+        client: LogicMonitor API client.
+        topologysource_id: TopologySource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        ts = await client.get(f"/setting/topologysources/{topologysource_id}")
+        ts_name = ts.get("name", f"ID:{topologysource_id}")
+
+        await client.delete(f"/setting/topologysources/{topologysource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"TopologySource '{ts_name}' deleted",
+                "topologysource_id": topologysource_id,
             }
         )
     except Exception as e:
