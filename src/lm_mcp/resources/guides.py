@@ -20,6 +20,12 @@ TOOL_CATEGORIES = {
                 "update_logicmodule",
             ],
         },
+        "universal_reference": {
+            "description": (
+                "Resource/Prompt mirrors exposed as Tools for clients without those primitives"
+            ),
+            "tools": ["get_reference", "get_workflow"],
+        },
         "discovery": {
             "description": "Tool search and discovery",
             "tools": ["search_tools"],

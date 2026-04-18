@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.1] - 2026-04-18
+
+### Added
+
+- `get_reference(category, name, list)`: universal read-only tool that mirrors MCP Resource content (schemas, enums, filters, syntax, guides) over the Tool primitive. Targets clients without full Resource support -- GitHub Copilot cloud agent, OpenAI Codex CLI, Cline. Pass `list=true` (or call with no args) to discover the available (category, name) pairs.
+- `get_workflow(name, list, arguments)`: universal read-only tool that mirrors MCP Prompt content for clients without Prompt support. Returns the rendered workflow guidance text. Prefer the composite workflow tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) when they exist -- those execute the procedure rather than returning guidance.
+- `universal_reference` entry in the tool-categories guide for `search_tools` discovery.
+- Seven single-word aliases in `_WORKFLOW_ALIASES` (`schema`, `filter`, `syntax`, `reference`, `guide`, `workflow`, `prompt`) route `search_tools` queries to the two new tools.
+
+### Changed
+
+- `prompts/registry.py`: hoisted the `templates` dict from inside `get_prompt_messages` to a module-level `_TEMPLATES` constant so `tools/reference.py` can import it without duplication. `get_prompt_messages` behavior is unchanged (same signature, same `ValueError` on unknown prompt).
+- Tool count: 236 -> 238 (LM), 265 -> 267 (overall: 238 LM + 18 AAP + 10 Terraform + 1 watsonx).
+- README release notes consolidated into this CHANGELOG; README now shows only the current version with a link here for full history.
+
 ## [3.6.0] - 2026-04-17
 
 ### Added
@@ -22,6 +37,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New module `src/lm_mcp/categories.py` with annotation-driven categorization plus a curated `WORKFLOW_TOOLS` frozenset.
 - `_filter_tools` (server.py), `execute_tool` rejection (server.py), and `check_required_tools` (workflows.py) all honor the new categories filter.
 - Tool count: 235 -> 236 (added `update_logicmodule`).
+
+## [3.5.0] - 2026-04-08
+
+### Added
+
+- `delete_configsource`, `delete_eventsource`, `delete_logsource`, `delete_propertysource`, `delete_topologysource` -- delete operations for all LogicModule source types.
+- `handle_conflict` and `fields_to_preserve` parameters on all `import_*` tools for safer imports into existing resources.
+
+### Fixed
+
+- `create_*` and `update_*` tools now auto-normalize field names from LM Exchange format and `snake_case` to the REST API's `camelCase`.
+- Import tools auto-inject the LM Exchange `type` envelope field when missing.
+
+## [3.4.0] - 2026-04-01
+
+### Added
+
+- REST API `create_*` and `update_*` tools for all LogicModule source types -- ConfigSource, EventSource, LogSource, TopologySource, PropertySource. Enables export -> modify -> update workflows without delete/recreate.
+
+### Fixed
+
+- `update_datasource` description now correctly documents full-replace semantics (name and displayName required).
+- All `import_*` tool descriptions clarify LM Exchange format requirement and direct users to `create_*` for REST API format.
+- All `export_*` tool descriptions reference both `create_*` and `update_*` for round-tripping.
+- Version synced across all locations (was drifted since v3.2.0).
+
+## [3.1.0] - [3.3.0] - 2026-03-25 - 2026-03-30
+
+### Added
+
+- Terraform IaC integration -- 10 tools (later 11 in v3.4.x) for plan/apply/state/import/HCL generation.
+- HuggingFace local Granite fallback for TTM forecasting and NL summaries via local models.
+- `[huggingface]` optional dependency group (`torch`, `transformers`, `granite-tsfm`, `accelerate`).
+- Device config retrieval and audit tools (`get_device_config`, `get_device_config_version`, `collect_device_config`).
+- `create_propertysource` REST API tool.
+- 5-way dispatch (Session, AWX, WatsonX, Terraform, LM) with graceful degradation when optional integrations are not configured.
+- AI inference priority chain: watsonx.ai API > HuggingFace local > statistical/linear fallback.
+
+## [3.0.0] - 2026-03-25
+
+### Added
+
+- IBM watsonx.ai integration (optional, requires `WATSONX_API_KEY`).
+- Granite TTM time-series forecasting via `method="ttm"` on `forecast_metric`.
+- Granite NL summaries via `summarize=true` on composite workflow tools.
+- `watsonx_summarize` standalone tool for ad-hoc data summarization.
+- `[ibm]` optional dependency group (`ibm-watsonx-ai`, `pandas`).
+- 4-way dispatch (Session, AWX, WatsonX, LM).
 
 ## [2.5.0] - 2026-03-24
 

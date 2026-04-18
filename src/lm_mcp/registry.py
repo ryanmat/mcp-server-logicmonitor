@@ -5214,6 +5214,74 @@ TOOLS.extend(
                 "required": ["type", "id", "changes"],
             },
         ),
+        Tool(
+            name="get_reference",
+            description=(
+                "Get LogicMonitor reference content (schemas, enums, filter syntax, guides). "
+                "Mirrors content from MCP Resources for clients without full Resource support "
+                "(Copilot cloud agent, OpenAI Codex, Cline). Categories: schema, enums, "
+                "filters, syntax, guide. Pass list=true (or omit both category and name) to "
+                "discover all available (category, name) pairs."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "enum": ["schema", "enums", "filters", "syntax", "guide"],
+                        "description": "Reference category",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": (
+                            "Resource name within the category (e.g., 'alerts', 'operators')"
+                        ),
+                    },
+                    "list": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "If true, return the available (category, name) pairs "
+                            "instead of content"
+                        ),
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_workflow",
+            description=(
+                "Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, "
+                "remediate_workflow, etc.). Mirrors MCP Prompt content for clients without "
+                "Prompt support. Prefer the composite workflow tools (triage, diagnose, "
+                "health_check, capacity_plan, portal_overview) when they exist -- those "
+                "execute the procedure. Pass list=true to discover available workflows."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Workflow name (e.g., 'incident_triage')",
+                    },
+                    "list": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "If true, return the list of available workflows with their arguments"
+                        ),
+                    },
+                    "arguments": {
+                        "type": "object",
+                        "description": (
+                            "Optional template arguments passed to the workflow text builder"
+                        ),
+                    },
+                },
+            },
+        ),
     ]
 )
 
@@ -5929,6 +5997,7 @@ def get_tool_handler(tool_name: str) -> Any:
         oids,
         ops,
         propertysources,
+        reference,
         remediationsources,
         reports,
         resources,
@@ -6241,6 +6310,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "diagnose": workflows.diagnose,
         "search_tools": workflows.search_tools,
         "update_logicmodule": workflows.update_logicmodule,
+        # Universal reference layer (Resource/Prompt mirrors for non-Claude clients)
+        "get_reference": reference.get_reference,
+        "get_workflow": reference.get_workflow,
         # IBM watsonx.ai
         "watsonx_summarize": watsonx.watsonx_summarize,
         # Terraform IaC

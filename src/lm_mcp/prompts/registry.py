@@ -304,6 +304,27 @@ PROMPTS: list[Prompt] = [
 ]
 
 
+# Module-level template dispatch. Exported so tools/reference.py can mirror
+# prompt content for clients without native Prompt support.
+_TEMPLATES = {
+    "incident_triage": incident_triage_template,
+    "capacity_review": capacity_review_template,
+    "health_check": health_check_template,
+    "alert_summary": alert_summary_template,
+    "sdt_planning": sdt_planning_template,
+    "cost_optimization": cost_optimization_template,
+    "audit_review": audit_review_template,
+    "alert_correlation": alert_correlation_template,
+    "collector_health": collector_health_template,
+    "troubleshoot_device": troubleshoot_device_template,
+    "top_talkers": top_talkers_template,
+    "rca_workflow": rca_workflow_template,
+    "capacity_forecast": capacity_forecast_template,
+    "remediate_workflow": remediate_workflow_template,
+    "remediation": remediation_template,
+}
+
+
 def get_prompt_messages(name: str, arguments: dict) -> GetPromptResult:
     """Get the messages for a prompt.
 
@@ -317,28 +338,10 @@ def get_prompt_messages(name: str, arguments: dict) -> GetPromptResult:
     Raises:
         ValueError: If prompt not found.
     """
-    templates = {
-        "incident_triage": incident_triage_template,
-        "capacity_review": capacity_review_template,
-        "health_check": health_check_template,
-        "alert_summary": alert_summary_template,
-        "sdt_planning": sdt_planning_template,
-        "cost_optimization": cost_optimization_template,
-        "audit_review": audit_review_template,
-        "alert_correlation": alert_correlation_template,
-        "collector_health": collector_health_template,
-        "troubleshoot_device": troubleshoot_device_template,
-        "top_talkers": top_talkers_template,
-        "rca_workflow": rca_workflow_template,
-        "capacity_forecast": capacity_forecast_template,
-        "remediate_workflow": remediate_workflow_template,
-        "remediation": remediation_template,
-    }
-
-    if name not in templates:
+    if name not in _TEMPLATES:
         raise ValueError(f"Unknown prompt: {name}")
 
-    template_func = templates[name]
+    template_func = _TEMPLATES[name]
     content = template_func(arguments)
 
     return GetPromptResult(

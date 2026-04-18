@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 265+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 267+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -70,70 +70,18 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## Release Notes
+## What's New in v3.6.1
 
-### v3.6.0 (Current)
-- **New**: `LM_MCP_CATEGORIES` env var -- filter the visible tool surface by logical category (`read`, `write`, `delete`, `export`, `import`, `session`, `workflow`). Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows the surface, never expands. Solves Cursor's 40-tool client cap and lets users restrict agents to read-only or workflow operations. Default behavior unchanged when env var is unset.
-- **New**: `update_logicmodule(type, id, changes, mode='preview')` workflow tool -- safe partial update for the 6 LogicModule source types. Exports the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (default) or applies the merged definition. Prevents the full-replace blanking footgun that has caused two prior production incidents wiping Groovy scripts.
-- **Changed**: The 6 raw `update_<source>` tools now require `confirm=true` to proceed. Without confirmation they return `CONFIRMATION_REQUIRED` with a pointer to `update_logicmodule` for safe partial updates. Soft-breaking change for direct API users; LLM callers can no longer accidentally pick the unsafe variant.
-- **Fix**: `handle_error` now logs unexpected exceptions via `logger.exception()` before returning the sanitized response. Stops the silent-swallow pattern that made `JSONDecodeError`, `KeyError`, `ValueError` and other non-`LMError` exceptions invisible to operators.
-- **Counts**: 265 tools (236 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
+- **New**: `get_reference(category, name, list)` -- universal read-only tool that mirrors MCP Resource content (schemas, enums, filters, syntax, guides) over the Tool primitive. Targets clients without full Resource support (GitHub Copilot cloud agent, OpenAI Codex CLI, Cline). Pass `list=true` or call with no args to discover available pairs.
+- **New**: `get_workflow(name, list, arguments)` -- universal read-only tool that mirrors MCP Prompt content for clients without Prompt support. Returns the rendered workflow guidance text. Prefer the composite workflow tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) when they exist -- those execute the procedure rather than returning guidance.
+- **Changed**: Tool count 265 -> 267 (238 LM + 18 AAP + 10 Terraform + 1 watsonx).
+- **Internal**: Hoisted the prompt template dispatch dict from inside `get_prompt_messages` to a module-level `_TEMPLATES` constant so the reference-layer handlers can reuse it. Public behavior of `get_prompt_messages` is unchanged.
 
-### v3.5.0
-- **New**: `delete_configsource`, `delete_eventsource`, `delete_logsource`, `delete_propertysource`, `delete_topologysource` -- delete operations for all LogicModule source types
-- **New**: `handle_conflict` and `fields_to_preserve` parameters on all import tools
-- **Fix**: create/update tools now auto-normalize field names from LM Exchange format and snake_case to REST API camelCase
-- **Fix**: import tools auto-inject LM Exchange `type` envelope field when missing
-
-### v3.4.0
-- **New**: REST API create/update tools for all LogicModule source types -- ConfigSource, EventSource, LogSource, TopologySource, PropertySource. Enables export -> modify -> update workflows without delete/recreate.
-- **Fix**: `update_datasource` description now correctly documents full-replace semantics (name and displayName required).
-- **Fix**: All `import_*` tool descriptions clarify LM Exchange format requirement and direct users to `create_*` for REST API format.
-- **Fix**: All `export_*` tool descriptions reference both `create_*` and `update_*` for round-tripping.
-- **Fix**: Version synced across all locations (was drifted since v3.2.0).
-
-### Changelog
-
-<details>
-<summary>v3.1.0-v3.3.0 — Terraform, HuggingFace, config tools, PropertySource create</summary>
-
-- Terraform IaC integration -- 11 tools for plan, apply, state, import, and HCL generation
-- HuggingFace local Granite fallback -- TTM forecasting and NL summaries via local models
-- `[huggingface]` optional dependency group (torch, transformers, granite-tsfm, accelerate)
-- Device config data retrieval and audit tools (get_device_config, get_device_config_version, collect_device_config)
-- create_propertysource REST API tool
-- 5-way dispatch (Session, AWX, WatsonX, Terraform, LM) with graceful degradation
-- AI inference priority chain: watsonx.ai API > HuggingFace local > statistical/linear
-</details>
-
-### Changelog
-
-<details>
-<summary>v3.0.0 — IBM watsonx.ai integration</summary>
-
-- IBM watsonx.ai integration (optional, requires `WATSONX_API_KEY`)
-- Granite TTM time series forecasting via `method="ttm"` on `forecast_metric`
-- Granite NL summaries via `summarize=true` on composite workflow tools
-- `watsonx_summarize` standalone tool for ad-hoc data summarization
-- `[ibm]` optional dependency group (`ibm-watsonx-ai`, `pandas`)
-- 4-way dispatch (Session, AWX, WatsonX, LM)
-</details>
-
-<details>
-<summary>v2.0.0–v2.6.0 — Composite workflows, ML analysis, AAP integration</summary>
-
-- Progressive discovery via `search_tools`
-- Holt-Winters, IQR/MAD anomaly detection, prediction intervals
-- `calculate_error_budget` SLO tracking
-- RemediationSource execution with 8-point safety checklist
-- 18 Ansible Automation Platform tools
-- User/role CRUD, collector group management, ops notes
-- Portal URL links, HTTPS transport
-</details>
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Features
 
-**265+ Tools** across comprehensive LogicMonitor API coverage (236 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**267+ Tools** across comprehensive LogicMonitor API coverage (238 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -515,7 +463,7 @@ For surgical control, combine with `LM_ENABLED_TOOLS`:
 }
 ```
 
-The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. Default behavior (env var unset) returns all 265 tools — backwards compatible.
+The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. Default behavior (env var unset) returns all 267 tools — backwards compatible.
 
 ### Claude Desktop
 
