@@ -72,12 +72,18 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Release Notes
 
-### v3.5.0 (Current)
+### v3.6.0 (Current)
+- **New**: `LM_MCP_CATEGORIES` env var -- filter the visible tool surface by logical category (`read`, `write`, `delete`, `export`, `import`, `session`, `workflow`). Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows the surface, never expands. Solves Cursor's 40-tool client cap and lets users restrict agents to read-only or workflow operations. Default behavior unchanged when env var is unset.
+- **New**: `update_logicmodule(type, id, changes, mode='preview')` workflow tool -- safe partial update for the 6 LogicModule source types. Exports the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (default) or applies the merged definition. Prevents the full-replace blanking footgun that has caused two prior production incidents wiping Groovy scripts.
+- **Changed**: The 6 raw `update_<source>` tools now require `confirm=true` to proceed. Without confirmation they return `CONFIRMATION_REQUIRED` with a pointer to `update_logicmodule` for safe partial updates. Soft-breaking change for direct API users; LLM callers can no longer accidentally pick the unsafe variant.
+- **Fix**: `handle_error` now logs unexpected exceptions via `logger.exception()` before returning the sanitized response. Stops the silent-swallow pattern that made `JSONDecodeError`, `KeyError`, `ValueError` and other non-`LMError` exceptions invisible to operators.
+- **Counts**: 265 tools (236 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
+
+### v3.5.0
 - **New**: `delete_configsource`, `delete_eventsource`, `delete_logsource`, `delete_propertysource`, `delete_topologysource` -- delete operations for all LogicModule source types
 - **New**: `handle_conflict` and `fields_to_preserve` parameters on all import tools
 - **Fix**: create/update tools now auto-normalize field names from LM Exchange format and snake_case to REST API camelCase
 - **Fix**: import tools auto-inject LM Exchange `type` envelope field when missing
-- **Counts**: 265 tools (236 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
 
 ### v3.4.0
 - **New**: REST API create/update tools for all LogicModule source types -- ConfigSource, EventSource, LogSource, TopologySource, PropertySource. Enables export -> modify -> update workflows without delete/recreate.
@@ -180,7 +186,8 @@ Multi-step analysis tools that combine several sub-tools into a single call. Eac
 - **Capacity Plan**: Per-datasource forecasting, trend classification, seasonality detection, and change point analysis
 - **Portal Overview**: Alert statistics, collector health, active SDTs, alert clusters, noise assessment, and down devices
 - **Diagnose**: Alert details, device context, correlation, blast radius, health scoring, and root cause analysis
-- **Search Tools**: Keyword search across all 230 tools by name and description with category filtering
+- **Update LogicModule (Safe Partial Updates)**: `update_logicmodule(type, id, changes, mode)` exports the current full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff (default) or applies the merge. Prevents the full-replace blanking that wiped production Groovy scripts in two prior incidents. Supports configsource, datasource, eventsource, logsource, propertysource, topologysource.
+- **Search Tools**: Keyword search across all tools by name and description with category filtering
 
 ### APM Trace Tools
 
@@ -478,6 +485,37 @@ To enable write operations and ingestion APIs:
 ```
 
 Then restart Cursor or enable the server in **Cursor Settings** → **MCP**.
+
+**Cursor's 40-tool cap (recommended for v3.6.0+):** Cursor only loads the first 40 MCP tools — the remaining ~225 are invisible to the agent. Use `LM_MCP_CATEGORIES` to fit a curated subset under the cap. The `workflow` category alone (`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, scoring/correlation tools, plus `update_logicmodule`) is roughly 21 tools and covers the 80% case:
+
+```json
+{
+  "mcpServers": {
+    "logicmonitor": {
+      "command": "uvx",
+      "args": ["--from", "lm-mcp", "lm-mcp-server"],
+      "env": {
+        "LM_PORTAL": "yourcompany.logicmonitor.com",
+        "LM_BEARER_TOKEN": "your-bearer-token",
+        "LM_MCP_CATEGORIES": "workflow"
+      }
+    }
+  }
+}
+```
+
+For surgical control, combine with `LM_ENABLED_TOOLS`:
+
+```json
+"env": {
+  "LM_PORTAL": "yourcompany.logicmonitor.com",
+  "LM_BEARER_TOKEN": "your-bearer-token",
+  "LM_ENABLED_TOOLS": "triage,diagnose,health_check,portal_overview,get_alerts,get_devices,get_alert_details,acknowledge_alert,search_tools",
+  "LM_MCP_CATEGORIES": "read,workflow"
+}
+```
+
+The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. Default behavior (env var unset) returns all 265 tools — backwards compatible.
 
 ### Claude Desktop
 
