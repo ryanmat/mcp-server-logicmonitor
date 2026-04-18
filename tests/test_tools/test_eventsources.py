@@ -354,9 +354,7 @@ class TestUpdateEventsource:
     ):
         from lm_mcp.tools.eventsources import update_eventsource
 
-        result = await update_eventsource(
-            client, eventsource_id=100, definition={"name": "X"}
-        )
+        result = await update_eventsource(client, eventsource_id=100, definition={"name": "X"})
         text = result[0].text
         assert "confirm" in text.lower()
         assert "update_logicmodule" in text

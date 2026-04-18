@@ -2246,7 +2246,8 @@ TOOLS.extend(
                         "default": False,
                         "description": (
                             "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                            "accidental field-blanking. Use update_logicmodule for safe "
+                            "partial updates."
                         ),
                     },
                 },
@@ -3309,14 +3310,17 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "FULL ConfigSource definition with all fields (will replace)",
+                        "description": (
+                            "FULL ConfigSource definition with all fields (will replace)"
+                        ),
                     },
                     "confirm": {
                         "type": "boolean",
                         "default": False,
                         "description": (
                             "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                            "accidental field-blanking. Use update_logicmodule for safe "
+                            "partial updates."
                         ),
                     },
                 },
@@ -3387,7 +3391,8 @@ TOOLS.extend(
                         "default": False,
                         "description": (
                             "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                            "accidental field-blanking. Use update_logicmodule for safe "
+                            "partial updates."
                         ),
                     },
                 },
@@ -3498,14 +3503,17 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "FULL PropertySource definition with all fields (will replace)",
+                        "description": (
+                            "FULL PropertySource definition with all fields (will replace)"
+                        ),
                     },
                     "confirm": {
                         "type": "boolean",
                         "default": False,
                         "description": (
                             "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                            "accidental field-blanking. Use update_logicmodule for safe "
+                            "partial updates."
                         ),
                     },
                 },
@@ -3599,7 +3607,8 @@ TOOLS.extend(
                         "default": False,
                         "description": (
                             "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                            "accidental field-blanking. Use update_logicmodule for safe "
+                            "partial updates."
                         ),
                     },
                 },
@@ -3686,14 +3695,17 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "FULL TopologySource definition with all fields (will replace)",
+                        "description": (
+                            "FULL TopologySource definition with all fields (will replace)"
+                        ),
                     },
                     "confirm": {
                         "type": "boolean",
                         "default": False,
                         "description": (
                             "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                            "accidental field-blanking. Use update_logicmodule for safe "
+                            "partial updates."
                         ),
                     },
                 },

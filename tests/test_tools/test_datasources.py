@@ -618,9 +618,7 @@ class TestUpdateDatasource:
         """update_datasource without confirm=True returns CONFIRMATION_REQUIRED."""
         from lm_mcp.tools.datasources import update_datasource
 
-        result = await update_datasource(
-            client, datasource_id=100, definition={"name": "X"}
-        )
+        result = await update_datasource(client, datasource_id=100, definition={"name": "X"})
 
         text = result[0].text
         assert "confirm=true" in text.lower() or "confirm" in text.lower()

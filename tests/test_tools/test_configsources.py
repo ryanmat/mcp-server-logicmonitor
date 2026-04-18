@@ -157,9 +157,7 @@ class TestUpdateConfigsource:
     ):
         from lm_mcp.tools.configsources import update_configsource
 
-        result = await update_configsource(
-            client, configsource_id=100, definition={"name": "X"}
-        )
+        result = await update_configsource(client, configsource_id=100, definition={"name": "X"})
         text = result[0].text
         assert "confirm" in text.lower()
         assert "update_logicmodule" in text

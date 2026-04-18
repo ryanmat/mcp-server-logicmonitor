@@ -10,9 +10,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from lm_mcp.tools.workflows import (
+    _LM_TYPES,
     _deep_merge,
     _diff,
-    _LM_TYPES,
     update_logicmodule,
 )
 
@@ -75,7 +75,7 @@ class TestDeepMerge:
     def test_path_threading_in_warnings(self):
         base = {"outer": {"inner": "x"}}
         overlay = {"outer": {"missing": None}}
-        out, warnings = _deep_merge(base, overlay)
+        _, warnings = _deep_merge(base, overlay)
         assert any("outer.missing" in w for w in warnings)
 
 
