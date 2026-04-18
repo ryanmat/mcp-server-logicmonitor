@@ -582,6 +582,7 @@ class TestUpdateDatasource:
             client,
             datasource_id=100,
             definition={"name": "UpdatedDS", "displayName": "Updated DataSource"},
+            confirm=True,
         )
 
         assert route.called
@@ -604,10 +605,26 @@ class TestUpdateDatasource:
             )
         )
 
-        await update_datasource(client, datasource_id=100, definition={"id": 999, "name": "DS"})
+        await update_datasource(
+            client, datasource_id=100, definition={"id": 999, "name": "DS"}, confirm=True
+        )
 
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+    async def test_update_datasource_without_confirm_errors_with_pointer(
+        self, client, enable_writes
+    ):
+        """update_datasource without confirm=True returns CONFIRMATION_REQUIRED."""
+        from lm_mcp.tools.datasources import update_datasource
+
+        result = await update_datasource(
+            client, datasource_id=100, definition={"name": "X"}
+        )
+
+        text = result[0].text
+        assert "confirm=true" in text.lower() or "confirm" in text.lower()
+        assert "update_logicmodule" in text
 
     @respx.mock
     async def test_update_datasource_handles_error(self, client, enable_writes):
@@ -618,7 +635,9 @@ class TestUpdateDatasource:
             return_value=httpx.Response(404, json={"errorMessage": "DataSource not found"})
         )
 
-        result = await update_datasource(client, datasource_id=999, definition={"name": "Missing"})
+        result = await update_datasource(
+            client, datasource_id=999, definition={"name": "Missing"}, confirm=True
+        )
 
         assert "Error:" in result[0].text
 

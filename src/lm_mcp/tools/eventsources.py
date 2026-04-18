@@ -158,21 +158,37 @@ async def update_eventsource(
     client: LogicMonitorClient,
     eventsource_id: int,
     definition: dict,
+    confirm: bool = False,
 ) -> list[TextContent]:
     """Update an existing EventSource via REST API (full replace).
 
     The LM API uses full-replace semantics: every field not included in the
-    definition will be blanked. Recommended workflow: export_eventsource ->
-    modify the export -> update_eventsource with the full payload.
+    definition will be blanked. PREFER update_logicmodule for partial updates;
+    it exports, deep-merges, and previews a diff before writing.
 
     Args:
         client: LogicMonitor API client.
         eventsource_id: EventSource ID to update.
         definition: Full EventSource definition dict with all fields.
+        confirm: Must be True to proceed. Defaults to False to prevent
+            accidental field-blanking via partial payloads.
 
     Returns:
         List of TextContent with updated EventSource info or error.
     """
+    if not confirm:
+        return format_response(
+            {
+                "error": True,
+                "code": "CONFIRMATION_REQUIRED",
+                "message": (
+                    "update_eventsource is full-replace -- any field omitted from "
+                    "`definition` will be BLANKED. Set confirm=true to proceed, OR "
+                    "use update_logicmodule(type='eventsource', id, changes, mode='preview') "
+                    "for a safe partial update with diff preview."
+                ),
+            }
+        )
     try:
         payload = normalize_definition_fields(definition)
         payload.pop("id", None)

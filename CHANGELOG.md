@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-04-17
+
+### Added
+
+- `LM_MCP_CATEGORIES` env var: filter the visible tool surface by logical category. Categories: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap) and for restricting agent surface to read-only or workflow operations. Default behavior unchanged when env var is unset.
+- `update_logicmodule(type, id, changes, mode='preview')` workflow tool: safe partial update for LogicMonitor source types (configsource, datasource, eventsource, logsource, propertysource, topologysource). Exports the current full definition, deep-merges your `changes` onto it, validates required fields, and returns a dry-run diff (`mode='preview'`, default) or applies the merged definition (`mode='apply'`). Prevents the full-replace blanking footgun that has caused two prior production incidents.
+
+### Changed
+
+- The 6 raw `update_<source>` tools (`update_configsource`, `update_datasource`, `update_eventsource`, `update_logsource`, `update_propertysource`, `update_topologysource`) now require `confirm=true` to proceed. Without confirmation they return `CONFIRMATION_REQUIRED` with a pointer to `update_logicmodule` for safe partial updates. This is a soft-breaking change for direct API users who relied on the old default; the rationale is that two prior incidents wiped Groovy scripts via these tools, and LLM-driven callers cannot be relied upon to read docstrings about full-replace semantics.
+- `handle_error` now logs unexpected exceptions via `logger.exception()` before returning the sanitized response. Previously, JSONDecodeError / KeyError / ValueError and other non-`LMError` exceptions were silently swallowed without leaving a stack trace, making debugging impossible. LMError instances continue to propagate without logging (they're expected).
+
+### Internal
+
+- New module `src/lm_mcp/categories.py` with annotation-driven categorization plus a curated `WORKFLOW_TOOLS` frozenset.
+- `_filter_tools` (server.py), `execute_tool` rejection (server.py), and `check_required_tools` (workflows.py) all honor the new categories filter.
+- Tool count: 235 -> 236 (added `update_logicmodule`).
+
 ## [2.5.0] - 2026-03-24
 
 ### Added

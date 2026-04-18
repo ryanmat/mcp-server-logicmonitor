@@ -325,6 +325,7 @@ class TestUpdateEventsource:
             client,
             eventsource_id=100,
             definition={"name": "UpdatedES", "displayName": "Updated EventSource"},
+            confirm=True,
         )
 
         assert route.called
@@ -342,9 +343,23 @@ class TestUpdateEventsource:
             return_value=httpx.Response(200, json={"id": 100, "name": "ES"}),
         )
 
-        await update_eventsource(client, eventsource_id=100, definition={"id": 999, "name": "ES"})
+        await update_eventsource(
+            client, eventsource_id=100, definition={"id": 999, "name": "ES"}, confirm=True
+        )
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+    async def test_update_eventsource_without_confirm_errors_with_pointer(
+        self, client, enable_writes
+    ):
+        from lm_mcp.tools.eventsources import update_eventsource
+
+        result = await update_eventsource(
+            client, eventsource_id=100, definition={"name": "X"}
+        )
+        text = result[0].text
+        assert "confirm" in text.lower()
+        assert "update_logicmodule" in text
 
 
 class TestDeleteEventsource:

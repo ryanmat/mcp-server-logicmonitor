@@ -5,12 +5,15 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 from collections.abc import Callable
 from typing import Any, TypeVar
 
 from mcp.types import TextContent
 
 from lm_mcp.exceptions import LMError
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "SEVERITY_MAP",
@@ -254,7 +257,9 @@ def handle_error(error: Exception) -> list[TextContent]:
     if isinstance(error, LMError):
         return format_response(error.to_dict())
 
-    # Generic exception - wrap in standard format
+    # Log unexpected exceptions with stack trace before returning sanitized response.
+    # Without this, JSONDecodeError, KeyError, ValueError, etc. are silently swallowed.
+    logger.exception("unhandled error in tool handler")
     return format_response(
         {
             "error": True,

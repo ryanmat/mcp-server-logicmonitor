@@ -295,7 +295,9 @@ class TestUpdateLogsource:
             return_value=httpx.Response(200, json={"id": 100, "name": "UpdatedLS"})
         )
 
-        result = await update_logsource(client, logsource_id=100, definition={"name": "UpdatedLS"})
+        result = await update_logsource(
+            client, logsource_id=100, definition={"name": "UpdatedLS"}, confirm=True
+        )
 
         assert route.called
         data = json.loads(result[0].text)
@@ -310,9 +312,21 @@ class TestUpdateLogsource:
             return_value=httpx.Response(200, json={"id": 100, "name": "LS"}),
         )
 
-        await update_logsource(client, logsource_id=100, definition={"id": 999, "name": "LS"})
+        await update_logsource(
+            client, logsource_id=100, definition={"id": 999, "name": "LS"}, confirm=True
+        )
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+    async def test_update_logsource_without_confirm_errors_with_pointer(
+        self, client, enable_writes
+    ):
+        from lm_mcp.tools.logsources import update_logsource
+
+        result = await update_logsource(client, logsource_id=100, definition={"name": "X"})
+        text = result[0].text
+        assert "confirm" in text.lower()
+        assert "update_logicmodule" in text
 
 
 class TestDeleteLogsource:

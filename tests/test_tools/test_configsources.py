@@ -128,6 +128,7 @@ class TestUpdateConfigsource:
             client,
             configsource_id=100,
             definition={"name": "UpdatedCS", "displayName": "Updated ConfigSource"},
+            confirm=True,
         )
 
         assert route.called
@@ -145,9 +146,23 @@ class TestUpdateConfigsource:
             return_value=httpx.Response(200, json={"id": 100, "name": "CS"}),
         )
 
-        await update_configsource(client, configsource_id=100, definition={"id": 999, "name": "CS"})
+        await update_configsource(
+            client, configsource_id=100, definition={"id": 999, "name": "CS"}, confirm=True
+        )
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+    async def test_update_configsource_without_confirm_errors_with_pointer(
+        self, client, enable_writes
+    ):
+        from lm_mcp.tools.configsources import update_configsource
+
+        result = await update_configsource(
+            client, configsource_id=100, definition={"name": "X"}
+        )
+        text = result[0].text
+        assert "confirm" in text.lower()
+        assert "update_logicmodule" in text
 
 
 class TestDeleteConfigsource:

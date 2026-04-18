@@ -157,21 +157,37 @@ async def update_propertysource(
     client: LogicMonitorClient,
     propertysource_id: int,
     definition: dict,
+    confirm: bool = False,
 ) -> list[TextContent]:
     """Update an existing PropertySource via REST API (full replace).
 
     The LM API uses full-replace semantics: every field not included in the
-    definition will be blanked. Recommended workflow: export_propertysource ->
-    modify the export -> update_propertysource with the full payload.
+    definition will be blanked. PREFER update_logicmodule for partial updates;
+    it exports, deep-merges, and previews a diff before writing.
 
     Args:
         client: LogicMonitor API client.
         propertysource_id: PropertySource ID to update.
         definition: Full PropertySource definition dict with all fields.
+        confirm: Must be True to proceed. Defaults to False to prevent
+            accidental field-blanking via partial payloads.
 
     Returns:
         List of TextContent with updated PropertySource info or error.
     """
+    if not confirm:
+        return format_response(
+            {
+                "error": True,
+                "code": "CONFIRMATION_REQUIRED",
+                "message": (
+                    "update_propertysource is full-replace -- any field omitted from "
+                    "`definition` will be BLANKED. Set confirm=true to proceed, OR "
+                    "use update_logicmodule(type='propertysource', id, changes, mode='preview') "
+                    "for a safe partial update with diff preview."
+                ),
+            }
+        )
     try:
         payload = normalize_definition_fields(definition)
         payload.pop("id", None)

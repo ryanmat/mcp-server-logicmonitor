@@ -147,7 +147,7 @@ RESOURCES: list[Resource] = [
     Resource(
         uri="lm://guide/tool-categories",
         name="Tool Categories",
-        description="All 157 LogicMonitor MCP tools organized by domain category",
+        description="All LogicMonitor MCP tools organized by domain category",
         mimeType="application/json",
     ),
     Resource(

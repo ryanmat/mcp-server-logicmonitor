@@ -55,6 +55,10 @@ class LMConfig(BaseSettings):
         LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
         LM_ENABLED_TOOLS: Comma-separated tool names or glob patterns to enable (default: all)
         LM_DISABLED_TOOLS: Comma-separated tool names or glob patterns to disable (default: none)
+        LM_MCP_CATEGORIES: Comma-separated categories to include (default: all).
+            Categories: read, write, delete, export, import, session, workflow.
+            Composes by intersection with LM_ENABLED_TOOLS / LM_DISABLED_TOOLS --
+            only narrows the surface, never expands.
         LM_HEALTH_CHECK_CONNECTIVITY: Include LM API ping in health checks (default: false)
         LM_LOG_LEVEL: Logging level - debug, info, warning, or error (default: warning)
 
@@ -92,6 +96,8 @@ class LMConfig(BaseSettings):
     # Tool filtering
     enabled_tools: str | None = None
     disabled_tools: str | None = None
+    # Comma-separated: read,write,delete,export,import,session,workflow
+    mcp_categories: str | None = None
 
     # Health check settings
     health_check_connectivity: bool = False

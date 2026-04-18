@@ -142,24 +142,36 @@ def _set_tf_runner(runner) -> None:
 
 
 def _filter_tools(tools: list, config) -> list:
-    """Filter tools based on LM_ENABLED_TOOLS or LM_DISABLED_TOOLS config.
+    """Filter tools based on LM_ENABLED_TOOLS, LM_DISABLED_TOOLS, and LM_MCP_CATEGORIES.
 
     Supports comma-separated tool names and glob patterns (e.g., "get_*", "delete_*").
+    LM_MCP_CATEGORIES composes by intersection — it narrows the result of the
+    enabled/disabled pass but never expands it.
 
     Args:
         tools: Full list of Tool objects.
-        config: LMConfig instance with enabled_tools/disabled_tools.
+        config: LMConfig instance with enabled_tools/disabled_tools/mcp_categories.
 
     Returns:
         Filtered list of Tool objects.
     """
     if config.enabled_tools:
         patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
-        return [t for t in tools if any(fnmatch(t.name, pat) for pat in patterns)]
-
-    if config.disabled_tools:
+        tools = [t for t in tools if any(fnmatch(t.name, pat) for pat in patterns)]
+    elif config.disabled_tools:
         patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
-        return [t for t in tools if not any(fnmatch(t.name, pat) for pat in patterns)]
+        tools = [t for t in tools if not any(fnmatch(t.name, pat) for pat in patterns)]
+
+    if config.mcp_categories:
+        from lm_mcp.categories import filter_by_categories
+
+        tools, unknown = filter_by_categories(tools, config.mcp_categories)
+        if unknown:
+            logger.warning(
+                "LM_MCP_CATEGORIES contains unknown tokens %s — ignored. "
+                "Known categories: read, write, delete, export, import, session, workflow",
+                unknown,
+            )
 
     return tools
 
@@ -230,6 +242,22 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                         type="text",
                         text=f"Error: Tool '{name}' is disabled. "
                         f"Disabled tools: {config.disabled_tools}",
+                    )
+                ]
+
+        if config.mcp_categories:
+            from lm_mcp.categories import tool_in_categories
+
+            tools_index = {t.name: t for t in TOOLS}
+            tools_index.update({t.name: t for t in AWX_TOOLS})
+            tools_index.update({t.name: t for t in WATSONX_TOOLS})
+            tools_index.update({t.name: t for t in TF_TOOLS})
+            if not tool_in_categories(name, tools_index, config.mcp_categories):
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Error: Tool '{name}' is excluded by LM_MCP_CATEGORIES "
+                        f"(active categories: {config.mcp_categories}).",
                     )
                 ]
 

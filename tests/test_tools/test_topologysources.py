@@ -136,6 +136,7 @@ class TestUpdateTopologysource:
             client,
             topologysource_id=100,
             definition={"name": "UpdatedTS", "displayName": "Updated TopologySource"},
+            confirm=True,
         )
 
         assert route.called
@@ -154,10 +155,22 @@ class TestUpdateTopologysource:
         )
 
         await update_topologysource(
-            client, topologysource_id=100, definition={"id": 999, "name": "TS"}
+            client, topologysource_id=100, definition={"id": 999, "name": "TS"}, confirm=True
         )
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
+
+    async def test_update_topologysource_without_confirm_errors_with_pointer(
+        self, client, enable_writes
+    ):
+        from lm_mcp.tools.topologysources import update_topologysource
+
+        result = await update_topologysource(
+            client, topologysource_id=100, definition={"name": "X"}
+        )
+        text = result[0].text
+        assert "confirm" in text.lower()
+        assert "update_logicmodule" in text
 
 
 class TestDeleteTopologysource:

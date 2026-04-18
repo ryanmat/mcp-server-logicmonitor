@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 264+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 265+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -77,7 +77,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 - **New**: `handle_conflict` and `fields_to_preserve` parameters on all import tools
 - **Fix**: create/update tools now auto-normalize field names from LM Exchange format and snake_case to REST API camelCase
 - **Fix**: import tools auto-inject LM Exchange `type` envelope field when missing
-- **Counts**: 264 tools (235 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
+- **Counts**: 265 tools (236 LM + 18 AAP + 10 Terraform + 1 watsonx), 15 prompts, 26 resources
 
 ### v3.4.0
 - **New**: REST API create/update tools for all LogicModule source types -- ConfigSource, EventSource, LogSource, TopologySource, PropertySource. Enables export -> modify -> update workflows without delete/recreate.
@@ -127,7 +127,7 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## Features
 
-**264+ Tools** across comprehensive LogicMonitor API coverage (235 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**265+ Tools** across comprehensive LogicMonitor API coverage (236 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -361,6 +361,9 @@ The server exposes health endpoints for container orchestration:
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
 | `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error` |
 | `LM_FIELD_VALIDATION` | No | `warn` | Field validation: `off`, `warn`, or `error` |
+| `LM_ENABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to enable (e.g., `get_*,triage`). Mutually exclusive with `LM_DISABLED_TOOLS`. |
+| `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable (e.g., `delete_*`). Mutually exclusive with `LM_ENABLED_TOOLS`. |
+| `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
 | `LM_ANALYSIS_TTL_MINUTES` | No | `60` | TTL for scheduled analysis results (1-1440 minutes) |

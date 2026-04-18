@@ -10,9 +10,10 @@ from lm_mcp.server import _filter_tools
 class _MockConfig:
     """Lightweight config mock for tool filtering tests."""
 
-    def __init__(self, enabled_tools=None, disabled_tools=None):
+    def __init__(self, enabled_tools=None, disabled_tools=None, mcp_categories=None):
         self.enabled_tools = enabled_tools
         self.disabled_tools = disabled_tools
+        self.mcp_categories = mcp_categories
 
 
 class TestFilterTools:
@@ -97,3 +98,97 @@ class TestCallToolRejection:
 
         result = await call_tool("delete_device", {"device_id": 1})
         assert "not enabled" in result[0].text.lower() or "error" in result[0].text.lower()
+
+
+class TestCategoryFilter:
+    """Tests for the LM_MCP_CATEGORIES annotation-based filter."""
+
+    def test_categories_unset_returns_all(self):
+        config = _MockConfig()
+        result = _filter_tools(TOOLS, config)
+        assert len(result) == len(TOOLS)
+
+    def test_categories_read_only_excludes_destructive(self):
+        config = _MockConfig(mcp_categories="read")
+        result = _filter_tools(TOOLS, config)
+        for tool in result:
+            assert tool.annotations is not None
+            assert tool.annotations.readOnlyHint, (
+                f"{tool.name} appeared in read-only filter but has readOnlyHint=False"
+            )
+            assert not tool.annotations.destructiveHint, (
+                f"{tool.name} appeared in read filter but is destructive"
+            )
+
+    def test_categories_workflow_returns_curated_set(self):
+        from lm_mcp.categories import WORKFLOW_TOOLS
+
+        config = _MockConfig(mcp_categories="workflow")
+        result = _filter_tools(TOOLS, config)
+        names = {t.name for t in result}
+        # update_logicmodule isn't registered yet — strip from the expected set
+        # for the curation-feature-only test pass.
+        expected = WORKFLOW_TOOLS & {t.name for t in TOOLS}
+        assert names == expected
+
+    def test_categories_export_only(self):
+        config = _MockConfig(mcp_categories="export")
+        result = _filter_tools(TOOLS, config)
+        for tool in result:
+            assert tool.name.startswith("export_"), (
+                f"{tool.name} appeared in export filter but doesn't start with export_"
+            )
+
+    def test_categories_intersect_with_enabled_tools(self):
+        """LM_MCP_CATEGORIES narrows further; never expands."""
+        config = _MockConfig(enabled_tools="get_*", mcp_categories="read")
+        result = _filter_tools(TOOLS, config)
+        for tool in result:
+            assert tool.name.startswith("get_")
+            assert tool.annotations is not None and tool.annotations.readOnlyHint
+
+    def test_categories_unknown_token_warned_not_errored(self, caplog):
+        import logging
+
+        config = _MockConfig(mcp_categories="read,bogus,workflow")
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.server"):
+            result = _filter_tools(TOOLS, config)
+        # Unknown token logs a warning but does not error
+        assert any("bogus" in r.message for r in caplog.records)
+        # Filter still applies based on the valid tokens
+        for tool in result:
+            cats_present = []
+            if (
+                tool.annotations is not None
+                and tool.annotations.readOnlyHint
+                and tool.annotations.openWorldHint
+            ):
+                cats_present.append("read")
+            from lm_mcp.categories import WORKFLOW_TOOLS
+
+            if tool.name in WORKFLOW_TOOLS:
+                cats_present.append("workflow")
+            assert cats_present, f"{tool.name} survived filter but matches no valid category"
+
+    def test_categories_all_typos_returns_unfiltered(self):
+        """Defensive: all-typo input does not silently empty the surface."""
+        config = _MockConfig(mcp_categories="bogus,nonsense")
+        result = _filter_tools(TOOLS, config)
+        assert len(result) == len(TOOLS)
+
+    @pytest.mark.asyncio
+    async def test_call_tool_rejects_filtered_by_category(self, monkeypatch):
+        """Calling a tool excluded by LM_MCP_CATEGORIES returns the category error."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-value")
+        monkeypatch.setenv("LM_MCP_CATEGORIES", "read")
+
+        from lm_mcp.config import reset_config
+        from lm_mcp.server import call_tool
+
+        reset_config()
+        try:
+            result = await call_tool("delete_device", {"device_id": 1})
+            assert "LM_MCP_CATEGORIES" in result[0].text
+        finally:
+            reset_config()

@@ -1,9 +1,10 @@
 # Description: Composite workflow tools for LogicMonitor MCP server.
-# Description: Provides triage, health_check, capacity_plan, portal_overview, diagnose.
+# Description: Provides triage, diagnose, capacity_plan, portal_overview, update_logicmodule.
 
 from __future__ import annotations
 
 import json
+import logging
 import re
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING
@@ -11,6 +12,10 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import format_response, handle_error
+
+# Audit logger for write workflows. Configured via standard logging; if no
+# handler is attached, records propagate to the root logger.
+_AUDIT = logging.getLogger("lm_mcp.audit")
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -31,7 +36,7 @@ async def _call_sub_tool(handler, client: LogicMonitorClient, **kwargs) -> dict:
 
 
 def check_required_tools(required: list[str]) -> list[TextContent] | None:
-    """Check all sub-tools pass LM_ENABLED_TOOLS/LM_DISABLED_TOOLS.
+    """Check all sub-tools pass LM_ENABLED_TOOLS, LM_DISABLED_TOOLS, and LM_MCP_CATEGORIES.
 
     Returns None if OK, error TextContent list if any tool is blocked.
     """
@@ -46,6 +51,33 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
     elif config.disabled_tools:
         patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
         blocked = [t for t in required if any(fnmatch(t, p) for p in patterns)]
+
+    if not blocked and config.mcp_categories:
+        from lm_mcp.categories import tool_in_categories
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+
+        tools_index = {t.name: t for t in TOOLS}
+        tools_index.update({t.name: t for t in AWX_TOOLS})
+        tools_index.update({t.name: t for t in WATSONX_TOOLS})
+        tools_index.update({t.name: t for t in TF_TOOLS})
+        blocked = [
+            t for t in required if not tool_in_categories(t, tools_index, config.mcp_categories)
+        ]
+        if blocked:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "REQUIRED_TOOLS_FILTERED_BY_CATEGORY",
+                    "message": (
+                        f"Composite tool requires tools excluded by LM_MCP_CATEGORIES="
+                        f"{config.mcp_categories}: {', '.join(blocked)}"
+                    ),
+                    "suggestion": (
+                        "Add the required category (e.g., 'read') to LM_MCP_CATEGORIES, "
+                        "or unset it to allow all categories."
+                    ),
+                }
+            )
 
     if blocked:
         return format_response(
@@ -1094,5 +1126,218 @@ async def search_tools(
                 "suggestions": suggestions if suggestions else None,
             }
         )
+    except Exception as e:
+        return handle_error(e)
+
+
+# ---------------------------------------------------------------------------
+# Composite tool: update_logicmodule (safe export-modify-update for source types)
+# ---------------------------------------------------------------------------
+
+# Map of LogicModule type -> (export tool name, update tool name, id arg name).
+# Diagnostic and Remediation sources are intentionally excluded:
+# DiagnosticSource is read-only; RemediationSource has its own execute path.
+_LM_TYPES: dict[str, tuple[str, str, str]] = {
+    "configsource": ("export_configsource", "update_configsource", "configsource_id"),
+    "datasource": ("export_datasource", "update_datasource", "datasource_id"),
+    "eventsource": ("export_eventsource", "update_eventsource", "eventsource_id"),
+    "logsource": ("export_logsource", "update_logsource", "logsource_id"),
+    "propertysource": ("export_propertysource", "update_propertysource", "propertysource_id"),
+    "topologysource": ("export_topologysource", "update_topologysource", "topologysource_id"),
+}
+
+
+def _deep_merge(base: dict, overlay: dict, *, path: str = "") -> tuple[dict, list[str]]:
+    """Merge overlay onto base for safe partial logicmodule updates.
+
+    Semantics:
+    - dict + dict: recurse
+    - list + list: REPLACE wholesale (LM treats dataPoints, instanceLevelAttribute,
+      etc. as atomic collections; by-id merging would require per-collection
+      schema knowledge that is not available)
+    - primitive + anything (compatible types): overlay wins
+    - None in overlay: explicit delete (pop key from result); emits a warning
+      if the key was not present, to surface typo'd field names
+    - type conflicts (e.g., dict in base, list in overlay) raise ValueError
+
+    Returns the merged dict plus a list of human-readable warnings about
+    no-op deletions or other notable merge events.
+    """
+    out = dict(base)
+    warnings: list[str] = []
+    for k, v in overlay.items():
+        full = f"{path}.{k}" if path else k
+        if v is None:
+            if k in out:
+                out.pop(k)
+            else:
+                warnings.append(f"deletion of missing key '{full}' was a no-op")
+            continue
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            sub, sub_warns = _deep_merge(out[k], v, path=full)
+            out[k] = sub
+            warnings.extend(sub_warns)
+        elif k in out and out[k] is not None and type(out[k]) is not type(v):
+            raise ValueError(
+                f"type conflict at '{full}': base is {type(out[k]).__name__}, "
+                f"overlay is {type(v).__name__}"
+            )
+        else:
+            out[k] = v
+    return out, warnings
+
+
+def _diff(before: dict, after: dict, path: str = "") -> list[dict]:
+    """Compute a flat list of diff entries between two dicts.
+
+    Each entry: {"path": "a.b.c", "op": "add" | "remove" | "change",
+                 "before": <value or None>, "after": <value or None>}.
+    Lists are compared by equality only; nested dict diffs recurse.
+    """
+    entries: list[dict] = []
+    keys = set(before) | set(after)
+    for k in sorted(keys):
+        full = f"{path}.{k}" if path else k
+        if k not in before:
+            entries.append({"path": full, "op": "add", "before": None, "after": after[k]})
+        elif k not in after:
+            entries.append({"path": full, "op": "remove", "before": before[k], "after": None})
+        elif before[k] == after[k]:
+            continue
+        elif isinstance(before[k], dict) and isinstance(after[k], dict):
+            entries.extend(_diff(before[k], after[k], path=full))
+        else:
+            entries.append({"path": full, "op": "change", "before": before[k], "after": after[k]})
+    return entries
+
+
+async def update_logicmodule(
+    client: LogicMonitorClient,
+    type: str,
+    id: int,
+    changes: dict,
+    mode: str = "preview",
+) -> list[TextContent]:
+    """Safe partial update for LogicMonitor source types.
+
+    Workflow: export the current full definition, deep-merge the provided
+    changes onto it, validate that LM-required fields (name, displayName)
+    are present, then either return a dry-run diff (mode='preview') or
+    apply the merged definition via the existing update_<type> handler
+    (mode='apply').
+
+    This avoids the full-replace blanking footgun documented in lessons.md:
+    naive update_<type> calls wipe any field not in the payload.
+
+    Args:
+        client: LogicMonitor API client.
+        type: One of configsource, datasource, eventsource, logsource,
+            propertysource, topologysource.
+        id: LogicModule ID.
+        changes: Partial update — only the fields to modify. Use None as a
+            value to explicitly delete a key.
+        mode: "preview" (default, returns diff without writing) or "apply"
+            (writes the merged definition).
+
+    Returns:
+        TextContent with diff preview or apply result; or error info.
+    """
+    try:
+        if type not in _LM_TYPES:
+            return format_response(
+                {
+                    "error": True,
+                    "code": "UNKNOWN_TYPE",
+                    "message": f"type must be one of {sorted(_LM_TYPES)}",
+                }
+            )
+        if mode not in ("preview", "apply"):
+            return format_response(
+                {
+                    "error": True,
+                    "code": "INVALID_MODE",
+                    "message": "mode must be 'preview' or 'apply'",
+                }
+            )
+        if not isinstance(changes, dict):
+            return format_response(
+                {
+                    "error": True,
+                    "code": "INVALID_CHANGES",
+                    "message": "changes must be a dict (partial update with field overrides)",
+                }
+            )
+
+        export_name, update_name, id_arg = _LM_TYPES[type]
+
+        blocked = check_required_tools([export_name, update_name])
+        if blocked:
+            return blocked
+
+        from lm_mcp.registry import get_tool_handler
+
+        export_handler = get_tool_handler(export_name)
+        update_handler = get_tool_handler(update_name)
+
+        current = await _call_sub_tool(export_handler, client, **{id_arg: id})
+        # DO NOT use `.get("definition") or current` -- an empty dict definition
+        # is falsy and would silently fall through to the envelope wrapper.
+        # `.get(key, default)` returns the value when key is present (even if
+        # falsy) and the default only when key is absent.
+        base = current.get("definition", current)
+
+        merged, merge_warnings = _deep_merge(base, changes)
+
+        for required in ("name", "displayName"):
+            if not merged.get(required):
+                return format_response(
+                    {
+                        "error": True,
+                        "code": "MISSING_REQUIRED_FIELD",
+                        "message": (
+                            f"merged definition missing required field '{required}'. "
+                            "LM API will reject the update. Either keep it from the "
+                            "exported definition or set it explicitly in changes."
+                        ),
+                    }
+                )
+
+        diff = _diff(base, merged)
+        preview = {
+            "type": type,
+            "id": id,
+            "mode": mode,
+            "diff": diff,
+            "merged_field_count": len(merged),
+            "warnings": merge_warnings,
+        }
+
+        if mode == "preview":
+            preview["dry_run"] = True
+            preview["next_step"] = (
+                "Re-call with mode='apply' to push the merged definition. "
+                "Note: the underlying update is full-replace; the merged payload "
+                "becomes the new full definition."
+            )
+            return format_response(preview)
+
+        # mode == "apply"
+        _AUDIT.info(
+            "update_logicmodule attempting type=%s id=%s diff_count=%d",
+            type,
+            id,
+            len(diff),
+        )
+        try:
+            result = await _call_sub_tool(
+                update_handler, client, **{id_arg: id, "definition": merged}
+            )
+        except Exception as exc:
+            _AUDIT.error("update_logicmodule failed type=%s id=%s error=%s", type, id, exc)
+            raise
+
+        # Audit log "applied" only after the underlying PUT succeeded.
+        _AUDIT.info("update_logicmodule applied type=%s id=%s", type, id)
+        return format_response({**preview, "applied": True, "result": result})
     except Exception as e:
         return handle_error(e)

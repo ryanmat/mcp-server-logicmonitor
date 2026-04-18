@@ -2222,9 +2222,13 @@ TOOLS.extend(
         ),
         Tool(
             name="update_datasource",
-            description="Update an existing DataSource via REST API (full replace, "
-            "requires write permission). Workflow: export_datasource -> modify -> "
-            "update_datasource with full payload. name and displayName are required.",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server. Two prior production incidents "
+                "wiped Groovy scripts via this tool. PREFER update_logicmodule"
+                "(type='datasource', id, changes, mode='preview') for partial updates "
+                "with diff preview. Requires confirm=true to proceed."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -2235,7 +2239,15 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "Full DataSource definition with all fields (full replace)",
+                        "description": "FULL DataSource definition with all fields (will replace)",
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                        ),
                     },
                 },
                 "required": ["datasource_id", "definition"],
@@ -3281,9 +3293,12 @@ TOOLS.extend(
         ),
         Tool(
             name="update_configsource",
-            description="Update an existing ConfigSource via REST API (full replace, "
-            "requires write permission). Workflow: export_configsource -> modify -> "
-            "update_configsource with full payload.",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server. PREFER update_logicmodule"
+                "(type='configsource', id, changes, mode='preview') for partial updates "
+                "with diff preview. Requires confirm=true to proceed."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3294,7 +3309,15 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "Full ConfigSource definition with all fields",
+                        "description": "FULL ConfigSource definition with all fields (will replace)",
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                        ),
                     },
                 },
                 "required": ["configsource_id", "definition"],
@@ -3341,9 +3364,12 @@ TOOLS.extend(
         ),
         Tool(
             name="update_eventsource",
-            description="Update an existing EventSource via REST API (full replace, "
-            "requires write permission). Workflow: export_eventsource -> modify -> "
-            "update_eventsource with full payload.",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server. PREFER update_logicmodule"
+                "(type='eventsource', id, changes, mode='preview') for partial updates "
+                "with diff preview. Requires confirm=true to proceed."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3354,7 +3380,15 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "Full EventSource definition with all fields",
+                        "description": "FULL EventSource definition with all fields (will replace)",
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                        ),
                     },
                 },
                 "required": ["eventsource_id", "definition"],
@@ -3448,9 +3482,12 @@ TOOLS.extend(
         ),
         Tool(
             name="update_propertysource",
-            description="Update an existing PropertySource via REST API (full replace, "
-            "requires write permission). Workflow: export_propertysource -> modify -> "
-            "update_propertysource with full payload.",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server. PREFER update_logicmodule"
+                "(type='propertysource', id, changes, mode='preview') for partial updates "
+                "with diff preview. Requires confirm=true to proceed."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3461,7 +3498,15 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "Full PropertySource definition with all fields",
+                        "description": "FULL PropertySource definition with all fields (will replace)",
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                        ),
                     },
                 },
                 "required": ["propertysource_id", "definition"],
@@ -3531,9 +3576,12 @@ TOOLS.extend(
         ),
         Tool(
             name="update_logsource",
-            description="Update an existing LogSource via REST API (full replace, "
-            "requires write permission). Workflow: export_logsource -> modify -> "
-            "update_logsource with full payload.",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server. PREFER update_logicmodule"
+                "(type='logsource', id, changes, mode='preview') for partial updates "
+                "with diff preview. Requires confirm=true to proceed."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3544,7 +3592,15 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "Full LogSource definition with all fields",
+                        "description": "FULL LogSource definition with all fields (will replace)",
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                        ),
                     },
                 },
                 "required": ["logsource_id", "definition"],
@@ -3614,9 +3670,12 @@ TOOLS.extend(
         ),
         Tool(
             name="update_topologysource",
-            description="Update an existing TopologySource via REST API (full replace, "
-            "requires write permission). Workflow: export -> modify -> "
-            "update_topologysource with full payload.",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server. PREFER update_logicmodule"
+                "(type='topologysource', id, changes, mode='preview') for partial updates "
+                "with diff preview. Requires confirm=true to proceed."
+            ),
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3627,7 +3686,15 @@ TOOLS.extend(
                     },
                     "definition": {
                         "type": "object",
-                        "description": "Full TopologySource definition with all fields",
+                        "description": "FULL TopologySource definition with all fields (will replace)",
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for safe partial updates."
+                        ),
                     },
                 },
                 "required": ["topologysource_id", "definition"],
@@ -5085,6 +5152,56 @@ TOOLS.extend(
                 "required": ["query"],
             },
         ),
+        Tool(
+            name="update_logicmodule",
+            description=(
+                "Safe partial update for LogicMonitor source types (configsource, "
+                "datasource, eventsource, logsource, propertysource, topologysource). "
+                "Exports the current full definition, deep-merges your `changes` onto it, "
+                "validates required fields, and either returns a dry-run diff (mode='preview', "
+                "default) or applies the merged definition (mode='apply'). PREFER this over "
+                "the raw update_<type> tools for partial updates -- the raw tools are "
+                "full-replace and will blank any field omitted from the payload (two prior "
+                "production incidents)."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "configsource",
+                            "datasource",
+                            "eventsource",
+                            "logsource",
+                            "propertysource",
+                            "topologysource",
+                        ],
+                        "description": "Source type to update",
+                    },
+                    "id": {"type": "integer", "description": "LogicModule ID"},
+                    "changes": {
+                        "type": "object",
+                        "description": (
+                            "Partial update -- only the fields to change. Use `null` as a "
+                            "value to explicitly delete a key. Lists replace wholesale."
+                        ),
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["preview", "apply"],
+                        "default": "preview",
+                        "description": (
+                            "'preview' returns a dry-run diff without writing (default). "
+                            "'apply' writes the merged definition via the underlying "
+                            "update_<type> handler."
+                        ),
+                    },
+                },
+                "required": ["type", "id", "changes"],
+            },
+        ),
     ]
 )
 
@@ -6111,6 +6228,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "portal_overview": workflows.portal_overview,
         "diagnose": workflows.diagnose,
         "search_tools": workflows.search_tools,
+        "update_logicmodule": workflows.update_logicmodule,
         # IBM watsonx.ai
         "watsonx_summarize": watsonx.watsonx_summarize,
         # Terraform IaC

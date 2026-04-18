@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-# All 264 tools organized by domain category (235 LM + 18 AAP + 10 TF + 1 WX).
+# All LogicMonitor MCP tools organized by domain category.
 # Helps AI agents pick the right tool from a large set.
 TOOL_CATEGORIES = {
     "name": "tool-categories",
@@ -17,6 +17,7 @@ TOOL_CATEGORIES = {
                 "capacity_plan",
                 "portal_overview",
                 "diagnose",
+                "update_logicmodule",
             ],
         },
         "discovery": {
