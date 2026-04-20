@@ -176,6 +176,21 @@ TOOL_CATEGORIES = {
                 "delete_recipient_group",
             ],
         },
+        "integrations": {
+            "description": (
+                "Alert delivery integrations (Custom HTTP Delivery / webhooks)."
+                " CRUD on /setting/integrations. Pair with escalation chains"
+                " and alert rules to route alerts to Azure Sentinel, PagerDuty,"
+                " ServiceNow, etc."
+            ),
+            "tools": [
+                "get_integrations",
+                "get_integration",
+                "create_http_integration",
+                "update_http_integration",
+                "delete_integration",
+            ],
+        },
         "users": {
             "description": "User, role, and access management",
             "tools": [
