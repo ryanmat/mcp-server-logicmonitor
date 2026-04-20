@@ -7,6 +7,9 @@ class LMError(Exception):
 
     All LM-specific exceptions inherit from this class, providing
     consistent error handling with codes and optional suggestions.
+    ``details`` carries the raw server message when ``message`` has been
+    rewritten into a user-facing hint (e.g., by the Jackson translator
+    in the client), so debugging context is not lost.
     """
 
     def __init__(
@@ -14,10 +17,12 @@ class LMError(Exception):
         message: str,
         code: str = "LM_ERROR",
         suggestion: str | None = None,
+        details: str | None = None,
     ):
         self.message = message
         self.code = code
         self.suggestion = suggestion
+        self.details = details
         super().__init__(message)
 
     def to_dict(self) -> dict:
@@ -29,6 +34,8 @@ class LMError(Exception):
         }
         if self.suggestion:
             result["suggestion"] = self.suggestion
+        if self.details:
+            result["details"] = self.details
         return result
 
 

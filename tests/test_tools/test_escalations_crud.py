@@ -168,6 +168,177 @@ class TestCreateEscalationChain:
         assert len(sent_body["ccDestinations"]) == 1
 
 
+class TestDestinationsShorthand:
+    """Tests for _normalize_destinations integration shorthand."""
+
+    def test_shorthand_rewritten_to_admin_method(self):
+        from lm_mcp.tools.escalations import _normalize_destinations
+
+        destinations = [
+            {
+                "type": "single",
+                "period": None,
+                "stages": [
+                    [
+                        {
+                            "type": "integration",
+                            "integration_name": "Sentinel POC",
+                            "admin": "rmatuszewski",
+                        }
+                    ]
+                ],
+            }
+        ]
+        result = _normalize_destinations(destinations)
+        recip = result[0]["stages"][0][0]
+        assert recip == {
+            "type": "admin",
+            "addr": "rmatuszewski",
+            "method": "Sentinel POC",
+        }
+
+    def test_shorthand_accepts_method_and_addr_aliases(self):
+        from lm_mcp.tools.escalations import _normalize_destinations
+
+        destinations = [
+            {
+                "type": "single",
+                "stages": [
+                    [
+                        {
+                            "type": "integration",
+                            "method": "Sentinel POC",
+                            "addr": "rmatuszewski",
+                        }
+                    ]
+                ],
+            }
+        ]
+        result = _normalize_destinations(destinations)
+        recip = result[0]["stages"][0][0]
+        assert recip == {
+            "type": "admin",
+            "addr": "rmatuszewski",
+            "method": "Sentinel POC",
+        }
+
+    def test_missing_admin_raises_with_actionable_message(self):
+        from lm_mcp.tools.escalations import _normalize_destinations
+
+        destinations = [
+            {
+                "type": "single",
+                "stages": [[{"type": "integration", "integration_name": "X"}]],
+            }
+        ]
+        with pytest.raises(ValueError) as exc_info:
+            _normalize_destinations(destinations)
+        msg = str(exc_info.value)
+        assert "admin" in msg
+        assert "username" in msg
+
+    def test_integration_id_alone_is_rejected(self):
+        from lm_mcp.tools.escalations import _normalize_destinations
+
+        destinations = [
+            {
+                "type": "single",
+                "stages": [[{"type": "integration", "integration_id": 3}]],
+            }
+        ]
+        with pytest.raises(ValueError) as exc_info:
+            _normalize_destinations(destinations)
+        assert "integration_id alone is not enough" in str(exc_info.value)
+
+    def test_non_integration_recipients_pass_through(self):
+        from lm_mcp.tools.escalations import _normalize_destinations
+
+        destinations = [
+            {
+                "type": "single",
+                "stages": [
+                    [
+                        {
+                            "type": "admin",
+                            "addr": "existing@example.com",
+                            "method": "email",
+                        }
+                    ]
+                ],
+            }
+        ]
+        original = [dict(destinations[0])]
+        result = _normalize_destinations(destinations)
+        assert result[0]["stages"] == original[0]["stages"]
+
+    def test_flat_stages_are_handled(self):
+        from lm_mcp.tools.escalations import _normalize_destinations
+
+        destinations = [
+            {
+                "type": "single",
+                "stages": [
+                    {
+                        "type": "integration",
+                        "integration_name": "X",
+                        "admin": "u",
+                    }
+                ],
+            }
+        ]
+        result = _normalize_destinations(destinations)
+        recip = result[0]["stages"][0]
+        assert recip["type"] == "admin"
+        assert recip["method"] == "X"
+
+    @respx.mock
+    async def test_create_escalation_chain_normalizes_shorthand(self, client, monkeypatch):
+        """create_escalation_chain rewrites shorthand before sending."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.escalations import create_escalation_chain
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/alert/chains").mock(
+            return_value=httpx.Response(200, json={"id": 99})
+        )
+
+        result = await create_escalation_chain(
+            client,
+            name="via shorthand",
+            destinations=[
+                {
+                    "type": "single",
+                    "period": None,
+                    "stages": [
+                        [
+                            {
+                                "type": "integration",
+                                "integration_name": "Sentinel POC",
+                                "admin": "rmatuszewski",
+                            }
+                        ]
+                    ],
+                }
+            ],
+        )
+
+        assert "Error:" not in result[0].text
+        sent_body = json.loads(route.calls[0].request.content)
+        recip = sent_body["destinations"][0]["stages"][0][0]
+        assert recip == {
+            "type": "admin",
+            "addr": "rmatuszewski",
+            "method": "Sentinel POC",
+        }
+
+
 class TestUpdateEscalationChain:
     """Tests for update_escalation_chain tool."""
 

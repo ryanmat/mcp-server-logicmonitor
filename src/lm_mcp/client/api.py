@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import json
 import random
+import re
 import time
 
 import httpx
@@ -20,6 +21,93 @@ from lm_mcp.exceptions import (
     ServerError,
 )
 from lm_mcp.logging import log_api_request, log_api_response
+
+# Jackson-aware translations for common LogicMonitor 4xx error shapes.
+# LM's v3 API frequently returns raw Jackson deserialization errors that
+# name Java POJO internals (e.g. ``RestEscalatingChainV3$Period``). This
+# table rewrites the worst offenders into actionable hints while keeping
+# the raw server message under ``LMError.details`` for debugging.
+#
+# Each entry is ``(pattern, translated_message_or_None, suggestion)``.
+# When ``translated_message_or_None`` is None, the raw message is kept
+# but the suggestion is still attached. ``{match1}`` / ``{match2}`` in
+# the translated message or suggestion are replaced by regex capture
+# groups (1-indexed).
+_LM_ERROR_PATTERNS: list[tuple[re.Pattern[str], str | None, str]] = [
+    (
+        re.compile(r"Cannot construct instance of `[^`]*\$Period`", re.IGNORECASE),
+        "destinations[].period must be null or a Period object",
+        (
+            "Set period to null for 'single' chains. For 'timebased' chains, "
+            "pass an object like {hour1: 9, hour2: 17, minute1: 0, minute2: 0, "
+            "weekDays: [1,2,3,4,5]}."
+        ),
+    ),
+    (
+        re.compile(
+            r"Cannot deserialize value of type `[^`]*ArrayList<[^`]*Recipient[^`]*>` from Object",
+            re.IGNORECASE,
+        ),
+        "destinations[].stages expects a list of Recipient objects, not a wrapper object",
+        (
+            "stages is a list of lists. Shape: stages: [[{type: 'admin', "
+            "addr: '<username>', method: '<integration display name>'}, ...]]."
+        ),
+    ),
+    (
+        re.compile(r"invalid recipient for stage \d+", re.IGNORECASE),
+        None,
+        (
+            "Escalation recipients use lowercase type='admin' with "
+            "method=<integration display name>. 'INTEGRATION' is not a valid "
+            "type. Use the integration-shorthand form "
+            "{type: 'integration', integration_name: ..., admin: ...} -- the "
+            "MCP server rewrites it to the canonical admin+method form."
+        ),
+    ),
+    (
+        re.compile(r"admin<(\d+)> is not found", re.IGNORECASE),
+        "admin user id {match1} not found",
+        (
+            "addr must be the admin's username string, not the integer id. "
+            "Use get_users to look up the username for this id."
+        ),
+    ),
+    (
+        re.compile(r"invalid method <\w+> for type ARBITRARY", re.IGNORECASE),
+        None,
+        (
+            "Recipients with type='ARBITRARY' can only use method='email'. "
+            "To reach an integration, use type='admin' with "
+            "method=<integration display name>."
+        ),
+    ),
+]
+
+
+def _translate_lm_error(raw_message: str) -> tuple[str | None, str | None]:
+    """Match a raw LM error message against known Jackson/validation patterns.
+
+    Returns ``(translated_message_or_None, suggestion_or_None)``. When no
+    pattern matches, both values are None and callers should fall back to
+    the raw message and the generic suggestion. When a pattern matches but
+    its translated message is None, the caller should keep the raw message
+    and attach only the suggestion.
+    """
+    if not raw_message:
+        return None, None
+    for pattern, translated, suggestion in _LM_ERROR_PATTERNS:
+        match = pattern.search(raw_message)
+        if match:
+            resolved_message = translated
+            resolved_suggestion = suggestion
+            if resolved_message is not None:
+                for idx, group in enumerate(match.groups(), start=1):
+                    resolved_message = resolved_message.replace(f"{{match{idx}}}", group or "")
+            for idx, group in enumerate(match.groups(), start=1):
+                resolved_suggestion = resolved_suggestion.replace(f"{{match{idx}}}", group or "")
+            return resolved_message, resolved_suggestion
+    return None, None
 
 
 class LogicMonitorClient:
@@ -135,6 +223,12 @@ class LogicMonitorClient:
     ) -> None:
         """Raise appropriate exception for error responses.
 
+        For 4xx responses, the raw server message is passed through the
+        Jackson-aware translator (see :func:`_translate_lm_error`). When a
+        pattern matches, the raised :class:`LMError` carries the
+        translated message, a targeted suggestion, and the original raw
+        text under ``details`` for debugging.
+
         Args:
             response: The HTTP response to check.
             message: Parsed error message.
@@ -160,11 +254,17 @@ class LogicMonitorClient:
         elif status >= 500:
             raise ServerError(message)
         elif 400 <= status < 500:
+            translated, translated_suggestion = _translate_lm_error(message)
+            user_message = translated if translated is not None else message
+            suggestion = translated_suggestion or (
+                f"The API returned HTTP {status}. Check the request parameters and body format."
+            )
+            details = message if translated is not None or translated_suggestion else None
             raise LMError(
-                message=message,
+                message=user_message,
                 code=f"HTTP_{status}",
-                suggestion=f"The API returned HTTP {status}. "
-                "Check the request parameters and body format.",
+                suggestion=suggestion,
+                details=details,
             )
 
     async def request(

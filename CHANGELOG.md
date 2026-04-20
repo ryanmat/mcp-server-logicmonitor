@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.2] - 2026-04-20
+
+### Added
+
+- **Jackson-aware 4xx error translation**. `_raise_for_status` in the HTTP client now matches LogicMonitor's raw Jackson deserialization errors (`Cannot construct instance of ...$Period`, `Cannot deserialize value of type ...ArrayList<...Recipient...> from Object`, `invalid recipient for stage N`, `admin<N> is not found`, `invalid method <...> for type ARBITRARY`) against a small translation table and rewrites them into actionable `LMError.message` + `LMError.suggestion` values. The raw server text is preserved on `LMError.details` so debugging context is not lost. Five starter patterns; the table is designed to grow as new shapes are seen in the wild.
+- **`LMError.details`** -- new optional field on the base exception. Surfaced by `to_dict()` when set. Carries the raw untranslated server message for callers that want to inspect it (logs, debuggers, follow-up tooling).
+- **Integration-shorthand recipient** in `create_escalation_chain` and `update_escalation_chain` destinations. Recipients of the form `{type: "integration", integration_name: "<display name>", admin: "<username>"}` are rewritten to the canonical `{type: "admin", addr: "<username>", method: "<display name>"}` form before the request is sent. `method`/`addr` aliases are also accepted. `integration_id` alone is explicitly rejected with an actionable error -- the display name and owning admin must be passed (use `get_integration` to look them up).
+
+### Rationale
+
+Wiring LogicMonitor escalation chains used to fail with multi-line Java stack traces like "Cannot construct instance of com.santaba.server.servlet.rest.v3.pojos.setting.alert.RestEscalatingChainV3$Period" because the LM v3 API forwards Jackson's raw deserialization errors to API clients. That wording names internal POJOs and teaches callers nothing about the fix. After v3.7.2, the same 400 response comes back as "destinations[].period must be null or a Period object" plus a concrete example, and the integration-shorthand rewrite means callers never have to discover the non-obvious `admin+method` form in the first place.
+
 ## [3.7.1] - 2026-04-20
 
 ### Added
