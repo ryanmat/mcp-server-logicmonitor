@@ -141,6 +141,69 @@ async def get_escalation_chain(
         return handle_error(e)
 
 
+def _normalize_destinations(
+    destinations: list[dict] | None,
+) -> list[dict] | None:
+    """Rewrite integration-shorthand Recipients into the canonical admin+method form.
+
+    Callers can pass ``{type: "integration", integration_name: <name>, admin: <user>}``
+    as a Recipient entry instead of the less obvious
+    ``{type: "admin", addr: <user>, method: <name>}`` form that LogicMonitor
+    actually stores. This helper mutates the input list in place so the LM
+    API receives the form it accepts. Legacy ``method``/``addr`` keys on a
+    shorthand recipient are also accepted for forward compatibility.
+
+    Raises ``ValueError`` when a shorthand entry is missing either the
+    integration name or the admin username. Does not auto-resolve
+    ``integration_id`` -- that would require a live GET and a judgment call
+    about which admin to use, so callers are asked to pass the display
+    name and username explicitly.
+    """
+    if not destinations:
+        return destinations
+    for dest in destinations:
+        stages = dest.get("stages") if isinstance(dest, dict) else None
+        if not isinstance(stages, list):
+            continue
+        for stage in stages:
+            stage_items = stage if isinstance(stage, list) else [stage]
+            for recip in stage_items:
+                if not isinstance(recip, dict):
+                    continue
+                recip_type = recip.get("type")
+                if not isinstance(recip_type, str):
+                    continue
+                if recip_type.lower() != "integration":
+                    continue
+                integration_name = recip.pop("integration_name", None) or recip.pop("method", None)
+                admin = recip.pop("admin", None) or recip.pop("addr", None)
+                integration_id = recip.pop("integration_id", None)
+                if not integration_name or not admin:
+                    missing = []
+                    if not integration_name:
+                        missing.append("integration_name")
+                    if not admin:
+                        missing.append("admin")
+                    hint = (
+                        " Pass integration_name=<display name> and"
+                        " admin=<username that owns the integration>."
+                    )
+                    if integration_id is not None:
+                        hint += (
+                            " integration_id alone is not enough: the server"
+                            " needs the integration display name (use"
+                            " get_integration to look it up) and a valid admin"
+                            " username."
+                        )
+                    raise ValueError(
+                        f"integration-shorthand recipient is missing {', '.join(missing)}.{hint}"
+                    )
+                recip["type"] = "admin"
+                recip["addr"] = admin
+                recip["method"] = integration_name
+    return destinations
+
+
 def _recipient_group_name(item: dict) -> str | None:
     """Return the group name from an LM response dict.
 
@@ -275,6 +338,16 @@ async def create_escalation_chain(
     display name string, not its id. ``addr`` is a username that owns
     the integration as one of their contact methods.
 
+    As a convenience the MCP server also accepts an
+    integration-shorthand Recipient::
+
+        {"type": "integration", "integration_name": "Sentinel POC", "admin": "rmatuszewski"}
+
+    which it rewrites into the canonical admin+method form before the
+    request hits the LM API. Passing just ``integration_id`` is not
+    enough -- resolve the display name and owning admin yourself via
+    ``get_integration``.
+
     Args:
         client: LogicMonitor API client.
         name: Name of the escalation chain.
@@ -301,7 +374,7 @@ async def create_escalation_chain(
         if throttling_alerts is not None:
             body["throttlingAlerts"] = throttling_alerts
         if destinations is not None:
-            body["destinations"] = destinations
+            body["destinations"] = _normalize_destinations(destinations)
         if cc_destinations is not None:
             body["ccDestinations"] = cc_destinations
 
@@ -361,7 +434,7 @@ async def update_escalation_chain(
         if throttling_alerts is not None:
             body["throttlingAlerts"] = throttling_alerts
         if destinations is not None:
-            body["destinations"] = destinations
+            body["destinations"] = _normalize_destinations(destinations)
         if cc_destinations is not None:
             body["ccDestinations"] = cc_destinations
 

@@ -1704,6 +1704,9 @@ TOOLS.extend(
                             " Recipient objects). To route to an LM Integration, use a"
                             " Recipient with type='admin', addr=<username>, and"
                             " method=<integration display name>. Lowercase 'admin'."
+                            " Shorthand {type: 'integration', integration_name: ...,"
+                            " admin: ...} is rewritten to the canonical admin+method"
+                            " form before the request hits the API."
                         ),
                         "items": {
                             "type": "object",
