@@ -256,15 +256,13 @@ class TestGetRecipientGroups:
                     "items": [
                         {
                             "id": 1,
-                            "name": "DevOps Team",
+                            "groupName": "DevOps Team",
                             "description": "DevOps notification group",
-                            "groupType": "email",
                         },
                         {
                             "id": 2,
-                            "name": "Management",
+                            "groupName": "Management",
                             "description": "Management notification group",
-                            "groupType": "email",
                         },
                     ],
                     "total": 2,
@@ -279,6 +277,7 @@ class TestGetRecipientGroups:
         assert data["total"] == 2
         assert len(data["recipient_groups"]) == 2
         assert data["recipient_groups"][0]["name"] == "DevOps Team"
+        assert "group_type" not in data["recipient_groups"][0]
 
     @respx.mock
     async def test_get_recipient_groups_with_filter(self, client):
@@ -307,9 +306,8 @@ class TestGetRecipientGroup:
                 200,
                 json={
                     "id": 100,
-                    "name": "DevOps Team",
+                    "groupName": "DevOps Team",
                     "description": "DevOps notification group",
-                    "groupType": "email",
                     "recipients": [
                         {
                             "type": "admin",
@@ -334,6 +332,7 @@ class TestGetRecipientGroup:
         data = json.loads(result[0].text)
         assert data["id"] == 100
         assert data["name"] == "DevOps Team"
+        assert "group_type" not in data
         assert len(data["recipients"]) == 2
         assert data["recipients"][0]["address"] == "devops1@example.com"
 
@@ -349,3 +348,68 @@ class TestGetRecipientGroup:
         result = await get_recipient_group(client, group_id=999)
 
         assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_get_recipient_groups_falls_back_to_name_key(self, client):
+        """get_recipient_groups falls back to legacy 'name' key when 'groupName' missing."""
+        from lm_mcp.tools.escalations import get_recipient_groups
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {"id": 1, "name": "Legacy Key Group", "description": ""},
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        result = await get_recipient_groups(client)
+
+        data = json.loads(result[0].text)
+        assert data["recipient_groups"][0]["name"] == "Legacy Key Group"
+
+    @respx.mock
+    async def test_get_recipient_groups_detail_fetches_recipients(self, client):
+        """detail=True attaches full recipient lists via per-id GETs."""
+        from lm_mcp.tools.escalations import get_recipient_groups
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {"id": 5, "groupName": "Team A", "description": ""},
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups/5").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 5,
+                    "groupName": "Team A",
+                    "description": "",
+                    "recipients": [
+                        {
+                            "type": "admin",
+                            "method": "email",
+                            "addr": "a@example.com",
+                            "contact": "",
+                        }
+                    ],
+                },
+            )
+        )
+
+        result = await get_recipient_groups(client, detail=True)
+
+        data = json.loads(result[0].text)
+        group = data["recipient_groups"][0]
+        assert group["name"] == "Team A"
+        assert len(group["recipients"]) == 1
+        assert group["recipients"][0]["address"] == "a@example.com"

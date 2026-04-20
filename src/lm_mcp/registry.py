@@ -1645,7 +1645,19 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by group name (supports wildcards)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "detail": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "When true, fetch each group's full recipient list via an extra"
+                            " GET per group. Off by default to avoid N+1 API calls."
+                        ),
+                    },
                 },
             },
         ),
@@ -1685,13 +1697,62 @@ TOOLS.extend(
                     },
                     "destinations": {
                         "type": "array",
-                        "items": {"type": "object"},
-                        "description": "Destination stages for the escalation chain",
+                        "description": (
+                            "List of Chain objects. Each Chain has type ('single' or"
+                            " 'timebased'), optional period object (null for 'single'),"
+                            " and stages (list of stage arrays; each stage is a list of"
+                            " Recipient objects). To route to an LM Integration, use a"
+                            " Recipient with type='admin', addr=<username>, and"
+                            " method=<integration display name>. Lowercase 'admin'."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["single", "timebased"],
+                                },
+                                "period": {"type": ["object", "null"]},
+                                "stages": {
+                                    "type": "array",
+                                    "description": (
+                                        "List of stage arrays; each stage is a list"
+                                        " of Recipient objects {type, addr, method,"
+                                        " contact}."
+                                    ),
+                                    "items": {
+                                        "type": "array",
+                                        "items": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "required": ["type", "stages"],
+                        },
+                        "examples": [
+                            [
+                                {
+                                    "type": "single",
+                                    "period": None,
+                                    "stages": [
+                                        [
+                                            {
+                                                "type": "admin",
+                                                "addr": "rmatuszewski",
+                                                "method": ("Azure Sentinel Pipeline (POC)"),
+                                            }
+                                        ]
+                                    ],
+                                }
+                            ]
+                        ],
                     },
                     "cc_destinations": {
                         "type": "array",
+                        "description": (
+                            "CC Recipient list. Each entry is a Recipient {type, addr,"
+                            " method, contact}. Applied to every stage."
+                        ),
                         "items": {"type": "object"},
-                        "description": "CC destinations for the escalation chain",
                     },
                 },
                 "required": ["name"],
@@ -1721,13 +1782,34 @@ TOOLS.extend(
                     },
                     "destinations": {
                         "type": "array",
-                        "items": {"type": "object"},
-                        "description": "Updated destination stages for the escalation chain",
+                        "description": (
+                            "Updated list of Chain objects. Same shape as on create:"
+                            " {type, period, stages}. See create_escalation_chain for"
+                            " the full Recipient shape and integration-routing form."
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["single", "timebased"],
+                                },
+                                "period": {"type": ["object", "null"]},
+                                "stages": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "array",
+                                        "items": {"type": "object"},
+                                    },
+                                },
+                            },
+                            "required": ["type", "stages"],
+                        },
                     },
                     "cc_destinations": {
                         "type": "array",
+                        "description": "Updated CC Recipient list.",
                         "items": {"type": "object"},
-                        "description": "Updated CC destinations for the escalation chain",
                     },
                 },
                 "required": ["chain_id"],
@@ -1752,8 +1834,31 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Name of the recipient group"},
+                    "name": {
+                        "type": "string",
+                        "description": (
+                            "Name of the recipient group. Sent as groupName to the LM v3 API."
+                        ),
+                    },
                     "description": {"type": "string", "description": "Optional description"},
+                    "recipients": {
+                        "type": "array",
+                        "description": (
+                            "Optional initial recipients. Each entry is a Recipient"
+                            " {type, method, addr, contact}. ``type`` and ``method``"
+                            " are required by the LM API."
+                        ),
+                        "items": {"type": "object"},
+                        "examples": [
+                            [
+                                {
+                                    "type": "admin",
+                                    "method": "email",
+                                    "addr": "oncall@example.com",
+                                }
+                            ]
+                        ],
+                    },
                 },
                 "required": ["name"],
             },
@@ -1766,8 +1871,19 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "group_id": {"type": "integer", "description": "Recipient group ID"},
-                    "name": {"type": "string", "description": "Updated name"},
+                    "name": {
+                        "type": "string",
+                        "description": ("Updated name. Sent as groupName to the LM v3 API."),
+                    },
                     "description": {"type": "string", "description": "Updated description"},
+                    "recipients": {
+                        "type": "array",
+                        "description": (
+                            "Replacement recipient list. When provided, LM replaces"
+                            " the group's current recipient set with this list."
+                        ),
+                        "items": {"type": "object"},
+                    },
                 },
                 "required": ["group_id"],
             },
