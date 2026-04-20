@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-04-20
+
+### Fixed
+
+- `get_recipient_groups` and `get_recipient_group` now read the LM v3 API's `groupName` field (falling back to `name` for legacy portal responses). Previously these tools read `item.get("name")`, which LM leaves unset on recipient-group reads, so the MCP response surfaced `name: null` for groups that do exist in the portal. The obsolete `group_type` field is no longer surfaced -- it is not part of the v3 `RecipientGroup` model.
+- `create_recipient_group` and `update_recipient_group` now post `groupName` to match the LM v3 model. The previous payload used `name`, which the API silently ignored.
+
+### Added
+
+- `create_recipient_group(..., recipients=[...])` accepts a list of Recipient objects at creation time, eliminating the prior two-step create-then-populate workflow. Each recipient is `{type, method, addr, contact}` with `type` and `method` required.
+- `update_recipient_group(..., recipients=[...])` accepts a replacement recipient list.
+- `get_recipient_groups(..., detail=True)` issues one follow-up GET per group to attach the full recipient list. Off by default to avoid N+1 API calls.
+
+### Changed
+
+- `create_escalation_chain` and `update_escalation_chain` input schemas now describe the Chain object shape (`{type, period, stages}`) and document that `stages` is a list of stage arrays where each stage is a list of Recipient objects. A concrete example covers routing alerts to a Custom HTTP Delivery integration via `{type: "admin", addr: "<username>", method: "<integration display name>"}` -- the reverse-engineered working form. The same guidance is mirrored into the tool docstrings for clients that don't render schema examples.
+
 ## [3.6.1] - 2026-04-18
 
 ### Added

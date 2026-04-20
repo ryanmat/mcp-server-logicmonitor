@@ -361,10 +361,12 @@ class TestCreateRecipientGroup:
 
         from lm_mcp.tools.escalations import create_recipient_group
 
-        respx.post("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups").mock(
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/recipientgroups"
+        ).mock(
             return_value=httpx.Response(
                 200,
-                json={"id": 20, "name": "Test Group"},
+                json={"id": 20, "groupName": "Test Group"},
             )
         )
 
@@ -377,6 +379,50 @@ class TestCreateRecipientGroup:
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["group_id"] == 20
+
+        sent_body = json.loads(route.calls[0].request.content)
+        assert sent_body["groupName"] == "Test Group"
+        assert "name" not in sent_body
+
+    @respx.mock
+    async def test_create_recipient_group_accepts_recipients(self, client, monkeypatch):
+        """create_recipient_group forwards recipients to the API."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.escalations import create_recipient_group
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/recipientgroups"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 21, "groupName": "Preloaded"},
+            )
+        )
+
+        recipients = [
+            {"type": "admin", "method": "email", "addr": "a@example.com"},
+            {"type": "admin", "method": "email", "addr": "b@example.com"},
+        ]
+        result = await create_recipient_group(
+            client,
+            name="Preloaded",
+            recipients=recipients,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert sent_body["groupName"] == "Preloaded"
+        assert sent_body["recipients"] == recipients
 
 
 class TestUpdateRecipientGroup:
@@ -421,9 +467,9 @@ class TestUpdateRecipientGroup:
 
         from lm_mcp.tools.escalations import update_recipient_group
 
-        respx.patch("https://test.logicmonitor.com/santaba/rest/setting/recipientgroups/20").mock(
-            return_value=httpx.Response(200, json={"id": 20, "name": "Updated Group"})
-        )
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/setting/recipientgroups/20"
+        ).mock(return_value=httpx.Response(200, json={"id": 20, "groupName": "Updated Group"}))
 
         result = await update_recipient_group(
             client,
@@ -434,6 +480,34 @@ class TestUpdateRecipientGroup:
         assert "Error:" not in result[0].text
         data = json.loads(result[0].text)
         assert data["success"] is True
+        sent_body = json.loads(route.calls[0].request.content)
+        assert sent_body["groupName"] == "Updated Group"
+        assert "name" not in sent_body
+
+    @respx.mock
+    async def test_update_recipient_group_replaces_recipients(self, client, monkeypatch):
+        """update_recipient_group forwards a new recipients list when provided."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.escalations import update_recipient_group
+
+        route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/setting/recipientgroups/20"
+        ).mock(return_value=httpx.Response(200, json={"id": 20}))
+
+        recipients = [{"type": "admin", "method": "email", "addr": "new@example.com"}]
+        await update_recipient_group(client, group_id=20, recipients=recipients)
+
+        sent_body = json.loads(route.calls[0].request.content)
+        assert sent_body == {"recipients": recipients}
 
 
 class TestDeleteRecipientGroup:

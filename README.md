@@ -70,12 +70,13 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.6.1
+## What's New in v3.7.0
 
-- **New**: `get_reference(category, name, list)` -- universal read-only tool that mirrors MCP Resource content (schemas, enums, filters, syntax, guides) over the Tool primitive. Targets clients without full Resource support (GitHub Copilot cloud agent, OpenAI Codex CLI, Cline). Pass `list=true` or call with no args to discover available pairs.
-- **New**: `get_workflow(name, list, arguments)` -- universal read-only tool that mirrors MCP Prompt content for clients without Prompt support. Returns the rendered workflow guidance text. Prefer the composite workflow tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) when they exist -- those execute the procedure rather than returning guidance.
-- **Changed**: Tool count 265 -> 267 (238 LM + 18 AAP + 10 Terraform + 1 watsonx).
-- **Internal**: Hoisted the prompt template dispatch dict from inside `get_prompt_messages` to a module-level `_TEMPLATES` constant so the reference-layer handlers can reuse it. Public behavior of `get_prompt_messages` is unchanged.
+- **Fixed**: `get_recipient_groups` and `get_recipient_group` now read the v3 API's `groupName` field (with legacy `name` fallback), so listings stop returning null names for groups that exist in the portal. The obsolete `group_type` field is no longer surfaced.
+- **Fixed**: `create_recipient_group` and `update_recipient_group` now post `groupName` to match the LM v3 model, replacing the previously ignored `name` key.
+- **New**: `create_recipient_group(..., recipients=[...])` and `update_recipient_group(..., recipients=[...])` accept a recipient list in one call, eliminating the prior two-step workflow.
+- **New**: `get_recipient_groups(..., detail=True)` enriches each item with its full recipient list via a per-id follow-up. Off by default to avoid N+1 calls.
+- **Changed**: `create_escalation_chain` and `update_escalation_chain` schemas now document the Chain / Recipient shape inline, including a working example for routing alerts to a Custom HTTP Delivery integration via `{type: "admin", addr: "<username>", method: "<integration display name>"}`. Tool docstrings carry the same guidance for LLM clients that don't render examples from the JSON schema.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 

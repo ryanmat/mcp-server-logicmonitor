@@ -141,10 +141,31 @@ async def get_escalation_chain(
         return handle_error(e)
 
 
+def _recipient_group_name(item: dict) -> str | None:
+    """Return the group name from an LM response dict.
+
+    LogicMonitor's v3 API uses the camelCase key ``groupName`` on read.
+    Older portal versions and some write paths accept the plain ``name``
+    alias, so we fall back to that for defensive compatibility.
+    """
+    return item.get("groupName") or item.get("name")
+
+
+def _format_recipient(recipient: dict) -> dict:
+    """Project an LM Recipient dict into the MCP response shape."""
+    return {
+        "type": recipient.get("type"),
+        "method": recipient.get("method"),
+        "address": recipient.get("addr"),
+        "contact": recipient.get("contact"),
+    }
+
+
 async def get_recipient_groups(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    detail: bool = False,
 ) -> list[TextContent]:
     """List recipient groups from LogicMonitor.
 
@@ -152,6 +173,8 @@ async def get_recipient_groups(
         client: LogicMonitor API client.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        detail: When true, fetch each group's full recipient list via an
+            extra GET per group. Off by default to avoid N+1 API calls.
 
     Returns:
         List of TextContent with recipient group data or error.
@@ -169,14 +192,15 @@ async def get_recipient_groups(
 
         groups = []
         for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "group_type": item.get("groupType"),
-                }
-            )
+            entry = {
+                "id": item.get("id"),
+                "name": _recipient_group_name(item),
+                "description": item.get("description"),
+            }
+            if detail and entry["id"] is not None:
+                full = await client.get(f"/setting/recipientgroups/{entry['id']}")
+                entry["recipients"] = [_format_recipient(r) for r in full.get("recipients", [])]
+            groups.append(entry)
 
         response = {
             "total": result.get("total", 0),
@@ -206,23 +230,12 @@ async def get_recipient_group(
     try:
         result = await client.get(f"/setting/recipientgroups/{group_id}")
 
-        # Parse recipients
-        recipients = []
-        for r in result.get("recipients", []):
-            recipients.append(
-                {
-                    "type": r.get("type"),
-                    "method": r.get("method"),
-                    "address": r.get("addr"),
-                    "contact": r.get("contact"),
-                }
-            )
+        recipients = [_format_recipient(r) for r in result.get("recipients", [])]
 
         group = {
             "id": result.get("id"),
-            "name": result.get("name"),
+            "name": _recipient_group_name(result),
             "description": result.get("description"),
-            "group_type": result.get("groupType"),
             "recipients": recipients,
         }
 
@@ -244,6 +257,24 @@ async def create_escalation_chain(
 ) -> list[TextContent]:
     """Create an escalation chain in LogicMonitor.
 
+    Each destination is a Chain object with shape::
+
+        {
+            "type": "single" | "timebased",
+            "period": null | {"hour1": 9, "hour2": 17, ...},
+            "stages": [[<Recipient>, ...], [<Recipient>, ...]]
+        }
+
+    ``stages`` is a list of stage arrays; each stage is itself a list of
+    Recipient objects. To route to an LM Integration (e.g., a Custom HTTP
+    Delivery), use a Recipient of the form::
+
+        {"type": "admin", "addr": "<username>", "method": "<integration display name>"}
+
+    Lowercase ``admin`` is required. ``method`` is the integration's
+    display name string, not its id. ``addr`` is a username that owns
+    the integration as one of their contact methods.
+
     Args:
         client: LogicMonitor API client.
         name: Name of the escalation chain.
@@ -251,8 +282,8 @@ async def create_escalation_chain(
         enable_throttling: Whether to enable alert throttling.
         throttling_period: Throttling period in minutes.
         throttling_alerts: Number of alerts before throttling.
-        destinations: List of destination stage dicts for the escalation chain.
-        cc_destinations: List of CC destination dicts for the escalation chain.
+        destinations: List of Chain objects (see shape above).
+        cc_destinations: List of Recipient objects for CC notifications.
 
     Returns:
         List of TextContent with result or error.
@@ -388,22 +419,32 @@ async def create_recipient_group(
     client: LogicMonitorClient,
     name: str,
     description: str | None = None,
+    recipients: list[dict] | None = None,
 ) -> list[TextContent]:
     """Create a recipient group in LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
-        name: Name of the recipient group.
+        name: Name of the recipient group. Sent as ``groupName`` per the
+            LM v3 API model.
         description: Optional description.
+        recipients: Optional list of Recipient objects to preload into the
+            group. Each entry is a dict with keys ``type``, ``method``,
+            ``addr``, and optional ``contact``. ``type`` and ``method``
+            are required by the LM API. Example entry::
+
+                {"type": "admin", "method": "email", "addr": "oncall@example.com"}
 
     Returns:
         List of TextContent with result or error.
     """
     try:
-        body: dict = {"name": name}
+        body: dict = {"groupName": name}
 
         if description:
             body["description"] = description
+        if recipients is not None:
+            body["recipients"] = recipients
 
         result = await client.post("/setting/recipientgroups", json_body=body)
 
@@ -425,14 +466,18 @@ async def update_recipient_group(
     group_id: int,
     name: str | None = None,
     description: str | None = None,
+    recipients: list[dict] | None = None,
 ) -> list[TextContent]:
     """Update a recipient group in LogicMonitor.
 
     Args:
         client: LogicMonitor API client.
         group_id: ID of the recipient group to update.
-        name: Updated name.
+        name: Updated name. Sent as ``groupName`` per the LM v3 API model.
         description: Updated description.
+        recipients: Optional replacement recipient list. When provided,
+            LM replaces the group's current recipient set with this list.
+            Same entry shape as ``create_recipient_group``.
 
     Returns:
         List of TextContent with result or error.
@@ -441,9 +486,11 @@ async def update_recipient_group(
         body: dict = {}
 
         if name is not None:
-            body["name"] = name
+            body["groupName"] = name
         if description is not None:
             body["description"] = description
+        if recipients is not None:
+            body["recipients"] = recipients
 
         if not body:
             return format_response(
