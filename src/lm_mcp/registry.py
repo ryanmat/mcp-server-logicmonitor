@@ -1903,6 +1903,212 @@ TOOLS.extend(
     ]
 )
 
+# Integrations (Custom HTTP Delivery)
+TOOLS.extend(
+    [
+        Tool(
+            name="get_integrations",
+            description=(
+                "List LogicMonitor integrations (Custom HTTP Delivery, Slack,"
+                " PagerDuty, etc.). Returns a short summary per integration."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by integration name (supports wildcards).",
+                    },
+                    "type_filter": {
+                        "type": "string",
+                        "description": (
+                            "Exact-match filter on the integration type, e.g."
+                            " 'http' for Custom HTTP Delivery, 'slack-2',"
+                            " 'pagerduty'. Wildcards are not supported for"
+                            " type."
+                        ),
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_integration",
+            description=(
+                "Get a specific integration's full definition. Field set"
+                " depends on integration type; password/OAuth secret"
+                " fields are masked."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "integration_id": {
+                        "type": "integer",
+                        "description": "Integration ID",
+                    },
+                },
+                "required": ["integration_id"],
+            },
+        ),
+        Tool(
+            name="create_http_integration",
+            description=(
+                "Create a Custom HTTP Delivery integration (type=http)."
+                " Required fields: name, url. Use extra_fields for"
+                " OAuth, actionNotes*, updateData*, or the 'extra' UI"
+                " metadata blob. (requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Integration display name"},
+                    "url": {
+                        "type": "string",
+                        "description": "Webhook URL for the active alert lifecycle",
+                    },
+                    "description": {"type": "string", "description": "Optional description"},
+                    "http_method": {
+                        "type": "string",
+                        "default": "post",
+                        "description": "HTTP verb for active alert posts",
+                    },
+                    "headers": {
+                        "type": ["object", "array"],
+                        "description": (
+                            "Headers for active alerts. Accepts a plain"
+                            " {name: value} dict or a list of {HeaderName:"
+                            " value} single-key dicts (LM's native form)."
+                        ),
+                        "examples": [
+                            {"Authorization": "Bearer ...", "Content-Type": "application/json"}
+                        ],
+                    },
+                    "alert_body": {
+                        "type": "string",
+                        "description": (
+                            "Payload template. Supports LM ##TOKEN## substitutions"
+                            " such as ##ALERTID##, ##LEVEL##, ##HOST##."
+                        ),
+                    },
+                    "alert_body_format": {
+                        "type": "string",
+                        "default": "json",
+                        "description": "Payload format (json or form).",
+                    },
+                    "alert_data_type": {
+                        "type": "string",
+                        "description": "LM alert data type, typically 'raw' or 'formatted'.",
+                    },
+                    "username": {"type": "string", "description": "Basic-auth username"},
+                    "password": {"type": "string", "description": "Basic-auth password"},
+                    "enabled_lifecycles": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Subset of ['active', 'ack', 'clear', 'update',"
+                            " 'actionNotes', 'updateData']. Defaults to the"
+                            " four core lifecycles."
+                        ),
+                    },
+                    "ack_url": {"type": "string", "description": "Override URL for ack"},
+                    "ack_method": {"type": "string", "description": "Override HTTP verb for ack"},
+                    "ack_body": {"type": "string", "description": "Override payload for ack"},
+                    "ack_headers": {
+                        "type": ["object", "array"],
+                        "description": "Override headers for ack (same shape as headers).",
+                    },
+                    "clear_url": {"type": "string", "description": "Override URL for clear"},
+                    "clear_method": {"type": "string"},
+                    "clear_body": {"type": "string"},
+                    "clear_headers": {"type": ["object", "array"]},
+                    "update_url": {"type": "string", "description": "Override URL for update"},
+                    "update_method": {"type": "string"},
+                    "update_body": {"type": "string"},
+                    "update_headers": {"type": ["object", "array"]},
+                    "extra_fields": {
+                        "type": "object",
+                        "description": (
+                            "Raw LM integration fields merged last. Use for"
+                            " OAuth credentials (oAuthClientId, etc.),"
+                            " updateData*, actionNotes*, and the 'extra'"
+                            " UI metadata string."
+                        ),
+                    },
+                },
+                "required": ["name", "url"],
+            },
+        ),
+        Tool(
+            name="update_http_integration",
+            description=(
+                "Update a Custom HTTP Delivery integration via PATCH. Only"
+                " fields explicitly provided are sent; omitted fields keep"
+                " their current server values. (requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "integration_id": {
+                        "type": "integer",
+                        "description": "Integration ID",
+                    },
+                    "name": {"type": "string"},
+                    "description": {"type": "string"},
+                    "url": {"type": "string"},
+                    "http_method": {"type": "string"},
+                    "headers": {"type": ["object", "array"]},
+                    "alert_body": {"type": "string"},
+                    "alert_body_format": {"type": "string"},
+                    "alert_data_type": {"type": "string"},
+                    "username": {"type": "string"},
+                    "password": {"type": "string"},
+                    "enabled_lifecycles": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "ack_url": {"type": "string"},
+                    "ack_method": {"type": "string"},
+                    "ack_body": {"type": "string"},
+                    "ack_headers": {"type": ["object", "array"]},
+                    "clear_url": {"type": "string"},
+                    "clear_method": {"type": "string"},
+                    "clear_body": {"type": "string"},
+                    "clear_headers": {"type": ["object", "array"]},
+                    "update_url": {"type": "string"},
+                    "update_method": {"type": "string"},
+                    "update_body": {"type": "string"},
+                    "update_headers": {"type": ["object", "array"]},
+                    "extra_fields": {"type": "object"},
+                },
+                "required": ["integration_id"],
+            },
+        ),
+        Tool(
+            name="delete_integration",
+            description=(
+                "Delete an integration by ID. Works for any integration"
+                " type (http, slack-2, pagerduty, etc.). (requires write"
+                " permission)"
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "integration_id": {
+                        "type": "integer",
+                        "description": "Integration ID",
+                    },
+                },
+                "required": ["integration_id"],
+            },
+        ),
+    ]
+)
+
 # Alert Rules
 TOOLS.extend(
     [
@@ -6107,6 +6313,7 @@ def get_tool_handler(tool_name: str) -> Any:
         forecasting,
         imports,
         ingestion,
+        integrations,
         logsources,
         metrics,
         netscans,
@@ -6226,6 +6433,12 @@ def get_tool_handler(tool_name: str) -> Any:
         "create_recipient_group": escalations.create_recipient_group,
         "update_recipient_group": escalations.update_recipient_group,
         "delete_recipient_group": escalations.delete_recipient_group,
+        # Integrations
+        "get_integrations": integrations.get_integrations,
+        "get_integration": integrations.get_integration,
+        "create_http_integration": integrations.create_http_integration,
+        "update_http_integration": integrations.update_http_integration,
+        "delete_integration": integrations.delete_integration,
         # Alert Rules
         "get_alert_rules": alert_rules.get_alert_rules,
         "get_alert_rule": alert_rules.get_alert_rule,
