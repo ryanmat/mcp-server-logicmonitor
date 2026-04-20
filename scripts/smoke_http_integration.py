@@ -9,9 +9,11 @@ Run once post-merge against your portal to confirm end-to-end shape:
     $ LM_ENABLE_WRITE_OPERATIONS=true uv run python scripts/smoke_http_integration.py
 
 The script creates an integration named ``mcp-smoke-<epoch>`` pointing at
-``https://example.invalid/smoke`` (a non-routable host, so no real traffic
-is ever sent), reads it back, patches the description, then deletes it.
-Any failure prints the raw LM response and exits non-zero.
+``https://example.com/lm-mcp-smoke`` (the IANA-reserved example domain,
+which resolves but ignores the POST), reads it back, patches the
+description, then deletes it. LM does a DNS check on create and rejects
+unroutable hosts like ``.invalid``, so this uses a resolvable but
+harmless URL. Any failure prints the raw LM response and exits non-zero.
 
 Requires LM_PORTAL and LM_BEARER_TOKEN in the environment (or .env).
 """
@@ -64,17 +66,25 @@ async def main() -> int:
         api_version=3,
     )
 
+    def _parse_tool_result(result, step):
+        raw = result[0].text
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            print(f"  {step} failed: {raw}", file=sys.stderr)
+            raise SystemExit(1) from None
+
     try:
         print(f"create: {name}")
         result = await create_http_integration(
             client,
             name=name,
-            url="https://example.invalid/smoke",
+            url="https://example.com/lm-mcp-smoke",
             description="mcp-server-logicmonitor v3.7.1 smoke test - safe to delete",
             headers={"X-Test": "smoke"},
             alert_body='{"alertId":"##ALERTID##"}',
         )
-        data = json.loads(result[0].text)
+        data = _parse_tool_result(result, "create")
         assert data.get("success"), data
         integration_id = data["integration_id"]
         print(f"  -> id={integration_id}")

@@ -271,6 +271,13 @@ async def create_http_integration(
             _normalize_headers(update_headers),
         )
 
+        # LM requires per-lifecycle url+method for every lifecycle in
+        # enabledStatus. The LM UI silently copies the active-lifecycle
+        # values into each enabled lifecycle that does not already
+        # override them. Mirror that so callers do not have to repeat
+        # themselves for the common "same URL for all lifecycles" case.
+        _inherit_active_defaults(body, body["enabledStatus"], normalized_headers)
+
         if extra_fields:
             body.update(extra_fields)
 
@@ -458,6 +465,49 @@ def _apply_lifecycle_overrides(
         body[f"{prefix}Payload"] = body_value
     if headers_value is not None:
         body[f"{prefix}Headers"] = headers_value
+
+
+def _inherit_active_defaults(
+    body: dict[str, Any],
+    enabled_lifecycles: list[str],
+    active_headers: list[dict[str, Any]] | None,
+) -> None:
+    """Fill in per-lifecycle fields from the active lifecycle defaults.
+
+    LM rejects a create request if any enabled lifecycle lacks its url
+    or method -- even when the active-lifecycle defaults would be a
+    sensible copy. The LM web UI silently performs this defaulting
+    before POSTing; this helper mirrors that behavior so callers can
+    pass just ``url`` and ``http_method`` and have every lifecycle in
+    ``enabledStatus`` inherit them.
+
+    Only ``url`` and ``method`` are strictly required by the server, but
+    we also mirror ``payload``, ``payloadFormat``, and ``headers`` so
+    every lifecycle behaves like the active one by default. Existing
+    per-lifecycle overrides are preserved.
+    """
+    active_url = body.get("url")
+    active_method = body.get("method")
+    active_payload = body.get("payload")
+    active_payload_format = body.get("payloadFormat")
+    for lifecycle in enabled_lifecycles:
+        if lifecycle == "active":
+            continue
+        url_key = f"{lifecycle}Url"
+        method_key = f"{lifecycle}Method"
+        payload_key = f"{lifecycle}Payload"
+        payload_format_key = f"{lifecycle}PayloadFormat"
+        headers_key = f"{lifecycle}Headers"
+        if body.get(url_key) in (None, "") and active_url is not None:
+            body[url_key] = active_url
+        if body.get(method_key) in (None, "") and active_method is not None:
+            body[method_key] = active_method
+        if body.get(payload_key) is None and active_payload is not None:
+            body[payload_key] = active_payload
+        if body.get(payload_format_key) is None and active_payload_format is not None:
+            body[payload_format_key] = active_payload_format
+        if body.get(headers_key) is None and active_headers is not None:
+            body[headers_key] = active_headers
 
 
 __all__ = [

@@ -70,10 +70,10 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.7.2
+## What's New in v3.7.3
 
-- **Improved**: LogicMonitor's raw Jackson deserialization errors on 4xx responses are now translated into actionable hints. "Cannot construct instance of `...$Period`" becomes "destinations[].period must be null or a Period object" with a concrete suggestion. The raw server text is preserved on `LMError.details` for debugging. Five starter patterns; the table grows as new shapes are seen.
-- **New**: Integration-shorthand recipient for escalation-chain destinations. `{type: "integration", integration_name: "<name>", admin: "<user>"}` is rewritten server-side into the canonical `{type: "admin", addr: "<user>", method: "<name>"}` form that LogicMonitor actually stores. Callers no longer have to reverse-engineer the non-obvious admin+method convention.
+- **Fixed**: `create_http_integration` now copies the active-lifecycle `url`, `method`, `payload`, `payloadFormat`, and `headers` into each enabled lifecycle that does not already override them. LM rejects a create with "ackUrl is null or empty, ..." when an enabled lifecycle lacks these fields -- the LM web UI silently defaults them, but the v3.7.1 MCP tool did not. Smoke test now passes end-to-end against a real portal.
+- **v3.7.2**: LogicMonitor's raw Jackson deserialization errors on 4xx responses are now translated into actionable hints. Raw server text preserved on `LMError.details`. Integration-shorthand recipient for escalation-chain destinations: `{type: "integration", integration_name: "<name>", admin: "<user>"}` is rewritten server-side into the canonical `{type: "admin", addr: "<user>", method: "<name>"}` form.
 - **v3.7.1**: Custom HTTP Delivery integration CRUD on `/setting/integrations` (`get_integrations`, `get_integration`, `create_http_integration`, `update_http_integration`, `delete_integration`), plus a `scripts/smoke_http_integration.py` live round-trip.
 - **v3.7.0**: Recipient-group `groupName` fix, `recipients=[...]` on create/update, `detail=True` on list, destinations-schema example for routing via the `{type: "admin", addr: "<user>", method: "<integration name>"}` form.
 
