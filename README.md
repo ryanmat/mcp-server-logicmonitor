@@ -70,19 +70,17 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.7.0
+## What's New in v3.7.1
 
-- **Fixed**: `get_recipient_groups` and `get_recipient_group` now read the v3 API's `groupName` field (with legacy `name` fallback), so listings stop returning null names for groups that exist in the portal. The obsolete `group_type` field is no longer surfaced.
-- **Fixed**: `create_recipient_group` and `update_recipient_group` now post `groupName` to match the LM v3 model, replacing the previously ignored `name` key.
-- **New**: `create_recipient_group(..., recipients=[...])` and `update_recipient_group(..., recipients=[...])` accept a recipient list in one call, eliminating the prior two-step workflow.
-- **New**: `get_recipient_groups(..., detail=True)` enriches each item with its full recipient list via a per-id follow-up. Off by default to avoid N+1 calls.
-- **Changed**: `create_escalation_chain` and `update_escalation_chain` schemas now document the Chain / Recipient shape inline, including a working example for routing alerts to a Custom HTTP Delivery integration via `{type: "admin", addr: "<username>", method: "<integration display name>"}`. Tool docstrings carry the same guidance for LLM clients that don't render examples from the JSON schema.
+- **New**: Custom HTTP Delivery integration CRUD on `/setting/integrations`. Tools: `get_integrations`, `get_integration`, `create_http_integration`, `update_http_integration`, `delete_integration`. Closes the one gap that forced manual UI steps when wiring LogicMonitor to Azure Sentinel, PagerDuty, ServiceNow, or any webhook target. A single MCP session can now wire the full alert-delivery path end-to-end (`create_http_integration` -> `create_escalation_chain` -> `create_alert_rule`).
+- **New**: `scripts/smoke_http_integration.py` -- one-shot live smoke test that round-trips a throwaway integration (create, get, patch, delete) against a real portal. Uses a non-routable host so no real traffic is sent.
+- **v3.7.0**: Recipient-group `groupName` fix, `recipients=[...]` on create/update, `detail=True` on list, destinations-schema example for routing via the `{type: "admin", addr: "<user>", method: "<integration name>"}` form.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Features
 
-**267+ Tools** across comprehensive LogicMonitor API coverage (238 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**272+ Tools** across comprehensive LogicMonitor API coverage (243 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -464,7 +462,7 @@ For surgical control, combine with `LM_ENABLED_TOOLS`:
 }
 ```
 
-The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. Default behavior (env var unset) returns all 267 tools — backwards compatible.
+The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. Default behavior (env var unset) returns all 272 tools — backwards compatible.
 
 ### Claude Desktop
 

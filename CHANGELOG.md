@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.1] - 2026-04-20
+
+### Added
+
+- Custom HTTP Delivery integration CRUD on `/setting/integrations`:
+  - `get_integrations(name_filter, type_filter, limit)` -- list integrations with optional `type:"http"` exact-match and `name~` substring filters (LM v3 requires exact quoting on type, wildcards are not supported there).
+  - `get_integration(integration_id)` -- full passthrough of the LM definition (field set varies by integration type; `password` and `oAuthClientSecret` are server-masked).
+  - `create_http_integration(name, url, ...)` -- creates a `type="http"` integration. Exposes `description`, `http_method`, `headers`, `alert_body`, `alert_body_format`, `alert_data_type`, `username`, `password`, `enabled_lifecycles` (subset of active/ack/clear/update/actionNotes/updateData), per-lifecycle overrides for ack/clear/update, and `extra_fields` for OAuth credentials, `actionNotes*`, `updateData*`, and the `extra` UI metadata blob.
+  - `update_http_integration(integration_id, ...)` -- PATCH partial update; only fields explicitly provided are sent.
+  - `delete_integration(integration_id)` -- works for any integration type.
+  - `headers` accepts a plain `{name: value}` dict (converted to LM's native `list[{HeaderName: value}]` form) or a friendly `[{name, value}, ...]` list.
+- `scripts/smoke_http_integration.py` -- one-shot live smoke test that creates a throwaway integration pointing at `https://example.invalid/smoke`, reads it back, patches it, then deletes it. Run post-merge with `LM_ENABLE_WRITE_OPERATIONS=true uv run python scripts/smoke_http_integration.py`.
+
+### Rationale
+
+Before v3.7.1, wiring LogicMonitor to any webhook-style destination (Azure Sentinel, PagerDuty, ServiceNow, Splunk, custom pipelines) required manual UI steps at Settings -> Integrations because the MCP server had no tool for the integration resource. Only `create_alert_rule` and (post-v3.7.0) `create_escalation_chain` worked via MCP. This release closes the gap so a single MCP session can wire the full alert-delivery path end-to-end.
+
 ## [3.7.0] - 2026-04-20
 
 ### Fixed
