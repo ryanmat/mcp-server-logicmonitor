@@ -227,6 +227,89 @@ class TestCreateHttpIntegration:
         ]
 
     @respx.mock
+    async def test_default_enabled_lifecycles_inherit_active_url_and_method(
+        self, client, monkeypatch
+    ):
+        """LM rejects a create with any enabled lifecycle missing url+method.
+
+        The LM UI silently copies the active-lifecycle values into each
+        enabled lifecycle. Mirror that so callers do not have to repeat
+        themselves for the common "same URL for all lifecycles" case.
+        """
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.integrations import create_http_integration
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/integrations").mock(
+            return_value=httpx.Response(200, json={"id": 77})
+        )
+
+        await create_http_integration(
+            client,
+            name="inherit",
+            url="https://example.com/hook",
+            http_method="post",
+            alert_body='{"x":1}',
+            headers={"X-Test": "inherit"},
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        for lifecycle in ("ack", "clear", "update"):
+            assert body[f"{lifecycle}Url"] == "https://example.com/hook"
+            assert body[f"{lifecycle}Method"] == "post"
+            assert body[f"{lifecycle}Payload"] == '{"x":1}'
+            assert body[f"{lifecycle}PayloadFormat"] == "json"
+            assert body[f"{lifecycle}Headers"] == [{"X-Test": "inherit"}]
+
+    @respx.mock
+    async def test_explicit_lifecycle_override_is_not_clobbered_by_inherit(
+        self, client, monkeypatch
+    ):
+        """An explicit ack_url takes precedence over the active-default copy."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.integrations import create_http_integration
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/integrations").mock(
+            return_value=httpx.Response(200, json={"id": 78})
+        )
+
+        await create_http_integration(
+            client,
+            name="override-keeps-its-value",
+            url="https://example.com/active",
+            ack_url="https://example.com/ack-only",
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["url"] == "https://example.com/active"
+        assert body["ackUrl"] == "https://example.com/ack-only"
+        # clear and update inherit from active.
+        assert body["clearUrl"] == "https://example.com/active"
+        assert body["updateUrl"] == "https://example.com/active"
+
+    @respx.mock
+    async def test_disabled_lifecycle_does_not_get_inherited_fields(self, client, monkeypatch):
+        """Lifecycles not listed in enabled_lifecycles are left untouched."""
+        _enable_writes(monkeypatch)
+        from lm_mcp.tools.integrations import create_http_integration
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/integrations").mock(
+            return_value=httpx.Response(200, json={"id": 79})
+        )
+
+        await create_http_integration(
+            client,
+            name="active-only",
+            url="https://example.com/hook",
+            enabled_lifecycles=["active"],
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["enabledStatus"] == ["active"]
+        for lifecycle in ("ack", "clear", "update"):
+            assert f"{lifecycle}Url" not in body
+            assert f"{lifecycle}Method" not in body
+
+    @respx.mock
     async def test_lifecycle_overrides_and_extra_fields(self, client, monkeypatch):
         _enable_writes(monkeypatch)
         from lm_mcp.tools.integrations import create_http_integration

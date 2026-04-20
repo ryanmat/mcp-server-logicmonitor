@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.3] - 2026-04-20
+
+### Fixed
+
+- `create_http_integration` now copies the active-lifecycle `url`, `method`, `payload`, `payloadFormat`, and `headers` into each enabled lifecycle that does not already override them. LM rejects a create with `ackUrl is null or empty, ackMethod is null or empty, ...` when an enabled lifecycle lacks these fields; the LM web UI silently defaults them to the active values, but the v3.7.1 MCP tool did not. The live smoke test (`scripts/smoke_http_integration.py`) against a real portal was failing as a result. Explicit per-lifecycle overrides (`ack_url`, `clear_method`, etc.) still take precedence. Lifecycles not listed in `enabled_lifecycles` are left untouched.
+- `scripts/smoke_http_integration.py` now posts to `https://example.com/lm-mcp-smoke` instead of `https://example.invalid/smoke`. LM does a DNS check on create; the IANA-reserved `.invalid` TLD fails resolution and surfaces as "Unknown Host" even though the webhook is never actually invoked during create. `example.com` resolves (owned by IANA for docs/examples) and accepts POSTs harmlessly.
+- Smoke script now prints the raw tool response on failure instead of crashing with `JSONDecodeError` when the tool returned an error string.
+
+### Verified
+
+- End-to-end live smoke test (create, get, patch, delete) now passes against Ryan's portal.
+
 ## [3.7.2] - 2026-04-20
 
 ### Added
