@@ -72,18 +72,9 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 
 ## What's New in v3.8.0
 
-**Networking intelligence release.** Eight new read-only tools that close the gap between raw alert streams and site-level correlation:
+**Networking intelligence release.** Eight read-only tools for interface metrics, NetFlow top talkers, alert burst detection, link flaps, UPS/PDU events, enriched collector health, and two composite workflows (`detect_site_outage`, `audit_network_monitoring_coverage`) that close the correlation gap generic AIOps misses.
 
-- **`detect_site_outage`** — composite workflow chaining CollectorDown, mass interface-down bursts, UPS on-battery events, and downstream device silence into a single outage verdict with confidence score. Designed to catch the class of site outage that generic AIOps correlation misses.
-- **`audit_network_monitoring_coverage`** — portal coverage audit with prioritized gap list and specific onboarding recommendations. Turns "you can't detect X" into "here's how to enable detection of X."
-- **`get_interface_metrics`** — per-interface time-series (in/out bytes, errors, discards, utilization, status). Answers "how is this port performing?"
-- **`get_top_talkers`** — NetFlow ranking by bandwidth, packets, or flow count. Group by source IP, destination IP, protocol, application, or src→dst pair.
-- **`detect_alert_burst`** — sliding-window detector for mass alert events. Generic primitive used by `detect_site_outage` and for DDoS/switch-cascade investigation.
-- **`get_link_flaps`** — interfaces with repeated up/down transitions. Answers "which ports are unstable?"
-- **`get_collector_health`** — enriched collector status with time-since-last-contact, downstream device count, and CollectorDown history. The preferred query when investigating potential outages.
-- **`get_power_events`** — UPS/PDU alert filter across APC, Liebert, Eaton DataSources.
-
-See [CHANGELOG.md](CHANGELOG.md) for the full release history.
+See [documentation/networking-intelligence.md](documentation/networking-intelligence.md) for the full tool reference, scoring model, and prerequisites. Full release history in [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
