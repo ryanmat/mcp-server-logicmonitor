@@ -70,9 +70,13 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.8.1
+## What's New in v3.8.2
 
-**Patch.** Fixes `detect_site_outage` collector-enumeration. The v3.8.0 composite looked for raw-API field names (`currentCollectorId`) that the formatted `get_devices` response renames to `collector_id`, so the CollectorDown signal was always zero through the normal dispatch path. Also counts `hostStatus=2` (dead-collector) as dead alongside `hostStatus=1`. Surfaced during the v3.8.0 portal smoke test.
+**Patch.** Hardens the composite dispatch helper and `detect_site_outage` collector enumeration. `_call_sub_tool` now handles sub-tool error responses cleanly (was crashing with `JSONDecodeError` when a sub-tool returned the human-readable `"Error: ..."` shape). `detect_site_outage` now probes each collector independently so a single orphaned collector reference no longer truncates the CollectorDown signal. Surfaced during the v3.8.1 portal smoke test.
+
+### v3.8.1 — detect_site_outage collector enumeration
+
+Fixes the v3.8.0 composite looking for raw-API field names (`currentCollectorId`) that the formatted `get_devices` response renames to `collector_id`; the CollectorDown signal was always zero. Also counts `hostStatus=2` (dead-collector) as dead alongside `hostStatus=1`.
 
 ### v3.8.0 — Networking intelligence
 

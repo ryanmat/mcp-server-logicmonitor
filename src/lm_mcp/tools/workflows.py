@@ -27,9 +27,28 @@ if TYPE_CHECKING:
 
 
 async def _call_sub_tool(handler, client: LogicMonitorClient, **kwargs) -> dict:
-    """Call a sub-handler, parse JSON response, raise on errors."""
+    """Call a sub-handler, parse JSON response, raise on errors.
+
+    Handles both structured JSON responses and the human-readable error
+    format `format_response` produces for error dicts
+    ("Error: <message>\\nSuggestion: <suggestion>"). Converts either shape
+    into a clean RuntimeError for the composite caller instead of a
+    cryptic JSONDecodeError that propagates as "Expecting value: line 1
+    column 1 (char 0)".
+    """
     result = await handler(client, **kwargs)
-    data = json.loads(result[0].text)
+    text = result[0].text
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        if text.startswith("Error:"):
+            first_line = text.split("\n", 1)[0]
+            message = first_line[len("Error:") :].strip() or "Sub-tool returned an error"
+            raise RuntimeError(message) from None
+        snippet = text[:200]
+        raise RuntimeError(f"Sub-tool returned non-JSON response: {snippet}") from None
+
     if isinstance(data, dict) and data.get("error"):
         raise RuntimeError(data.get("message", "Sub-tool returned an error"))
     return data
@@ -1422,11 +1441,15 @@ async def detect_site_outage(
         dead_devices = _count_dead_devices(devices)
         collector_ids = _collector_ids_from_devices(devices)
 
-        # Signal A: CollectorDown on collectors serving this group.
+        # Signal A: CollectorDown on collectors serving this group. Each
+        # collector is probed independently so a single bad collector ID
+        # (e.g., orphaned reference to a deleted collector) does not abort
+        # the rest of the signal.
         collector_down_count = 0
         collectors_inspected: list[dict] = []
-        try:
-            for cid in collector_ids:
+        collector_probe_failures: list[str] = []
+        for cid in collector_ids:
+            try:
                 health_data = await _call_sub_tool(
                     get_collector_health,
                     client,
@@ -1437,8 +1460,16 @@ async def detect_site_outage(
                 collectors_inspected.append(entry)
                 if entry.get("is_down"):
                     collector_down_count += 1
-        except Exception as exc:
-            warnings.append(f"Collector health probe failed: {exc}")
+            except Exception as exc:
+                collector_probe_failures.append(f"collector_id={cid}: {exc}")
+
+        if collector_probe_failures:
+            failures_shown = "; ".join(collector_probe_failures[:5])
+            suffix = "..." if len(collector_probe_failures) > 5 else ""
+            warnings.append(
+                f"{len(collector_probe_failures)}/{len(collector_ids)} "
+                f"collector health probes failed: {failures_shown}{suffix}"
+            )
 
         # Signal B: mass interface-down burst in the window.
         burst_signal: dict | None = None

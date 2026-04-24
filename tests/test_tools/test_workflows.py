@@ -11,6 +11,7 @@ import pytest
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools.workflows import (
+    _call_sub_tool,
     _resolve_device,
     _trim_detail,
     capacity_plan,
@@ -813,6 +814,69 @@ class TestSearchTools:
 
 
 # ---------------------------------------------------------------------------
+# TestCallSubTool (robustness against non-JSON / error-formatted responses)
+# ---------------------------------------------------------------------------
+
+
+class TestCallSubTool:
+    """Direct tests for `_call_sub_tool` parse and error-handling behavior."""
+
+    async def test_happy_path_returns_parsed_json(self, client):
+        from mcp.types import TextContent
+
+        async def handler(_client):
+            return [TextContent(type="text", text=json.dumps({"ok": True, "n": 42}))]
+
+        data = await _call_sub_tool(handler, client)
+        assert data == {"ok": True, "n": 42}
+
+    async def test_error_formatted_text_raises_runtime_error(self, client):
+        """format_response renders errors as 'Error: ...' text, not JSON.
+
+        `_call_sub_tool` must detect that shape and raise a clean
+        RuntimeError with the underlying message rather than leaking a
+        JSONDecodeError from json.loads.
+        """
+        from mcp.types import TextContent
+
+        async def handler(_client):
+            return [
+                TextContent(
+                    type="text",
+                    text="Error: collector 999 not found\nSuggestion: Verify the ID.",
+                )
+            ]
+
+        with pytest.raises(RuntimeError, match="collector 999 not found"):
+            await _call_sub_tool(handler, client)
+
+    async def test_non_json_non_error_text_raises_with_snippet(self, client):
+        """Truly unexpected text (neither JSON nor 'Error:') surfaces a snippet."""
+        from mcp.types import TextContent
+
+        async def handler(_client):
+            return [TextContent(type="text", text="<html>gateway timeout</html>")]
+
+        with pytest.raises(RuntimeError, match="non-JSON response"):
+            await _call_sub_tool(handler, client)
+
+    async def test_dict_with_error_field_raises(self, client):
+        """A parsed dict carrying {'error': True} still triggers RuntimeError."""
+        from mcp.types import TextContent
+
+        async def handler(_client):
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": True, "code": "SOMETHING", "message": "nope"}),
+                )
+            ]
+
+        with pytest.raises(RuntimeError, match="nope"):
+            await _call_sub_tool(handler, client)
+
+
+# ---------------------------------------------------------------------------
 # TestSiteOutageHelpers (shape compatibility with get_devices formatted output)
 # ---------------------------------------------------------------------------
 
@@ -1030,9 +1094,84 @@ class TestDetectSiteOutage:
 
         data = json.loads(result[0].text)
         assert len(data["warnings"]) >= 1
-        assert any("Collector health" in w for w in data["warnings"])
+        assert any("collector health probes failed" in w for w in data["warnings"])
+        assert any("collector_id=1" in w for w in data["warnings"])
         # No CollectorDown signal → collector_down triggered is False
         assert data["signals"]["collector_down"]["triggered"] is False
+
+    async def test_partial_collector_failures_do_not_abort_loop(self, client):
+        """One bad collector probe no longer aborts the rest (v3.8.2 fix).
+
+        Composite must continue probing remaining collector IDs and
+        surface a single aggregate warning summarizing the failures.
+        """
+        from mcp.types import TextContent
+
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        devices_data = {
+            "devices": [
+                {"id": 1, "status": 1, "collector_id": 10},
+                {"id": 2, "status": 1, "collector_id": 20},
+                {"id": 3, "status": 1, "collector_id": 30},
+            ]
+        }
+
+        async def selective_health(_client, collector_id, **_kwargs):
+            # Collector 20 fails; 10 and 30 succeed.
+            if collector_id == 20:
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: collector 20 not found\nSuggestion: Verify ID.",
+                    )
+                ]
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "total_collectors": 1,
+                            "collectors_down": 0,
+                            "collectors": [
+                                {
+                                    "id": collector_id,
+                                    "hostname": f"col-{collector_id}",
+                                    "is_down": False,
+                                }
+                            ],
+                        }
+                    ),
+                )
+            ]
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            patch(
+                "lm_mcp.tools.collectors.get_collector_health",
+                new_callable=AsyncMock,
+                side_effect=selective_health,
+            ),
+            _patch_sub(
+                "lm_mcp.tools.networking.detect_alert_burst",
+                {"bursts_detected": 0, "bursts": []},
+            ),
+            _patch_sub(
+                "lm_mcp.tools.networking.get_power_events",
+                {"total_power_events": 0, "events": []},
+            ),
+        ):
+            result = await detect_site_outage(client, group_id=42, detail_level="full")
+
+        data = json.loads(result[0].text)
+        # Composite kept going past collector 20 and probed 30.
+        inspected_ids = [c.get("id") for c in data["collectors_inspected"]]
+        assert 10 in inspected_ids
+        assert 30 in inspected_ids
+        assert 20 not in inspected_ids
+        # Warning mentions the failed collector specifically.
+        assert any("collector_id=20" in w for w in data["warnings"])
+        assert any("1/3" in w for w in data["warnings"])
 
     async def test_required_tools_disabled_blocks_composite(self, client, monkeypatch):
         """LM_DISABLED_TOOLS matching a required sub-tool blocks execution."""

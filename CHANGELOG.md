@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.2] - 2026-04-23
+
+### Fixed
+
+- `_call_sub_tool` (composite dispatch helper) no longer leaks a cryptic `JSONDecodeError: Expecting value: line 1 column 1 (char 0)` when a sub-tool returns an error response. `format_response` renders error dicts as human-readable `"Error: <message>\nSuggestion: <suggestion>"` text, which is not JSON. `_call_sub_tool` now detects that shape and raises a clean `RuntimeError` carrying the underlying message. Benefits every composite (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`, `update_logicmodule`, `detect_site_outage`, `audit_network_monitoring_coverage`), not just the one that surfaced the bug. Also handles truly unexpected non-JSON bodies by surfacing a 200-char snippet for debugging.
+- `detect_site_outage` no longer aborts the entire CollectorDown signal when a single collector-health probe fails. Each `collector_id` is now probed under its own try/except; failures accumulate into a single aggregate warning (`"N/M collector health probes failed: collector_id=X: <error>; ..."`) while the remaining collectors continue to be inspected. Surfaced during the v3.8.1 portal smoke test on Ryan's portal: 2 of 4 collectors returned errors (likely orphaned references to deleted collectors) and truncated `collectors_inspected` to 2 entries.
+
+### Added
+
+- Four direct unit tests for `_call_sub_tool` covering happy-path JSON, `"Error:"`-formatted text, non-JSON non-error body, and `{"error": True}` dict shape.
+- `test_partial_collector_failures_do_not_abort_loop` covers the multi-collector partial-failure path end-to-end.
+
+### Verified
+
+- Full 1784-test suite passing (4 new `_call_sub_tool` + 1 new partial-failure test + 1 updated assertion).
+- Ruff check + format clean.
+
 ## [3.8.1] - 2026-04-23
 
 ### Fixed
