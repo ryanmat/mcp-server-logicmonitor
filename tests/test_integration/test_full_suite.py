@@ -1536,7 +1536,7 @@ class TestServerCallToolFlow:
         """list_tools returns the full set of registered tools."""
         from lm_mcp.registry import TOOLS
 
-        assert len(TOOLS) == 243
+        assert len(TOOLS) == 251
         tool_names = {t.name for t in TOOLS}
         assert "get_devices" in tool_names
         assert "get_alerts" in tool_names
@@ -1547,6 +1547,15 @@ class TestServerCallToolFlow:
         assert "get_reference" in tool_names
         assert "get_workflow" in tool_names
         assert "get_integrations" in tool_names
+        # v3.8.0 networking intelligence
+        assert "get_interface_metrics" in tool_names
+        assert "get_top_talkers" in tool_names
+        assert "detect_alert_burst" in tool_names
+        assert "get_link_flaps" in tool_names
+        assert "get_power_events" in tool_names
+        assert "get_collector_health" in tool_names
+        assert "detect_site_outage" in tool_names
+        assert "audit_network_monitoring_coverage" in tool_names
         assert "create_http_integration" in tool_names
 
     def test_awx_tools_registered(self):

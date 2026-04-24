@@ -18,6 +18,8 @@ TOOL_CATEGORIES = {
                 "portal_overview",
                 "diagnose",
                 "update_logicmodule",
+                "detect_site_outage",
+                "audit_network_monitoring_coverage",
             ],
         },
         "universal_reference": {
@@ -95,6 +97,21 @@ TOOL_CATEGORIES = {
                 "create_collector_group",
                 "update_collector_group",
                 "delete_collector_group",
+                "get_collector_health",
+            ],
+        },
+        "networking": {
+            "description": (
+                "Network intelligence primitives: interface metrics, NetFlow top "
+                "talkers, alert burst detection, link flap identification, power "
+                "event filtering (UPS/PDU)"
+            ),
+            "tools": [
+                "get_interface_metrics",
+                "get_top_talkers",
+                "detect_alert_burst",
+                "get_link_flaps",
+                "get_power_events",
             ],
         },
         "datasources": {

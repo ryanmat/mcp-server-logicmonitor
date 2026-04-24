@@ -1350,3 +1350,541 @@ async def update_logicmodule(
         return format_response({**preview, "applied": True, "result": result})
     except Exception as e:
         return handle_error(e)
+
+
+# ---------------------------------------------------------------------------
+# Composite tool: detect_site_outage
+# ---------------------------------------------------------------------------
+
+_SITE_OUTAGE_REQUIRED = [
+    "get_alerts",
+    "get_devices",
+    "get_collector_health",
+    "detect_alert_burst",
+    "get_power_events",
+]
+
+_POWER_KEYWORDS = ("ups", "pdu", "battery", "power")
+
+
+async def detect_site_outage(
+    client: LogicMonitorClient,
+    group_id: int,
+    window_seconds: int = 300,
+    hours_back: int = 1,
+    detail_level: str = "summary",
+) -> list[TextContent]:
+    """Composite detector for site-level outages across a device group.
+
+    Chains four signals into a single verdict:
+      A) CollectorDown — any collector serving devices in this group is down
+      B) Mass interface-down burst — detect_alert_burst on Interface-family DSes
+      C) Power events — UPS/PDU alerts in the last hour
+      D) Device silence — count of dead devices in the group
+
+    Confidence score (0-100):
+      A>0: +40  |  B>0: +25  |  C>0: +25  |  D>threshold: +10
+
+    Verdict: >=70 site_outage_detected; >=40 possible_site_outage; else no.
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Site = device group ID. Devices in this group define the
+            scope of the analysis.
+        window_seconds: Burst window size in seconds (default: 300).
+        hours_back: Context window for power events in hours (default: 1).
+        detail_level: "summary" or "full" (default: summary).
+
+    Returns:
+        TextContent list with verdict, confidence, signal breakdown, and
+        affected-scope details.
+    """
+    blocked = check_required_tools(_SITE_OUTAGE_REQUIRED)
+    if blocked:
+        return blocked
+
+    try:
+        from lm_mcp.tools.collectors import get_collector_health
+        from lm_mcp.tools.devices import get_devices
+        from lm_mcp.tools.networking import detect_alert_burst, get_power_events
+
+        warnings: list[str] = []
+
+        # Scope: enumerate devices in the group once.
+        devices_data = await _call_sub_tool(
+            get_devices,
+            client,
+            group_id=group_id,
+            limit=500,
+        )
+        devices = devices_data.get("devices", [])
+        device_count = len(devices)
+        dead_devices = _count_dead_devices(devices)
+        collector_ids = _collector_ids_from_devices(devices)
+
+        # Signal A: CollectorDown on collectors serving this group.
+        collector_down_count = 0
+        collectors_inspected: list[dict] = []
+        try:
+            for cid in collector_ids:
+                health_data = await _call_sub_tool(
+                    get_collector_health,
+                    client,
+                    collector_id=cid,
+                    include_history=False,
+                )
+                entry = (health_data.get("collectors") or [{}])[0]
+                collectors_inspected.append(entry)
+                if entry.get("is_down"):
+                    collector_down_count += 1
+        except Exception as exc:
+            warnings.append(f"Collector health probe failed: {exc}")
+
+        # Signal B: mass interface-down burst in the window.
+        burst_signal: dict | None = None
+        try:
+            burst_data = await _call_sub_tool(
+                detect_alert_burst,
+                client,
+                group_id=group_id,
+                datasource_pattern="interface",
+                window_seconds=window_seconds,
+                min_alerts=5,
+                min_devices=3,
+                hours_back=hours_back,
+            )
+            burst_signal = burst_data
+        except Exception as exc:
+            warnings.append(f"Burst detection failed: {exc}")
+
+        # Signal C: power events (UPS/PDU on-battery, battery-runtime, etc.).
+        power_events_count = 0
+        power_events_preview: list[dict] = []
+        try:
+            power_data = await _call_sub_tool(
+                get_power_events,
+                client,
+                group_id=group_id,
+                hours_back=hours_back,
+            )
+            power_events_count = int(power_data.get("total_power_events", 0))
+            power_events_preview = list(power_data.get("events", []))[:10]
+        except Exception as exc:
+            warnings.append(f"Power event query failed: {exc}")
+
+        # Score and verdict.
+        silence_threshold = max(3, device_count // 5)  # 20% of group or 3 whichever higher
+        confidence = 0
+        signals_breakdown = {}
+        if collector_down_count > 0:
+            confidence += 40
+            signals_breakdown["collector_down"] = {
+                "triggered": True,
+                "count": collector_down_count,
+                "weight": 40,
+            }
+        else:
+            signals_breakdown["collector_down"] = {"triggered": False, "count": 0}
+
+        burst_count = int((burst_signal or {}).get("bursts_detected", 0))
+        if burst_count > 0:
+            confidence += 25
+            signals_breakdown["interface_burst"] = {
+                "triggered": True,
+                "burst_count": burst_count,
+                "weight": 25,
+            }
+        else:
+            signals_breakdown["interface_burst"] = {"triggered": False, "burst_count": 0}
+
+        if power_events_count > 0:
+            confidence += 25
+            signals_breakdown["power_events"] = {
+                "triggered": True,
+                "count": power_events_count,
+                "weight": 25,
+            }
+        else:
+            signals_breakdown["power_events"] = {"triggered": False, "count": 0}
+
+        if dead_devices >= silence_threshold:
+            confidence += 10
+            signals_breakdown["device_silence"] = {
+                "triggered": True,
+                "dead_devices": dead_devices,
+                "threshold": silence_threshold,
+                "weight": 10,
+            }
+        else:
+            signals_breakdown["device_silence"] = {
+                "triggered": False,
+                "dead_devices": dead_devices,
+                "threshold": silence_threshold,
+            }
+
+        confidence = min(confidence, 100)
+        if confidence >= 70:
+            verdict = "site_outage_detected"
+        elif confidence >= 40:
+            verdict = "possible_site_outage"
+        else:
+            verdict = "no_outage_signature"
+
+        recommendations = _site_outage_recommendations(
+            verdict, signals_breakdown, power_events_count, collector_down_count
+        )
+
+        report: dict = {
+            "verdict": verdict,
+            "confidence": confidence,
+            "group_id": group_id,
+            "window_seconds": window_seconds,
+            "hours_back": hours_back,
+            "scope": {
+                "devices_in_group": device_count,
+                "dead_devices": dead_devices,
+                "collectors_serving_group": len(collector_ids),
+            },
+            "signals": signals_breakdown,
+            "recommendations": recommendations,
+            "warnings": warnings,
+            "collectors_inspected": collectors_inspected,
+            "interface_burst_detail": burst_signal,
+            "power_events_preview": power_events_preview,
+        }
+
+        report = _trim_detail(
+            report,
+            detail_level,
+            {"collectors_inspected", "interface_burst_detail", "power_events_preview"},
+        )
+        return format_response(report)
+    except Exception as e:
+        return handle_error(e)
+
+
+def _count_dead_devices(devices: list[dict]) -> int:
+    """Count devices with a dead or unreachable status."""
+    count = 0
+    for dev in devices:
+        status = dev.get("hostStatus") or dev.get("status")
+        alert_status = (dev.get("alertStatus") or "").lower()
+        if status in ("dead", 1, "1") or alert_status in (
+            "dead",
+            "dead-collector",
+            "unreachable",
+        ):
+            count += 1
+    return count
+
+
+def _collector_ids_from_devices(devices: list[dict]) -> list[int]:
+    """Distinct currentCollectorId values from a device list."""
+    seen: set[int] = set()
+    ordered: list[int] = []
+    for dev in devices:
+        cid = dev.get("currentCollectorId") or dev.get("preferredCollectorId")
+        if cid and cid not in seen:
+            seen.add(cid)
+            ordered.append(cid)
+    return ordered
+
+
+def _site_outage_recommendations(
+    verdict: str,
+    signals: dict,
+    power_events: int,
+    collector_down: int,
+) -> list[str]:
+    """Actionable next steps based on which signals fired."""
+    recs: list[str] = []
+    if verdict == "site_outage_detected":
+        recs.append("Treat as a single site-level incident; do not triage individual alerts.")
+    if collector_down > 0:
+        recs.append(
+            "Verify collector host connectivity — collector is the typical first signal "
+            "of site-level power or network loss."
+        )
+    if power_events > 0:
+        recs.append(
+            "Review UPS/PDU events for on-battery transitions and runtime-remaining "
+            "alerts to confirm power-infrastructure involvement."
+        )
+    if signals.get("interface_burst", {}).get("triggered"):
+        recs.append(
+            "Mass interface-down detected — correlate affected ports to a common rack, "
+            "switch, or uplink to localize the fault domain."
+        )
+    if signals.get("device_silence", {}).get("triggered"):
+        recs.append(
+            "Elevated count of dead devices — expect delayed alert clearing; "
+            "re-run after site recovery to confirm scope."
+        )
+    if not recs:
+        recs.append(
+            "No outage signature detected. If symptoms persist, widen the group scope "
+            "or lengthen the hours_back window."
+        )
+    return recs
+
+
+# ---------------------------------------------------------------------------
+# Composite tool: audit_network_monitoring_coverage
+# ---------------------------------------------------------------------------
+
+_AUDIT_COVERAGE_REQUIRED = [
+    "get_devices",
+    "get_collectors",
+]
+
+
+async def audit_network_monitoring_coverage(
+    client: LogicMonitorClient,
+    group_id: int | None = None,
+) -> list[TextContent]:
+    """Audit portal monitoring coverage and surface actionable gaps.
+
+    Inventories devices, collectors, and coverage indicators (power
+    monitoring, SNMP credentials, NetFlow exporters). Returns a gap list
+    with specific recommendations — turns "you can't detect X" into
+    "here's how to enable detection of X."
+
+    Args:
+        client: LogicMonitor API client.
+        group_id: Scope the audit to a device group. None = portal-wide.
+
+    Returns:
+        TextContent list with inventory, coverage percentages, and prioritized gaps.
+    """
+    blocked = check_required_tools(_AUDIT_COVERAGE_REQUIRED)
+    if blocked:
+        return blocked
+
+    try:
+        from lm_mcp.tools.collectors import get_collectors
+        from lm_mcp.tools.devices import get_devices
+
+        warnings: list[str] = []
+
+        devices_data = await _call_sub_tool(
+            get_devices,
+            client,
+            group_id=group_id,
+            limit=1000,
+        )
+        devices = devices_data.get("devices", [])
+        collectors_data = await _call_sub_tool(get_collectors, client, limit=200)
+        collectors = collectors_data.get("collectors", [])
+
+        inventory = _build_inventory(devices, collectors)
+        coverage = _compute_coverage(devices, collectors)
+        gaps = _derive_gaps(inventory, coverage)
+
+        return format_response(
+            {
+                "scope": {"group_id": group_id, "portal_wide": group_id is None},
+                "inventory": inventory,
+                "coverage_percentages": coverage["percentages"],
+                "coverage_counts": coverage["counts"],
+                "gaps": gaps,
+                "summary": _audit_summary(inventory, coverage, gaps),
+                "warnings": warnings,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+def _build_inventory(devices: list[dict], collectors: list[dict]) -> dict:
+    """Counts by deviceType and likely power infrastructure."""
+    total_devices = len(devices)
+    power_like = 0
+    network_like = 0
+    server_like = 0
+    unknown = 0
+
+    for dev in devices:
+        name = (dev.get("displayName") or dev.get("name") or "").lower()
+        system_categories = (dev.get("systemCategories") or "").lower()
+        combined = f"{name} {system_categories}"
+        if any(kw in combined for kw in _POWER_KEYWORDS):
+            power_like += 1
+        elif any(kw in combined for kw in ("switch", "router", "firewall", "wlan")):
+            network_like += 1
+        elif any(kw in combined for kw in ("server", "linux", "windows", "host")):
+            server_like += 1
+        else:
+            unknown += 1
+
+    return {
+        "total_devices": total_devices,
+        "likely_power_infrastructure": power_like,
+        "likely_network_gear": network_like,
+        "likely_servers": server_like,
+        "unclassified": unknown,
+        "total_collectors": len(collectors),
+    }
+
+
+def _compute_coverage(devices: list[dict], collectors: list[dict]) -> dict:
+    """Count devices with specific monitoring properties set."""
+    total = len(devices) or 1
+    snmp_count = 0
+    netflow_count = 0
+    power_monitored = 0
+
+    for dev in devices:
+        props = _properties_dict(dev)
+        categories = (dev.get("systemCategories") or "").lower()
+        name = (dev.get("displayName") or dev.get("name") or "").lower()
+
+        if props.get("snmp.version") or props.get("snmp.community"):
+            snmp_count += 1
+        if (
+            props.get("netflow.enabled")
+            or "netflow" in categories
+            or "netflowexporter" in categories
+        ):
+            netflow_count += 1
+        if any(kw in f"{name} {categories}" for kw in _POWER_KEYWORDS):
+            power_monitored += 1
+
+    collectors_up = sum(1 for c in collectors if c.get("status") not in ("dead", "down"))
+
+    return {
+        "counts": {
+            "snmp_credentialed": snmp_count,
+            "netflow_exporters": netflow_count,
+            "power_monitored_devices": power_monitored,
+            "collectors_up": collectors_up,
+            "collectors_total": len(collectors),
+        },
+        "percentages": {
+            "snmp_coverage_pct": round(100.0 * snmp_count / total, 1),
+            "netflow_coverage_pct": round(100.0 * netflow_count / total, 1),
+            "power_monitoring_coverage_pct": round(100.0 * power_monitored / total, 1),
+        },
+    }
+
+
+def _properties_dict(device: dict) -> dict[str, str]:
+    """Flatten a device's customProperties list into a name->value dict."""
+    result: dict[str, str] = {}
+    for prop in device.get("customProperties", []) or []:
+        name = prop.get("name")
+        if name:
+            result[name] = prop.get("value", "")
+    for prop in device.get("systemProperties", []) or []:
+        name = prop.get("name")
+        if name and name not in result:
+            result[name] = prop.get("value", "")
+    return result
+
+
+def _derive_gaps(inventory: dict, coverage: dict) -> list[dict]:
+    """Prioritized list of coverage gaps with concrete recommendations."""
+    gaps: list[dict] = []
+    counts = coverage["counts"]
+
+    if counts["power_monitored_devices"] == 0 and inventory["total_devices"] > 0:
+        gaps.append(
+            {
+                "severity": "high",
+                "category": "power",
+                "finding": (
+                    "No UPS/PDU/battery devices detected in this scope. Power outage "
+                    "correlation cannot use UPS-state signals."
+                ),
+                "recommendation": (
+                    "Onboard UPS and PDU devices (APC, Liebert, Eaton). Apply the "
+                    "APC_UPS_Battery, Liebert_UPS, or Eaton_UPS DataSources so "
+                    "on-battery and runtime-remaining events surface as alerts."
+                ),
+            }
+        )
+
+    total = max(inventory["total_devices"], 1)
+    snmp_pct = coverage["percentages"]["snmp_coverage_pct"]
+    if snmp_pct < 25 and inventory["likely_network_gear"] > 0:
+        gaps.append(
+            {
+                "severity": "high",
+                "category": "snmp",
+                "finding": (
+                    f"SNMP credentials set on only {snmp_pct}% of devices while "
+                    f"{inventory['likely_network_gear']} network devices are present. "
+                    "Interface metrics and link-flap detection depend on SNMP."
+                ),
+                "recommendation": (
+                    "Apply snmp.version and snmp.community properties to network "
+                    "devices at the group level to enable Interface DataSources."
+                ),
+            }
+        )
+
+    if counts["netflow_exporters"] == 0 and inventory["likely_network_gear"] > 0:
+        gaps.append(
+            {
+                "severity": "medium",
+                "category": "netflow",
+                "finding": "No NetFlow exporters detected. Traffic intelligence unavailable.",
+                "recommendation": (
+                    "Enable NetFlow export on core and WAN devices. Set "
+                    "netflow.enabled=true on the device or add the NetflowExporter "
+                    "DataSource so the /netflow/flows endpoint receives records."
+                ),
+            }
+        )
+
+    if counts["collectors_total"] == 0:
+        gaps.append(
+            {
+                "severity": "critical",
+                "category": "collectors",
+                "finding": "No collectors registered. Nothing can be monitored.",
+                "recommendation": "Deploy at least one collector and assign it to devices.",
+            }
+        )
+    elif counts["collectors_up"] < counts["collectors_total"]:
+        down = counts["collectors_total"] - counts["collectors_up"]
+        gaps.append(
+            {
+                "severity": "high",
+                "category": "collectors",
+                "finding": f"{down} collector(s) are down or unreachable.",
+                "recommendation": (
+                    "Restore collectors before relying on alert data — downstream "
+                    "device alerts are suppressed while their collector is down."
+                ),
+            }
+        )
+
+    if inventory["unclassified"] > total * 0.5:
+        gaps.append(
+            {
+                "severity": "low",
+                "category": "inventory",
+                "finding": (
+                    f"{inventory['unclassified']} devices are unclassified by "
+                    "systemCategories. Device grouping and filtering accuracy is limited."
+                ),
+                "recommendation": (
+                    "Apply systemCategories property at the device-group level so "
+                    "audit and correlation tools can partition inventory."
+                ),
+            }
+        )
+
+    return gaps
+
+
+def _audit_summary(inventory: dict, coverage: dict, gaps: list[dict]) -> str:
+    """One-line human-readable summary."""
+    total = inventory["total_devices"]
+    critical = sum(1 for g in gaps if g["severity"] in ("critical", "high"))
+    if critical == 0:
+        return f"Coverage looks solid across {total} devices ({len(gaps)} low-priority findings)."
+    return (
+        f"{critical} high-priority coverage gaps detected across {total} devices. "
+        "Review gap list for specific onboarding actions."
+    )

@@ -5646,6 +5646,321 @@ TOOLS.extend(
 )
 
 
+# Network Intelligence (v3.8.0)
+# Interface metrics, NetFlow aggregation, alert burst detection, link flaps,
+# power events, enriched collector health, site-outage composite, and coverage audit.
+TOOLS.extend(
+    [
+        Tool(
+            name="get_interface_metrics",
+            description=(
+                "Pull interface-level metrics (in/out bytes, errors, discards, utilization, "
+                "status) for a device's interface over a time window. Answers 'how is this "
+                "port performing?' Resolves the Interface-family DataSource and the instance "
+                "matching the interface name before fetching datapoints."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "interface": {
+                        "type": "string",
+                        "description": (
+                            "Interface name or substring (case-insensitive), e.g. 'Gi0/1', 'eth0'"
+                        ),
+                    },
+                    "metrics": {
+                        "type": "string",
+                        "description": (
+                            "Comma-separated datapoint names. Defaults to RxRate, TxRate, "
+                            "ErrorsIn, ErrorsOut, DiscardsIn, DiscardsOut, InterfaceStatus."
+                        ),
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Hours of history to pull (default: 1)",
+                    },
+                },
+                "required": ["device_id", "interface"],
+            },
+        ),
+        Tool(
+            name="get_top_talkers",
+            description=(
+                "Rank NetFlow flows on an exporter by bandwidth, packets, or flow count. "
+                "Group by source IP, destination IP, protocol, application, or "
+                "source->destination pair. Answers 'what is consuming my WAN?'"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "exporter_device_id": {
+                        "type": "integer",
+                        "description": "NetFlow exporter device ID",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Time window to aggregate (default: 1 hour)",
+                    },
+                    "n": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Number of top entries to return (default: 10)",
+                    },
+                    "group_by": {
+                        "type": "string",
+                        "enum": [
+                            "src_ip",
+                            "dst_ip",
+                            "application",
+                            "protocol",
+                            "src_dst_pair",
+                        ],
+                        "default": "src_ip",
+                        "description": "Aggregation dimension",
+                    },
+                    "min_bytes": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Drop aggregated entries below this byte threshold",
+                    },
+                },
+                "required": ["exporter_device_id"],
+            },
+        ),
+        Tool(
+            name="detect_alert_burst",
+            description=(
+                "Sliding-window detector for mass alert events: N alerts from the same "
+                "DataSource across M+ devices within T seconds. Answers 'did a bunch of "
+                "stuff break at once?' Used for detecting cascading failures like mass "
+                "interface-down events during a site outage."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Scope to a device group",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Scope to a device name (substring match)",
+                    },
+                    "datasource_pattern": {
+                        "type": "string",
+                        "description": ("Substring match on dataSourceName (case-insensitive)"),
+                    },
+                    "window_seconds": {
+                        "type": "integer",
+                        "default": 60,
+                        "description": "Sliding window size in seconds",
+                    },
+                    "min_alerts": {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Minimum alerts in the window to qualify as burst",
+                    },
+                    "min_devices": {
+                        "type": "integer",
+                        "default": 3,
+                        "description": "Minimum distinct devices in the window",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Lookback window in hours",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "error", "warning", "info"],
+                        "description": "Filter by severity",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_link_flaps",
+            description=(
+                "Identify interfaces with repeated up/down transitions in a time window. "
+                "Answers 'which ports are unstable?' Common causes: bad cable, duplex "
+                "mismatch, bad SFP, PoE power cycling, WAN instability."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Scope to a device group",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Scope to a device name (substring match)",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Lookback window in hours (default: 24)",
+                    },
+                    "min_transitions": {
+                        "type": "integer",
+                        "default": 4,
+                        "description": "Minimum alert fires to qualify as flapping",
+                    },
+                    "interface_pattern": {
+                        "type": "string",
+                        "default": "interface|interfaces|if-|port|ethernet",
+                        "description": (
+                            "Case-insensitive regex matching interface DataSource names"
+                        ),
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_collector_health",
+            description=(
+                "Enriched collector status with time-since-last-contact, downstream device "
+                "count, dependent alert count, and optional CollectorDown history. Leading "
+                "indicator for site-level events. Prefer this over `get_collectors` when "
+                "investigating potential outages."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {
+                        "type": "integer",
+                        "description": "Single collector ID. Other scope args are ignored if set.",
+                    },
+                    "collector_group_id": {
+                        "type": "integer",
+                        "description": "Restrict to collectors in this group",
+                    },
+                    "include_history": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include CollectorDown alert history",
+                    },
+                    "history_days": {
+                        "type": "integer",
+                        "default": 7,
+                        "description": "CollectorDown history lookback in days",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_power_events",
+            description=(
+                "Filter alerts for UPS/PDU power-event signatures across APC, Liebert, "
+                "and Eaton DataSources ('on battery', 'runtime remaining', 'input voltage "
+                "lost') over a time window. Returns events matched by DataSource or alert "
+                "name substring with counts per pattern."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Scope to a device group",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Scope to a device name (substring match)",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 2,
+                        "description": "Lookback window in hours (default: 2)",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "error", "warning", "info"],
+                        "description": "Filter by severity",
+                    },
+                    "patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Override default patterns. Default covers UPS, PDU, APC, "
+                            "Liebert, Eaton, Battery, PowerSupply, Power_."
+                        ),
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="detect_site_outage",
+            description=(
+                "Composite workflow for site outage detection. Chains CollectorDown "
+                "detection, mass-interface-down burst analysis, UPS on-battery events, "
+                "and downstream device silence into a single site-outage verdict with "
+                "confidence score, scope, and affected device list. Designed to catch the "
+                "class of site-outage that generic AIOps correlation misses. Pass a device "
+                "group ID representing the site."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": (
+                            "Device group ID representing the site. Devices in this group "
+                            "define the analysis scope."
+                        ),
+                    },
+                    "window_seconds": {
+                        "type": "integer",
+                        "default": 300,
+                        "description": "Burst window size in seconds (default: 300)",
+                    },
+                    "hours_back": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Context window for power events in hours",
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "full"],
+                        "default": "summary",
+                        "description": "Output detail level",
+                    },
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="audit_network_monitoring_coverage",
+            description=(
+                "Portal audit that counts UPS/PDU devices onboarded, interface "
+                "DataSources applied, SNMP credentials configured, and NetFlow exporters "
+                "set up. Returns a prioritized gap list with onboarding recommendations "
+                "— turns 'you can't detect X' into 'here's how to enable detection of X.'"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {
+                        "type": "integer",
+                        "description": ("Scope the audit to a device group. Omit for portal-wide."),
+                    },
+                },
+            },
+        ),
+    ]
+)
+
+
 # Ansible Automation Platform tools (conditionally included)
 AWX_TOOLS: list[Tool] = [
     # Connection test
@@ -6320,6 +6635,7 @@ def get_tool_handler(tool_name: str) -> Any:
         logsources,
         metrics,
         netscans,
+        networking,
         oids,
         ops,
         propertysources,
@@ -6381,6 +6697,13 @@ def get_tool_handler(tool_name: str) -> Any:
         "create_collector_group": collectors.create_collector_group,
         "update_collector_group": collectors.update_collector_group,
         "delete_collector_group": collectors.delete_collector_group,
+        "get_collector_health": collectors.get_collector_health,
+        # Network Intelligence (v3.8.0)
+        "get_interface_metrics": networking.get_interface_metrics,
+        "get_top_talkers": networking.get_top_talkers,
+        "detect_alert_burst": networking.detect_alert_burst,
+        "get_link_flaps": networking.get_link_flaps,
+        "get_power_events": networking.get_power_events,
         # Metrics
         "get_device_datasources": metrics.get_device_datasources,
         "get_device_instances": metrics.get_device_instances,
@@ -6642,6 +6965,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "diagnose": workflows.diagnose,
         "search_tools": workflows.search_tools,
         "update_logicmodule": workflows.update_logicmodule,
+        "detect_site_outage": workflows.detect_site_outage,
+        "audit_network_monitoring_coverage": workflows.audit_network_monitoring_coverage,
         # Universal reference layer (Resource/Prompt mirrors for non-Claude clients)
         "get_reference": reference.get_reference,
         "get_workflow": reference.get_workflow,

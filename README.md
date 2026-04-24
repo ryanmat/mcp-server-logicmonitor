@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 267+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 280+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -70,18 +70,24 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.7.3
+## What's New in v3.8.0
 
-- **Fixed**: `create_http_integration` now copies the active-lifecycle `url`, `method`, `payload`, `payloadFormat`, and `headers` into each enabled lifecycle that does not already override them. LM rejects a create with "ackUrl is null or empty, ..." when an enabled lifecycle lacks these fields -- the LM web UI silently defaults them, but the v3.7.1 MCP tool did not. Smoke test now passes end-to-end against a real portal.
-- **v3.7.2**: LogicMonitor's raw Jackson deserialization errors on 4xx responses are now translated into actionable hints. Raw server text preserved on `LMError.details`. Integration-shorthand recipient for escalation-chain destinations: `{type: "integration", integration_name: "<name>", admin: "<user>"}` is rewritten server-side into the canonical `{type: "admin", addr: "<user>", method: "<name>"}` form.
-- **v3.7.1**: Custom HTTP Delivery integration CRUD on `/setting/integrations` (`get_integrations`, `get_integration`, `create_http_integration`, `update_http_integration`, `delete_integration`), plus a `scripts/smoke_http_integration.py` live round-trip.
-- **v3.7.0**: Recipient-group `groupName` fix, `recipients=[...]` on create/update, `detail=True` on list, destinations-schema example for routing via the `{type: "admin", addr: "<user>", method: "<integration name>"}` form.
+**Networking intelligence release.** Eight new read-only tools that close the gap between raw alert streams and site-level correlation:
+
+- **`detect_site_outage`** — composite workflow chaining CollectorDown, mass interface-down bursts, UPS on-battery events, and downstream device silence into a single outage verdict with confidence score. Designed to catch the class of site outage that generic AIOps correlation misses.
+- **`audit_network_monitoring_coverage`** — portal coverage audit with prioritized gap list and specific onboarding recommendations. Turns "you can't detect X" into "here's how to enable detection of X."
+- **`get_interface_metrics`** — per-interface time-series (in/out bytes, errors, discards, utilization, status). Answers "how is this port performing?"
+- **`get_top_talkers`** — NetFlow ranking by bandwidth, packets, or flow count. Group by source IP, destination IP, protocol, application, or src→dst pair.
+- **`detect_alert_burst`** — sliding-window detector for mass alert events. Generic primitive used by `detect_site_outage` and for DDoS/switch-cascade investigation.
+- **`get_link_flaps`** — interfaces with repeated up/down transitions. Answers "which ports are unstable?"
+- **`get_collector_health`** — enriched collector status with time-since-last-contact, downstream device count, and CollectorDown history. The preferred query when investigating potential outages.
+- **`get_power_events`** — UPS/PDU alert filter across APC, Liebert, Eaton DataSources.
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ## Features
 
-**272+ Tools** across comprehensive LogicMonitor API coverage (243 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**280+ Tools** across comprehensive LogicMonitor API coverage (251 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules

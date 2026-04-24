@@ -810,3 +810,289 @@ class TestSearchTools:
         data = json.loads(result[0].text)
         assert data["total"] == 0
         assert "available_categories" in data
+
+
+# ---------------------------------------------------------------------------
+# TestDetectSiteOutage
+# ---------------------------------------------------------------------------
+
+
+class TestDetectSiteOutage:
+    """Tests for the detect_site_outage composite."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_config(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
+        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_MCP_CATEGORIES", raising=False)
+        from lm_mcp.config import reset_config
+
+        reset_config()
+        yield
+        reset_config()
+
+    async def test_all_signals_trigger_site_outage_detected(self, client):
+        """CollectorDown + burst + power + silence → verdict = site_outage_detected."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        devices_data = {
+            "devices": [{"id": i, "hostStatus": "dead", "currentCollectorId": 1} for i in range(10)]
+        }
+        collector_data = {
+            "total_collectors": 1,
+            "collectors_down": 1,
+            "collectors": [{"id": 1, "hostname": "col-01", "is_down": True}],
+        }
+        burst_data = {
+            "bursts_detected": 1,
+            "bursts": [{"datasource": "SNMP_Network_Interfaces", "alert_count": 20}],
+        }
+        power_data = {
+            "total_power_events": 3,
+            "events": [
+                {"id": 1, "datasource": "APC_UPS_Battery"},
+                {"id": 2, "datasource": "APC_UPS_Battery"},
+                {"id": 3, "datasource": "Liebert_UPS"},
+            ],
+        }
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collector_health", collector_data),
+            _patch_sub("lm_mcp.tools.networking.detect_alert_burst", burst_data),
+            _patch_sub("lm_mcp.tools.networking.get_power_events", power_data),
+        ):
+            result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["verdict"] == "site_outage_detected"
+        assert data["confidence"] == 100
+        assert data["signals"]["collector_down"]["triggered"] is True
+        assert data["signals"]["interface_burst"]["triggered"] is True
+        assert data["signals"]["power_events"]["triggered"] is True
+
+    async def test_no_signals_returns_no_outage(self, client):
+        """Clean state → verdict = no_outage_signature."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        devices_data = {"devices": [{"id": 1, "hostStatus": "normal", "currentCollectorId": 1}]}
+        collector_data = {
+            "total_collectors": 1,
+            "collectors_down": 0,
+            "collectors": [{"id": 1, "hostname": "col-01", "is_down": False}],
+        }
+        burst_data = {"bursts_detected": 0, "bursts": []}
+        power_data = {"total_power_events": 0, "events": []}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collector_health", collector_data),
+            _patch_sub("lm_mcp.tools.networking.detect_alert_burst", burst_data),
+            _patch_sub("lm_mcp.tools.networking.get_power_events", power_data),
+        ):
+            result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["verdict"] == "no_outage_signature"
+        assert data["confidence"] == 0
+
+    async def test_possible_outage_at_boundary(self, client):
+        """Burst + power (no collector down) → 50 confidence → possible_site_outage."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        devices_data = {"devices": [{"id": 1, "hostStatus": "normal", "currentCollectorId": 1}]}
+        collector_data = {
+            "total_collectors": 1,
+            "collectors_down": 0,
+            "collectors": [{"id": 1, "hostname": "col-01", "is_down": False}],
+        }
+        burst_data = {"bursts_detected": 1, "bursts": []}
+        power_data = {"total_power_events": 2, "events": []}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collector_health", collector_data),
+            _patch_sub("lm_mcp.tools.networking.detect_alert_burst", burst_data),
+            _patch_sub("lm_mcp.tools.networking.get_power_events", power_data),
+        ):
+            result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["verdict"] == "possible_site_outage"
+        assert data["confidence"] == 50
+
+    async def test_sub_tool_failure_appends_warning(self, client):
+        """Failure in one sub-tool is captured as warning, composite continues."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        devices_data = {"devices": [{"id": 1, "hostStatus": "dead", "currentCollectorId": 1}]}
+
+        async def failing_mock(*args, **kwargs):
+            raise RuntimeError("sub-tool exploded")
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            patch(
+                "lm_mcp.tools.collectors.get_collector_health",
+                new_callable=AsyncMock,
+                side_effect=failing_mock,
+            ),
+            _patch_sub(
+                "lm_mcp.tools.networking.detect_alert_burst",
+                {"bursts_detected": 0, "bursts": []},
+            ),
+            _patch_sub(
+                "lm_mcp.tools.networking.get_power_events",
+                {"total_power_events": 0, "events": []},
+            ),
+        ):
+            result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert len(data["warnings"]) >= 1
+        assert any("Collector health" in w for w in data["warnings"])
+        # No CollectorDown signal → collector_down triggered is False
+        assert data["signals"]["collector_down"]["triggered"] is False
+
+    async def test_required_tools_disabled_blocks_composite(self, client, monkeypatch):
+        """LM_DISABLED_TOOLS matching a required sub-tool blocks execution."""
+        from lm_mcp.config import reset_config
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "detect_alert_burst")
+        reset_config()
+
+        result = await detect_site_outage(client, group_id=42)
+        assert "requires disabled tools" in result[0].text
+        assert "detect_alert_burst" in result[0].text
+        reset_config()
+
+
+# ---------------------------------------------------------------------------
+# TestAuditNetworkMonitoringCoverage
+# ---------------------------------------------------------------------------
+
+
+class TestAuditNetworkMonitoringCoverage:
+    """Tests for the audit_network_monitoring_coverage composite."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_config(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
+        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_MCP_CATEGORIES", raising=False)
+        from lm_mcp.config import reset_config
+
+        reset_config()
+        yield
+        reset_config()
+
+    async def test_reports_power_gap_when_no_ups_devices(self, client):
+        """No UPS/PDU → high-severity power gap."""
+        from lm_mcp.tools.workflows import audit_network_monitoring_coverage
+
+        devices_data = {
+            "devices": [
+                {
+                    "id": 1,
+                    "displayName": "core-switch-01",
+                    "systemCategories": "switch,network",
+                    "customProperties": [{"name": "snmp.version", "value": "v2c"}],
+                },
+                {
+                    "id": 2,
+                    "displayName": "core-switch-02",
+                    "systemCategories": "switch,network",
+                    "customProperties": [{"name": "snmp.version", "value": "v2c"}],
+                },
+            ]
+        }
+        collectors_data = {"collectors": [{"id": 1, "hostname": "col-01", "status": "normal"}]}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collectors", collectors_data),
+        ):
+            result = await audit_network_monitoring_coverage(client, group_id=1)
+
+        data = json.loads(result[0].text)
+        power_gaps = [g for g in data["gaps"] if g["category"] == "power"]
+        assert len(power_gaps) == 1
+        assert power_gaps[0]["severity"] == "high"
+        assert data["inventory"]["total_devices"] == 2
+        assert data["coverage_counts"]["snmp_credentialed"] == 2
+
+    async def test_flags_missing_netflow_exporters(self, client):
+        """No NetFlow exporters on network gear → medium netflow gap."""
+        from lm_mcp.tools.workflows import audit_network_monitoring_coverage
+
+        devices_data = {
+            "devices": [
+                {
+                    "id": 1,
+                    "displayName": "router-01",
+                    "systemCategories": "router",
+                    "customProperties": [{"name": "snmp.version", "value": "v2c"}],
+                }
+            ]
+        }
+        collectors_data = {"collectors": [{"id": 1, "status": "normal"}]}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collectors", collectors_data),
+        ):
+            result = await audit_network_monitoring_coverage(client)
+
+        data = json.loads(result[0].text)
+        netflow_gaps = [g for g in data["gaps"] if g["category"] == "netflow"]
+        assert len(netflow_gaps) == 1
+
+    async def test_power_coverage_healthy_when_ups_present(self, client):
+        """UPS device present → no power gap."""
+        from lm_mcp.tools.workflows import audit_network_monitoring_coverage
+
+        devices_data = {
+            "devices": [
+                {
+                    "id": 1,
+                    "displayName": "ups-01",
+                    "systemCategories": "ups",
+                    "customProperties": [],
+                }
+            ]
+        }
+        collectors_data = {"collectors": [{"id": 1, "status": "normal"}]}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collectors", collectors_data),
+        ):
+            result = await audit_network_monitoring_coverage(client)
+
+        data = json.loads(result[0].text)
+        assert data["coverage_counts"]["power_monitored_devices"] == 1
+        power_gaps = [g for g in data["gaps"] if g["category"] == "power"]
+        assert power_gaps == []
+
+    async def test_critical_when_no_collectors(self, client):
+        """Zero collectors → critical gap."""
+        from lm_mcp.tools.workflows import audit_network_monitoring_coverage
+
+        devices_data = {"devices": []}
+        collectors_data = {"collectors": []}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            _patch_sub("lm_mcp.tools.collectors.get_collectors", collectors_data),
+        ):
+            result = await audit_network_monitoring_coverage(client)
+
+        data = json.loads(result[0].text)
+        critical = [g for g in data["gaps"] if g["severity"] == "critical"]
+        assert len(critical) == 1
+        assert critical[0]["category"] == "collectors"

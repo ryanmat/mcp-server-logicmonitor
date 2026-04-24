@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-04-23
+
+### Added
+
+Networking intelligence release. Eight new tools for interface metrics, NetFlow intelligence, alert burst detection, link flap identification, UPS/PDU event filtering, enriched collector health, site-outage composition, and coverage audit. Answers the class of networking questions operators ask every day and, crucially, detects site-outage signatures (collector down + mass interface-down + UPS on-battery + downstream device silence) that generic AIOps correlation misses.
+
+**Network primitives (5):**
+
+- `get_interface_metrics(device_id, interface, metrics, hours_back)` -- pulls per-interface time-series metrics (default datapoints: RxRate, TxRate, ErrorsIn, ErrorsOut, DiscardsIn, DiscardsOut, InterfaceStatus). Resolves the Interface-family DataSource and instance from an interface name substring, then fetches datapoints via the existing metrics endpoint. Returns structured errors (`INTERFACE_DATASOURCE_NOT_FOUND`, `INTERFACE_NOT_FOUND`) with available-instance suggestions to aid discovery.
+- `get_top_talkers(exporter_device_id, hours_back, n, group_by, min_bytes)` -- ranks NetFlow flows for an exporter. Group by `src_ip`, `dst_ip`, `application`, `protocol`, or `src_dst_pair`. Client-side aggregation with percentage-of-total reporting. Graceful "no flows in window" path when the exporter is not configured or the window is empty.
+- `detect_alert_burst(group_id, device, datasource_pattern, window_seconds, min_alerts, min_devices, hours_back, severity)` -- sliding-window mass-event detector. Buckets alerts by DataSource, identifies windows where alert count and distinct device count exceed thresholds. Hard-capped at 5000 alerts per window with truncation warning. Used by the site-outage composite but also answers general "did a bunch of things break at once?" queries (DDoS, switch cascade, firmware push failures).
+- `get_link_flaps(group_id, device, hours_back, min_transitions, interface_pattern)` -- identifies interfaces with repeated up/down transitions. Regex-matches interface-family DataSources against alert stream, groups by (device, instance), counts transitions, returns top-50 flappers.
+- `get_power_events(group_id, device, hours_back, severity, patterns)` -- UPS/PDU alert filter. Default patterns cover APC, Liebert, Eaton, UPS, PDU, Battery, PowerSupply, Power_. Client-side substring match on `dataSourceName` and `alertName`. Returns per-pattern match counts for quick attribution.
+
+**Enriched collector status (1):**
+
+- `get_collector_health(collector_id, collector_group_id, include_history, history_days)` -- augments the thin `get_collectors` with time-since-last-contact, downstream device count (via `/device/devices?filter=currentCollectorId:{id}`), active CollectorDown alert detection, and optional CollectorDown history over a lookback window. Now the preferred query when investigating potential outages.
+
+**Composite workflows (2):**
+
+- `detect_site_outage(group_id, window_seconds, hours_back, detail_level)` -- the headline tool. Chains four signals into a single verdict with confidence score (0-100): CollectorDown on any collector serving the group (+40), mass-interface-down burst (+25), UPS/PDU power events (+25), elevated dead-device count (+10). Verdict thresholds: `>= 70` site_outage_detected, `>= 40` possible_site_outage, `< 40` no_outage_signature. Returns affected scope, triggered signals, actionable recommendations, and per-signal detail available in `full` mode.
+- `audit_network_monitoring_coverage(group_id)` -- portal coverage audit. Inventories devices and collectors, counts SNMP-credentialed devices, NetFlow exporters, power-monitored devices, and collector health. Produces prioritized gap list with specific onboarding recommendations (e.g., "0 UPS devices onboarded -- add APC_UPS_Battery or equivalent to enable power-event detection"). Turns prerequisite gaps into actionable consulting output.
+
+### Rationale
+
+The Edwin AI product recently failed to correlate a customer power outage as a single incident. The MCP had a parallel gap: no primitives for interface-level metric queries, NetFlow aggregation beyond a raw flow list, alert burst detection, link flap counting, UPS event filtering, or collector-health enrichment, and no composite that combined these into an outage verdict. This release closes the gap with eight read-only tools that run alongside existing correlation tools and composites. The site-outage composite specifically encodes the signal pattern that generic temporal correlation misses: a collector losing power at the same moment 40 interfaces on 8 switches drop and 3 UPS units switch to battery is one incident, not 51.
+
+### Changed
+
+- Tool count: 243 -> 251 LM tools. Overall surface (LM + AAP + Terraform + watsonx): 272 -> 280.
+- `collectors` and `workflows` tool-categories indexes updated with the new entries. Added a `networking` category listing the five primitives.
+- Composite dispatch remains unchanged -- all new tools live in the LM dispatch path.
+
+### Verified
+
+- 1773 unit tests passing (80 new).
+- Ruff lint and format clean across `src` and `tests`.
+- No `hostGroupIds~` regressions in new code (all group-scoped queries use `resolve_group_filter` per `docs/lessons.md`).
+
 ## [3.7.3] - 2026-04-20
 
 ### Fixed

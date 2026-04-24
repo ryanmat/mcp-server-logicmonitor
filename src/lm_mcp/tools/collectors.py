@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
@@ -13,6 +14,7 @@ from lm_mcp.tools import (
     handle_error,
     quote_filter_value,
     require_write_permission,
+    safe_total,
     sanitize_filter_value,
 )
 
@@ -212,6 +214,191 @@ async def get_collector_group(
         return format_response(group)
     except Exception as e:
         return handle_error(e)
+
+
+async def get_collector_health(
+    client: LogicMonitorClient,
+    collector_id: int | None = None,
+    collector_group_id: int | None = None,
+    include_history: bool = False,
+    history_days: int = 7,
+) -> list[TextContent]:
+    """Enriched collector status with downstream device count and CollectorDown history.
+
+    Reports collector health signals critical for detecting site-level events
+    (power outages, network partitions). Status is enriched with whether the
+    collector is currently down, how many devices it monitors, and optionally
+    the history of CollectorDown alerts over a lookback window.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Single collector ID. If set, other scope args are ignored.
+        collector_group_id: Restrict to collectors in this group.
+        include_history: Include recent CollectorDown alert history (default: False).
+        history_days: CollectorDown history lookback in days (default: 7).
+
+    Returns:
+        List of TextContent with enriched collector records.
+    """
+    try:
+        if collector_id is not None:
+            collectors = [await client.get(f"/setting/collector/collectors/{collector_id}")]
+        else:
+            params: dict = {"size": 100}
+            if collector_group_id is not None:
+                params["filter"] = f"collectorGroupId:{collector_group_id}"
+            list_result = await client.get("/setting/collector/collectors", params=params)
+            collectors = list_result.get("items", [])
+
+        enriched: list[dict] = []
+        for col in collectors:
+            enriched.append(await _enrich_collector(client, col, include_history, history_days))
+
+        down_count = sum(1 for c in enriched if c["is_down"])
+
+        return format_response(
+            {
+                "total_collectors": len(enriched),
+                "collectors_down": down_count,
+                "include_history": include_history,
+                "history_days": history_days if include_history else None,
+                "collectors": enriched,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+async def _enrich_collector(
+    client: LogicMonitorClient,
+    col: dict,
+    include_history: bool,
+    history_days: int,
+) -> dict:
+    """Attach downstream device count and CollectorDown signals to a collector."""
+    cid = col.get("id")
+    hostname = col.get("hostname") or ""
+    status = col.get("status")
+    num_hosts_reported = col.get("numberOfHosts") or 0
+
+    downstream_count = num_hosts_reported
+    try:
+        device_result = await client.get(
+            "/device/devices",
+            params={
+                "size": 1,
+                "filter": f"currentCollectorId:{cid}",
+            },
+        )
+        downstream_count = safe_total(device_result)
+    except Exception:
+        # Fall back to numberOfHosts from the collector record when the
+        # devices filter is not supported.
+        downstream_count = num_hosts_reported
+
+    active_collector_down = await _active_collector_down_count(client, hostname)
+
+    history: list[dict] = []
+    if include_history and hostname:
+        history = await _collector_down_history(client, hostname, history_days)
+
+    is_down = bool(active_collector_down) or _status_indicates_down(status)
+
+    record: dict = {
+        "id": cid,
+        "hostname": hostname,
+        "collector_group_id": col.get("collectorGroupId"),
+        "collector_group_name": col.get("collectorGroupName"),
+        "platform": col.get("platform"),
+        "status": status,
+        "is_down": is_down,
+        "downstream_device_count": downstream_count,
+        "reported_numberOfHosts": num_hosts_reported,
+        "active_collector_down_alerts": active_collector_down,
+        "up_time_seconds": col.get("upTime"),
+    }
+    if include_history:
+        record["collector_down_history"] = history
+    return record
+
+
+def _status_indicates_down(status: int | str | None) -> bool:
+    """Conservative interpretation of the LM collector status field.
+
+    The LM API returns status as either an integer code or a short string
+    depending on the portal generation. We treat anything that is not
+    clearly a "normal"/"up" signal as not-down to avoid false positives;
+    the authoritative signal is the presence of an active CollectorDown
+    alert, which is checked separately.
+    """
+    if status is None:
+        return False
+    if isinstance(status, str):
+        lowered = status.lower()
+        return lowered in {"dead", "down", "critical"}
+    return False
+
+
+async def _active_collector_down_count(
+    client: LogicMonitorClient,
+    hostname: str,
+) -> int:
+    """Count active CollectorDown alerts for a collector hostname."""
+    if not hostname:
+        return 0
+    try:
+        result = await client.get(
+            "/alert/alerts",
+            params={
+                "size": 10,
+                "filter": (
+                    "type:alert,"
+                    f"monitorObjectName:{quote_filter_value(hostname)},"
+                    "cleared:false,"
+                    'alertType~"CollectorDown"'
+                ),
+            },
+        )
+    except Exception:
+        return 0
+    return len(result.get("items", []))
+
+
+async def _collector_down_history(
+    client: LogicMonitorClient,
+    hostname: str,
+    history_days: int,
+) -> list[dict]:
+    """Fetch recent CollectorDown alerts for a collector hostname."""
+    start_epoch = int(time.time()) - (history_days * 86400)
+    try:
+        result = await client.get(
+            "/alert/alerts",
+            params={
+                "size": 100,
+                "filter": (
+                    f"monitorObjectName:{quote_filter_value(hostname)},"
+                    f"startEpoch>:{start_epoch},"
+                    'alertType~"CollectorDown"'
+                ),
+            },
+        )
+    except Exception:
+        return []
+
+    history: list[dict] = []
+    for item in result.get("items", []):
+        history.append(
+            {
+                "alert_id": item.get("id"),
+                "severity": item.get("severity"),
+                "start_epoch": item.get("startEpoch"),
+                "end_epoch": item.get("endEpoch"),
+                "cleared": item.get("cleared", False),
+                "alert_type": item.get("alertType"),
+            }
+        )
+    return history
 
 
 @require_write_permission
