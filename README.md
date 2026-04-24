@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 267+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 280+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -70,18 +70,15 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.7.3
+## What's New in v3.8.0
 
-- **Fixed**: `create_http_integration` now copies the active-lifecycle `url`, `method`, `payload`, `payloadFormat`, and `headers` into each enabled lifecycle that does not already override them. LM rejects a create with "ackUrl is null or empty, ..." when an enabled lifecycle lacks these fields -- the LM web UI silently defaults them, but the v3.7.1 MCP tool did not. Smoke test now passes end-to-end against a real portal.
-- **v3.7.2**: LogicMonitor's raw Jackson deserialization errors on 4xx responses are now translated into actionable hints. Raw server text preserved on `LMError.details`. Integration-shorthand recipient for escalation-chain destinations: `{type: "integration", integration_name: "<name>", admin: "<user>"}` is rewritten server-side into the canonical `{type: "admin", addr: "<user>", method: "<name>"}` form.
-- **v3.7.1**: Custom HTTP Delivery integration CRUD on `/setting/integrations` (`get_integrations`, `get_integration`, `create_http_integration`, `update_http_integration`, `delete_integration`), plus a `scripts/smoke_http_integration.py` live round-trip.
-- **v3.7.0**: Recipient-group `groupName` fix, `recipients=[...]` on create/update, `detail=True` on list, destinations-schema example for routing via the `{type: "admin", addr: "<user>", method: "<integration name>"}` form.
+**Networking intelligence release.** Eight read-only tools for interface metrics, NetFlow top talkers, alert burst detection, link flaps, UPS/PDU events, enriched collector health, and two composite workflows (`detect_site_outage`, `audit_network_monitoring_coverage`) that close the correlation gap generic AIOps misses.
 
-See [CHANGELOG.md](CHANGELOG.md) for the full release history.
+See [documentation/networking-intelligence.md](documentation/networking-intelligence.md) for the full tool reference, scoring model, and prerequisites. Full release history in [CHANGELOG.md](CHANGELOG.md).
 
 ## Features
 
-**272+ Tools** across comprehensive LogicMonitor API coverage (243 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**280+ Tools** across comprehensive LogicMonitor API coverage (251 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules

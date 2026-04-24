@@ -13,7 +13,7 @@ from lm_mcp.exceptions import (
     ServerError,
 )
 
-__version__ = "3.6.1"
+__version__ = "3.8.0"
 
 __all__ = [
     "AuthenticationError",

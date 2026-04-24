@@ -321,3 +321,150 @@ class TestDeleteCollector:
         result = await delete_collector(client, collector_id=121)
         data = json.loads(result[0].text)
         assert data["success"] is True
+
+
+class TestGetCollectorHealth:
+    """Tests for get_collector_health tool."""
+
+    @respx.mock
+    async def test_reports_healthy_collector(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 1,
+                    "hostname": "col-01",
+                    "status": "normal",
+                    "numberOfHosts": 42,
+                    "collectorGroupId": 5,
+                    "collectorGroupName": "prod",
+                    "platform": "linux",
+                    "upTime": 86400,
+                },
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 42})
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": []})
+        )
+
+        result = await get_collector_health(client, collector_id=1)
+        data = json.loads(result[0].text)
+
+        assert data["total_collectors"] == 1
+        col = data["collectors"][0]
+        assert col["hostname"] == "col-01"
+        assert col["is_down"] is False
+        assert col["downstream_device_count"] == 42
+        assert col["active_collector_down_alerts"] == 0
+
+    @respx.mock
+    async def test_flags_collector_with_active_collector_down_alert(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/2").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 2,
+                    "hostname": "col-02",
+                    "status": "normal",
+                    "numberOfHosts": 30,
+                },
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 30})
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 999,
+                            "alertType": "CollectorDown",
+                            "monitorObjectName": "col-02",
+                            "cleared": False,
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = await get_collector_health(client, collector_id=2)
+        data = json.loads(result[0].text)
+
+        assert data["collectors_down"] == 1
+        assert data["collectors"][0]["is_down"] is True
+        assert data["collectors"][0]["active_collector_down_alerts"] == 1
+
+    @respx.mock
+    async def test_lists_all_collectors_when_no_scope(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {"id": 1, "hostname": "col-a", "status": "normal", "numberOfHosts": 10},
+                        {"id": 2, "hostname": "col-b", "status": "normal", "numberOfHosts": 20},
+                    ]
+                },
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": []})
+        )
+
+        result = await get_collector_health(client)
+        data = json.loads(result[0].text)
+        assert data["total_collectors"] == 2
+
+    @respx.mock
+    async def test_includes_history_when_requested(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/3").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 3, "hostname": "col-03", "status": "normal"},
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 500,
+                            "alertType": "CollectorDown",
+                            "monitorObjectName": "col-03",
+                            "startEpoch": 1700000000,
+                            "severity": 4,
+                            "cleared": True,
+                        }
+                    ]
+                },
+            )
+        )
+
+        result = await get_collector_health(
+            client, collector_id=3, include_history=True, history_days=3
+        )
+        data = json.loads(result[0].text)
+        assert data["include_history"] is True
+        history = data["collectors"][0]["collector_down_history"]
+        assert len(history) == 1
+        assert history[0]["alert_type"] == "CollectorDown"
