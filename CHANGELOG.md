@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.1] - 2026-04-23
+
+### Fixed
+
+- `detect_site_outage` now correctly enumerates the collectors serving a device group. Previously, `_collector_ids_from_devices` looked for `currentCollectorId` / `preferredCollectorId` on device records, but the formatted `get_devices` sub-tool response renames that field to `collector_id`. The mismatch meant the CollectorDown signal was always zero for the composite when called through the normal dispatch path. Surfaced during the v3.8.0 smoke test on Ryan's portal (500 devices in group 1 reported `collectors_serving_group: 0`). The helper now checks `collector_id` first, with fallback to the raw API field names so raw-data callers still work.
+- `_count_dead_devices` now counts LM `hostStatus=2` (dead-collector) in addition to `hostStatus=1` (dead). Both indicate devices not reporting metrics; counting only one under-reported device silence. Also reads the formatted-response `status` field before falling back to the raw `hostStatus`, matching the shape that arrives from the composite's sub-tool dispatch.
+
+### Added
+
+- Six direct unit tests for the `_collector_ids_from_devices` and `_count_dead_devices` helpers covering formatted shape, raw API shape, absent fields, and alertStatus-only fallback.
+
+### Verified
+
+- Full 1779-test suite passing (6 new helper tests).
+- Ruff check + format clean.
+
 ## [3.8.0] - 2026-04-23
 
 ### Added

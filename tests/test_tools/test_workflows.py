@@ -813,6 +813,82 @@ class TestSearchTools:
 
 
 # ---------------------------------------------------------------------------
+# TestSiteOutageHelpers (shape compatibility with get_devices formatted output)
+# ---------------------------------------------------------------------------
+
+
+class TestSiteOutageHelpers:
+    """Direct tests for _collector_ids_from_devices and _count_dead_devices.
+
+    These helpers receive output from the formatted `get_devices` sub-tool
+    (which renames `currentCollectorId` -> `collector_id` and `hostStatus`
+    -> `status`). The helpers must handle both shapes.
+    """
+
+    def test_collector_ids_from_formatted_shape(self):
+        """Formatted get_devices output uses `collector_id`."""
+        from lm_mcp.tools.workflows import _collector_ids_from_devices
+
+        devices = [
+            {"id": 1, "collector_id": 10},
+            {"id": 2, "collector_id": 10},  # duplicate
+            {"id": 3, "collector_id": 20},
+            {"id": 4, "collector_id": None},  # unassigned
+        ]
+        assert _collector_ids_from_devices(devices) == [10, 20]
+
+    def test_collector_ids_from_raw_shape(self):
+        """Raw LM API items use `currentCollectorId`."""
+        from lm_mcp.tools.workflows import _collector_ids_from_devices
+
+        devices = [
+            {"id": 1, "currentCollectorId": 11},
+            {"id": 2, "preferredCollectorId": 22},
+        ]
+        assert _collector_ids_from_devices(devices) == [11, 22]
+
+    def test_collector_ids_empty(self):
+        """No collector fields present returns empty list."""
+        from lm_mcp.tools.workflows import _collector_ids_from_devices
+
+        assert _collector_ids_from_devices([{"id": 1}]) == []
+
+    def test_dead_devices_counts_status_1_and_2(self):
+        """Both hostStatus=1 (dead) and hostStatus=2 (dead-collector) count."""
+        from lm_mcp.tools.workflows import _count_dead_devices
+
+        devices = [
+            {"id": 1, "status": 0},  # normal
+            {"id": 2, "status": 1},  # dead
+            {"id": 3, "status": 2},  # dead-collector
+            {"id": 4, "status": 3},  # unmonitored, not counted
+        ]
+        assert _count_dead_devices(devices) == 2
+
+    def test_dead_devices_accepts_raw_host_status_field(self):
+        """Raw LM API shape uses `hostStatus` not `status`."""
+        from lm_mcp.tools.workflows import _count_dead_devices
+
+        devices = [
+            {"id": 1, "hostStatus": 1},
+            {"id": 2, "hostStatus": 2},
+            {"id": 3, "hostStatus": 0},
+        ]
+        assert _count_dead_devices(devices) == 2
+
+    def test_dead_devices_falls_back_to_alert_status(self):
+        """When hostStatus absent, alertStatus strings still flag dead devices."""
+        from lm_mcp.tools.workflows import _count_dead_devices
+
+        devices = [
+            {"id": 1, "alertStatus": "dead"},
+            {"id": 2, "alertStatus": "dead-collector"},
+            {"id": 3, "alertStatus": "normal"},
+        ]
+        assert _count_dead_devices(devices) == 2
+
+
+# ---------------------------------------------------------------------------
 # TestDetectSiteOutage
 # ---------------------------------------------------------------------------
 
@@ -834,12 +910,14 @@ class TestDetectSiteOutage:
         reset_config()
 
     async def test_all_signals_trigger_site_outage_detected(self, client):
-        """CollectorDown + burst + power + silence → verdict = site_outage_detected."""
+        """CollectorDown + burst + power + silence → verdict = site_outage_detected.
+
+        Uses the formatted `get_devices` shape (`status`, `collector_id`) that
+        the composite actually receives from the sub-tool dispatch.
+        """
         from lm_mcp.tools.workflows import detect_site_outage
 
-        devices_data = {
-            "devices": [{"id": i, "hostStatus": "dead", "currentCollectorId": 1} for i in range(10)]
-        }
+        devices_data = {"devices": [{"id": i, "status": 1, "collector_id": 1} for i in range(10)]}
         collector_data = {
             "total_collectors": 1,
             "collectors_down": 1,
@@ -877,7 +955,7 @@ class TestDetectSiteOutage:
         """Clean state → verdict = no_outage_signature."""
         from lm_mcp.tools.workflows import detect_site_outage
 
-        devices_data = {"devices": [{"id": 1, "hostStatus": "normal", "currentCollectorId": 1}]}
+        devices_data = {"devices": [{"id": 1, "status": 0, "collector_id": 1}]}
         collector_data = {
             "total_collectors": 1,
             "collectors_down": 0,
@@ -902,7 +980,7 @@ class TestDetectSiteOutage:
         """Burst + power (no collector down) → 50 confidence → possible_site_outage."""
         from lm_mcp.tools.workflows import detect_site_outage
 
-        devices_data = {"devices": [{"id": 1, "hostStatus": "normal", "currentCollectorId": 1}]}
+        devices_data = {"devices": [{"id": 1, "status": 0, "collector_id": 1}]}
         collector_data = {
             "total_collectors": 1,
             "collectors_down": 0,
@@ -927,7 +1005,7 @@ class TestDetectSiteOutage:
         """Failure in one sub-tool is captured as warning, composite continues."""
         from lm_mcp.tools.workflows import detect_site_outage
 
-        devices_data = {"devices": [{"id": 1, "hostStatus": "dead", "currentCollectorId": 1}]}
+        devices_data = {"devices": [{"id": 1, "status": 1, "collector_id": 1}]}
 
         async def failing_mock(*args, **kwargs):
             raise RuntimeError("sub-tool exploded")

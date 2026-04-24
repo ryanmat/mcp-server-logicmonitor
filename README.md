@@ -70,9 +70,13 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.8.0
+## What's New in v3.8.1
 
-**Networking intelligence release.** Eight read-only tools for interface metrics, NetFlow top talkers, alert burst detection, link flaps, UPS/PDU events, enriched collector health, and two composite workflows (`detect_site_outage`, `audit_network_monitoring_coverage`) that close the correlation gap generic AIOps misses.
+**Patch.** Fixes `detect_site_outage` collector-enumeration. The v3.8.0 composite looked for raw-API field names (`currentCollectorId`) that the formatted `get_devices` response renames to `collector_id`, so the CollectorDown signal was always zero through the normal dispatch path. Also counts `hostStatus=2` (dead-collector) as dead alongside `hostStatus=1`. Surfaced during the v3.8.0 portal smoke test.
+
+### v3.8.0 — Networking intelligence
+
+Eight read-only tools for interface metrics, NetFlow top talkers, alert burst detection, link flaps, UPS/PDU events, enriched collector health, and two composite workflows (`detect_site_outage`, `audit_network_monitoring_coverage`) that close the correlation gap generic AIOps misses.
 
 See [documentation/networking-intelligence.md](documentation/networking-intelligence.md) for the full tool reference, scoring model, and prerequisites. Full release history in [CHANGELOG.md](CHANGELOG.md).
 

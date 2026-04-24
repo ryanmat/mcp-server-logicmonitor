@@ -1564,12 +1564,20 @@ async def detect_site_outage(
 
 
 def _count_dead_devices(devices: list[dict]) -> int:
-    """Count devices with a dead or unreachable status."""
+    """Count devices in dead or dead-collector status.
+
+    LM hostStatus codes: 0=normal, 1=dead, 2=dead-collector, 3=unmonitored,
+    4=disabled. Both 1 and 2 count as dead because the device is not
+    reporting metrics in either case. The formatted `get_devices` response
+    surfaces hostStatus as `status`; the raw API item keeps `hostStatus`.
+    """
     count = 0
     for dev in devices:
-        status = dev.get("hostStatus") or dev.get("status")
+        status = dev.get("hostStatus")
+        if status is None:
+            status = dev.get("status")
         alert_status = (dev.get("alertStatus") or "").lower()
-        if status in ("dead", 1, "1") or alert_status in (
+        if status in (1, 2, "1", "2", "dead", "dead-collector") or alert_status in (
             "dead",
             "dead-collector",
             "unreachable",
@@ -1579,11 +1587,22 @@ def _count_dead_devices(devices: list[dict]) -> int:
 
 
 def _collector_ids_from_devices(devices: list[dict]) -> list[int]:
-    """Distinct currentCollectorId values from a device list."""
+    """Distinct collector IDs from a device list.
+
+    Accepts both the formatted `get_devices` shape (`collector_id`) and the
+    raw LM API shape (`currentCollectorId` / `preferredCollectorId`) so the
+    helper works whether the caller passes formatted sub-tool output or raw
+    API items. Formatted shape is preferred because that's what the composite
+    sub-tool dispatch produces today.
+    """
     seen: set[int] = set()
     ordered: list[int] = []
     for dev in devices:
-        cid = dev.get("currentCollectorId") or dev.get("preferredCollectorId")
+        cid = (
+            dev.get("collector_id")
+            or dev.get("currentCollectorId")
+            or dev.get("preferredCollectorId")
+        )
         if cid and cid not in seen:
             seen.add(cid)
             ordered.append(cid)
