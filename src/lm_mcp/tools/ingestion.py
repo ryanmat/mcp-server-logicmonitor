@@ -7,12 +7,18 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import (
+    format_response,
+    handle_error,
+    require_write_permission,
+    validation_error,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+@require_write_permission
 async def ingest_logs(
     client: LogicMonitorClient,
     logs: list[dict],
@@ -41,7 +47,11 @@ async def ingest_logs(
     """
     try:
         if not logs:
-            return [TextContent(type="text", text="Error: logs list cannot be empty")]
+            return validation_error(
+                "VALIDATION_ERROR",
+                "logs list cannot be empty",
+                suggestion="Pass at least one log entry with message + _lm.resourceId.",
+            )
 
         result = await client.ingest_post("/rest/log/ingest", json_body=logs)
         return format_response(result)
@@ -49,6 +59,7 @@ async def ingest_logs(
         return handle_error(e)
 
 
+@require_write_permission
 async def push_metrics(
     client: LogicMonitorClient,
     metrics: dict,
@@ -86,23 +97,24 @@ async def push_metrics(
     """
     try:
         if not metrics:
-            return [TextContent(type="text", text="Error: metrics cannot be empty")]
+            return validation_error(
+                "VALIDATION_ERROR",
+                "metrics payload cannot be empty",
+                suggestion="Provide resourceIds, dataSource, and instances at minimum.",
+            )
 
-        # Validate required fields
         if "resourceIds" not in metrics:
-            return [
-                TextContent(
-                    type="text",
-                    text="Error: metrics.resourceIds is required",
-                )
-            ]
+            return validation_error(
+                "VALIDATION_ERROR",
+                "metrics.resourceIds is required",
+                suggestion='Add resourceIds, e.g. {"system.hostname": "server1"}.',
+            )
         if "dataSource" not in metrics:
-            return [
-                TextContent(
-                    type="text",
-                    text="Error: metrics.dataSource is required",
-                )
-            ]
+            return validation_error(
+                "VALIDATION_ERROR",
+                "metrics.dataSource is required",
+                suggestion="Add a dataSource name string.",
+            )
 
         result = await client.ingest_post("/rest/metric/ingest?create=true", json_body=metrics)
         return format_response(result)
