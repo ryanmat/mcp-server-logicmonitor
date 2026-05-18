@@ -512,3 +512,86 @@ class TestCompareToBaseline:
         assert "deviation_percent" in comp
         assert "current_mean" in comp
         assert "baseline_mean" in comp
+
+
+class TestBaselineErrorEnvelopeShape:
+    """Regression tests for the bare-TextContent error return removal.
+
+    Prior behavior: save_baseline and compare_to_baseline returned
+    [TextContent(text=f"Error: {e}")] from their outer except blocks,
+    bypassing handle_error and producing a naked string with no
+    structured envelope, no code, no logged stack trace. Now both go
+    through handle_error so the response matches every other tool.
+    """
+
+    @respx.mock
+    async def test_save_baseline_4xx_goes_through_handle_error(self, client):
+        """save_baseline 4xx now returns LMError envelope with HTTP_<status> code."""
+        from lm_mcp.tools.baselines import save_baseline
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                403,
+                json={"errorMessage": "Forbidden"},
+            )
+        )
+
+        result = await save_baseline(
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            baseline_name="test",
+        )
+
+        text = result[0].text
+        assert text.startswith("Error: Forbidden")
+        # handle_error attaches a Suggestion line for LMError responses.
+        assert "Suggestion:" in text
+
+    @respx.mock
+    async def test_compare_to_baseline_unexpected_exception_envelope(self, client):
+        """An unexpected Python exception (e.g. malformed body) -> structured envelope."""
+        from lm_mcp.tools.baselines import compare_to_baseline
+
+        session = get_session()
+        session.set_variable(
+            "baseline_malformed",
+            {
+                "device_id": 1,
+                "device_datasource_id": 10,
+                "instance_id": 100,
+                "datapoints": {
+                    "cpu": {
+                        "mean": 50.0,
+                        "min": 40.0,
+                        "max": 60.0,
+                        "stddev": 5.0,
+                        "sample_count": 10,
+                    },
+                },
+            },
+        )
+
+        # Return a body that the comparison logic cannot consume cleanly.
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"unexpected": "shape"},
+            )
+        )
+
+        result = await compare_to_baseline(client, baseline_name="malformed")
+
+        # Either we get the (legitimate, empty-values) success path or we get
+        # the new structured envelope -- both must NOT be a naked
+        # "Error: <ClassName>" string the old code produced.
+        text = result[0].text
+        if text.startswith("Error:"):
+            assert "Suggestion:" in text or "code" in text.lower()

@@ -111,7 +111,7 @@ async def save_baseline(
         )
 
     except Exception as e:
-        return [TextContent(type="text", text=f"Error: {e}")]
+        return handle_error(e)
 
 
 async def compare_to_baseline(
@@ -237,4 +237,4 @@ async def compare_to_baseline(
         )
 
     except Exception as e:
-        return [TextContent(type="text", text=f"Error: {e}")]
+        return handle_error(e)
