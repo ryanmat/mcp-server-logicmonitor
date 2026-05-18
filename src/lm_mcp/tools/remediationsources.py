@@ -7,7 +7,15 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, require_write_permission
+from lm_mcp.tools import (
+    WILDCARD_STRIP_NOTE,
+    format_response,
+    handle_error,
+    quote_filter_value,
+    require_write_permission,
+    safe_total,
+    sanitize_filter_value,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -17,52 +25,77 @@ async def get_remediationsources(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     group_filter: str | None = None,
+    filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
-    """List remediation sources from LogicMonitor Exchange Toolbox.
+    """List RemediationSources from LogicMonitor.
+
+    Calls the public REST endpoint ``/setting/remediationsources``. Filters
+    and pagination are pushed down to the server. Mirrors :func:`get_datasources`
+    so consumers get the same shape across every LogicModule resource family.
 
     Args:
         client: LogicMonitor API client.
-        name_filter: Filter by source name (client-side substring match).
-        group_filter: Filter by group (client-side substring match).
+        name_filter: Filter by RemediationSource name (substring, server-side).
+        group_filter: Filter by group (substring, server-side).
+        filter: Raw LM filter expression (overrides typed filters).
+        limit: Maximum sources to return per page.
+        offset: Number of results to skip for pagination.
 
     Returns:
-        List of TextContent with remediation source data or error.
+        List of TextContent with RemediationSource data or error.
     """
     try:
-        result = await client.post("/exchange/toolbox/exchangeRemediationSources", json_body={})
+        params: dict = {"size": limit, "offset": offset}
+        wildcards_stripped = False
 
-        # Unwrap Exchange Toolbox envelope
-        data = result.get("data", {})
-        by_id = data.get("byId", {})
-        sources = list(by_id.values())
+        if filter:
+            params["filter"] = filter
+        else:
+            filters: list[str] = []
+            if name_filter:
+                clean_name, was_modified = sanitize_filter_value(name_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"name~{quote_filter_value(clean_name)}")
+            if group_filter:
+                clean_group, was_modified = sanitize_filter_value(group_filter)
+                wildcards_stripped = wildcards_stripped or was_modified
+                filters.append(f"group~{quote_filter_value(clean_group)}")
+            if filters:
+                params["filter"] = ",".join(filters)
 
-        # Apply client-side filters
-        if name_filter:
-            name_lower = name_filter.lower()
-            sources = [s for s in sources if name_lower in s.get("name", "").lower()]
-        if group_filter:
-            group_lower = group_filter.lower()
-            sources = [s for s in sources if group_lower in s.get("group", "").lower()]
+        result = await client.get("/setting/remediationsources", params=params)
 
-        formatted = []
-        for src in sources:
-            formatted.append(
+        sources = []
+        for item in result.get("items", []):
+            sources.append(
                 {
-                    "id": src.get("id"),
-                    "name": src.get("name"),
-                    "description": src.get("description"),
-                    "group": src.get("group"),
-                    "tags": src.get("tags", []),
-                    "technical_notes": src.get("technicalNotes"),
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "display_name": item.get("displayName"),
+                    "description": item.get("description"),
+                    "applies_to": item.get("appliesTo"),
+                    "group": item.get("group"),
+                    "collect_method": item.get("collectMethod"),
+                    "tags": item.get("tags", []),
+                    "technical_notes": item.get("technicalNotes"),
                 }
             )
 
-        return format_response(
-            {
-                "count": len(formatted),
-                "remediationsources": formatted,
-            }
-        )
+        total = safe_total(result)
+        has_more = (offset + len(sources)) < total
+
+        response = {
+            "total": total,
+            "count": len(sources),
+            "offset": offset,
+            "has_more": has_more,
+            "remediationsources": sources,
+        }
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -71,36 +104,43 @@ async def get_remediationsource(
     client: LogicMonitorClient,
     source_id: int,
 ) -> list[TextContent]:
-    """Get detailed information about a specific remediation source.
+    """Get details for a specific RemediationSource.
+
+    Calls ``/setting/remediationsources/{id}`` and projects the fields most
+    useful to callers (metadata + script content). The same endpoint is
+    already exercised by ``execute_remediation`` for pre-flight checks.
 
     Args:
         client: LogicMonitor API client.
-        source_id: Remediation source ID.
+        source_id: RemediationSource ID.
 
     Returns:
         List of TextContent with source details or error.
     """
     try:
-        result = await client.post(
-            f"/exchange/toolbox/exchangeRemediationSources/{source_id}", json_body={}
-        )
-
-        # Handle envelope or direct response
-        if "data" in result and "byId" in result.get("data", {}):
-            by_id = result["data"]["byId"]
-            source = by_id.get(str(source_id), {})
-        else:
-            source = result
+        result = await client.get(f"/setting/remediationsources/{source_id}")
 
         detail = {
-            "id": source.get("id"),
-            "name": source.get("name"),
-            "description": source.get("description"),
-            "group": source.get("group"),
-            "tags": source.get("tags", []),
-            "technical_notes": source.get("technicalNotes"),
-            "applies_to": source.get("appliesToScript"),
-            "script": source.get("script"),
+            "id": result.get("id"),
+            "name": result.get("name"),
+            "display_name": result.get("displayName"),
+            "description": result.get("description"),
+            "applies_to": result.get("appliesTo"),
+            "group": result.get("group"),
+            "collect_method": result.get("collectMethod"),
+            "collect_interval": result.get("collectInterval"),
+            "tags": result.get("tags", []),
+            "technical_notes": result.get("technicalNotes"),
+            "groovy_script": result.get("groovyScript"),
+            "datapoints": [
+                {
+                    "id": dp.get("id"),
+                    "name": dp.get("name"),
+                    "description": dp.get("description"),
+                    "type": dp.get("type"),
+                }
+                for dp in result.get("dataPoints", [])
+            ],
         }
 
         return format_response(detail)

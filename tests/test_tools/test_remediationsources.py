@@ -47,36 +47,38 @@ class TestGetRemediationSources:
 
     @respx.mock
     async def test_get_remediationsources_returns_list(self, client):
-        """get_remediationsources unwraps envelope and returns source list."""
+        """get_remediationsources reads /setting/remediationsources and projects items."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": {
-                        "allIds": [1, 2],
-                        "byId": {
-                            "1": {
-                                "id": 1,
-                                "name": "Restart Service",
-                                "description": "Restart a failed service",
-                                "group": "Services",
-                                "tags": ["restart", "service"],
-                                "technicalNotes": "Uses systemctl",
-                            },
-                            "2": {
-                                "id": 2,
-                                "name": "Clear Disk",
-                                "description": "Clear temp files",
-                                "group": "Storage",
-                                "tags": ["disk", "cleanup"],
-                                "technicalNotes": "",
-                            },
+                    "total": 2,
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Restart_Service",
+                            "displayName": "Restart Service",
+                            "description": "Restart a failed service",
+                            "appliesTo": "isLinux()",
+                            "group": "Services",
+                            "collectMethod": "script",
+                            "tags": ["restart", "service"],
+                            "technicalNotes": "Uses systemctl",
                         },
-                    }
+                        {
+                            "id": 2,
+                            "name": "Clear_Disk",
+                            "displayName": "Clear Disk",
+                            "description": "Clear temp files",
+                            "group": "Storage",
+                            "collectMethod": "script",
+                            "tags": ["disk", "cleanup"],
+                        },
+                    ],
                 },
             )
         )
@@ -85,116 +87,130 @@ class TestGetRemediationSources:
 
         assert len(result) == 1
         data = json.loads(result[0].text)
+        assert data["total"] == 2
         assert data["count"] == 2
-        assert len(data["remediationsources"]) == 2
-        assert data["remediationsources"][0]["name"] in [
-            "Restart Service",
-            "Clear Disk",
-        ]
+        assert data["offset"] == 0
+        assert data["has_more"] is False
+        names = {s["name"] for s in data["remediationsources"]}
+        assert names == {"Restart_Service", "Clear_Disk"}
 
     @respx.mock
     async def test_get_remediationsources_with_name_filter(self, client):
-        """get_remediationsources filters by name client-side."""
+        """name_filter builds a server-side filter clause."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": {
-                        "allIds": [1, 2],
-                        "byId": {
-                            "1": {
-                                "id": 1,
-                                "name": "Restart Service",
-                                "description": "Restart",
-                                "group": "Services",
-                            },
-                            "2": {
-                                "id": 2,
-                                "name": "Clear Disk",
-                                "description": "Clear",
-                                "group": "Storage",
-                            },
-                        },
-                    }
+                    "total": 1,
+                    "items": [
+                        {"id": 1, "name": "Restart_Service", "group": "Services"}
+                    ],
                 },
             )
         )
 
         result = await get_remediationsources(client, name_filter="Restart")
 
+        assert route.called
+        filter_param = route.calls.last.request.url.params.get("filter", "")
+        assert "name~" in filter_param
+        assert "Restart" in filter_param
+
         data = json.loads(result[0].text)
         assert data["count"] == 1
-        assert data["remediationsources"][0]["name"] == "Restart Service"
+        assert data["remediationsources"][0]["name"] == "Restart_Service"
 
     @respx.mock
     async def test_get_remediationsources_with_group_filter(self, client):
-        """get_remediationsources filters by group client-side."""
+        """group_filter builds a server-side filter clause."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": {
-                        "allIds": [1, 2],
-                        "byId": {
-                            "1": {
-                                "id": 1,
-                                "name": "Restart Service",
-                                "description": "Restart",
-                                "group": "Services",
-                            },
-                            "2": {
-                                "id": 2,
-                                "name": "Clear Disk",
-                                "description": "Clear",
-                                "group": "Storage",
-                            },
-                        },
-                    }
+                    "total": 1,
+                    "items": [{"id": 2, "name": "Clear_Disk", "group": "Storage"}],
                 },
             )
         )
 
         result = await get_remediationsources(client, group_filter="Storage")
 
+        assert route.called
+        filter_param = route.calls.last.request.url.params.get("filter", "")
+        assert "group~" in filter_param
+
         data = json.loads(result[0].text)
         assert data["count"] == 1
         assert data["remediationsources"][0]["group"] == "Storage"
 
     @respx.mock
-    async def test_get_remediationsources_empty_response(self, client):
-        """get_remediationsources handles empty data envelope."""
+    async def test_get_remediationsources_raw_filter_overrides_typed(self, client):
+        """Raw filter parameter overrides typed name/group filters."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={"data": {"allIds": [], "byId": {}}},
-            )
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
+        ).mock(return_value=httpx.Response(200, json={"total": 0, "items": []}))
+
+        await get_remediationsources(
+            client,
+            name_filter="ignored",
+            filter='group:"Custom"',
         )
+
+        params = route.calls.last.request.url.params
+        assert params.get("filter") == 'group:"Custom"'
+
+    @respx.mock
+    async def test_get_remediationsources_pagination_passed_to_api(self, client):
+        """limit/offset map to size/offset query params."""
+        from lm_mcp.tools.remediationsources import get_remediationsources
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
+        ).mock(return_value=httpx.Response(200, json={"total": 200, "items": []}))
+
+        result = await get_remediationsources(client, limit=25, offset=50)
+
+        params = route.calls.last.request.url.params
+        assert params.get("size") == "25"
+        assert params.get("offset") == "50"
+
+        data = json.loads(result[0].text)
+        assert data["offset"] == 50
+        assert data["has_more"] is True
+
+    @respx.mock
+    async def test_get_remediationsources_empty_response(self, client):
+        """get_remediationsources handles an empty items list."""
+        from lm_mcp.tools.remediationsources import get_remediationsources
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
+        ).mock(return_value=httpx.Response(200, json={"total": 0, "items": []}))
 
         result = await get_remediationsources(client)
 
         data = json.loads(result[0].text)
+        assert data["total"] == 0
         assert data["count"] == 0
         assert data["remediationsources"] == []
 
     @respx.mock
     async def test_get_remediationsources_handles_error(self, client):
-        """get_remediationsources returns error on API failure."""
+        """get_remediationsources returns a structured error on API failure."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/exchange/toolbox/exchangeRemediationSources"
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
         ).mock(return_value=httpx.Response(500, json={"errorMessage": "Server error"}))
 
         result = await get_remediationsources(client)
@@ -210,31 +226,23 @@ class TestGetRemediationSource:
         """get_remediationsource returns detailed source info."""
         from lm_mcp.tools.remediationsources import get_remediationsource
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources/10"
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/10"
         ).mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "data": {
-                        "allIds": [10],
-                        "byId": {
-                            "10": {
-                                "id": 10,
-                                "name": "Restart Service",
-                                "description": "Restart a systemd service",
-                                "group": "Services",
-                                "tags": ["restart"],
-                                "technicalNotes": "Uses systemctl restart",
-                                "appliesToScript": "isLinux()",
-                                "script": {
-                                    "type": "groovy",
-                                    "groovyScript": "println 'restart'",
-                                },
-                            }
-                        },
-                    }
+                    "id": 10,
+                    "name": "Restart_Service",
+                    "displayName": "Restart Service",
+                    "description": "Restart a systemd service",
+                    "appliesTo": "isLinux()",
+                    "group": "Services",
+                    "collectMethod": "script",
+                    "collectInterval": 300,
+                    "tags": ["restart"],
+                    "technicalNotes": "Uses systemctl restart",
+                    "groovyScript": "println 'restart'",
                 },
             )
         )
@@ -244,44 +252,19 @@ class TestGetRemediationSource:
         assert len(result) == 1
         data = json.loads(result[0].text)
         assert data["id"] == 10
-        assert data["name"] == "Restart Service"
+        assert data["name"] == "Restart_Service"
+        assert data["display_name"] == "Restart Service"
         assert data["group"] == "Services"
-        assert data["script"]["type"] == "groovy"
-
-    @respx.mock
-    async def test_get_remediationsource_direct_response(self, client):
-        """get_remediationsource handles direct (non-envelope) response."""
-        from lm_mcp.tools.remediationsources import get_remediationsource
-
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources/10"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 10,
-                    "name": "Restart Service",
-                    "description": "Direct response",
-                    "group": "Services",
-                },
-            )
-        )
-
-        result = await get_remediationsource(client, source_id=10)
-
-        data = json.loads(result[0].text)
-        assert data["id"] == 10
-        assert data["name"] == "Restart Service"
+        assert data["collect_interval"] == 300
+        assert data["groovy_script"] == "println 'restart'"
 
     @respx.mock
     async def test_get_remediationsource_not_found(self, client):
         """get_remediationsource returns error for missing source."""
         from lm_mcp.tools.remediationsources import get_remediationsource
 
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest"
-            "/exchange/toolbox/exchangeRemediationSources/999"
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/999"
         ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
 
         result = await get_remediationsource(client, source_id=999)
@@ -361,6 +344,23 @@ class TestRemediationSourceToolRegistration:
 
         handler = get_tool_handler("get_remediation_history")
         assert handler is not None
+
+    def test_get_remediationsources_schema_includes_pagination(self):
+        """Schema advertises limit/offset/filter for the public REST surface."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "get_remediationsources")
+        props = tool.inputSchema["properties"]
+        for required in ("name_filter", "group_filter", "filter", "limit", "offset"):
+            assert required in props
+
+    def test_descriptions_drop_preview_marker(self):
+        """[PREVIEW] prefix is gone now that the tools call the public REST endpoint."""
+        from lm_mcp.registry import TOOLS
+
+        for name in ("get_remediationsources", "get_remediationsource"):
+            tool = next(t for t in TOOLS if t.name == name)
+            assert "[PREVIEW]" not in tool.description
 
 
 class TestExecuteRemediation:
