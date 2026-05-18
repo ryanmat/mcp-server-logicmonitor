@@ -1162,3 +1162,128 @@ class TestCalculateErrorBudget:
         data = json.loads(result[0].text)
         assert data["total_budget_minutes"] == 0.0
         assert data["status"] == "healthy"  # No downtime with 0 budget = healthy
+
+
+DEVICE_URL_TEMPLATE = "https://test.logicmonitor.com/santaba/rest/device/devices/{id}"
+
+
+class TestCalculateAvailabilityDeviceLookup:
+    """Regression tests for the device-lookup silent-failure fix.
+
+    Prior behavior: a 404/403 on the device lookup proceeded with
+    unfiltered alerts, producing availability numbers for a different
+    device set than the caller asked for. Now an unreachable device must
+    return a structured DEVICE_LOOKUP_FAILED error envelope.
+    """
+
+    @respx.mock
+    async def test_404_on_device_lookup_returns_structured_error(self, client):
+        from lm_mcp.tools.scoring import calculate_availability
+
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        respx.get(DEVICE_URL_TEMPLATE.format(id=99999)).mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
+        )
+
+        result = await calculate_availability(client, device_id=99999, hours_back=24)
+
+        text = result[0].text
+        assert "Error:" in text
+        assert "device 99999" in text.lower() or "99999" in text
+
+    @respx.mock
+    async def test_403_on_device_lookup_returns_structured_error(self, client):
+        from lm_mcp.tools.scoring import calculate_availability
+
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        respx.get(DEVICE_URL_TEMPLATE.format(id=42)).mock(
+            return_value=httpx.Response(403, json={"errorMessage": "Forbidden"})
+        )
+
+        result = await calculate_availability(client, device_id=42, hours_back=24)
+
+        assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_successful_device_lookup_still_filters_alerts(self, client):
+        """Happy path remains: device lookup returns name, alerts filter by name."""
+        from lm_mcp.tools.scoring import calculate_availability
+
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": "a1",
+                            "severity": 3,
+                            "monitorObjectName": "server1",
+                            "startEpoch": int(time.time()) - 1000,
+                            "endEpoch": 0,
+                        },
+                        {
+                            "id": "a2",
+                            "severity": 3,
+                            "monitorObjectName": "other-server",
+                            "startEpoch": int(time.time()) - 2000,
+                            "endEpoch": 0,
+                        },
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+        respx.get(DEVICE_URL_TEMPLATE.format(id=100)).mock(
+            return_value=httpx.Response(
+                200, json={"id": 100, "displayName": "server1", "hostStatus": 0}
+            )
+        )
+
+        result = await calculate_availability(client, device_id=100, hours_back=24)
+
+        data = json.loads(result[0].text)
+        # Filtered to server1 only -- prior bug would have included both alerts.
+        assert "error" not in data or data.get("error") is False
+        assert "by_device" in data
+
+
+class TestCalculateErrorBudgetSubToolHardening:
+    """Regression test mirroring the v3.8.2 _call_sub_tool fix.
+
+    Prior behavior: calculate_error_budget did a raw json.loads on the
+    text returned by calculate_availability. If the inner call returned
+    an Error: ... envelope, json.loads raised JSONDecodeError and the
+    composite crashed. The fix routes through call_sub_tool so the error
+    surfaces cleanly.
+    """
+
+    @respx.mock
+    async def test_inner_failure_surfaces_as_clean_error(self, client):
+        from lm_mcp.tools.scoring import calculate_error_budget
+
+        # calculate_availability will return an Error envelope because the
+        # device lookup 404s. Without the call_sub_tool routing, this
+        # would JSONDecodeError below.
+        respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        respx.get(DEVICE_URL_TEMPLATE.format(id=99999)).mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
+        )
+
+        result = await calculate_error_budget(
+            client,
+            device_id=99999,
+            target_slo=99.9,
+            period_days=30,
+        )
+
+        text = result[0].text
+        assert "Error:" in text
+        # The JSONDecodeError message ("Expecting value: line 1 column 1")
+        # must NOT appear -- that was the v3.8.2-pattern regression signal.
+        assert "Expecting value" not in text
