@@ -50,9 +50,7 @@ class TestGetRemediationSources:
         """get_remediationsources reads /setting/remediationsources and projects items."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -106,9 +104,7 @@ class TestGetRemediationSources:
                 200,
                 json={
                     "total": 1,
-                    "items": [
-                        {"id": 1, "name": "Restart_Service", "group": "Services"}
-                    ],
+                    "items": [{"id": 1, "name": "Restart_Service", "group": "Services"}],
                 },
             )
         )
@@ -193,9 +189,9 @@ class TestGetRemediationSources:
         """get_remediationsources handles an empty items list."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
-        ).mock(return_value=httpx.Response(200, json={"total": 0, "items": []}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources").mock(
+            return_value=httpx.Response(200, json={"total": 0, "items": []})
+        )
 
         result = await get_remediationsources(client)
 
@@ -209,9 +205,9 @@ class TestGetRemediationSources:
         """get_remediationsources returns a structured error on API failure."""
         from lm_mcp.tools.remediationsources import get_remediationsources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
-        ).mock(return_value=httpx.Response(500, json={"errorMessage": "Server error"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
+        )
 
         result = await get_remediationsources(client)
 
@@ -226,9 +222,7 @@ class TestGetRemediationSource:
         """get_remediationsource returns detailed source info."""
         from lm_mcp.tools.remediationsources import get_remediationsource
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/10"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/10").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -263,9 +257,9 @@ class TestGetRemediationSource:
         """get_remediationsource returns error for missing source."""
         from lm_mcp.tools.remediationsources import get_remediationsource
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/999"
-        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
 
         result = await get_remediationsource(client, source_id=999)
 

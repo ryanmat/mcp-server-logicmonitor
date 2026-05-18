@@ -11,7 +11,7 @@ class TestPackageExports:
         """Package version is accessible."""
         from lm_mcp import __version__
 
-        assert __version__ == "3.8.2"
+        assert __version__ == "3.8.3"
 
     def test_lm_config_exported(self):
         """LMConfig is exported from package root."""

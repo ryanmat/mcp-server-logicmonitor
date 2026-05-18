@@ -36,9 +36,7 @@ class TestGetDiagnosticSources:
         """get_diagnosticsources reads /setting/diagnosticsources and projects items."""
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -191,9 +189,9 @@ class TestGetDiagnosticSources:
         """get_diagnosticsources handles an empty items list."""
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources"
-        ).mock(return_value=httpx.Response(200, json={"total": 0, "items": []}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources").mock(
+            return_value=httpx.Response(200, json={"total": 0, "items": []})
+        )
 
         result = await get_diagnosticsources(client)
 
@@ -207,9 +205,9 @@ class TestGetDiagnosticSources:
         """get_diagnosticsources returns a structured error on API failure."""
         from lm_mcp.tools.diagnosticsources import get_diagnosticsources
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources"
-        ).mock(return_value=httpx.Response(500, json={"errorMessage": "Server error"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
+        )
 
         result = await get_diagnosticsources(client)
 
@@ -224,9 +222,7 @@ class TestGetDiagnosticSource:
         """get_diagnosticsource returns detailed source info."""
         from lm_mcp.tools.diagnosticsources import get_diagnosticsource
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/10"
-        ).mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/10").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -240,9 +236,7 @@ class TestGetDiagnosticSource:
                     "collectInterval": 300,
                     "tags": ["disk"],
                     "technicalNotes": "Uses df",
-                    "dataPoints": [
-                        {"id": 1, "name": "usage", "type": 1, "description": "% used"}
-                    ],
+                    "dataPoints": [{"id": 1, "name": "usage", "type": 1, "description": "% used"}],
                 },
             )
         )
@@ -264,9 +258,9 @@ class TestGetDiagnosticSource:
         """get_diagnosticsource returns error for missing source."""
         from lm_mcp.tools.diagnosticsources import get_diagnosticsource
 
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/999"
-        ).mock(return_value=httpx.Response(404, json={"errorMessage": "Not found"}))
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
 
         result = await get_diagnosticsource(client, source_id=999)
 

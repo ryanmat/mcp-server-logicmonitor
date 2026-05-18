@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.3] - 2026-05-18
+
+### Fixed
+
+- **DiagnosticSource and RemediationSource read tools return HTTP 415.** `get_diagnosticsources`, `get_diagnosticsource`, `get_remediationsources`, and `get_remediationsource` were calling the Santaba UI's internal Exchange Toolbox endpoint (`POST /exchange/toolbox/exchange{Diagnostic,Remediation}Sources` with body `{}`). Per LM's internal Action Source API spec, that path with POST is the CREATE verb -- not LIST or GET -- so the API rejected the malformed CREATE payload with 415. Repointed all four tools to the public REST surface `GET /setting/{diagnostic,remediation}sources` and `GET /setting/{diagnostic,remediation}sources/{id}`. This is the same path family every other source tool uses (`get_datasources`, `get_configsources`, etc.) and that LogicMonitor's official PowerShell module canonicalizes for these resources. Filtering is now pushed server-side via the standard LM `filter=name~"x"` query parameter and pagination via `size`/`offset`. `[PREVIEW]` markers removed from the four tools -- they are first-class public reads.
+- **LMv1 HMAC signature drift on empty-body requests.** The body-signing path in `client/api.py` checked `if json_body` (truthiness), so an empty dict `{}` was treated as missing and signed against `""` while httpx put `"{}"` on the wire. The mismatch produced 401 on LMv1 portals every empty-body POST/PATCH (`recover_device`, the broken Exchange Toolbox readers above, and anything future that passes `json_body={}`). Bearer-auth portals ignore body in the signature so the bug remained dormant. Fix uses `if json_body is not None`, applied to both `request()` (line 299) and `ingest_post()` (line 520).
+- **`calculate_error_budget` JSON-decode crash on inner errors.** When the inner `calculate_availability` call returned a human-readable `"Error: ...\nSuggestion: ..."` envelope (now reachable through the device-lookup fix below), `calculate_error_budget` did a raw `json.loads(avail_result[0].text)` and raised `JSONDecodeError`, which propagated as `"Expecting value: line 1 column 1 (char 0)"`. Routed through `call_sub_tool` so the inner failure surfaces cleanly. Same hardening v3.8.2 applied to workflow composites; `calculate_error_budget` was missed in that sweep.
+- **`calculate_availability` device-lookup silent failure.** A 404 or 403 on the device lookup proceeded silently with unfiltered alerts, producing availability numbers for a different device set (or every device in the portal). Replaced the bare `except Exception: pass` with an `LMError`-only catch that returns a structured `DEVICE_LOOKUP_FAILED` envelope.
+- **`ingest_logs` and `push_metrics` missing `@require_write_permission`.** Both tools push data into the portal but the decorator was absent, so `LM_ENABLE_WRITE_OPERATIONS=false` did not gate them. Added the decorator and converted the bare `[TextContent(text="Error: ...")]` validation returns to the new `validation_error()` helper for canonical envelope shape.
+- **`baselines.save_baseline` and `compare_to_baseline` bare error returns.** Both functions returned `[TextContent(text=f"Error: {e}")]` from their outer except blocks, bypassing `handle_error()`. No structured envelope, no logged stack trace, no `error: true`/`code` fields. Replaced with `return handle_error(e)`.
+
+### Added
+
+- **`lm_mcp.tools.call_sub_tool`** (moved and renamed from `_call_sub_tool` in `workflows.py`). Public helper that calls a sub-handler, parses the JSON response, and raises a clean `RuntimeError` on error envelopes or non-JSON bodies. Now usable from non-workflow composites without copy-paste or circular imports.
+- **`lm_mcp.tools.validation_error(code, message, suggestion?)`** helper for canonical input-validation responses. Used by `ingest_logs` and `push_metrics`; available to every tool.
+- New regression tests for each of the six fix sites (~15 tests total).
+
+### Tracked Follow-ups
+
+The pre-release audit surfaced additional consistency and silent-failure gaps that are not bundled in v3.8.3 to keep the diff focused. Each will get a dedicated PR:
+
+- Pagination compliance for ~17 list endpoints missing `offset`/`has_more` (sdts, netscans, oids, services, alert_rules, escalations, integrations, device_groups, website_groups, dashboard_groups, collector_groups, roles, batchjobs, api_tokens, device_eventsources, device_logsources, dashboard_widgets).
+- Filter-convention rollout: add raw `filter` escape hatch to list tools that currently accept only typed filters.
+- Naming: `list_sdts` -> `get_sdts`, `list_session_history` -> `get_session_history` (one release with alias).
+- List/singular field parity expansion (`get_devices`, `get_alerts`, `get_collectors`, `logsources` `display_name`).
+- Session singleton thread-safety for HTTP transport.
+- Method-gated retry on POST 5xx in the client.
+- `_LM_ERROR_PATTERNS` coverage: add 415, malformed-enum, and empty-body 400 patterns.
+- Workflows.py silent-failure cleanup (~20 bare `except Exception: pass` sites in `triage`, `diagnose`, `audit_network_monitoring_coverage`, `capacity_plan`).
+- Expand `IMPORT_SILENT_FAILURE` guard to the 7 sibling `import_*` tools.
+- `export_topologysource` missing despite create/import/update/delete being present.
+
+### Verified
+
+- Full test suite passing (1810+ tests).
+- Ruff check + format clean.
+- LM PowerShell module (`logicmonitor/lm-powershell-module`) cross-referenced as the canonical public-API path source for diagnosticsources and remediationsources.
+
 ## [3.8.2] - 2026-04-23
 
 ### Fixed

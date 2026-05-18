@@ -70,9 +70,13 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.8.2
+## What's New in v3.8.3
 
-**Patch.** Hardens the composite dispatch helper and `detect_site_outage` collector enumeration. `_call_sub_tool` now handles sub-tool error responses cleanly (was crashing with `JSONDecodeError` when a sub-tool returned the human-readable `"Error: ..."` shape). `detect_site_outage` now probes each collector independently so a single orphaned collector reference no longer truncates the CollectorDown signal. Surfaced during the v3.8.1 portal smoke test.
+**Patch.** Bug-class sweep across the tool surface. Fixes the diagnosticsource and remediationsource readers (HTTP 415 against the wrong path), an LMv1 HMAC signature mismatch on empty-body requests, a `JSONDecodeError` crash in `calculate_error_budget`, a wrong-math silent failure in `calculate_availability` when the device lookup 404s, missing `@require_write_permission` on `ingest_logs`/`push_metrics`, and bare error-string returns in `baselines.py`. Introduces `call_sub_tool` and `validation_error` as shared helpers in `lm_mcp.tools` so the v3.8.2 hardening pattern is usable outside `workflows.py`. CHANGELOG lists tracked follow-ups for the rest of the audit (pagination, naming, parity).
+
+### v3.8.2 — composite dispatch helper hardening
+
+Patches the composite dispatch helper and `detect_site_outage` collector enumeration. `_call_sub_tool` now handles sub-tool error responses cleanly (was crashing with `JSONDecodeError` when a sub-tool returned the human-readable `"Error: ..."` shape). `detect_site_outage` now probes each collector independently so a single orphaned collector reference no longer truncates the CollectorDown signal. Surfaced during the v3.8.1 portal smoke test.
 
 ### v3.8.1 — detect_site_outage collector enumeration
 

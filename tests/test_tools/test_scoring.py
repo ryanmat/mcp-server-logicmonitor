@@ -1180,9 +1180,7 @@ class TestCalculateAvailabilityDeviceLookup:
     async def test_404_on_device_lookup_returns_structured_error(self, client):
         from lm_mcp.tools.scoring import calculate_availability
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
         respx.get(DEVICE_URL_TEMPLATE.format(id=99999)).mock(
             return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
         )
@@ -1197,9 +1195,7 @@ class TestCalculateAvailabilityDeviceLookup:
     async def test_403_on_device_lookup_returns_structured_error(self, client):
         from lm_mcp.tools.scoring import calculate_availability
 
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
         respx.get(DEVICE_URL_TEMPLATE.format(id=42)).mock(
             return_value=httpx.Response(403, json={"errorMessage": "Forbidden"})
         )
@@ -1268,9 +1264,7 @@ class TestCalculateErrorBudgetSubToolHardening:
         # calculate_availability will return an Error envelope because the
         # device lookup 404s. Without the call_sub_tool routing, this
         # would JSONDecodeError below.
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
         respx.get(DEVICE_URL_TEMPLATE.format(id=99999)).mock(
             return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
         )
