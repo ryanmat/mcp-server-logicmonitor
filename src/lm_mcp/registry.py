@@ -5111,37 +5111,52 @@ TOOLS.extend(
     ]
 )
 
-# Diagnostic Sources (Exchange Toolbox)
+# Diagnostic Sources
 TOOLS.extend(
     [
         Tool(
             name="get_diagnosticsources",
-            description="[PREVIEW] List diagnostic sources from Exchange Toolbox",
+            description="List DiagnosticSources from LogicMonitor",
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by source name (client-side)",
+                        "description": "Filter by source name (substring, server-side)",
                     },
                     "group_filter": {
                         "type": "string",
-                        "description": "Filter by group (client-side)",
+                        "description": "Filter by group (substring, server-side)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": (
+                            "Raw LM filter expression (overrides typed filters). "
+                            "Operators: : (eq), !: (neq), ~ (contains), !~ (not contains)."
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum sources to return (default: 50)",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Results to skip for pagination (default: 0)",
                     },
                 },
             },
         ),
         Tool(
             name="get_diagnosticsource",
-            description="[PREVIEW] Get details about a specific diagnostic source including script",
+            description="Get details about a specific DiagnosticSource including datapoints",
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "source_id": {
                         "type": "integer",
-                        "description": "Diagnostic source ID",
+                        "description": "DiagnosticSource ID",
                     },
                 },
                 "required": ["source_id"],
@@ -5150,23 +5165,38 @@ TOOLS.extend(
     ]
 )
 
-# Remediation Sources (Exchange Toolbox)
+# Remediation Sources
 TOOLS.extend(
     [
         Tool(
             name="get_remediationsources",
-            description="[PREVIEW] List remediation sources from Exchange Toolbox",
+            description="List RemediationSources from LogicMonitor",
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by source name (client-side)",
+                        "description": "Filter by source name (substring, server-side)",
                     },
                     "group_filter": {
                         "type": "string",
-                        "description": "Filter by group (client-side)",
+                        "description": "Filter by group (substring, server-side)",
+                    },
+                    "filter": {
+                        "type": "string",
+                        "description": (
+                            "Raw LM filter expression (overrides typed filters). "
+                            "Operators: : (eq), !: (neq), ~ (contains), !~ (not contains)."
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum sources to return (default: 50)",
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Results to skip for pagination (default: 0)",
                     },
                 },
             },
@@ -5174,7 +5204,7 @@ TOOLS.extend(
         Tool(
             name="get_remediationsource",
             description=(
-                "[PREVIEW] Get details about a specific remediation source including script"
+                "Get details about a specific RemediationSource including the Groovy script"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -5182,7 +5212,7 @@ TOOLS.extend(
                 "properties": {
                     "source_id": {
                         "type": "integer",
-                        "description": "Remediation source ID",
+                        "description": "RemediationSource ID",
                     },
                 },
                 "required": ["source_id"],

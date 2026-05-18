@@ -10,8 +10,10 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
+from lm_mcp.exceptions import LMError
 from lm_mcp.tools import (
     SEVERITY_MAP,
+    call_sub_tool,
     format_response,
     handle_error,
     quote_filter_value,
@@ -251,15 +253,32 @@ async def calculate_availability(
         result = await client.get("/alert/alerts", params=params)
         alerts = result.get("items", [])
 
-        # Post-filter: ensure alerts match the requested device
+        # Post-filter: ensure alerts match the requested device. A failed
+        # device lookup must propagate -- otherwise the function would
+        # silently return availability numbers for an unfiltered alert set
+        # (or for a different device) when the caller's device_id is
+        # missing/forbidden. The original ``except: pass`` masked the
+        # NotFoundError/PermissionError as wrong-math.
         if device_id is not None:
             try:
                 device_info = await client.get(f"/device/devices/{device_id}")
-                target_name = device_info.get("displayName", "")
-                if target_name:
-                    alerts = [a for a in alerts if a.get("monitorObjectName") == target_name]
-            except Exception:
-                pass  # If device lookup fails, proceed with unfiltered alerts
+            except LMError as exc:
+                return format_response(
+                    {
+                        "error": True,
+                        "code": "DEVICE_LOOKUP_FAILED",
+                        "message": (
+                            f"Could not look up device {device_id}: {exc}. "
+                            "Availability cannot be computed without confirming the device."
+                        ),
+                        "suggestion": (
+                            "Verify the device_id exists and the API token has read access."
+                        ),
+                    }
+                )
+            target_name = device_info.get("displayName", "")
+            if target_name:
+                alerts = [a for a in alerts if a.get("monitorObjectName") == target_name]
 
         if device_name is not None and device_id is None:
             alerts = [a for a in alerts if a.get("monitorObjectName") == device_name]
@@ -556,16 +575,17 @@ async def calculate_error_budget(
         Error budget status with remaining minutes and burn rate.
     """
     try:
-        import json as _json
-
-        # Call calculate_availability to get actual availability
-        avail_result = await calculate_availability(
+        # Route through call_sub_tool so an upstream error from
+        # calculate_availability (e.g. DEVICE_LOOKUP_FAILED above) surfaces
+        # as a clean RuntimeError rather than a JSONDecodeError -- this is
+        # the same hardening v3.8.2 added to workflow composites.
+        avail_data = await call_sub_tool(
+            calculate_availability,
             client,
             device_id=device_id,
             group_id=group_id,
             hours_back=period_days * 24,
         )
-        avail_data = _json.loads(avail_result[0].text)
 
         total_minutes = period_days * 24 * 60
         total_budget_minutes = total_minutes * (1 - target_slo / 100)

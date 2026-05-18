@@ -246,3 +246,102 @@ class TestPortalUrl:
 
         url = portal_url("device", "999")
         assert url == "https://test.logicmonitor.com/santaba/uiv4/devices/999"
+
+
+class TestCallSubTool:
+    """Tests for the shared call_sub_tool helper exported from lm_mcp.tools."""
+
+    def test_is_importable_from_tools_package(self):
+        """call_sub_tool is part of the public tools namespace."""
+        from lm_mcp import tools
+
+        assert hasattr(tools, "call_sub_tool")
+        assert "call_sub_tool" in tools.__all__
+
+    async def test_happy_path_returns_parsed_dict(self):
+        from mcp.types import TextContent
+
+        from lm_mcp.tools import call_sub_tool
+
+        async def handler(_client):
+            return [TextContent(type="text", text=json.dumps({"ok": True, "count": 3}))]
+
+        data = await call_sub_tool(handler, client=None)
+        assert data == {"ok": True, "count": 3}
+
+    async def test_error_text_raises_runtime_error(self):
+        """format_response error envelope becomes 'Error: ...' text -- must surface."""
+        import pytest
+        from mcp.types import TextContent
+
+        from lm_mcp.tools import call_sub_tool
+
+        async def handler(_client):
+            return [
+                TextContent(
+                    type="text",
+                    text="Error: device 42 not found\nSuggestion: Check the ID.",
+                )
+            ]
+
+        with pytest.raises(RuntimeError, match="device 42 not found"):
+            await call_sub_tool(handler, client=None)
+
+    async def test_non_json_text_raises_with_snippet(self):
+        import pytest
+        from mcp.types import TextContent
+
+        from lm_mcp.tools import call_sub_tool
+
+        async def handler(_client):
+            return [TextContent(type="text", text="<html>gateway timeout</html>")]
+
+        with pytest.raises(RuntimeError, match="non-JSON response"):
+            await call_sub_tool(handler, client=None)
+
+    async def test_parsed_error_dict_raises(self):
+        import pytest
+        from mcp.types import TextContent
+
+        from lm_mcp.tools import call_sub_tool
+
+        async def handler(_client):
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": True, "code": "X", "message": "boom"}),
+                )
+            ]
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await call_sub_tool(handler, client=None)
+
+
+class TestValidationError:
+    """Tests for the validation_error helper."""
+
+    def test_is_importable_from_tools_package(self):
+        from lm_mcp import tools
+
+        assert hasattr(tools, "validation_error")
+        assert "validation_error" in tools.__all__
+
+    def test_returns_canonical_envelope(self):
+        from lm_mcp.tools import validation_error
+
+        result = validation_error("VALIDATION_ERROR", "name is required")
+        assert len(result) == 1
+        text = result[0].text
+        assert text.startswith("Error: name is required")
+
+    def test_envelope_includes_suggestion(self):
+        from lm_mcp.tools import validation_error
+
+        result = validation_error(
+            "VALIDATION_ERROR",
+            "logs list cannot be empty",
+            suggestion="Pass at least one log entry.",
+        )
+        text = result[0].text
+        assert "Error: logs list cannot be empty" in text
+        assert "Suggestion: Pass at least one log entry." in text

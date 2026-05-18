@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from fnmatch import fnmatch
@@ -11,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import call_sub_tool, format_response, handle_error
 
 # Audit logger for write workflows. Configured via standard logging; if no
 # handler is attached, records propagate to the root logger.
@@ -24,34 +23,6 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Shared utilities
 # ---------------------------------------------------------------------------
-
-
-async def _call_sub_tool(handler, client: LogicMonitorClient, **kwargs) -> dict:
-    """Call a sub-handler, parse JSON response, raise on errors.
-
-    Handles both structured JSON responses and the human-readable error
-    format `format_response` produces for error dicts
-    ("Error: <message>\\nSuggestion: <suggestion>"). Converts either shape
-    into a clean RuntimeError for the composite caller instead of a
-    cryptic JSONDecodeError that propagates as "Expecting value: line 1
-    column 1 (char 0)".
-    """
-    result = await handler(client, **kwargs)
-    text = result[0].text
-
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        if text.startswith("Error:"):
-            first_line = text.split("\n", 1)[0]
-            message = first_line[len("Error:") :].strip() or "Sub-tool returned an error"
-            raise RuntimeError(message) from None
-        snippet = text[:200]
-        raise RuntimeError(f"Sub-tool returned non-JSON response: {snippet}") from None
-
-    if isinstance(data, dict) and data.get("error"):
-        raise RuntimeError(data.get("message", "Sub-tool returned an error"))
-    return data
 
 
 def check_required_tools(required: list[str]) -> list[TextContent] | None:
@@ -119,10 +90,10 @@ async def _resolve_device(
     from lm_mcp.tools.devices import get_device, get_devices
 
     if device_id is not None:
-        data = await _call_sub_tool(get_device, client, device_id=device_id)
+        data = await call_sub_tool(get_device, client, device_id=device_id)
         return device_id, data
     if device_name:
-        data = await _call_sub_tool(
+        data = await call_sub_tool(
             get_devices,
             client,
             name_filter=device_name,
@@ -226,7 +197,7 @@ async def triage(
 
         # 1. Get alert statistics
         try:
-            stats = await _call_sub_tool(
+            stats = await call_sub_tool(
                 get_alert_statistics,
                 client,
                 hours_back=hours_back,
@@ -241,7 +212,7 @@ async def triage(
         # 2. Correlate alerts (clusters)
         clusters_data: dict = {}
         try:
-            clusters_data = await _call_sub_tool(
+            clusters_data = await call_sub_tool(
                 correlate_alerts,
                 client,
                 hours_back=hours_back,
@@ -256,7 +227,7 @@ async def triage(
 
         # 3. Score alert noise
         try:
-            noise = await _call_sub_tool(
+            noise = await call_sub_tool(
                 score_alert_noise,
                 client,
                 hours_back=hours_back,
@@ -278,7 +249,7 @@ async def triage(
             try:
                 from lm_mcp.tools.devices import get_devices
 
-                dev_data = await _call_sub_tool(
+                dev_data = await call_sub_tool(
                     get_devices,
                     client,
                     name_filter=device_key,
@@ -286,7 +257,7 @@ async def triage(
                 )
                 devs = dev_data.get("devices", [])
                 if devs:
-                    br = await _call_sub_tool(
+                    br = await call_sub_tool(
                         analyze_blast_radius,
                         client,
                         device_id=devs[0]["id"],
@@ -303,7 +274,7 @@ async def triage(
 
         # 5. Correlate changes
         try:
-            changes = await _call_sub_tool(
+            changes = await call_sub_tool(
                 correlate_changes,
                 client,
                 hours_back=hours_back,
@@ -392,7 +363,7 @@ async def health_check(
         # 2. Get datasources
         ds_list: list[dict] = []
         try:
-            ds_data = await _call_sub_tool(
+            ds_data = await call_sub_tool(
                 get_device_datasources,
                 client,
                 device_id=resolved_id,
@@ -413,7 +384,7 @@ async def health_check(
             if ds_id is None:
                 continue
             try:
-                inst_data = await _call_sub_tool(
+                inst_data = await call_sub_tool(
                     get_device_instances,
                     client,
                     device_id=resolved_id,
@@ -429,7 +400,7 @@ async def health_check(
                     primary_instance_id = inst_id
 
                 try:
-                    score = await _call_sub_tool(
+                    score = await call_sub_tool(
                         score_device_health,
                         client,
                         device_id=resolved_id,
@@ -452,7 +423,7 @@ async def health_check(
         # 4. Metric anomalies for primary datasource
         if primary_ds_id is not None and primary_instance_id is not None:
             try:
-                anomalies = await _call_sub_tool(
+                anomalies = await call_sub_tool(
                     get_metric_anomalies,
                     client,
                     device_id=resolved_id,
@@ -468,7 +439,7 @@ async def health_check(
         # 5. Active alerts for the device
         try:
             device_display = report["device_name"]
-            alert_data = await _call_sub_tool(
+            alert_data = await call_sub_tool(
                 get_alerts,
                 client,
                 device=device_display,
@@ -481,7 +452,7 @@ async def health_check(
 
         # 6. Availability (30-day)
         try:
-            avail = await _call_sub_tool(
+            avail = await call_sub_tool(
                 calculate_availability,
                 client,
                 device_id=resolved_id,
@@ -573,7 +544,7 @@ async def capacity_plan(
 
         # 2. Get datasources (filtered if datasource param given)
         try:
-            ds_data = await _call_sub_tool(
+            ds_data = await call_sub_tool(
                 get_device_datasources,
                 client,
                 device_id=resolved_id,
@@ -594,7 +565,7 @@ async def capacity_plan(
             ds_report: dict = {"datasource": ds.get("name", ""), "instances": []}
 
             try:
-                inst_data = await _call_sub_tool(
+                inst_data = await call_sub_tool(
                     get_device_instances,
                     client,
                     device_id=resolved_id,
@@ -619,7 +590,7 @@ async def capacity_plan(
 
                 # Forecast (use threshold=90 as default capacity threshold)
                 try:
-                    fc = await _call_sub_tool(
+                    fc = await call_sub_tool(
                         forecast_metric,
                         client,
                         threshold=90.0,
@@ -631,7 +602,7 @@ async def capacity_plan(
 
                 # Classify trend
                 try:
-                    trend = await _call_sub_tool(
+                    trend = await call_sub_tool(
                         classify_trend,
                         client,
                         **common_kwargs,
@@ -642,7 +613,7 @@ async def capacity_plan(
 
                 # Seasonality
                 try:
-                    season = await _call_sub_tool(
+                    season = await call_sub_tool(
                         detect_seasonality,
                         client,
                         **common_kwargs,
@@ -662,7 +633,7 @@ async def capacity_plan(
 
                 if is_volatile:
                     try:
-                        cps = await _call_sub_tool(
+                        cps = await call_sub_tool(
                             detect_change_points,
                             client,
                             **common_kwargs,
@@ -740,7 +711,7 @@ async def portal_overview(
 
         # 1. Alert statistics
         try:
-            stats = await _call_sub_tool(
+            stats = await call_sub_tool(
                 get_alert_statistics,
                 client,
                 hours_back=hours_back,
@@ -752,14 +723,14 @@ async def portal_overview(
 
         # 2. High-severity active alerts (critical + error)
         try:
-            crit_alerts = await _call_sub_tool(
+            crit_alerts = await call_sub_tool(
                 get_alerts,
                 client,
                 severity="critical",
                 cleared=False,
                 limit=20,
             )
-            err_alerts = await _call_sub_tool(
+            err_alerts = await call_sub_tool(
                 get_alerts,
                 client,
                 severity="error",
@@ -775,7 +746,7 @@ async def portal_overview(
 
         # 3. Collector health
         try:
-            coll_data = await _call_sub_tool(get_collectors, client)
+            coll_data = await call_sub_tool(get_collectors, client)
             report["collectors"] = coll_data
         except Exception as exc:
             warnings.append(f"get_collectors failed: {exc}")
@@ -783,7 +754,7 @@ async def portal_overview(
 
         # 4. Active SDTs
         try:
-            sdt_data = await _call_sub_tool(get_active_sdts, client)
+            sdt_data = await call_sub_tool(get_active_sdts, client)
             report["active_sdts"] = sdt_data
         except Exception as exc:
             warnings.append(f"get_active_sdts failed: {exc}")
@@ -791,7 +762,7 @@ async def portal_overview(
 
         # 5. Correlate alerts
         try:
-            cluster_data = await _call_sub_tool(
+            cluster_data = await call_sub_tool(
                 correlate_alerts,
                 client,
                 hours_back=hours_back,
@@ -803,7 +774,7 @@ async def portal_overview(
 
         # 6. Noise assessment
         try:
-            noise = await _call_sub_tool(
+            noise = await call_sub_tool(
                 score_alert_noise,
                 client,
                 hours_back=hours_back,
@@ -815,7 +786,7 @@ async def portal_overview(
 
         # 7. Dead/unmonitored devices
         try:
-            dead = await _call_sub_tool(get_devices, client, status="dead", limit=20)
+            dead = await call_sub_tool(get_devices, client, status="dead", limit=20)
             report["dead_devices"] = dead
         except Exception as exc:
             warnings.append(f"get_devices (dead) failed: {exc}")
@@ -892,7 +863,7 @@ async def diagnose(
 
         if alert_id:
             try:
-                alert_data = await _call_sub_tool(
+                alert_data = await call_sub_tool(
                     get_alert_details,
                     client,
                     alert_id=alert_id,
@@ -903,7 +874,7 @@ async def diagnose(
                 warnings.append(f"get_alert_details failed: {exc}")
         elif device_name:
             try:
-                alerts_data = await _call_sub_tool(
+                alerts_data = await call_sub_tool(
                     get_alerts,
                     client,
                     device=device_name,
@@ -914,7 +885,7 @@ async def diagnose(
                 alert_list = alerts_data.get("alerts", [])
                 if alert_list:
                     resolved_alert_id = alert_list[0].get("id", "")
-                    alert_data = await _call_sub_tool(
+                    alert_data = await call_sub_tool(
                         get_alert_details,
                         client,
                         alert_id=str(resolved_alert_id),
@@ -938,7 +909,7 @@ async def diagnose(
         # 2. Device context
         if target_device_id is not None:
             try:
-                dev = await _call_sub_tool(
+                dev = await call_sub_tool(
                     get_device,
                     client,
                     device_id=target_device_id,
@@ -948,7 +919,7 @@ async def diagnose(
                 warnings.append(f"get_device failed: {exc}")
 
             try:
-                props = await _call_sub_tool(
+                props = await call_sub_tool(
                     get_device_properties,
                     client,
                     device_id=target_device_id,
@@ -959,7 +930,7 @@ async def diagnose(
 
         # 3. Correlated alerts
         try:
-            corr = await _call_sub_tool(
+            corr = await call_sub_tool(
                 correlate_alerts,
                 client,
                 hours_back=4,
@@ -970,7 +941,7 @@ async def diagnose(
 
         # 4. Change correlation
         try:
-            changes = await _call_sub_tool(
+            changes = await call_sub_tool(
                 correlate_changes,
                 client,
                 hours_back=4,
@@ -982,7 +953,7 @@ async def diagnose(
         # 5. Blast radius
         if target_device_id is not None:
             try:
-                blast = await _call_sub_tool(
+                blast = await call_sub_tool(
                     analyze_blast_radius,
                     client,
                     device_id=target_device_id,
@@ -1307,7 +1278,7 @@ async def update_logicmodule(
         export_handler = get_tool_handler(export_name)
         update_handler = get_tool_handler(update_name)
 
-        current = await _call_sub_tool(export_handler, client, **{id_arg: id})
+        current = await call_sub_tool(export_handler, client, **{id_arg: id})
         # DO NOT use `.get("definition") or current` -- an empty dict definition
         # is falsy and would silently fall through to the envelope wrapper.
         # `.get(key, default)` returns the value when key is present (even if
@@ -1357,7 +1328,7 @@ async def update_logicmodule(
             len(diff),
         )
         try:
-            result = await _call_sub_tool(
+            result = await call_sub_tool(
                 update_handler, client, **{id_arg: id, "definition": merged}
             )
         except Exception as exc:
@@ -1430,7 +1401,7 @@ async def detect_site_outage(
         warnings: list[str] = []
 
         # Scope: enumerate devices in the group once.
-        devices_data = await _call_sub_tool(
+        devices_data = await call_sub_tool(
             get_devices,
             client,
             group_id=group_id,
@@ -1450,7 +1421,7 @@ async def detect_site_outage(
         collector_probe_failures: list[str] = []
         for cid in collector_ids:
             try:
-                health_data = await _call_sub_tool(
+                health_data = await call_sub_tool(
                     get_collector_health,
                     client,
                     collector_id=cid,
@@ -1474,7 +1445,7 @@ async def detect_site_outage(
         # Signal B: mass interface-down burst in the window.
         burst_signal: dict | None = None
         try:
-            burst_data = await _call_sub_tool(
+            burst_data = await call_sub_tool(
                 detect_alert_burst,
                 client,
                 group_id=group_id,
@@ -1492,7 +1463,7 @@ async def detect_site_outage(
         power_events_count = 0
         power_events_preview: list[dict] = []
         try:
-            power_data = await _call_sub_tool(
+            power_data = await call_sub_tool(
                 get_power_events,
                 client,
                 group_id=group_id,
@@ -1716,14 +1687,14 @@ async def audit_network_monitoring_coverage(
 
         warnings: list[str] = []
 
-        devices_data = await _call_sub_tool(
+        devices_data = await call_sub_tool(
             get_devices,
             client,
             group_id=group_id,
             limit=1000,
         )
         devices = devices_data.get("devices", [])
-        collectors_data = await _call_sub_tool(get_collectors, client, limit=200)
+        collectors_data = await call_sub_tool(get_collectors, client, limit=200)
         collectors = collectors_data.get("collectors", [])
 
         inventory = _build_inventory(devices, collectors)
