@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "SEVERITY_MAP",
     "SEVERITY_NAMES",
+    "call_sub_tool",
     "format_response",
     "handle_error",
     "normalize_definition_fields",
@@ -27,6 +28,7 @@ __all__ = [
     "resolve_group_filter",
     "safe_total",
     "sanitize_filter_value",
+    "validation_error",
 ]
 
 # Severity name-to-integer mapping used by alert, trace, and scoring tools
@@ -267,6 +269,75 @@ def handle_error(error: Exception) -> list[TextContent]:
             "message": str(error),
         }
     )
+
+
+async def call_sub_tool(handler: Callable[..., Any], client: Any, **kwargs: Any) -> Any:
+    """Call a sub-handler, parse JSON response, raise RuntimeError on error.
+
+    Handles both structured JSON responses and the human-readable error
+    format ``format_response`` produces for error dicts
+    ("Error: <message>\\nSuggestion: <suggestion>"). Converts either shape
+    into a clean RuntimeError for the composite caller instead of a
+    cryptic JSONDecodeError ("Expecting value: line 1 column 1 (char 0)").
+
+    Args:
+        handler: Async tool function. Must accept ``client`` as first arg.
+        client: LogicMonitor API client passed through to the handler.
+        **kwargs: Forwarded to the handler.
+
+    Returns:
+        Parsed JSON payload from the sub-tool. For list/dict payloads the
+        parsed structure is returned directly.
+
+    Raises:
+        RuntimeError: When the sub-tool returns an error envelope, a
+            human-readable "Error: ..." line, or non-JSON text.
+    """
+    result = await handler(client, **kwargs)
+    text = result[0].text
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        if text.startswith("Error:"):
+            first_line = text.split("\n", 1)[0]
+            message = first_line[len("Error:") :].strip() or "Sub-tool returned an error"
+            raise RuntimeError(message) from None
+        snippet = text[:200]
+        raise RuntimeError(f"Sub-tool returned non-JSON response: {snippet}") from None
+
+    if isinstance(data, dict) and data.get("error"):
+        raise RuntimeError(data.get("message", "Sub-tool returned an error"))
+    return data
+
+
+def validation_error(
+    code: str,
+    message: str,
+    suggestion: str | None = None,
+) -> list[TextContent]:
+    """Return a canonical input-validation error response.
+
+    Use for argument validation that fails before any API call. Produces
+    the same envelope shape as :func:`handle_error` so callers see a
+    consistent structure regardless of where the error originated.
+
+    Args:
+        code: UPPER_SNAKE_CASE machine-readable code, e.g. ``VALIDATION_ERROR``.
+        message: Human-readable description of the failure.
+        suggestion: Optional remediation hint shown to the caller.
+
+    Returns:
+        List with a single TextContent carrying the formatted error envelope.
+    """
+    payload: dict[str, Any] = {
+        "error": True,
+        "code": code,
+        "message": message,
+    }
+    if suggestion:
+        payload["suggestion"] = suggestion
+    return format_response(payload)
 
 
 def require_write_permission(func: F) -> F:

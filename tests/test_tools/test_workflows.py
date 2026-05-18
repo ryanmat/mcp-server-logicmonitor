@@ -10,8 +10,8 @@ import pytest
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import call_sub_tool
 from lm_mcp.tools.workflows import (
-    _call_sub_tool,
     _resolve_device,
     _trim_detail,
     capacity_plan,
@@ -819,7 +819,7 @@ class TestSearchTools:
 
 
 class TestCallSubTool:
-    """Direct tests for `_call_sub_tool` parse and error-handling behavior."""
+    """Direct tests for `call_sub_tool` parse and error-handling behavior."""
 
     async def test_happy_path_returns_parsed_json(self, client):
         from mcp.types import TextContent
@@ -827,13 +827,13 @@ class TestCallSubTool:
         async def handler(_client):
             return [TextContent(type="text", text=json.dumps({"ok": True, "n": 42}))]
 
-        data = await _call_sub_tool(handler, client)
+        data = await call_sub_tool(handler, client)
         assert data == {"ok": True, "n": 42}
 
     async def test_error_formatted_text_raises_runtime_error(self, client):
         """format_response renders errors as 'Error: ...' text, not JSON.
 
-        `_call_sub_tool` must detect that shape and raise a clean
+        `call_sub_tool` must detect that shape and raise a clean
         RuntimeError with the underlying message rather than leaking a
         JSONDecodeError from json.loads.
         """
@@ -848,7 +848,7 @@ class TestCallSubTool:
             ]
 
         with pytest.raises(RuntimeError, match="collector 999 not found"):
-            await _call_sub_tool(handler, client)
+            await call_sub_tool(handler, client)
 
     async def test_non_json_non_error_text_raises_with_snippet(self, client):
         """Truly unexpected text (neither JSON nor 'Error:') surfaces a snippet."""
@@ -858,7 +858,7 @@ class TestCallSubTool:
             return [TextContent(type="text", text="<html>gateway timeout</html>")]
 
         with pytest.raises(RuntimeError, match="non-JSON response"):
-            await _call_sub_tool(handler, client)
+            await call_sub_tool(handler, client)
 
     async def test_dict_with_error_field_raises(self, client):
         """A parsed dict carrying {'error': True} still triggers RuntimeError."""
@@ -873,7 +873,7 @@ class TestCallSubTool:
             ]
 
         with pytest.raises(RuntimeError, match="nope"):
-            await _call_sub_tool(handler, client)
+            await call_sub_tool(handler, client)
 
 
 # ---------------------------------------------------------------------------
