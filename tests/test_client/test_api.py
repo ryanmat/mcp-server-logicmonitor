@@ -611,3 +611,103 @@ class TestResponseBodyErrorDetection:
             result = await client.post("/test", json_body={"name": "test"})
 
         assert result["id"] == 42
+
+
+class _RecordingAuth:
+    """AuthProvider double that records the body string the client signs."""
+
+    def __init__(self) -> None:
+        self.captured_body: str | None = None
+        self.calls: list[tuple[str, str, str]] = []
+
+    def get_auth_headers(self, method: str, resource_path: str, body: str = "") -> dict[str, str]:
+        self.captured_body = body
+        self.calls.append((method, resource_path, body))
+        return {"Authorization": "LMv1 stub"}
+
+
+class TestRequestBodyAuthSignature:
+    """Regression tests for the LMv1 HMAC empty-body signature drift.
+
+    Background: ``body_str = json.dumps(json_body) if json_body else ""`` treats
+    ``{}`` as falsy and signs against ``""`` while httpx still sends ``"{}"``
+    over the wire. LMv1 portals reject the resulting signature mismatch with 401.
+    The fix uses ``is not None`` so an empty dict still serializes to ``"{}"``.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_empty_dict_body_signs_curly_braces(self):
+        """POST with json_body={} signs the body string ``{}``, not ``""``."""
+        from lm_mcp.client import LogicMonitorClient
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/test/recover").mock(
+            return_value=Response(200, json={"ok": True})
+        )
+
+        auth = _RecordingAuth()
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            await client.post("/test/recover", json_body={})
+
+        assert auth.captured_body == "{}"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_none_body_signs_empty_string(self):
+        """GET with no body still signs ``""`` -- regression guard against over-eager fix."""
+        from lm_mcp.client import LogicMonitorClient
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=Response(200, json={"items": []})
+        )
+
+        auth = _RecordingAuth()
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            await client.get("/alert/alerts")
+
+        assert auth.captured_body == ""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_populated_body_signs_full_json(self):
+        """POST with a populated dict signs the full JSON-serialized body."""
+        from lm_mcp.client import LogicMonitorClient
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=Response(200, json={"id": 1})
+        )
+
+        auth = _RecordingAuth()
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+        ) as client:
+            await client.post("/sdt/sdts", json_body={"type": "DeviceSDT"})
+
+        assert auth.captured_body == '{"type": "DeviceSDT"}'
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ingest_post_empty_dict_body_signs_curly_braces(self):
+        """ingest_post parallel implementation must apply the same fix."""
+        from lm_mcp.client import LogicMonitorClient
+
+        respx.post("https://test.logicmonitor.com/rest/log/ingest").mock(
+            return_value=Response(202, json={"success": True})
+        )
+
+        auth = _RecordingAuth()
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+            ingest_url="https://test.logicmonitor.com",
+        ) as client:
+            await client.ingest_post("/rest/log/ingest", json_body={})
+
+        assert auth.captured_body == "{}"

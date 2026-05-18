@@ -296,7 +296,11 @@ class LogicMonitorClient:
             ServerError: For 5xx responses.
         """
         url = f"{self.base_url}{path}"
-        body_str = json.dumps(json_body) if json_body else ""
+        # ``json_body`` is checked against None rather than truthiness so that an
+        # empty dict ``{}`` still serializes to ``"{}"`` and matches the body
+        # httpx puts on the wire. LMv1 HMAC signs the body string verbatim, so
+        # a ``""`` vs ``"{}"`` mismatch produces 401 on LMv1 portals.
+        body_str = json.dumps(json_body) if json_body is not None else ""
         headers = self._get_headers(method, path, body_str)
 
         log_api_request(method, path, params)
@@ -517,7 +521,9 @@ class LogicMonitorClient:
             )
 
         url = f"{self.ingest_url}{path}"
-        body_str = json.dumps(json_body) if json_body else ""
+        # See note on ``request()`` -- empty body must serialize as ``"{}"`` so
+        # the LMv1 HMAC signature matches what httpx actually transmits.
+        body_str = json.dumps(json_body) if json_body is not None else ""
 
         # Build headers with auth for the ingest path
         headers = {
