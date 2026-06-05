@@ -13,6 +13,20 @@ lives on the dashboard's `widgetsConfig` keyed by widget id; the report schedule
 flat cron string, not a nested object) and extended to silent failures that corrupt
 health verdicts.
 
+### Added
+
+- **Server instructions** that steer the model to call `search_tools` first and point at
+  the composite workflow tools, so the large tool surface is navigated by search rather
+  than enumeration (the established pattern for large MCP servers).
+- **A tool-contract snapshot test** (`tests/test_tool_contract.py` against
+  `tests/fixtures/tool_list.json`) that fails on any accidental change to a tool name,
+  parameter, type, required field, description, or schema across all 280 tools.
+  Intentional changes regenerate the fixture with
+  `uv run python tests/test_tool_contract.py`.
+- A `WORKFLOW_TOOLS` membership guard (every tool implemented in `tools/workflows.py`
+  must be in the curated set), a `search_tools` coverage test (configured AWX/Terraform
+  tools are searchable), and a duplicate-tool-name guard.
+
 ### Fixed
 
 - **`create_dashboard(template=...)` silently dropped every widget.** The handler
