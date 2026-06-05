@@ -1578,14 +1578,14 @@ TOOLS.extend(
                     "group_id": {"type": "integer", "default": 1, "description": "Report group ID"},
                     "description": {"type": "string", "description": "Report description"},
                     "format": {"type": "string", "default": "PDF", "description": "Output format"},
-                    "schedule_enabled": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Enable schedule",
-                    },
                     "schedule_cron": {
                         "type": "string",
-                        "description": "Cron expression for schedule",
+                        "description": "Cron expression to schedule generation "
+                        "(omit for on-demand only)",
+                    },
+                    "schedule_timezone": {
+                        "type": "string",
+                        "description": "Schedule timezone (e.g. America/Los_Angeles)",
                     },
                 },
                 "required": ["name", "report_type"],
@@ -1599,10 +1599,15 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "report_id": {"type": "integer", "description": "Report ID to update"},
-                    "enabled": {"type": "boolean", "description": "Enable/disable schedule"},
-                    "schedule_type": {"type": "string", "description": "Schedule type"},
-                    "cron": {"type": "string", "description": "Cron expression"},
-                    "timezone": {"type": "string", "description": "Timezone"},
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Pass false to clear (disable) the schedule",
+                    },
+                    "cron": {"type": "string", "description": "Cron expression, e.g. 0 8 * * 1"},
+                    "timezone": {
+                        "type": "string",
+                        "description": "Schedule timezone -> scheduleTimezone",
+                    },
                 },
                 "required": ["report_id"],
             },

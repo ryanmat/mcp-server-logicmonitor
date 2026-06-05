@@ -16,6 +16,7 @@ from lm_mcp.tools import (
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
+    strip_readonly,
 )
 
 if TYPE_CHECKING:
@@ -59,11 +60,6 @@ _WIDGET_READONLY_FIELDS = (
     "lastUpdatedBy",
     "userPermission",
 )
-
-
-def _strip_readonly(payload: dict, fields: tuple[str, ...]) -> dict:
-    """Return a copy of ``payload`` with the given read-only fields removed."""
-    return {k: v for k, v in payload.items() if k not in fields}
 
 
 def _next_widget_row(config: dict) -> int:
@@ -305,7 +301,7 @@ async def create_dashboard(
         template_config: dict = {}
 
         if template:
-            payload = _strip_readonly(dict(template), _DASHBOARD_READONLY_FIELDS)
+            payload = strip_readonly(dict(template), _DASHBOARD_READONLY_FIELDS)
             payload.pop("id", None)
             # Widgets and their placement are recreated in follow-up calls, not on the
             # dashboard create body (which silently discards them).
@@ -351,7 +347,7 @@ async def create_dashboard(
             warnings: list[str] = []
             for widget in widgets_to_create:
                 old_id = widget.get("id")
-                body = _strip_readonly(dict(widget), _WIDGET_READONLY_FIELDS)
+                body = strip_readonly(dict(widget), _WIDGET_READONLY_FIELDS)
                 body.pop("id", None)
                 body["dashboardId"] = new_dashboard_id
                 try:
@@ -415,7 +411,7 @@ async def update_dashboard(
         # server-managed read-only fields so the PUT does not 400 on echoed values.
         current = await client.get(f"/dashboard/dashboards/{dashboard_id}")
 
-        payload = _strip_readonly(dict(current), _DASHBOARD_READONLY_FIELDS)
+        payload = strip_readonly(dict(current), _DASHBOARD_READONLY_FIELDS)
         if name is not None:
             payload["name"] = name
         if description is not None:
@@ -670,7 +666,7 @@ async def update_widget(
             # Preserve unmodified fields but drop server-managed read-only ones so the
             # PUT does not 400 on echoed values.
             current = await client.get(f"/dashboard/widgets/{widget_id}")
-            payload = _strip_readonly(dict(current), _WIDGET_READONLY_FIELDS)
+            payload = strip_readonly(dict(current), _WIDGET_READONLY_FIELDS)
             if name is not None:
                 payload["name"] = name
             if description is not None:

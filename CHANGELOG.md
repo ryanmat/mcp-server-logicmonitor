@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Dashboard and report correctness sweep. Surfaced while building a dashboard against a
 live portal; root causes confirmed against the LM v3 API shapes (widget placement
-lives on the dashboard's `widgetsConfig`, keyed by widget id).
+lives on the dashboard's `widgetsConfig`, keyed by widget id; the report schedule is a
+flat cron string, not a nested object).
 
 ### Fixed
 
@@ -44,6 +45,18 @@ lives on the dashboard's `widgetsConfig`, keyed by widget id).
   dashboard `widgetsConfig` PATCH. `update_dashboard` likewise strips dashboard
   read-only fields (`fullName`, `userPermission`, `groupName`, `groupFullPath`,
   `owner`) before its PUT.
+- **`run_report` posted to a nonexistent `/functions` endpoint** and 404'd on every v3
+  portal. It now triggers generation via `POST /report/reports/{id}/executions` and
+  returns the execution `taskId` and `resulturl` for polling.
+- **The report `schedule` was modeled as a nested dict, but the LM v3 field is a flat
+  string** (a cron expression; empty means unscheduled) with a separate
+  `scheduleTimezone` string. The dict model broke every path: `update_report_schedule`
+  raised `TypeError` (`'str' object does not support item assignment`) on a real
+  scheduled report, `get_scheduled_reports` raised `AttributeError` calling `.get()` on
+  a string, and `create_report` sent a wrong-typed body. `create_report`,
+  `update_report_schedule`, `get_scheduled_reports`, and `get_report` now use the flat
+  `schedule`/`scheduleTimezone` strings, and `update_report_schedule` strips report
+  read-only fields before its PUT.
 
 ### Changed
 
@@ -51,13 +64,24 @@ lives on the dashboard's `widgetsConfig`, keyed by widget id).
   `row_span`, and `col_span` as 1-indexed grid coordinates clamped to the 12-column
   grid. Omitting all placement on `add_widget` lets the portal auto-place the widget
   below existing ones.
+- `create_report` and `update_report_schedule` take a cron schedule string plus
+  `schedule_timezone` (replacing the prior nested-dict / `schedule_type` /
+  `schedule_enabled` parameters); `get_scheduled_reports` returns the `schedule` string
+  and `schedule_timezone`.
 
 ### Verified
 
 - Live-portal read validation of the `widgetsConfig` shape (dict keyed by widget id ->
-  {col, row, sizex, sizey}) on dashboards 3 and 15.
-- Full test suite green; ruff check and format clean. Dashboard mock fixtures corrected
-  from the prior list / `{"count": N}` shapes to the real keyed-by-id `widgetsConfig`.
+  {col, row, sizex, sizey}) on dashboards 3 and 15, and of the report
+  `schedule`/`scheduleTimezone` flat-string shape on reports 1, 2, and 6.
+- Live-portal write validation: a widget placed via `add_widget` persisted its position
+  and an `export_dashboard` -> `create_dashboard` clone round-tripped its widget;
+  `run_report` reached the executions endpoint and a cron written via
+  `update_report_schedule` stored `schedule="0 8 * * 1"` + `scheduleTimezone` (report 6,
+  restored afterward).
+- Full test suite green; ruff check and format clean. Dashboard and report mock fixtures
+  corrected from the prior list / `{"count": N}` / nested-dict-schedule shapes to the
+  real API shapes.
 
 ## [3.8.3] - 2026-05-18
 

@@ -14,10 +14,25 @@ from lm_mcp.tools import (
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
+    strip_readonly,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+
+# Server-managed fields LogicMonitor sets on a report; strip before a PUT so echoed
+# read-only values do not trigger a 400.
+_REPORT_READONLY_FIELDS = (
+    "lastGenerateOn",
+    "lastGenerateSize",
+    "lastGeneratePages",
+    "lastmodifyUserId",
+    "lastmodifyUserName",
+    "userPermission",
+    "typeAlias",
+    "customReportTypeName",
+)
 
 
 async def get_reports(
@@ -132,6 +147,7 @@ async def get_report(
             "format": result.get("format"),
             "delivery": result.get("delivery"),
             "schedule": result.get("schedule"),
+            "schedule_timezone": result.get("scheduleTimezone"),
             "date_range": result.get("dateRange"),
             "recipients": [
                 {
@@ -207,33 +223,38 @@ async def run_report(
     report_id: int,
     notify_email: str | None = None,
 ) -> list[TextContent]:
-    """Run/execute a report.
+    """Run/execute a report now.
+
+    Triggers an on-demand generation via the report executions endpoint
+    (``POST /report/reports/{id}/executions``). The returned id can be polled at
+    ``GET /report/reports/{id}/tasks/{taskId}``.
 
     Args:
         client: LogicMonitor API client.
         report_id: Report ID to execute.
-        notify_email: Optional email to notify when report completes.
+        notify_email: Optional recipient email(s) to notify when the report completes.
 
     Returns:
-        List of TextContent with task info or error.
+        List of TextContent with execution/task info or error.
     """
     try:
-        payload: dict = {
-            "type": "generateReport",
-            "reportId": report_id,
-        }
-
+        payload: dict = {}
         if notify_email:
             payload["receiveEmails"] = notify_email
 
-        result = await client.post("/functions", json_body=payload)
+        result = await client.post(f"/report/reports/{report_id}/executions", json_body=payload)
+
+        task_id = None
+        if isinstance(result, dict):
+            task_id = result.get("id") or result.get("taskId")
 
         return format_response(
             {
                 "success": True,
                 "report_id": report_id,
-                "task_id": result.get("taskId"),
-                "message": "Report generation started. Use task_id to check status.",
+                "task_id": task_id,
+                "execution": result,
+                "message": "Report generation started.",
             }
         )
     except Exception as e:
@@ -245,11 +266,16 @@ async def get_scheduled_reports(
     enabled_only: bool = False,
     limit: int = 50,
 ) -> list[TextContent]:
-    """Get reports with schedules configured.
+    """Get reports that have a schedule configured.
+
+    The LM report ``schedule`` is a single string (a cron expression; an empty string
+    means the report is not scheduled), with the timezone in ``scheduleTimezone``. A
+    report is considered scheduled when ``schedule`` is non-empty.
 
     Args:
         client: LogicMonitor API client.
-        enabled_only: Only return reports with enabled schedules.
+        enabled_only: Accepted for compatibility; a non-empty schedule is already an
+            active schedule, so this does not further filter.
         limit: Maximum number of reports to return.
 
     Returns:
@@ -264,18 +290,13 @@ async def get_scheduled_reports(
         for item in result.get("items", []):
             schedule = item.get("schedule")
             if schedule:
-                if enabled_only and not schedule.get("enabled", False):
-                    continue
                 scheduled.append(
                     {
                         "id": item.get("id"),
                         "name": item.get("name"),
                         "type": item.get("type"),
-                        "schedule_enabled": schedule.get("enabled", False),
-                        "schedule_type": schedule.get("type"),
-                        "schedule_cron": schedule.get("cron"),
-                        "timezone": schedule.get("timezone"),
-                        "next_run": schedule.get("nextRunTime"),
+                        "schedule": schedule,
+                        "schedule_timezone": item.get("scheduleTimezone"),
                         "last_generated": item.get("lastGenerateOn"),
                     }
                 )
@@ -296,41 +317,39 @@ async def update_report_schedule(
     client: LogicMonitorClient,
     report_id: int,
     enabled: bool | None = None,
-    schedule_type: str | None = None,
     cron: str | None = None,
     timezone: str | None = None,
 ) -> list[TextContent]:
-    """Update a report's schedule configuration.
+    """Update a report's schedule.
+
+    The LM report schedule is a single ``schedule`` string (a cron expression; an empty
+    string disables it) plus a ``scheduleTimezone`` string -- not a nested object.
 
     Args:
         client: LogicMonitor API client.
         report_id: Report ID to update.
-        enabled: Enable or disable the schedule.
-        schedule_type: Schedule type (daily, weekly, monthly, custom).
-        cron: Cron expression for custom schedules.
-        timezone: Timezone for schedule (e.g., America/Los_Angeles).
+        enabled: Pass False to clear the schedule (disable). True with ``cron`` sets one;
+            True alone keeps the existing cron.
+        cron: Cron expression for the schedule (e.g. ``"0 8 * * 1"``).
+        timezone: Schedule timezone (e.g. America/Los_Angeles) -> scheduleTimezone.
 
     Returns:
-        List of TextContent with updated schedule or error.
+        List of TextContent with the updated schedule or error.
     """
     try:
-        # Get current report to preserve other fields
+        # Fetch the current report and preserve its fields, dropping read-only ones so
+        # the PUT does not 400 on echoed server-managed values.
         current = await client.get(f"/report/reports/{report_id}")
+        payload = strip_readonly(dict(current), _REPORT_READONLY_FIELDS)
 
-        schedule = current.get("schedule", {}) or {}
-
-        if enabled is not None:
-            schedule["enabled"] = enabled
-        if schedule_type is not None:
-            schedule["type"] = schedule_type
+        if enabled is False:
+            payload["schedule"] = ""
         if cron is not None:
-            schedule["cron"] = cron
+            payload["schedule"] = cron
         if timezone is not None:
-            schedule["timezone"] = timezone
+            payload["scheduleTimezone"] = timezone
 
-        current["schedule"] = schedule
-
-        result = await client.put(f"/report/reports/{report_id}", json_body=current)
+        result = await client.put(f"/report/reports/{report_id}", json_body=payload)
 
         return format_response(
             {
@@ -340,6 +359,7 @@ async def update_report_schedule(
                     "id": result.get("id"),
                     "name": result.get("name"),
                     "schedule": result.get("schedule"),
+                    "schedule_timezone": result.get("scheduleTimezone"),
                 },
             }
         )
@@ -355,10 +375,13 @@ async def create_report(
     group_id: int = 1,
     description: str | None = None,
     format: str = "PDF",
-    schedule_enabled: bool = False,
     schedule_cron: str | None = None,
+    schedule_timezone: str | None = None,
 ) -> list[TextContent]:
     """Create a new report.
+
+    To schedule the report, pass ``schedule_cron`` (a cron expression); the LM report
+    ``schedule`` field is that string, with the timezone in ``scheduleTimezone``.
 
     Args:
         client: LogicMonitor API client.
@@ -367,8 +390,8 @@ async def create_report(
         group_id: Report group ID (default: 1 for root).
         description: Report description.
         format: Output format (PDF, CSV, HTML).
-        schedule_enabled: Enable scheduled generation.
-        schedule_cron: Cron expression for schedule.
+        schedule_cron: Cron expression to schedule generation (omit for on-demand only).
+        schedule_timezone: Schedule timezone (e.g. America/Los_Angeles).
 
     Returns:
         List of TextContent with created report or error.
@@ -383,13 +406,10 @@ async def create_report(
 
         if description:
             payload["description"] = description
-
-        if schedule_enabled and schedule_cron:
-            payload["schedule"] = {
-                "enabled": True,
-                "type": "custom",
-                "cron": schedule_cron,
-            }
+        if schedule_cron:
+            payload["schedule"] = schedule_cron
+        if schedule_timezone:
+            payload["scheduleTimezone"] = schedule_timezone
 
         result = await client.post("/report/reports", json_body=payload)
 
