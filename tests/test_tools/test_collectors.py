@@ -404,6 +404,35 @@ class TestGetCollectorHealth:
         assert data["collectors"][0]["active_collector_down_alerts"] == 1
 
     @respx.mock
+    async def test_alert_query_failure_surfaces_unknown_down_signal(self, client):
+        """A failed CollectorDown query is surfaced, not reported as zero collectors down."""
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/3").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 3, "hostname": "col-03", "status": "normal", "numberOfHosts": 10},
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 10})
+        )
+        # The CollectorDown alert query fails (e.g. 500/429/403).
+        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "boom"})
+        )
+
+        result = await get_collector_health(client, collector_id=3)
+        data = json.loads(result[0].text)
+
+        # The down signal is unknown, surfaced as such -- not a confident zero.
+        assert data["collectors_down_signal_unavailable"] == 1
+        assert "undercounted" in data["warning"]
+        col = data["collectors"][0]
+        assert col["down_signal_unavailable"] is True
+        assert col["active_collector_down_alerts"] == 0
+
+    @respx.mock
     async def test_lists_all_collectors_when_no_scope(self, client):
         from lm_mcp.tools.collectors import get_collector_health
 

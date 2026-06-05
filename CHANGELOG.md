@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.9.0] - Unreleased
 
-Dashboard and report correctness sweep. Surfaced while building a dashboard against a
-live portal; root causes confirmed against the LM v3 API shapes (widget placement
-lives on the dashboard's `widgetsConfig`, keyed by widget id; the report schedule is a
-flat cron string, not a nested object).
+Correctness and reliability sweep. Started from dashboard/report bugs hit against a
+live portal (root causes confirmed against the LM v3 API shapes -- widget placement
+lives on the dashboard's `widgetsConfig` keyed by widget id; the report schedule is a
+flat cron string, not a nested object) and extended to silent failures that corrupt
+health verdicts.
 
 ### Fixed
 
@@ -57,6 +58,24 @@ flat cron string, not a nested object).
   `update_report_schedule`, `get_scheduled_reports`, and `get_report` now use the flat
   `schedule`/`scheduleTimezone` strings, and `update_report_schedule` strips report
   read-only fields before its PUT.
+- **Three health-verdict signals were silently zeroed on API failure**, none logged:
+  - `get_collector_health` returned `active_collector_down_alerts: 0` (and
+    `is_down: false`) whenever the CollectorDown alert query failed, so a real outage
+    could read `collectors_down: 0`. The probe now returns "unknown" instead of 0 on
+    failure, sets a per-collector `down_signal_unavailable` flag plus a top-level
+    `collectors_down_signal_unavailable` count and warning, and logs the exception.
+  - `analyze_blast_radius` treated a failed neighbor lookup as "no neighbors" and a
+    failed per-device alert lookup as `has_critical: false`, understating the blast
+    radius and reporting alerting devices as healthy. Failures are now logged, the
+    device is marked `alert_status_unavailable` with `has_critical: null`, and the
+    response carries a `degraded` flag.
+  - `get_remediation_history` turned a failed audit-log read (commonly a 403) into the
+    benign "no remediation execution records found" note, conflating "could not read"
+    with "nothing ran." It now logs the failure and returns a distinct
+    `audit_read_failed` note stating history is unavailable, not confirmed empty.
+- Added module loggers to `collectors`, `topology_analysis`, and `remediationsources`
+  so these degrade-on-failure paths log a stack trace before falling back (per the
+  no-silent-except rule).
 
 ### Changed
 
@@ -79,6 +98,9 @@ flat cron string, not a nested object).
   `run_report` reached the executions endpoint and a cron written via
   `update_report_schedule` stored `schedule="0 8 * * 1"` + `scheduleTimezone` (report 6,
   restored afterward).
+- New regression tests assert the degraded/unavailable surfacing for the three
+  silent-failure fixes (collector down-signal, blast-radius alert lookup, remediation
+  audit read).
 - Full test suite green; ruff check and format clean. Dashboard and report mock fixtures
   corrected from the prior list / `{"count": N}` / nested-dict-schedule shapes to the
   real API shapes.

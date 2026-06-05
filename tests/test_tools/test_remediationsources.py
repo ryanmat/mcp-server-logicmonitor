@@ -683,3 +683,35 @@ class TestGetRemediationHistory:
         data = json.loads(result[0].text)
         assert data["total_entries"] == 1
         assert "100" in data["entries"][0]["description"]
+
+    @respx.mock
+    async def test_audit_read_failure_is_not_reported_as_empty(self, client):
+        """A failed audit-log read is surfaced as unavailable, not confirmed-empty."""
+        from lm_mcp.tools.remediationsources import get_remediation_history
+
+        # The audit log query 403s (audit access is privileged).
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
+            return_value=httpx.Response(403, json={"errorMessage": "Permission denied"})
+        )
+
+        result = await get_remediation_history(client, host_id=100)
+        data = json.loads(result[0].text)
+
+        assert data["audit_read_failed"] is True
+        assert "UNAVAILABLE" in data["note"]
+        assert data["total_entries"] == 0
+
+    @respx.mock
+    async def test_empty_audit_log_reports_no_records(self, client):
+        """A successful but empty audit read reports the benign no-records note."""
+        from lm_mcp.tools.remediationsources import get_remediation_history
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
+            return_value=httpx.Response(200, json={"items": []})
+        )
+
+        result = await get_remediation_history(client, host_id=100)
+        data = json.loads(result[0].text)
+
+        assert "audit_read_failed" not in data
+        assert "No remediation execution records" in data["note"]
