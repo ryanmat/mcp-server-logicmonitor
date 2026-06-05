@@ -313,6 +313,31 @@ class TestImportEventsource:
         data = json.loads(result[0].text)
         assert data["imported_id"] == 3001
 
+    @respx.mock
+    async def test_import_eventsource_silent_failure(self, client, monkeypatch):
+        """An import returning no id and no error is surfaced as IMPORT_SILENT_FAILURE."""
+        from lm_mcp.tools.imports import import_eventsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        # 200 with neither id nor errorMessage (e.g. wrong definition format).
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/eventsources/importjson"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        result = await import_eventsource(client, definition={"name": "Bad"})
+
+        text = result[0].text
+        assert "Error:" in text
+        assert "silently failed" in text.lower()
+
 
 class TestImportPropertysource:
     """Tests for import_propertysource tool (v228 JSON import API)."""
@@ -615,6 +640,42 @@ class TestImportDatasourceErrorHandling:
 
         assert len(result) == 1
         assert "Error:" in result[0].text
+
+    @respx.mock
+    async def test_import_datasource_rest_format_redirects_to_create(self, client, monkeypatch):
+        """A REST/exported definition (wrong module type) redirects to create_datasource."""
+        from lm_mcp.tools.imports import import_datasource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        # The real rejection when a REST/exported definition is sent to importjson.
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                400,
+                json={
+                    "errorMessage": "The provided logic module JSON does not match the "
+                    "expected module type for this operation."
+                },
+            )
+        )
+
+        result = await import_datasource(
+            client, definition={"name": "Exported", "collectMethod": "script"}
+        )
+
+        text = result[0].text
+        assert "Error:" in text
+        assert "create_datasource" in text
+        assert "LM Exchange" in text
 
 
 class TestImportEnvelope:

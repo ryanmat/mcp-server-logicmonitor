@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,8 @@ from lm_mcp.tools import format_response, handle_error
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+logger = logging.getLogger(__name__)
 
 
 async def analyze_blast_radius(
@@ -41,6 +44,7 @@ async def analyze_blast_radius(
         affected_devices: list[dict] = []
         current_layer = [device_id]
         neighbor_map: dict[int, list[int]] = defaultdict(list)
+        neighbor_lookup_failures = 0
 
         for current_depth in range(1, depth + 1):
             next_layer = []
@@ -63,6 +67,10 @@ async def analyze_blast_radius(
                         )
                         neighbors = result.get("items", [])
                     except Exception:
+                        logger.exception(
+                            "blast radius: neighbor lookup failed for device %s", dev_id
+                        )
+                        neighbor_lookup_failures += 1
                         neighbors = []
 
                 for neighbor in neighbors:
@@ -94,6 +102,7 @@ async def analyze_blast_radius(
         # Check alert status of affected devices (cap at 50)
         devices_to_check = affected_devices[:50]
         critical_alert_count = 0
+        alert_check_failures = 0
         for dev in devices_to_check:
             try:
                 alert_result = await client.get(
@@ -109,8 +118,13 @@ async def analyze_blast_radius(
                 if dev["has_critical"]:
                     critical_alert_count += 1
             except Exception:
-                dev["active_alert_count"] = 0
-                dev["has_critical"] = False
+                logger.exception(
+                    "blast radius: alert lookup failed for device %s", dev["device_id"]
+                )
+                alert_check_failures += 1
+                dev["active_alert_count"] = None
+                dev["has_critical"] = None
+                dev["alert_status_unavailable"] = True
 
         # Identify critical path devices (appear as neighbors of multiple devices)
         path_counts: dict[int, int] = defaultdict(int)
@@ -135,16 +149,22 @@ async def analyze_blast_radius(
             affected_count * 10 + critical_alert_count * 15 + len(critical_path_devices) * 20,
         )
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "depth": depth,
-                "total_affected_devices": affected_count,
-                "blast_radius_score": blast_radius_score,
-                "affected_devices": affected_devices,
-                "critical_path_devices": critical_path_devices,
-                "critical_alert_count": critical_alert_count,
-            }
-        )
+        response: dict = {
+            "device_id": device_id,
+            "depth": depth,
+            "total_affected_devices": affected_count,
+            "blast_radius_score": blast_radius_score,
+            "affected_devices": affected_devices,
+            "critical_path_devices": critical_path_devices,
+            "critical_alert_count": critical_alert_count,
+        }
+        if neighbor_lookup_failures or alert_check_failures:
+            response["degraded"] = True
+            response["degraded_detail"] = (
+                f"{neighbor_lookup_failures} neighbor lookup(s) and "
+                f"{alert_check_failures} alert lookup(s) failed; the blast radius and "
+                "critical counts may be understated."
+            )
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

@@ -28,6 +28,20 @@ def client(auth):
     )
 
 
+@pytest.fixture
+def enable_writes(monkeypatch):
+    """Enable write operations for testing."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+    from importlib import reload
+
+    import lm_mcp.config
+
+    reload(lm_mcp.config)
+
+
 class TestGetReports:
     """Tests for get_reports tool."""
 
@@ -252,9 +266,9 @@ class TestRunReport:
 
         reload(lm_mcp.config)
 
-        respx.post("https://test.logicmonitor.com/santaba/rest/functions").mock(
-            return_value=httpx.Response(200, json={"taskId": "task-12345"})
-        )
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/report/reports/100/executions"
+        ).mock(return_value=httpx.Response(200, json={"id": 6789, "status": "running"}))
 
         result = await run_report(client, report_id=100, notify_email="user@example.com")
 
@@ -262,4 +276,158 @@ class TestRunReport:
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["report_id"] == 100
-        assert data["task_id"] == "task-12345"
+        assert data["task_id"] == 6789
+        # Email recipients are passed through to the executions body.
+        body = json.loads(route.calls[0].request.content)
+        assert body["receiveEmails"] == "user@example.com"
+
+
+class TestGetScheduledReports:
+    """Tests for get_scheduled_reports tool (schedule is a string, not a dict)."""
+
+    @respx.mock
+    async def test_returns_only_reports_with_nonempty_schedule(self, client):
+        """A report is scheduled when its schedule string is non-empty."""
+        from lm_mcp.tools.reports import get_scheduled_reports
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Scheduled",
+                            "type": "Alert",
+                            "schedule": "0 8 * * 1",
+                            "scheduleTimezone": "America/New_York",
+                            "lastGenerateOn": 1702500000,
+                        },
+                        {"id": 2, "name": "Unscheduled", "type": "Alert", "schedule": ""},
+                    ],
+                    "total": 2,
+                },
+            )
+        )
+
+        result = await get_scheduled_reports(client)
+
+        data = json.loads(result[0].text)
+        assert data["count"] == 1
+        assert data["scheduled_reports"][0]["id"] == 1
+        assert data["scheduled_reports"][0]["schedule"] == "0 8 * * 1"
+        assert data["scheduled_reports"][0]["schedule_timezone"] == "America/New_York"
+
+    @respx.mock
+    async def test_string_schedule_does_not_crash(self, client):
+        """A non-empty string schedule must not raise (the prior dict model did)."""
+        from lm_mcp.tools.reports import get_scheduled_reports
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [{"id": 9, "name": "S", "type": "Alert", "schedule": "manual"}],
+                    "total": 1,
+                },
+            )
+        )
+
+        result = await get_scheduled_reports(client)
+        data = json.loads(result[0].text)
+        assert data["count"] == 1
+        assert data["scheduled_reports"][0]["schedule"] == "manual"
+
+
+class TestUpdateReportSchedule:
+    """Tests for update_report_schedule tool."""
+
+    @respx.mock
+    async def test_writes_flat_schedule_string(self, client, enable_writes):
+        """Schedule is written as a flat string + scheduleTimezone, read-only stripped."""
+        from lm_mcp.tools.reports import update_report_schedule
+
+        # The current report comes back with schedule as a STRING (the real shape).
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "R",
+                    "type": "Alert",
+                    "schedule": "",
+                    "scheduleTimezone": "",
+                    "lastmodifyUserName": "admin",
+                    "userPermission": "write",
+                },
+            )
+        )
+        put_route = respx.put("https://test.logicmonitor.com/santaba/rest/report/reports/100").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 100,
+                    "name": "R",
+                    "schedule": "0 8 * * 1",
+                    "scheduleTimezone": "America/New_York",
+                },
+            )
+        )
+
+        result = await update_report_schedule(
+            client, report_id=100, cron="0 8 * * 1", timezone="America/New_York"
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        body = json.loads(put_route.calls[0].request.content)
+        assert body["schedule"] == "0 8 * * 1"
+        assert body["scheduleTimezone"] == "America/New_York"
+        # Read-only fields are stripped from the PUT body.
+        assert "lastmodifyUserName" not in body
+        assert "userPermission" not in body
+
+    @respx.mock
+    async def test_enabled_false_clears_schedule(self, client, enable_writes):
+        """enabled=False clears the schedule string."""
+        from lm_mcp.tools.reports import update_report_schedule
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports/100").mock(
+            return_value=httpx.Response(200, json={"id": 100, "name": "R", "schedule": "0 8 * * 1"})
+        )
+        put_route = respx.put("https://test.logicmonitor.com/santaba/rest/report/reports/100").mock(
+            return_value=httpx.Response(200, json={"id": 100, "schedule": ""})
+        )
+
+        await update_report_schedule(client, report_id=100, enabled=False)
+
+        body = json.loads(put_route.calls[0].request.content)
+        assert body["schedule"] == ""
+
+
+class TestCreateReport:
+    """Tests for create_report tool."""
+
+    @respx.mock
+    async def test_create_report_with_schedule_string(self, client, enable_writes):
+        """Schedule is sent as a flat string field, not a nested object."""
+        from lm_mcp.tools.reports import create_report
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+            return_value=httpx.Response(200, json={"id": 55, "name": "New", "type": "Alert"})
+        )
+
+        result = await create_report(
+            client,
+            name="New",
+            report_type="Alert",
+            schedule_cron="0 8 * * 1",
+            schedule_timezone="UTC",
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        body = json.loads(route.calls[0].request.content)
+        assert isinstance(body["schedule"], str)
+        assert body["schedule"] == "0 8 * * 1"
+        assert body["scheduleTimezone"] == "UTC"

@@ -711,3 +711,43 @@ class TestRequestBodyAuthSignature:
             await client.ingest_post("/rest/log/ingest", json_body={})
 
         assert auth.captured_body == "{}"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ingest_post_202_with_success_false_raises(self):
+        """A 202 whose body reports success:false is surfaced, not treated as success."""
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/rest/log/ingest").mock(
+            return_value=Response(202, json={"success": False, "message": "2 records rejected"})
+        )
+
+        auth = _RecordingAuth()
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+            ingest_url="https://test.logicmonitor.com",
+        ) as client:
+            with pytest.raises(LMError, match="2 records rejected"):
+                await client.ingest_post("/rest/log/ingest", json_body={"foo": "bar"})
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ingest_post_202_with_error_body_raises(self):
+        """A 202 carrying errorMessage+errorCode is surfaced as an error, not success."""
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import LMError
+
+        respx.post("https://test.logicmonitor.com/rest/log/ingest").mock(
+            return_value=Response(202, json={"errorMessage": "bad resourceId", "errorCode": 1400})
+        )
+
+        auth = _RecordingAuth()
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+            ingest_url="https://test.logicmonitor.com",
+        ) as client:
+            with pytest.raises(LMError):
+                await client.ingest_post("/rest/log/ingest", json_body={"foo": "bar"})

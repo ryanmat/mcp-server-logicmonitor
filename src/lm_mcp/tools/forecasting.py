@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
@@ -20,6 +21,8 @@ from lm_mcp.tools.stats_helpers import (
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+logger = logging.getLogger(__name__)
 
 
 async def forecast_metric(
@@ -216,7 +219,9 @@ async def _forecast_ttm(
 
         wx = get_watsonx_client()
         if wx is None:
-            return _forecast_linear_fallback(values, timestamps, threshold)
+            result = _forecast_linear_fallback(values, timestamps, threshold)
+            result["ttm_fallback_reason"] = "watsonx_not_configured"
+            return result
 
         return await ttm_forecast_helper(
             watsonx_client=wx,
@@ -224,8 +229,15 @@ async def _forecast_ttm(
             values=values,
             threshold=threshold,
         )
-    except Exception:
-        return _forecast_linear_fallback(values, timestamps, threshold)
+    except Exception as exc:
+        logger.warning(
+            "watsonx TTM forecast failed; falling back to linear regression: %s",
+            exc,
+            exc_info=True,
+        )
+        result = _forecast_linear_fallback(values, timestamps, threshold)
+        result["ttm_fallback_reason"] = f"watsonx_error: {exc}"
+        return result
 
 
 def _forecast_linear_fallback(

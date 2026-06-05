@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
@@ -19,6 +20,8 @@ from lm_mcp.tools import (
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+logger = logging.getLogger(__name__)
 
 
 async def get_remediationsources(
@@ -405,11 +408,14 @@ async def get_remediation_history(
             "filter": f"happenedOn>:{start_epoch}",
         }
 
+        audit_read_failed = False
         try:
             result = await client.get("/setting/accesslogs", params=params)
             items = result.get("items", [])
         except Exception:
+            logger.exception("remediation history: audit log read failed (host_id=%s)", host_id)
             items = []
+            audit_read_failed = True
 
         # Filter for remediation-related entries
         remediation_entries = []
@@ -452,7 +458,14 @@ async def get_remediation_history(
                 if len(serialized) <= 32768:
                     break
 
-        if not remediation_entries:
+        if audit_read_failed:
+            response["audit_read_failed"] = True
+            response["note"] = (
+                "Could not read the audit log (the /setting/accesslogs query failed, "
+                "commonly a permissions issue); remediation history is UNAVAILABLE, not "
+                "confirmed empty."
+            )
+        elif not remediation_entries:
             response["note"] = (
                 "No remediation execution records found in the audit log. "
                 "Entries may have aged out or remediation may not have been executed "

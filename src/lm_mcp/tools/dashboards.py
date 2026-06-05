@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
@@ -15,27 +17,97 @@ from lm_mcp.tools import (
     quote_filter_value,
     require_write_permission,
     sanitize_filter_value,
+    strip_readonly,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
+logger = logging.getLogger(__name__)
+
 
 def _count_widgets(item: dict) -> int:
-    """Extract widget count from a dashboard list item.
+    """Extract widget count from a dashboard record.
 
-    The API returns widgetsConfig in varying formats: a list of widget IDs,
-    a dict with a count key, or an empty dict/list. Use numOfWidgets when
-    available as it is the most reliable field on the list endpoint.
+    Prefer ``numOfWidgets`` when present (most reliable on the list endpoint).
+    Otherwise count ``widgetsConfig``, which real portals return as a dict keyed by
+    widget id ({"21": {...}, ...}) and which older callers passed as a list of ids. A
+    literal ``count`` key only appears in synthetic data; honor it if present.
     """
     if "numOfWidgets" in item:
-        return item["numOfWidgets"]
+        return int(item["numOfWidgets"])
     cfg = item.get("widgetsConfig")
+    if isinstance(cfg, dict):
+        count = cfg.get("count")
+        if isinstance(count, int):
+            return count
+        return len(cfg)
     if isinstance(cfg, list):
         return len(cfg)
-    if isinstance(cfg, dict) and "count" in cfg:
-        return cfg["count"]
     return 0
+
+
+# Server-managed fields that LogicMonitor rejects or ignores when echoed back on a
+# write; strip them before a PUT to avoid intermittent 400s.
+_DASHBOARD_READONLY_FIELDS = (
+    "fullName",
+    "userPermission",
+    "groupName",
+    "groupFullPath",
+    "owner",
+)
+_WIDGET_READONLY_FIELDS = (
+    "lastUpdatedOn",
+    "lastUpdatedBy",
+    "userPermission",
+)
+
+
+def _next_widget_row(config: dict) -> int:
+    """First row below every existing widget, so a new widget appends at the bottom.
+
+    ``config`` is the dashboard's widgetsConfig: a dict keyed by widget id whose
+    values are {col, row, sizex, sizey}.
+    """
+    if not isinstance(config, dict) or not config:
+        return 1
+    bottoms = [
+        pos.get("row", 1) + pos.get("sizey", 1) for pos in config.values() if isinstance(pos, dict)
+    ]
+    return max(bottoms) if bottoms else 1
+
+
+async def _place_widget(
+    client: LogicMonitorClient,
+    dashboard_id: int,
+    widget_id: int,
+    *,
+    col: int,
+    sizex: int,
+    sizey: int,
+    row: int | None = None,
+) -> dict:
+    """Write a widget's grid position into the parent dashboard's widgetsConfig.
+
+    Placement lives on the dashboard (keyed by widget id), not on the widget; the
+    ``/dashboard/widgets`` body silently discards columnIdx/rowSpan/colSpan. This
+    merges the one widget into the current widgetsConfig (preserving every sibling's
+    position) and PATCHes it back so the placement takes effect. Returns the position
+    written.
+    """
+    dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
+    config = dashboard.get("widgetsConfig")
+    if not isinstance(config, dict):
+        config = {}
+    if row is None:
+        row = _next_widget_row(config)
+    position = {"col": col, "row": row, "sizex": sizex, "sizey": sizey}
+    config[str(widget_id)] = position
+    await client.patch(
+        f"/dashboard/dashboards/{dashboard_id}",
+        json_body={"widgetsConfig": config},
+    )
+    return position
 
 
 async def get_dashboards(
@@ -157,17 +229,29 @@ async def get_dashboard_widgets(
 
         result = await client.get(f"/dashboard/dashboards/{dashboard_id}/widgets", params=params)
 
+        # Position (column/row/spans) lives on the parent dashboard's widgetsConfig
+        # keyed by widget id, not on the widget objects -- which is why these came back
+        # null before. Fetch the dashboard and map placement onto each widget.
+        dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
+        config = dashboard.get("widgetsConfig")
+        if not isinstance(config, dict):
+            config = {}
+
         widgets = []
         for item in result.get("items", []):
+            pos = config.get(str(item.get("id")))
+            if not isinstance(pos, dict):
+                pos = {}
             widgets.append(
                 {
                     "id": item.get("id"),
                     "name": item.get("name"),
                     "type": item.get("type"),
                     "description": item.get("description"),
-                    "column": item.get("columnIdx"),
-                    "row_span": item.get("rowSpan"),
-                    "col_span": item.get("colSpan"),
+                    "column": pos.get("col"),
+                    "row": pos.get("row"),
+                    "col_span": pos.get("sizex"),
+                    "row_span": pos.get("sizey"),
                 }
             )
 
@@ -192,13 +276,21 @@ async def create_dashboard(
     sharable: bool = True,
     widget_tokens: list[dict] | None = None,
     template: dict | None = None,
+    template_path: str | None = None,
 ) -> list[TextContent]:
-    """Create a new dashboard.
+    """Create a new dashboard, optionally cloning widgets from an exported template.
 
-    Supports creating from scratch or cloning from an exported dashboard template.
-    When using a template, the exported definition is used as the base payload with
-    the name overridden and the id stripped. Explicit parameters (group_id, description,
-    widget_tokens) override any values from the template.
+    The template (an exported dashboard definition from ``export_dashboard``) can be
+    passed inline via ``template`` or loaded by reference from a local file via
+    ``template_path`` -- the latter keeps a large exported definition out of the model
+    context. An ``export_dashboard`` envelope (``{..., "definition": {...}}``) is
+    unwrapped automatically. When the template has widgets, the shell is created first,
+    then each widget in ``widgets_full`` is recreated on the new dashboard and the
+    exported ``widgetsConfig`` placement is re-applied with the new widget ids. Explicit
+    parameters (group_id, description, widget_tokens) override template values.
+
+    There is no separate "import_dashboard": dashboards have no LM Exchange format, so
+    recreating an exported dashboard is a create, not an import.
 
     Args:
         client: LogicMonitor API client.
@@ -208,14 +300,36 @@ async def create_dashboard(
         sharable: Whether dashboard is sharable (default: True).
         widget_tokens: List of token dicts (e.g., [{"name": "##host##", "value": "server1"}]).
         template: Full dashboard definition to use as base (from export_dashboard).
+        template_path: Path to a local JSON file holding the dashboard definition or an
+            export_dashboard envelope. Ignored when ``template`` is provided.
 
     Returns:
         List of TextContent with created dashboard details or error.
     """
     try:
+        # Load the template by reference if a path was given (keeps a large exported
+        # definition out of the model context); unwrap an export_dashboard envelope.
+        if template is None and template_path:
+            with open(template_path, encoding="utf-8") as fh:
+                loaded = json.loads(fh.read())
+            if isinstance(loaded, dict) and isinstance(loaded.get("definition"), dict):
+                loaded = loaded["definition"]
+            template = loaded
+
+        widgets_to_create: list[dict] = []
+        template_config: dict = {}
+
         if template:
-            payload = dict(template)
+            payload = strip_readonly(dict(template), _DASHBOARD_READONLY_FIELDS)
             payload.pop("id", None)
+            # Widgets and their placement are recreated in follow-up calls, not on the
+            # dashboard create body (which silently discards them).
+            embedded = payload.pop("widgets_full", None) or payload.pop("widgets", None)
+            if isinstance(embedded, list):
+                widgets_to_create = [w for w in embedded if isinstance(w, dict)]
+            cfg = payload.pop("widgetsConfig", None)
+            if isinstance(cfg, dict):
+                template_config = cfg
             payload["name"] = name
             payload["groupId"] = group_id
             payload["sharable"] = sharable
@@ -235,18 +349,56 @@ async def create_dashboard(
                 payload["widgetTokens"] = widget_tokens
 
         result = await client.post("/dashboard/dashboards", json_body=payload)
+        new_dashboard_id = result.get("id")
 
-        return format_response(
-            {
-                "success": True,
-                "message": f"Dashboard '{name}' created successfully",
-                "dashboard": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "group_id": result.get("groupId"),
-                },
-            }
-        )
+        response: dict = {
+            "success": True,
+            "message": f"Dashboard '{name}' created successfully",
+            "dashboard": {
+                "id": new_dashboard_id,
+                "name": result.get("name"),
+                "group_id": result.get("groupId"),
+            },
+        }
+
+        if widgets_to_create and new_dashboard_id is not None:
+            id_map: dict[str, str] = {}
+            warnings: list[str] = []
+            for widget in widgets_to_create:
+                old_id = widget.get("id")
+                body = strip_readonly(dict(widget), _WIDGET_READONLY_FIELDS)
+                body.pop("id", None)
+                body["dashboardId"] = new_dashboard_id
+                try:
+                    created = await client.post("/dashboard/widgets", json_body=body)
+                except Exception as widget_error:
+                    # One bad widget must not abort the clone or vanish silently:
+                    # log the stack and surface a warning, then keep going.
+                    logger.exception(
+                        "create_dashboard: widget %r failed on dashboard %s",
+                        widget.get("name"),
+                        new_dashboard_id,
+                    )
+                    warnings.append(f"widget '{widget.get('name')}' failed: {widget_error}")
+                    continue
+                new_id = created.get("id")
+                if old_id is not None and new_id is not None:
+                    id_map[str(old_id)] = str(new_id)
+
+            # Re-apply placement keyed by the NEW widget ids.
+            new_config = {id_map[old]: pos for old, pos in template_config.items() if old in id_map}
+            if new_config:
+                await client.patch(
+                    f"/dashboard/dashboards/{new_dashboard_id}",
+                    json_body={"widgetsConfig": new_config},
+                )
+
+            response["widgets_created"] = len(id_map)
+            response["widgets_requested"] = len(widgets_to_create)
+            if warnings:
+                response["widget_warnings"] = warnings
+
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -274,10 +426,11 @@ async def update_dashboard(
         List of TextContent with updated dashboard details or error.
     """
     try:
-        # Get current dashboard to preserve unmodified fields
+        # Get current dashboard to preserve unmodified fields, stripping the
+        # server-managed read-only fields so the PUT does not 400 on echoed values.
         current = await client.get(f"/dashboard/dashboards/{dashboard_id}")
 
-        payload = dict(current)
+        payload = strip_readonly(dict(current), _DASHBOARD_READONLY_FIELDS)
         if name is not None:
             payload["name"] = name
         if description is not None:
@@ -324,7 +477,7 @@ async def delete_dashboard(
         # Get dashboard info first for confirmation message
         dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
         dashboard_name = dashboard.get("name", f"ID:{dashboard_id}")
-        widget_count = len(dashboard.get("widgetsConfig", []))
+        widget_count = _count_widgets(dashboard)
 
         await client.delete(f"/dashboard/dashboards/{dashboard_id}")
 
@@ -370,22 +523,29 @@ async def add_widget(
     dashboard_id: int,
     name: str,
     widget_type: str,
-    column_index: int = 0,
-    row_span: int = 1,
-    col_span: int = 6,
+    column_index: int | None = None,
+    row_span: int | None = None,
+    col_span: int | None = None,
+    row: int | None = None,
     description: str | None = None,
     config: dict | None = None,
 ) -> list[TextContent]:
     """Add a widget to a dashboard.
+
+    Placement (column_index, row, row_span, col_span) is written to the parent
+    dashboard's widgetsConfig, which is where LogicMonitor stores widget position; the
+    widget body itself discards those fields. When no placement is given the portal
+    auto-places the widget.
 
     Args:
         client: LogicMonitor API client.
         dashboard_id: Dashboard ID to add widget to.
         name: Widget name.
         widget_type: Widget type (e.g., cgraph, sgraph, text, html, alert, etc.).
-        column_index: Column position (0-11).
-        row_span: Number of rows to span.
-        col_span: Number of columns to span (1-12).
+        column_index: Start column, 1-12.
+        row_span: Height in rows.
+        col_span: Width in columns, 1-12.
+        row: Start row (defaults to below existing widgets).
         description: Widget description.
         config: Additional widget configuration (type-specific).
 
@@ -397,9 +557,6 @@ async def add_widget(
             "name": name,
             "type": widget_type,
             "dashboardId": dashboard_id,
-            "columnIdx": column_index,
-            "rowSpan": row_span,
-            "colSpan": col_span,
         }
 
         if description:
@@ -446,16 +603,38 @@ async def add_widget(
             json_body=payload,
         )
 
+        widget_id = result.get("id")
+        # Position is not accepted on the widget body; write it to the parent
+        # dashboard's widgetsConfig so the widget is actually placed (and does not
+        # overlap existing widgets). Only when the caller asked for a position --
+        # otherwise the portal auto-places the new widget.
+        position = None
+        position_requested = any(v is not None for v in (column_index, row, row_span, col_span))
+        if widget_id is not None and position_requested:
+            position = await _place_widget(
+                client,
+                dashboard_id,
+                widget_id,
+                col=min(12, max(1, column_index)) if column_index is not None else 1,
+                sizex=min(12, max(1, col_span)) if col_span is not None else 6,
+                sizey=max(1, row_span) if row_span is not None else 1,
+                row=row,
+            )
+
+        widget = {
+            "id": widget_id,
+            "name": result.get("name"),
+            "type": result.get("type"),
+            "dashboard_id": dashboard_id,
+        }
+        if position is not None:
+            widget["position"] = position
+
         return format_response(
             {
                 "success": True,
                 "message": f"Widget '{name}' added to dashboard {dashboard_id}",
-                "widget": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "type": result.get("type"),
-                    "dashboard_id": dashboard_id,
-                },
+                "widget": widget,
             }
         )
     except Exception as e:
@@ -470,11 +649,16 @@ async def update_widget(
     name: str | None = None,
     description: str | None = None,
     column_index: int | None = None,
+    row: int | None = None,
     row_span: int | None = None,
     col_span: int | None = None,
     config: dict | None = None,
 ) -> list[TextContent]:
-    """Update an existing widget.
+    """Update an existing widget's content and/or its placement.
+
+    Content fields (name, description, config) are written to the widget. Placement
+    (column_index, row, row_span, col_span) is written to the parent dashboard's
+    widgetsConfig, which is where LogicMonitor actually stores widget position.
 
     Args:
         client: LogicMonitor API client.
@@ -482,46 +666,74 @@ async def update_widget(
         widget_id: Widget ID to update.
         name: New widget name.
         description: New widget description.
-        column_index: New column position.
-        row_span: New row span.
-        col_span: New column span.
+        column_index: New start column (1-12).
+        row: New start row.
+        row_span: New height in rows.
+        col_span: New width in columns (1-12).
         config: Additional configuration to update.
 
     Returns:
         List of TextContent with updated widget details or error.
     """
     try:
-        # First get the current widget to preserve unmodified fields
-        current = await client.get(f"/dashboard/widgets/{widget_id}")
+        content_changed = name is not None or description is not None or bool(config)
+        position_changed = any(v is not None for v in (column_index, row, row_span, col_span))
 
-        payload = dict(current)
-        if name is not None:
-            payload["name"] = name
-        if description is not None:
-            payload["description"] = description
-        if column_index is not None:
-            payload["columnIdx"] = column_index
-        if row_span is not None:
-            payload["rowSpan"] = row_span
-        if col_span is not None:
-            payload["colSpan"] = col_span
-        if config:
-            payload.update(config)
+        widget_summary: dict = {"id": widget_id}
 
-        result = await client.put(
-            f"/dashboard/widgets/{widget_id}",
-            json_body=payload,
-        )
+        if content_changed:
+            # Preserve unmodified fields but drop server-managed read-only ones so the
+            # PUT does not 400 on echoed values.
+            current = await client.get(f"/dashboard/widgets/{widget_id}")
+            payload = strip_readonly(dict(current), _WIDGET_READONLY_FIELDS)
+            if name is not None:
+                payload["name"] = name
+            if description is not None:
+                payload["description"] = description
+            if config:
+                payload.update(config)
+
+            result = await client.put(
+                f"/dashboard/widgets/{widget_id}",
+                json_body=payload,
+            )
+            widget_summary = {
+                "id": result.get("id"),
+                "name": result.get("name"),
+                "type": result.get("type"),
+            }
+
+        if position_changed:
+            dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
+            config_map = dashboard.get("widgetsConfig")
+            if not isinstance(config_map, dict):
+                config_map = {}
+            pos = config_map.get(str(widget_id))
+            pos = dict(pos) if isinstance(pos, dict) else {}
+            if column_index is not None:
+                pos["col"] = min(12, max(1, column_index))
+            if row is not None:
+                pos["row"] = max(1, row)
+            if col_span is not None:
+                pos["sizex"] = min(12, max(1, col_span))
+            if row_span is not None:
+                pos["sizey"] = max(1, row_span)
+            pos.setdefault("col", 1)
+            pos.setdefault("row", _next_widget_row(config_map))
+            pos.setdefault("sizex", 6)
+            pos.setdefault("sizey", 1)
+            config_map[str(widget_id)] = pos
+            await client.patch(
+                f"/dashboard/dashboards/{dashboard_id}",
+                json_body={"widgetsConfig": config_map},
+            )
+            widget_summary["position"] = pos
 
         return format_response(
             {
                 "success": True,
                 "message": f"Widget {widget_id} updated",
-                "widget": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "type": result.get("type"),
-                },
+                "widget": widget_summary,
             }
         )
     except Exception as e:

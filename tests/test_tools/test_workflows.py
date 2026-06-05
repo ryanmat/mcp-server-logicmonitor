@@ -489,6 +489,42 @@ class TestCapacityPlan:
         assert len(data["datasources"]) == 1
         reset_config()
 
+    async def test_surfaces_forecast_failure(self, client, monkeypatch):
+        """A failing forecast sub-tool is surfaced as forecast_error, not a silent None."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
+        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+        from lm_mcp.config import reset_config
+
+        reset_config()
+
+        device_data = {"id": 1, "displayName": "server-01"}
+        ds_data = {"datasources": [{"id": 10, "name": "CPU"}]}
+        inst_data = {"instances": [{"id": 100, "name": "main"}]}
+        trend_data = {"classifications": {"cpu": {"classification": "stable"}}}
+        season_data = {"seasonality": {"cpu": {"is_seasonal": False}}}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_device", device_data),
+            _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
+            _patch_sub("lm_mcp.tools.metrics.get_device_instances", inst_data),
+            patch(
+                "lm_mcp.tools.forecasting.forecast_metric",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("ttm down"),
+            ),
+            _patch_sub("lm_mcp.tools.forecasting.classify_trend", trend_data),
+            _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
+        ):
+            result = await capacity_plan(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        inst0 = data["datasources"][0]["instances"][0]
+        assert inst0["forecast"] is None
+        assert "ttm down" in inst0["forecast_error"]
+        reset_config()
+
     async def test_required_tool_blocked(self, client, monkeypatch):
         """Capacity plan returns error when a required tool is disabled."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -765,6 +801,25 @@ class TestSearchTools:
         assert data["total"] > 0
         tool_names = [m["name"] for m in data["matches"]]
         assert "forecast_metric" in tool_names
+
+    async def test_configured_integration_tools_are_searchable(self, client):
+        """AWX/Terraform tools (conditional) become searchable when their client is set.
+
+        Regression for the drift where search_tools iterated only the core TOOLS list,
+        leaving the AWX/watsonx/Terraform tools unsearchable even when configured.
+        """
+        from unittest.mock import patch
+
+        # Not configured -> AWX tools are absent from the search corpus.
+        result = await search_tools(client, query="ansible job template")
+        names = [m["name"] for m in json.loads(result[0].text)["matches"]]
+        assert "get_job_templates" not in names
+
+        # Configured -> AWX tools are searchable.
+        with patch("lm_mcp.server.get_awx_client", return_value=object()):
+            result = await search_tools(client, query="ansible job template")
+        names = [m["name"] for m in json.loads(result[0].text)["matches"]]
+        assert "get_job_templates" in names
 
     async def test_category_filter(self, client):
         """Category filter restricts results to that category's tools."""

@@ -340,6 +340,16 @@ def validation_error(
     return format_response(payload)
 
 
+def strip_readonly(payload: dict, fields: tuple[str, ...]) -> dict:
+    """Return a copy of ``payload`` without the given server-managed read-only fields.
+
+    LogicMonitor rejects or ignores read-only fields echoed back on a write; stripping
+    them before a PUT avoids intermittent 400s. The field list is caller-supplied so it
+    stays specific to each resource.
+    """
+    return {k: v for k, v in payload.items() if k not in fields}
+
+
 def require_write_permission(func: F) -> F:
     """Decorator to enforce write permission check.
 

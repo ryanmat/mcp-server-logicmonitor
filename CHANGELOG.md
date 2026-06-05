@@ -5,6 +5,184 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-06-05
+
+Correctness and reliability sweep. Started from dashboard/report bugs hit against a
+live portal (root causes confirmed against the LM v3 API shapes -- widget placement
+lives on the dashboard's `widgetsConfig` keyed by widget id; the report schedule is a
+flat cron string, not a nested object) and extended to silent failures that corrupt
+health verdicts.
+
+### Added
+
+- **Server instructions** that steer the model to call `search_tools` first and point at
+  the composite workflow tools, so the large tool surface is navigated by search rather
+  than enumeration (the established pattern for large MCP servers).
+- **A tool-contract snapshot test** (`tests/test_tool_contract.py` against
+  `tests/fixtures/tool_list.json`) that fails on any accidental change to a tool name,
+  parameter, type, required field, description, or schema across all 280 tools.
+  Intentional changes regenerate the fixture with
+  `uv run python tests/test_tool_contract.py`.
+- A `WORKFLOW_TOOLS` membership guard (every tool implemented in `tools/workflows.py`
+  must be in the curated set), a `search_tools` coverage test (configured AWX/Terraform
+  tools are searchable), and a duplicate-tool-name guard.
+
+### Fixed
+
+- **`create_dashboard(template=...)` silently dropped every widget.** The handler
+  copied the exported definition into the create body and POSTed it once; the dashboard
+  create endpoint does not accept embedded widgets, so cloning an exported dashboard
+  produced an empty one (HTTP 200, `success: true`, zero widgets) while only
+  `widgetTokens` survived. `create_dashboard` now creates the shell, recreates each
+  widget from the template's `widgets_full` on the new dashboard (old id stripped, new
+  `dashboardId` set), and re-applies the exported `widgetsConfig` placement remapped to
+  the new widget ids. A single failed widget is logged with stack trace and surfaced as
+  a `widget_warnings` entry rather than aborting the clone or vanishing. This makes
+  `export_dashboard` -> `create_dashboard` round-trip widgets, not just the shell.
+- **`add_widget` silently discarded widget placement.** `columnIdx`/`rowSpan`/`colSpan`
+  were sent on the `/dashboard/widgets` body, which the API accepts and discards, so
+  every widget landed at the default cell and the position parameters were dead.
+  Placement lives on the parent dashboard's `widgetsConfig` (keyed by widget id);
+  `add_widget` now writes it there via a PATCH that preserves sibling positions, and
+  only when a position is requested (otherwise the portal auto-places). Added a `row`
+  parameter for explicit vertical placement.
+- **`get_dashboard_widgets` returned null `column`/`row_span`/`col_span` for every
+  widget.** It read those off the widget objects, which never carry them; it now sources
+  `column`/`row`/`col_span`/`row_span` from the parent dashboard's `widgetsConfig`.
+- **`get_dashboards` reported `widget_count: 0` for widget-bearing dashboards.**
+  `_count_widgets` only counted `widgetsConfig` as a list or a literal `count` key;
+  real portals return a dict keyed by widget id. It now counts the keyed dict, and the
+  same helper backs `delete_dashboard`'s count (previously `len(..., [])` on the wrong
+  default type).
+- **`update_widget` could 400 on echoed read-only fields and could not move a widget.**
+  Content updates now strip server-managed read-only fields (`lastUpdatedOn`,
+  `lastUpdatedBy`, `userPermission`) before the PUT; placement updates route to the
+  dashboard `widgetsConfig` PATCH. `update_dashboard` likewise strips dashboard
+  read-only fields (`fullName`, `userPermission`, `groupName`, `groupFullPath`,
+  `owner`) before its PUT.
+- **`run_report` posted to a nonexistent `/functions` endpoint** and 404'd on every v3
+  portal. It now triggers generation via `POST /report/reports/{id}/executions` and
+  returns the execution `taskId` and `resulturl` for polling.
+- **The report `schedule` was modeled as a nested dict, but the LM v3 field is a flat
+  string** (a cron expression; empty means unscheduled) with a separate
+  `scheduleTimezone` string. The dict model broke every path: `update_report_schedule`
+  raised `TypeError` (`'str' object does not support item assignment`) on a real
+  scheduled report, `get_scheduled_reports` raised `AttributeError` calling `.get()` on
+  a string, and `create_report` sent a wrong-typed body. `create_report`,
+  `update_report_schedule`, `get_scheduled_reports`, and `get_report` now use the flat
+  `schedule`/`scheduleTimezone` strings, and `update_report_schedule` strips report
+  read-only fields before its PUT.
+- **Three health-verdict signals were silently zeroed on API failure**, none logged:
+  - `get_collector_health` returned `active_collector_down_alerts: 0` (and
+    `is_down: false`) whenever the CollectorDown alert query failed, so a real outage
+    could read `collectors_down: 0`. The probe now returns "unknown" instead of 0 on
+    failure, sets a per-collector `down_signal_unavailable` flag plus a top-level
+    `collectors_down_signal_unavailable` count and warning, and logs the exception.
+  - `analyze_blast_radius` treated a failed neighbor lookup as "no neighbors" and a
+    failed per-device alert lookup as `has_critical: false`, understating the blast
+    radius and reporting alerting devices as healthy. Failures are now logged, the
+    device is marked `alert_status_unavailable` with `has_critical: null`, and the
+    response carries a `degraded` flag.
+  - `get_remediation_history` turned a failed audit-log read (commonly a 403) into the
+    benign "no remediation execution records found" note, conflating "could not read"
+    with "nothing ran." It now logs the failure and returns a distinct
+    `audit_read_failed` note stating history is unavailable, not confirmed empty.
+- Added module loggers to `collectors`, `topology_analysis`, and `remediationsources`
+  so these degrade-on-failure paths log a stack trace before falling back (per the
+  no-silent-except rule).
+- **MED/LOW silent-failure hardening** across degrade-on-failure paths, each now logged
+  before the fallback:
+  - `ingest_post` returned blanket success on an HTTP 202 even when the body reported
+    per-record rejections (silent ingestion data loss). It now inspects the 202 body
+    and raises on an error envelope or `success: false`.
+  - `correlate_changes` turned a failed audit/change-log read into "0 changes"; it now
+    sets `audit_read_failed` + a warning so "no changes" is not confused with "could
+    not read."
+  - the watsonx TTM forecast silently fell back to linear regression; it now logs the
+    failure and tags the result with `ttm_fallback_reason` (`watsonx_not_configured`
+    vs `watsonx_error: ...`).
+  - the `terraform` env-var build and the `get_collector_health` advisory fallbacks
+    (downstream device count, collector-down history) now log before degrading.
+- Added module loggers to `event_correlation`, `forecasting`, and `terraform`.
+- **Composite workflows no longer swallow sub-step failures silently.** In `triage`,
+  `health_check`/`diagnose`, and `capacity_plan`, eight bare
+  `except Exception: pass / continue / = None` blocks now log via the audit logger and
+  surface the failure: the higher-signal ones (blast radius, health score, datasource
+  and instance fetches) append to the response `warnings`, and the per-metric
+  `capacity_plan` analyses (forecast, trend, seasonality, change points) attach a
+  `<field>_error` alongside the `None` so a failure is distinguishable from "no data."
+- **The empty/null-id import silent-failure guard now covers all eight `import_*`
+  tools.** Previously only `import_datasource` detected a 200 response with no id and no
+  error (the wrong-definition-format case); the other seven reported `imported_id: null`
+  as a success. All eight now route through a shared `_import_result_response` helper
+  that returns `IMPORT_SILENT_FAILURE` for that shape.
+- **Registration / discoverability drift.**
+  - `LM_MCP_CATEGORIES=workflow` (the documented Cursor 40-tool-cap workaround) silently
+    dropped `detect_site_outage` and `audit_network_monitoring_coverage`: the curated
+    `WORKFLOW_TOOLS` set was never updated when those v3.8.0 composites landed. Both are
+    now included.
+  - `search_tools` searched only the core `TOOLS` list, so the 29 AWX/watsonx/Terraform
+    tools were unsearchable even when configured (and `search_tools(category="ansible"
+    |"terraform"|"watsonx")` always returned empty). It now builds its corpus the same
+    way the server advertises tools.
+  - `recover_device` and `collect_device_config` mutate the portal but lacked a write
+    prefix, so they executed with no audit-log entry; `recover_`/`collect_` were added to
+    `WRITE_TOOL_PREFIXES`.
+  - Removed the dead, unreachable `ops.get_audit_logs` duplicate (the registry routes
+    `get_audit_logs` to the more specific `audit.get_audit_logs`).
+  - Corrected stale tool counts in the README (272/225/220 -> 280/240/280).
+- **`import_*` LogicModule tools now redirect REST/exported definitions to `create_*`.**
+  Feeding a REST API definition (from `export_<type>` or the API) to an `import_*` tool
+  made the importjson endpoint reject it with a generic "does not match the expected
+  module type" 400, and you had to already know to pivot to `create_*`. The `import_*`
+  tools now detect that rejection and return an actionable `IMPORT_FORMAT_MISMATCH` error
+  naming the matching `create_*` tool. (`import_*` accepts only LM Exchange JSON;
+  `export_*` yields REST format that `create_*` consumes -- the names mislead, so the
+  error now says so.)
+
+### Changed
+
+- `add_widget` and `update_widget` expose a `row` parameter and treat `column_index`,
+  `row_span`, and `col_span` as 1-indexed grid coordinates clamped to the 12-column
+  grid. Omitting all placement on `add_widget` lets the portal auto-place the widget
+  below existing ones.
+- `create_report` and `update_report_schedule` take a cron schedule string plus
+  `schedule_timezone` (replacing the prior nested-dict / `schedule_type` /
+  `schedule_enabled` parameters); `get_scheduled_reports` returns the `schedule` string
+  and `schedule_timezone`.
+- `create_dashboard` accepts a `template_path` to load the dashboard definition (or an
+  `export_dashboard` envelope) from a local file by reference, keeping a large export out
+  of the model context. There is intentionally no `import_dashboard` tool: dashboards
+  have no LM Exchange format, so recreating an export is a create, not an import.
+
+### Documentation
+
+- Slimmed the README from roughly 1380 to roughly 640 lines: the full tool catalog moved
+  to `documentation/tools.md`, the per-client configuration matrix to
+  `documentation/client-setup.md`, and the example-prompt list and What's New section were
+  trimmed. Full version history remains in this changelog.
+- `documentation/tools.md` is now generated from the tool registry and the
+  `lm://guide/tool-categories` index by `tests/test_tools_doc.py`. Drift guards fail the
+  suite when a tool is added without a category or when the committed doc is stale, so the
+  tool reference can no longer fall out of sync with the code.
+
+### Verified
+
+- Live-portal read validation of the `widgetsConfig` shape (dict keyed by widget id ->
+  {col, row, sizex, sizey}) on dashboards 3 and 15, and of the report
+  `schedule`/`scheduleTimezone` flat-string shape on reports 1, 2, and 6.
+- Live-portal write validation: a widget placed via `add_widget` persisted its position
+  and an `export_dashboard` -> `create_dashboard` clone round-tripped its widget;
+  `run_report` reached the executions endpoint and a cron written via
+  `update_report_schedule` stored `schedule="0 8 * * 1"` + `scheduleTimezone` (report 6,
+  restored afterward).
+- New regression tests assert the degraded/unavailable surfacing for the three
+  silent-failure fixes (collector down-signal, blast-radius alert lookup, remediation
+  audit read).
+- Full test suite green; ruff check and format clean. Dashboard and report mock fixtures
+  corrected from the prior list / `{"count": N}` / nested-dict-schedule shapes to the
+  real API shapes.
+
 ## [3.8.3] - 2026-05-18
 
 ### Fixed

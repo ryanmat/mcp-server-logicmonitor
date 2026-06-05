@@ -22,7 +22,16 @@ from lm_mcp.validation import infer_resource_type, validate_fields, validate_fil
 logger = logging.getLogger(__name__)
 
 # Create server instance
-server = Server("logicmonitor-platform")
+SERVER_INSTRUCTIONS = (
+    "This server exposes 280+ LogicMonitor tools, more than most clients load at once. "
+    "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
+    "`category`) first instead of enumerating the full list. Composite workflow tools -- "
+    "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
+    "`detect_site_outage` -- answer common multi-step investigations in a single call. "
+    "Write operations (create/update/delete/run) are gated behind "
+    "`LM_ENABLE_WRITE_OPERATIONS` and are absent unless the operator enabled them."
+)
+server = Server("logicmonitor-platform", instructions=SERVER_INSTRUCTIONS)
 
 # Global client (initialized on startup)
 _client: LogicMonitorClient | None = None

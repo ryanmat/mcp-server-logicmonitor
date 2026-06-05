@@ -55,6 +55,17 @@ class TestWriteToolPrefixDetection:
                 f"{tool} should not match a write prefix"
             )
 
+    def test_recover_and_collect_are_write_tools(self):
+        """recover_device and collect_device_config are detected as write tools.
+
+        Both mutate the portal but lacked a write prefix, so they executed without an
+        audit-log entry until recover_/collect_ were added to WRITE_TOOL_PREFIXES.
+        """
+        from lm_mcp.logging import is_write_tool
+
+        assert is_write_tool("recover_device")
+        assert is_write_tool("collect_device_config")
+
 
 class TestAwxWriteToolPrefixes:
     """Tests for AWX write tool prefix detection."""

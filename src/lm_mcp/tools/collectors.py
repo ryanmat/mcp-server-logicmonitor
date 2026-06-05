@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,8 @@ from lm_mcp.tools import (
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+logger = logging.getLogger(__name__)
 
 
 async def get_collectors(
@@ -255,16 +258,22 @@ async def get_collector_health(
             enriched.append(await _enrich_collector(client, col, include_history, history_days))
 
         down_count = sum(1 for c in enriched if c["is_down"])
+        unknown_signal = sum(1 for c in enriched if c.get("down_signal_unavailable"))
 
-        return format_response(
-            {
-                "total_collectors": len(enriched),
-                "collectors_down": down_count,
-                "include_history": include_history,
-                "history_days": history_days if include_history else None,
-                "collectors": enriched,
-            }
-        )
+        response: dict = {
+            "total_collectors": len(enriched),
+            "collectors_down": down_count,
+            "include_history": include_history,
+            "history_days": history_days if include_history else None,
+            "collectors": enriched,
+        }
+        if unknown_signal:
+            response["collectors_down_signal_unavailable"] = unknown_signal
+            response["warning"] = (
+                f"{unknown_signal} of {len(enriched)} collector(s) could not be checked "
+                "for active CollectorDown alerts; collectors_down may be undercounted."
+            )
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -294,15 +303,23 @@ async def _enrich_collector(
     except Exception:
         # Fall back to numberOfHosts from the collector record when the
         # devices filter is not supported.
+        logger.warning(
+            "collector %s: downstream device count query failed; using reported "
+            "numberOfHosts as fallback",
+            cid,
+            exc_info=True,
+        )
         downstream_count = num_hosts_reported
 
     active_collector_down = await _active_collector_down_count(client, hostname)
+    down_signal_unavailable = active_collector_down is None
+    active_down = active_collector_down or 0
 
     history: list[dict] = []
     if include_history and hostname:
         history = await _collector_down_history(client, hostname, history_days)
 
-    is_down = bool(active_collector_down) or _status_indicates_down(status)
+    is_down = bool(active_down) or _status_indicates_down(status)
 
     record: dict = {
         "id": cid,
@@ -314,9 +331,11 @@ async def _enrich_collector(
         "is_down": is_down,
         "downstream_device_count": downstream_count,
         "reported_numberOfHosts": num_hosts_reported,
-        "active_collector_down_alerts": active_collector_down,
+        "active_collector_down_alerts": active_down,
         "up_time_seconds": col.get("upTime"),
     }
+    if down_signal_unavailable:
+        record["down_signal_unavailable"] = True
     if include_history:
         record["collector_down_history"] = history
     return record
@@ -342,8 +361,13 @@ def _status_indicates_down(status: int | str | None) -> bool:
 async def _active_collector_down_count(
     client: LogicMonitorClient,
     hostname: str,
-) -> int:
-    """Count active CollectorDown alerts for a collector hostname."""
+) -> int | None:
+    """Count active CollectorDown alerts for a collector hostname.
+
+    Returns None (not 0) when the alert query fails, so the caller can distinguish "no
+    active CollectorDown alerts" from "could not determine" and avoid reporting a real
+    outage as zero collectors down.
+    """
     if not hostname:
         return 0
     try:
@@ -360,7 +384,11 @@ async def _active_collector_down_count(
             },
         )
     except Exception:
-        return 0
+        logger.exception(
+            "collector-down alert query failed for hostname=%s; down signal unavailable",
+            hostname,
+        )
+        return None
     return len(result.get("items", []))
 
 
@@ -384,6 +412,11 @@ async def _collector_down_history(
             },
         )
     except Exception:
+        logger.warning(
+            "collector history query failed for hostname=%s; returning empty history",
+            hostname,
+            exc_info=True,
+        )
         return []
 
     history: list[dict] = []

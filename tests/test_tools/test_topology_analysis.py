@@ -105,6 +105,26 @@ class TestAnalyzeBlastRadius:
         assert data["blast_radius_score"] == 0
 
     @respx.mock
+    async def test_alert_lookup_failure_marks_degraded(self, client):
+        """A failed per-device alert lookup is surfaced, not silently treated as healthy."""
+        from lm_mcp.tools.topology_analysis import analyze_blast_radius
+
+        respx.get(f"{BASE_URL}/topology/devices/1/neighbors").mock(
+            return_value=httpx.Response(200, json={"items": [{"id": 2, "displayName": "sw"}]})
+        )
+        # The per-device alert query fails -> the device's alert status is unknown.
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(500, json={"errorMessage": "boom"}))
+
+        result = await analyze_blast_radius(client, device_id=1, depth=1)
+
+        data = json.loads(result[0].text)
+        assert data["degraded"] is True
+        dev = data["affected_devices"][0]
+        assert dev["alert_status_unavailable"] is True
+        # Not a confident "healthy" -- the critical status is unknown.
+        assert dev["has_critical"] is None
+
+    @respx.mock
     async def test_depth_capped_at_three(self, client):
         """Depth is capped at maximum of 3."""
         from lm_mcp.tools.topology_analysis import analyze_blast_radius

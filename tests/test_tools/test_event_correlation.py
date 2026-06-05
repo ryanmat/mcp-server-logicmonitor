@@ -53,6 +53,22 @@ class TestCorrelateChanges:
         assert data["correlated_events"] == []
 
     @respx.mock
+    async def test_audit_read_failure_is_flagged(self, client):
+        """A failed audit-log read is surfaced as audit_read_failed, not silent zero changes."""
+        from lm_mcp.tools.event_correlation import correlate_changes
+
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        # The audit/change log read fails (e.g. 403 -- audit access is privileged).
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(403, json={"errorMessage": "denied"}))
+
+        result = await correlate_changes(client)
+
+        data = json.loads(result[0].text)
+        assert data["audit_read_failed"] is True
+        assert "unavailable" in data["warning"].lower()
+        assert data["total_changes"] == 0
+
+    @respx.mock
     async def test_change_followed_by_spike(self, client):
         """Change event followed by alert spike is correlated."""
         from lm_mcp.tools.event_correlation import correlate_changes

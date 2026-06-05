@@ -29,6 +29,78 @@ def _ensure_dict(definition: dict | str) -> dict:
     return definition
 
 
+def _import_result_response(result: dict, *, extra: dict | None = None) -> list[TextContent]:
+    """Format an import result, surfacing the empty/null-id silent-failure case.
+
+    The /importjson endpoints can return HTTP 200 with neither an id nor an
+    errorMessage when the definition is in the wrong format (e.g. REST API format
+    instead of LM Exchange format). Treat that as a failure rather than a success with
+    imported_id=None.
+    """
+    if result.get("id") is None and result.get("errorMessage") is None:
+        return format_response(
+            {
+                "error": True,
+                "code": "IMPORT_SILENT_FAILURE",
+                "message": "Import may have silently failed: the API returned no ID and "
+                "no error. Verify the definition is in LM Exchange format (not REST API "
+                "format); for REST API format use the matching create_* tool.",
+            }
+        )
+    payload: dict = {
+        "imported_id": result.get("id"),
+        "name": result.get("name"),
+    }
+    if extra:
+        payload.update(extra)
+    return format_response(payload)
+
+
+# LogicModule type -> the REST-format create_* tool that handles an exported definition.
+# jobmonitor and appliesto_function have no create_* counterpart.
+_CREATE_COUNTERPART: dict[str, str] = {
+    "datasource": "create_datasource",
+    "configsource": "create_configsource",
+    "eventsource": "create_eventsource",
+    "propertysource": "create_propertysource",
+    "logsource": "create_logsource",
+    "topologysource": "create_topologysource",
+}
+
+
+def _import_error_response(error: Exception, module_type: str) -> list[TextContent]:
+    """Redirect a REST-format / wrong-type import failure to the matching create_* tool.
+
+    import_* accepts only LM Exchange JSON. Feeding it a REST API definition (from
+    export_<type> or the API) makes the importjson endpoint reject it with "does not
+    match the expected module type"; the actionable fix is the create_* tool, so the
+    message names it instead of returning the generic HTTP 400.
+    """
+    if "expected module type" in str(error).lower():
+        create_tool = _CREATE_COUNTERPART.get(module_type)
+        if create_tool:
+            suggestion = (
+                f"If this definition came from export_{module_type} or the REST API it is "
+                f"REST format -- use {create_tool} with the same definition. "
+                f"import_{module_type} accepts only LM Exchange JSON (the portal's "
+                "'LM Exchange' export or a community module)."
+            )
+        else:
+            suggestion = (
+                f"import_{module_type} accepts only LM Exchange JSON. Verify the definition "
+                f"is a valid LM Exchange {module_type} module."
+            )
+        return format_response(
+            {
+                "error": True,
+                "code": "IMPORT_FORMAT_MISMATCH",
+                "message": f"The definition is not a valid LM Exchange {module_type} module.",
+                "suggestion": suggestion,
+            }
+        )
+    return handle_error(error)
+
+
 # LM Exchange "type" field values required by /importjson endpoints.
 _IMPORT_TYPE_MAP: dict[str, str] = {
     "datasource": "datasource",
@@ -357,27 +429,9 @@ async def import_datasource(
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
 
-        # Detect silent failures where the API returns empty or null-id responses
-        if result.get("id") is None and result.get("errorMessage") is None:
-            return format_response(
-                {
-                    "error": True,
-                    "code": "IMPORT_SILENT_FAILURE",
-                    "message": "Import may have silently failed. The API returned no "
-                    "ID or error. Verify the definition is in LM Exchange format "
-                    "(not REST API format). For REST API format, use create_datasource.",
-                }
-            )
-
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-                "display_name": result.get("displayName"),
-            }
-        )
+        return _import_result_response(result, extra={"display_name": result.get("displayName")})
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "datasource")
 
 
 @require_write_permission
@@ -406,14 +460,9 @@ async def import_configsource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "configsource")
 
 
 @require_write_permission
@@ -442,14 +491,9 @@ async def import_eventsource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "eventsource")
 
 
 @require_write_permission
@@ -478,14 +522,9 @@ async def import_propertysource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "propertysource")
 
 
 @require_write_permission
@@ -514,14 +553,9 @@ async def import_logsource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "logsource")
 
 
 @require_write_permission
@@ -550,14 +584,9 @@ async def import_topologysource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "topologysource")
 
 
 @require_write_permission
@@ -586,14 +615,9 @@ async def import_jobmonitor(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "jobmonitor")
 
 
 @require_write_permission
@@ -622,11 +646,6 @@ async def import_appliesto_function(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "appliesto_function")

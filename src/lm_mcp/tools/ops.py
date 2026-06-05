@@ -20,68 +20,6 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-async def get_audit_logs(
-    client: LogicMonitorClient,
-    username_filter: str | None = None,
-    keyword_filter: str | None = None,
-    limit: int = 50,
-) -> list[TextContent]:
-    """Get audit log entries from LogicMonitor.
-
-    Args:
-        client: LogicMonitor API client.
-        username_filter: Filter by username (supports wildcards).
-        keyword_filter: Filter by keyword in description.
-        limit: Maximum number of entries to return.
-
-    Returns:
-        List of TextContent with audit log data or error.
-    """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        filters = []
-        if username_filter:
-            clean_username, was_modified = sanitize_filter_value(username_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"username~{quote_filter_value(clean_username)}")
-        if keyword_filter:
-            clean_keyword, was_modified = sanitize_filter_value(keyword_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"_all~{quote_filter_value(clean_keyword)}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/accesslogs", params=params)
-
-        entries = []
-        for item in result.get("items", []):
-            entries.append(
-                {
-                    "id": item.get("id"),
-                    "username": item.get("username"),
-                    "description": item.get("description"),
-                    "happened_on": item.get("happenedOn"),
-                    "happened_on_local": item.get("happenedOnLocal"),
-                    "ip": item.get("ip"),
-                    "session_id": item.get("sessionId"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(entries),
-            "audit_logs": entries,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
-
-
 async def get_ops_notes(
     client: LogicMonitorClient,
     tag_filter: str | None = None,

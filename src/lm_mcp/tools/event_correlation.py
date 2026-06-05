@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 import time
 from collections import defaultdict
@@ -14,6 +15,8 @@ from lm_mcp.tools import format_response, handle_error
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+logger = logging.getLogger(__name__)
 
 
 async def correlate_changes(
@@ -55,11 +58,18 @@ async def correlate_changes(
             "filter": f"happenedOn>:{start_epoch}",
             "sort": "-happenedOn",
         }
+        audit_read_failed = False
         try:
             audit_result = await client.get("/setting/accesslogs", params=audit_params)
             changes = audit_result.get("items", [])
         except Exception:
+            logger.warning(
+                "correlate_changes: audit log read failed; change correlation "
+                "unavailable (treating as zero changes)",
+                exc_info=True,
+            )
             changes = []
+            audit_read_failed = True
 
         # Bucket alerts into 5-minute windows
         bucket_size = 300  # 5 minutes in seconds
@@ -150,17 +160,22 @@ async def correlate_changes(
             s for s in spike_buckets if s["timestamp"] not in correlated_spike_ts
         ]
 
-        return format_response(
-            {
-                "total_alerts": len(alerts),
-                "total_changes": len(changes),
-                "total_spikes": len(spike_buckets),
-                "correlated_events": correlated_events,
-                "uncorrelated_changes": uncorrelated_changes[:10],
-                "uncorrelated_spikes": uncorrelated_spikes[:10],
-                "hours_back": hours_back,
-                "correlation_window_minutes": correlation_window_minutes,
-            }
-        )
+        response = {
+            "total_alerts": len(alerts),
+            "total_changes": len(changes),
+            "total_spikes": len(spike_buckets),
+            "correlated_events": correlated_events,
+            "uncorrelated_changes": uncorrelated_changes[:10],
+            "uncorrelated_spikes": uncorrelated_spikes[:10],
+            "hours_back": hours_back,
+            "correlation_window_minutes": correlation_window_minutes,
+        }
+        if audit_read_failed:
+            response["audit_read_failed"] = True
+            response["warning"] = (
+                "Audit/change log read failed; change correlation is unavailable for "
+                "this window (no changes does NOT mean none occurred)."
+            )
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
