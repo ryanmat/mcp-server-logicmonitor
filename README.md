@@ -70,7 +70,11 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.8.3
+## What's New in v3.9.0
+
+**Minor.** Correctness and reliability sweep, every behavioral fix validated against a live portal. Dashboards and widgets now round-trip: widget placement persists via the dashboard `widgetsConfig` (keyed by widget id), `export_dashboard` -> `create_dashboard` recreates widgets and their layout, and `create_dashboard` gains a `template_path` to clone an exported definition from a file by reference. Reports run via the `/report/reports/{id}/executions` endpoint with the schedule modeled as a flat cron string plus `scheduleTimezone`. Silent failures that corrupted health verdicts (collector down-signal, blast radius, remediation history) and swallowed composite-workflow sub-steps now log a stack trace and surface a warning instead of degrading quietly. The eight `import_*` tools redirect REST/exported-JSON definitions to the matching `create_*` with `IMPORT_FORMAT_MISMATCH`, ending the import/create confusion. New server instructions steer the model to call `search_tools` first, and a tool-contract snapshot test guards all 280 tools against accidental name, parameter, or schema drift.
+
+### v3.8.3 — bug-class sweep
 
 **Patch.** Bug-class sweep across the tool surface. Fixes the diagnosticsource and remediationsource readers (HTTP 415 against the wrong path), an LMv1 HMAC signature mismatch on empty-body requests, a `JSONDecodeError` crash in `calculate_error_budget`, a wrong-math silent failure in `calculate_availability` when the device lookup 404s, missing `@require_write_permission` on `ingest_logs`/`push_metrics`, and bare error-string returns in `baselines.py`. Introduces `call_sub_tool` and `validation_error` as shared helpers in `lm_mcp.tools` so the v3.8.2 hardening pattern is usable outside `workflows.py`. CHANGELOG lists tracked follow-ups for the rest of the audit (pagination, naming, parity).
 
