@@ -90,6 +90,18 @@ health verdicts.
   - the `terraform` env-var build and the `get_collector_health` advisory fallbacks
     (downstream device count, collector-down history) now log before degrading.
 - Added module loggers to `event_correlation`, `forecasting`, and `terraform`.
+- **Composite workflows no longer swallow sub-step failures silently.** In `triage`,
+  `health_check`/`diagnose`, and `capacity_plan`, eight bare
+  `except Exception: pass / continue / = None` blocks now log via the audit logger and
+  surface the failure: the higher-signal ones (blast radius, health score, datasource
+  and instance fetches) append to the response `warnings`, and the per-metric
+  `capacity_plan` analyses (forecast, trend, seasonality, change points) attach a
+  `<field>_error` alongside the `None` so a failure is distinguishable from "no data."
+- **The empty/null-id import silent-failure guard now covers all eight `import_*`
+  tools.** Previously only `import_datasource` detected a 200 response with no id and no
+  error (the wrong-definition-format case); the other seven reported `imported_id: null`
+  as a success. All eight now route through a shared `_import_result_response` helper
+  that returns `IMPORT_SILENT_FAILURE` for that shape.
 
 ### Changed
 

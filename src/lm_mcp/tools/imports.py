@@ -29,6 +29,33 @@ def _ensure_dict(definition: dict | str) -> dict:
     return definition
 
 
+def _import_result_response(result: dict, *, extra: dict | None = None) -> list[TextContent]:
+    """Format an import result, surfacing the empty/null-id silent-failure case.
+
+    The /importjson endpoints can return HTTP 200 with neither an id nor an
+    errorMessage when the definition is in the wrong format (e.g. REST API format
+    instead of LM Exchange format). Treat that as a failure rather than a success with
+    imported_id=None.
+    """
+    if result.get("id") is None and result.get("errorMessage") is None:
+        return format_response(
+            {
+                "error": True,
+                "code": "IMPORT_SILENT_FAILURE",
+                "message": "Import may have silently failed: the API returned no ID and "
+                "no error. Verify the definition is in LM Exchange format (not REST API "
+                "format); for REST API format use the matching create_* tool.",
+            }
+        )
+    payload: dict = {
+        "imported_id": result.get("id"),
+        "name": result.get("name"),
+    }
+    if extra:
+        payload.update(extra)
+    return format_response(payload)
+
+
 # LM Exchange "type" field values required by /importjson endpoints.
 _IMPORT_TYPE_MAP: dict[str, str] = {
     "datasource": "datasource",
@@ -357,25 +384,7 @@ async def import_datasource(
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
 
-        # Detect silent failures where the API returns empty or null-id responses
-        if result.get("id") is None and result.get("errorMessage") is None:
-            return format_response(
-                {
-                    "error": True,
-                    "code": "IMPORT_SILENT_FAILURE",
-                    "message": "Import may have silently failed. The API returned no "
-                    "ID or error. Verify the definition is in LM Exchange format "
-                    "(not REST API format). For REST API format, use create_datasource.",
-                }
-            )
-
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-                "display_name": result.get("displayName"),
-            }
-        )
+        return _import_result_response(result, extra={"display_name": result.get("displayName")})
     except Exception as e:
         return handle_error(e)
 
@@ -406,12 +415,7 @@ async def import_configsource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -442,12 +446,7 @@ async def import_eventsource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -478,12 +477,7 @@ async def import_propertysource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -514,12 +508,7 @@ async def import_logsource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -550,12 +539,7 @@ async def import_topologysource(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -586,12 +570,7 @@ async def import_jobmonitor(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)
 
@@ -622,11 +601,6 @@ async def import_appliesto_function(
             definition=definition,
             params=_build_import_params(handle_conflict, fields_to_preserve),
         )
-        return format_response(
-            {
-                "imported_id": result.get("id"),
-                "name": result.get("name"),
-            }
-        )
+        return _import_result_response(result)
     except Exception as e:
         return handle_error(e)

@@ -268,8 +268,11 @@ async def triage(
                             "blast_radius": br,
                         }
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                _AUDIT.warning(
+                    "triage: blast radius failed for %s: %s", device_key, exc, exc_info=True
+                )
+                warnings.append(f"blast_radius for {device_key} failed: {exc}")
         report["blast_radius"] = blast_results
 
         # 5. Correlate changes
@@ -413,9 +416,19 @@ async def health_check(
                             "score": score,
                         }
                     )
-                except Exception:
-                    pass
-            except Exception:
+                except Exception as exc:
+                    _AUDIT.warning(
+                        "health: score failed for datasource %s: %s",
+                        ds.get("name", ds_id),
+                        exc,
+                        exc_info=True,
+                    )
+                    warnings.append(
+                        f"score_device_health for {ds.get('name', ds_id)} failed: {exc}"
+                    )
+            except Exception as exc:
+                _AUDIT.warning("health: datasource processing failed: %s", exc, exc_info=True)
+                warnings.append(f"datasource processing failed: {exc}")
                 continue
 
         report["health_scores"] = health_scores
@@ -572,7 +585,14 @@ async def capacity_plan(
                     device_datasource_id=ds_id,
                 )
                 instances = inst_data.get("instances", [])
-            except Exception:
+            except Exception as exc:
+                _AUDIT.warning(
+                    "capacity_plan: instance fetch failed for datasource %s: %s",
+                    ds.get("name", ds_id),
+                    exc,
+                    exc_info=True,
+                )
+                warnings.append(f"instance fetch for {ds.get('name', ds_id)} failed: {exc}")
                 instances = []
 
             for inst in instances[:3]:
@@ -597,8 +617,15 @@ async def capacity_plan(
                         **common_kwargs,
                     )
                     inst_report["forecast"] = fc
-                except Exception:
+                except Exception as exc:
+                    _AUDIT.warning(
+                        "capacity_plan: forecast failed for instance %s: %s",
+                        inst_id,
+                        exc,
+                        exc_info=True,
+                    )
                     inst_report["forecast"] = None
+                    inst_report["forecast_error"] = str(exc)
 
                 # Classify trend
                 try:
@@ -608,8 +635,15 @@ async def capacity_plan(
                         **common_kwargs,
                     )
                     inst_report["trend"] = trend
-                except Exception:
+                except Exception as exc:
+                    _AUDIT.warning(
+                        "capacity_plan: trend failed for instance %s: %s",
+                        inst_id,
+                        exc,
+                        exc_info=True,
+                    )
                     inst_report["trend"] = None
+                    inst_report["trend_error"] = str(exc)
 
                 # Seasonality
                 try:
@@ -619,8 +653,15 @@ async def capacity_plan(
                         **common_kwargs,
                     )
                     inst_report["seasonality"] = season
-                except Exception:
+                except Exception as exc:
+                    _AUDIT.warning(
+                        "capacity_plan: seasonality failed for instance %s: %s",
+                        inst_id,
+                        exc,
+                        exc_info=True,
+                    )
                     inst_report["seasonality"] = None
+                    inst_report["seasonality_error"] = str(exc)
 
                 # Change points (only if volatile trend detected)
                 is_volatile = False
@@ -639,8 +680,15 @@ async def capacity_plan(
                             **common_kwargs,
                         )
                         inst_report["change_points"] = cps
-                    except Exception:
+                    except Exception as exc:
+                        _AUDIT.warning(
+                            "capacity_plan: change points failed for instance %s: %s",
+                            inst_id,
+                            exc,
+                            exc_info=True,
+                        )
                         inst_report["change_points"] = None
+                        inst_report["change_points_error"] = str(exc)
 
                 ds_report["instances"].append(inst_report)
 
