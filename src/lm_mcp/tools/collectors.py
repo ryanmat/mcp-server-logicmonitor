@@ -303,6 +303,12 @@ async def _enrich_collector(
     except Exception:
         # Fall back to numberOfHosts from the collector record when the
         # devices filter is not supported.
+        logger.warning(
+            "collector %s: downstream device count query failed; using reported "
+            "numberOfHosts as fallback",
+            cid,
+            exc_info=True,
+        )
         downstream_count = num_hosts_reported
 
     active_collector_down = await _active_collector_down_count(client, hostname)
@@ -406,6 +412,11 @@ async def _collector_down_history(
             },
         )
     except Exception:
+        logger.warning(
+            "collector history query failed for hostname=%s; returning empty history",
+            hostname,
+            exc_info=True,
+        )
         return []
 
     history: list[dict] = []

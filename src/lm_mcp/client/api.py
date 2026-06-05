@@ -563,9 +563,22 @@ class LogicMonitorClient:
             # Handle 202 Accepted (success for ingestion)
             if response.status_code == 202:
                 try:
-                    return response.json()
+                    data = response.json()
                 except (json.JSONDecodeError, ValueError):
                     return {"success": True, "message": "Accepted"}
+                # A 202 can still carry per-record rejection details in the body;
+                # surface them instead of reporting blanket success (silent data loss).
+                self._check_response_body_errors(data)
+                if isinstance(data, dict) and data.get("success") is False:
+                    raise LMError(
+                        message=str(
+                            data.get("message")
+                            or data.get("errorMessage")
+                            or "Ingestion reported failure in a 202 response"
+                        ),
+                        code="INGEST_PARTIAL_FAILURE",
+                    )
+                return data
 
             if response.status_code >= 400:
                 message, retry_after = self._parse_error_response(response)

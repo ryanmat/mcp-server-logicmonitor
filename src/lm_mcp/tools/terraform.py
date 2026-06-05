@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,8 @@ from lm_mcp.tools import format_response, handle_error, require_write_permission
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.client.terraform import TerraformRunner
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -48,6 +51,11 @@ def _lm_env_vars() -> dict[str, str]:
             env["TF_VAR_lm_api_key"] = config.access_key
         return env
     except Exception:
+        logger.warning(
+            "terraform: failed to build LM env vars from config; "
+            "running without injected LM credentials",
+            exc_info=True,
+        )
         return {}
 
 

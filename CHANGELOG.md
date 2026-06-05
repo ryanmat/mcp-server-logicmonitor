@@ -76,6 +76,20 @@ health verdicts.
 - Added module loggers to `collectors`, `topology_analysis`, and `remediationsources`
   so these degrade-on-failure paths log a stack trace before falling back (per the
   no-silent-except rule).
+- **MED/LOW silent-failure hardening** across degrade-on-failure paths, each now logged
+  before the fallback:
+  - `ingest_post` returned blanket success on an HTTP 202 even when the body reported
+    per-record rejections (silent ingestion data loss). It now inspects the 202 body
+    and raises on an error envelope or `success: false`.
+  - `correlate_changes` turned a failed audit/change-log read into "0 changes"; it now
+    sets `audit_read_failed` + a warning so "no changes" is not confused with "could
+    not read."
+  - the watsonx TTM forecast silently fell back to linear regression; it now logs the
+    failure and tags the result with `ttm_fallback_reason` (`watsonx_not_configured`
+    vs `watsonx_error: ...`).
+  - the `terraform` env-var build and the `get_collector_health` advisory fallbacks
+    (downstream device count, collector-down history) now log before degrading.
+- Added module loggers to `event_correlation`, `forecasting`, and `terraform`.
 
 ### Changed
 
