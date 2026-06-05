@@ -400,7 +400,7 @@ Cursor only loads the first 40 MCP tools, so the remaining ~240 are invisible to
 
 ## Available Tools
 
-280+ tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**.
+280+ tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**, generated from the tool registry so it never drifts.
 
 Discover tools at runtime without leaving your client:
 
