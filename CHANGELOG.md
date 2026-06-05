@@ -155,6 +155,17 @@ health verdicts.
   of the model context. There is intentionally no `import_dashboard` tool: dashboards
   have no LM Exchange format, so recreating an export is a create, not an import.
 
+### Documentation
+
+- Slimmed the README from roughly 1380 to roughly 640 lines: the full tool catalog moved
+  to `documentation/tools.md`, the per-client configuration matrix to
+  `documentation/client-setup.md`, and the example-prompt list and What's New section were
+  trimmed. Full version history remains in this changelog.
+- `documentation/tools.md` is now generated from the tool registry and the
+  `lm://guide/tool-categories` index by `tests/test_tools_doc.py`. Drift guards fail the
+  suite when a tool is added without a category or when the committed doc is stale, so the
+  tool reference can no longer fall out of sync with the code.
+
 ### Verified
 
 - Live-portal read validation of the `widgetsConfig` shape (dict keyed by widget id ->
