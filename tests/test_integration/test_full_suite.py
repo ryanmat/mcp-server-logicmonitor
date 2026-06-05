@@ -1197,9 +1197,9 @@ class TestReportManagementFlow:
         )
 
         # Mock: Run report via the executions endpoint
-        respx.post(
-            "https://test.logicmonitor.com/santaba/rest/report/reports/100/executions"
-        ).mock(return_value=httpx.Response(200, json={"taskId": "task-12345"}))
+        respx.post("https://test.logicmonitor.com/santaba/rest/report/reports/100/executions").mock(
+            return_value=httpx.Response(200, json={"taskId": "task-12345"})
+        )
 
         # Step 1: List available reports
         reports_result = await get_reports(client)
