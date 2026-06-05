@@ -1117,6 +1117,12 @@ TOOLS.extend(
                         "description": "Full dashboard definition to clone from "
                         "(from export_dashboard). Name is overridden, id is stripped.",
                     },
+                    "template_path": {
+                        "type": "string",
+                        "description": "Path to a local JSON file holding the dashboard "
+                        "definition or an export_dashboard envelope; loaded by reference so "
+                        "a large export stays out of context. Ignored if template is set.",
+                    },
                 },
                 "required": ["name"],
             },

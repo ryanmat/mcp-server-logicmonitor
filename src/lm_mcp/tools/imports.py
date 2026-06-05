@@ -56,6 +56,51 @@ def _import_result_response(result: dict, *, extra: dict | None = None) -> list[
     return format_response(payload)
 
 
+# LogicModule type -> the REST-format create_* tool that handles an exported definition.
+# jobmonitor and appliesto_function have no create_* counterpart.
+_CREATE_COUNTERPART: dict[str, str] = {
+    "datasource": "create_datasource",
+    "configsource": "create_configsource",
+    "eventsource": "create_eventsource",
+    "propertysource": "create_propertysource",
+    "logsource": "create_logsource",
+    "topologysource": "create_topologysource",
+}
+
+
+def _import_error_response(error: Exception, module_type: str) -> list[TextContent]:
+    """Redirect a REST-format / wrong-type import failure to the matching create_* tool.
+
+    import_* accepts only LM Exchange JSON. Feeding it a REST API definition (from
+    export_<type> or the API) makes the importjson endpoint reject it with "does not
+    match the expected module type"; the actionable fix is the create_* tool, so the
+    message names it instead of returning the generic HTTP 400.
+    """
+    if "expected module type" in str(error).lower():
+        create_tool = _CREATE_COUNTERPART.get(module_type)
+        if create_tool:
+            suggestion = (
+                f"If this definition came from export_{module_type} or the REST API it is "
+                f"REST format -- use {create_tool} with the same definition. "
+                f"import_{module_type} accepts only LM Exchange JSON (the portal's "
+                "'LM Exchange' export or a community module)."
+            )
+        else:
+            suggestion = (
+                f"import_{module_type} accepts only LM Exchange JSON. Verify the definition "
+                f"is a valid LM Exchange {module_type} module."
+            )
+        return format_response(
+            {
+                "error": True,
+                "code": "IMPORT_FORMAT_MISMATCH",
+                "message": f"The definition is not a valid LM Exchange {module_type} module.",
+                "suggestion": suggestion,
+            }
+        )
+    return handle_error(error)
+
+
 # LM Exchange "type" field values required by /importjson endpoints.
 _IMPORT_TYPE_MAP: dict[str, str] = {
     "datasource": "datasource",
@@ -386,7 +431,7 @@ async def import_datasource(
 
         return _import_result_response(result, extra={"display_name": result.get("displayName")})
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "datasource")
 
 
 @require_write_permission
@@ -417,7 +462,7 @@ async def import_configsource(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "configsource")
 
 
 @require_write_permission
@@ -448,7 +493,7 @@ async def import_eventsource(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "eventsource")
 
 
 @require_write_permission
@@ -479,7 +524,7 @@ async def import_propertysource(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "propertysource")
 
 
 @require_write_permission
@@ -510,7 +555,7 @@ async def import_logsource(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "logsource")
 
 
 @require_write_permission
@@ -541,7 +586,7 @@ async def import_topologysource(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "topologysource")
 
 
 @require_write_permission
@@ -572,7 +617,7 @@ async def import_jobmonitor(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "jobmonitor")
 
 
 @require_write_permission
@@ -603,4 +648,4 @@ async def import_appliesto_function(
         )
         return _import_result_response(result)
     except Exception as e:
-        return handle_error(e)
+        return _import_error_response(e, "appliesto_function")

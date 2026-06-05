@@ -453,6 +453,47 @@ class TestCreateDashboardWithWidgetTokens:
             "9002": {"col": 9, "row": 1, "sizex": 4, "sizey": 3},
         }
 
+    @respx.mock
+    async def test_create_dashboard_from_template_path(self, client, enable_writes, tmp_path):
+        """create_dashboard loads the template by reference from a local file."""
+        from lm_mcp.tools.dashboards import create_dashboard
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(200, json={"id": 950, "name": "FromFile", "groupId": 1})
+        )
+
+        # An export_dashboard envelope written to a file (definition has no widgets here).
+        export_file = tmp_path / "dash.json"
+        export_file.write_text(
+            json.dumps(
+                {
+                    "dashboard_id": 5,
+                    "name": "Orig",
+                    "format": "json",
+                    "definition": {
+                        "id": 5,
+                        "name": "Orig",
+                        "groupId": 2,
+                        "sharable": True,
+                        "widgetsConfig": {},
+                        "widgets_full": [],
+                    },
+                }
+            )
+        )
+
+        result = await create_dashboard(client, name="FromFile", template_path=str(export_file))
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["dashboard"]["id"] == 950
+        # The export envelope was unwrapped, the id stripped, and no widget data echoed.
+        body = json.loads(route.calls[0].request.content)
+        assert body["name"] == "FromFile"
+        assert "id" not in body
+        assert "definition" not in body
+        assert "widgetsConfig" not in body
+
 
 class TestUpdateDashboard:
     """Tests for update_dashboard tool."""

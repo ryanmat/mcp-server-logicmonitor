@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -275,14 +276,21 @@ async def create_dashboard(
     sharable: bool = True,
     widget_tokens: list[dict] | None = None,
     template: dict | None = None,
+    template_path: str | None = None,
 ) -> list[TextContent]:
     """Create a new dashboard, optionally cloning widgets from an exported template.
 
-    When ``template`` is an exported dashboard definition (from ``export_dashboard``),
-    the shell is created first, then each widget in ``widgets_full`` is recreated on the
-    new dashboard and the exported ``widgetsConfig`` placement is re-applied with the
-    new widget ids. Without widgets in the template only the shell is created. Explicit
+    The template (an exported dashboard definition from ``export_dashboard``) can be
+    passed inline via ``template`` or loaded by reference from a local file via
+    ``template_path`` -- the latter keeps a large exported definition out of the model
+    context. An ``export_dashboard`` envelope (``{..., "definition": {...}}``) is
+    unwrapped automatically. When the template has widgets, the shell is created first,
+    then each widget in ``widgets_full`` is recreated on the new dashboard and the
+    exported ``widgetsConfig`` placement is re-applied with the new widget ids. Explicit
     parameters (group_id, description, widget_tokens) override template values.
+
+    There is no separate "import_dashboard": dashboards have no LM Exchange format, so
+    recreating an exported dashboard is a create, not an import.
 
     Args:
         client: LogicMonitor API client.
@@ -292,11 +300,22 @@ async def create_dashboard(
         sharable: Whether dashboard is sharable (default: True).
         widget_tokens: List of token dicts (e.g., [{"name": "##host##", "value": "server1"}]).
         template: Full dashboard definition to use as base (from export_dashboard).
+        template_path: Path to a local JSON file holding the dashboard definition or an
+            export_dashboard envelope. Ignored when ``template`` is provided.
 
     Returns:
         List of TextContent with created dashboard details or error.
     """
     try:
+        # Load the template by reference if a path was given (keeps a large exported
+        # definition out of the model context); unwrap an export_dashboard envelope.
+        if template is None and template_path:
+            with open(template_path, encoding="utf-8") as fh:
+                loaded = json.loads(fh.read())
+            if isinstance(loaded, dict) and isinstance(loaded.get("definition"), dict):
+                loaded = loaded["definition"]
+            template = loaded
+
         widgets_to_create: list[dict] = []
         template_config: dict = {}
 

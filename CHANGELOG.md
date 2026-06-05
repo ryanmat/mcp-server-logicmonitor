@@ -131,6 +131,14 @@ health verdicts.
   - Removed the dead, unreachable `ops.get_audit_logs` duplicate (the registry routes
     `get_audit_logs` to the more specific `audit.get_audit_logs`).
   - Corrected stale tool counts in the README (272/225/220 -> 280/240/280).
+- **`import_*` LogicModule tools now redirect REST/exported definitions to `create_*`.**
+  Feeding a REST API definition (from `export_<type>` or the API) to an `import_*` tool
+  made the importjson endpoint reject it with a generic "does not match the expected
+  module type" 400, and you had to already know to pivot to `create_*`. The `import_*`
+  tools now detect that rejection and return an actionable `IMPORT_FORMAT_MISMATCH` error
+  naming the matching `create_*` tool. (`import_*` accepts only LM Exchange JSON;
+  `export_*` yields REST format that `create_*` consumes -- the names mislead, so the
+  error now says so.)
 
 ### Changed
 
@@ -142,6 +150,10 @@ health verdicts.
   `schedule_timezone` (replacing the prior nested-dict / `schedule_type` /
   `schedule_enabled` parameters); `get_scheduled_reports` returns the `schedule` string
   and `schedule_timezone`.
+- `create_dashboard` accepts a `template_path` to load the dashboard definition (or an
+  `export_dashboard` envelope) from a local file by reference, keeping a large export out
+  of the model context. There is intentionally no `import_dashboard` tool: dashboards
+  have no LM Exchange format, so recreating an export is a create, not an import.
 
 ### Verified
 
