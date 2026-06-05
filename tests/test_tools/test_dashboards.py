@@ -179,21 +179,29 @@ class TestGetDashboardWidgets:
                             "name": "CPU Usage",
                             "type": "cgraph",
                             "description": "CPU graph",
-                            "columnIdx": 0,
-                            "rowSpan": 1,
-                            "colSpan": 6,
                         },
                         {
                             "id": 1002,
                             "name": "Memory Usage",
                             "type": "cgraph",
                             "description": "Memory graph",
-                            "columnIdx": 6,
-                            "rowSpan": 1,
-                            "colSpan": 6,
                         },
                     ],
                     "total": 2,
+                },
+            )
+        )
+        # Placement lives on the parent dashboard's widgetsConfig (keyed by widget id).
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 123,
+                    "name": "Dash",
+                    "widgetsConfig": {
+                        "1001": {"col": 1, "row": 1, "sizex": 6, "sizey": 1},
+                        "1002": {"col": 7, "row": 1, "sizex": 6, "sizey": 2},
+                    },
                 },
             )
         )
@@ -207,6 +215,11 @@ class TestGetDashboardWidgets:
         assert len(data["widgets"]) == 2
         assert data["widgets"][0]["name"] == "CPU Usage"
         assert data["widgets"][0]["type"] == "cgraph"
+        # Position is sourced from the dashboard widgetsConfig, not the widget object.
+        assert data["widgets"][0]["column"] == 1
+        assert data["widgets"][0]["col_span"] == 6
+        assert data["widgets"][1]["column"] == 7
+        assert data["widgets"][1]["row_span"] == 2
 
     @respx.mock
     async def test_get_dashboard_widgets_handles_error(self, client):
@@ -341,12 +354,13 @@ class TestCreateDashboardWithWidgetTokens:
         assert data["success"] is True
         assert data["dashboard"]["id"] == 700
 
-        # Verify template fields are used, name is overridden, id is stripped
+        # Verify template fields are used, name is overridden, id is stripped, and
+        # widgetsConfig is handled separately (widgets are recreated, not echoed here).
         request_body = json.loads(route.calls[0].request.content)
         assert request_body["name"] == "Cloned Dashboard"
         assert "id" not in request_body
         assert request_body["description"] == "From template"
-        assert request_body["widgetsConfig"] == [1, 2, 3]
+        assert "widgetsConfig" not in request_body
 
     @respx.mock
     async def test_create_dashboard_template_with_tokens_override(self, client, enable_writes):
@@ -384,6 +398,60 @@ class TestCreateDashboardWithWidgetTokens:
         assert request_body["name"] == "Merged Dashboard"
         assert request_body["groupId"] == 1
         assert request_body["widgetTokens"] == tokens
+
+    @respx.mock
+    async def test_create_dashboard_clones_widgets_from_template(self, client, enable_writes):
+        """create_dashboard recreates template widgets and re-applies placement with new ids."""
+        from lm_mcp.tools.dashboards import create_dashboard
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(200, json={"id": 900, "name": "Clone", "groupId": 1})
+        )
+        # Two widgets created in order -> new ids 9001, 9002.
+        widget_route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
+        ).mock(
+            side_effect=[
+                httpx.Response(200, json={"id": 9001, "name": "W1", "type": "cgraph"}),
+                httpx.Response(200, json={"id": 9002, "name": "W2", "type": "alert"}),
+            ]
+        )
+        patch_route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/900"
+        ).mock(return_value=httpx.Response(200, json={"id": 900}))
+
+        template = {
+            "id": 500,
+            "name": "Original",
+            "groupId": 2,
+            "sharable": True,
+            "widgetsConfig": {
+                "21": {"col": 1, "row": 1, "sizex": 8, "sizey": 6},
+                "22": {"col": 9, "row": 1, "sizex": 4, "sizey": 3},
+            },
+            "widgets_full": [
+                {"id": 21, "name": "W1", "type": "cgraph", "dashboardId": 500},
+                {"id": 22, "name": "W2", "type": "alert", "dashboardId": 500},
+            ],
+        }
+
+        result = await create_dashboard(client, name="Clone", template=template)
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["widgets_created"] == 2
+        assert data["widgets_requested"] == 2
+
+        # Each widget is recreated with the new dashboard id and the old id stripped.
+        first = json.loads(widget_route.calls[0].request.content)
+        assert first["dashboardId"] == 900
+        assert "id" not in first
+        # Placement re-applied keyed by the NEW widget ids (21->9001, 22->9002).
+        patched = json.loads(patch_route.calls[0].request.content)
+        assert patched["widgetsConfig"] == {
+            "9001": {"col": 1, "row": 1, "sizex": 8, "sizey": 6},
+            "9002": {"col": 9, "row": 1, "sizex": 4, "sizey": 3},
+        }
 
 
 class TestUpdateDashboard:
@@ -595,9 +663,6 @@ class TestAddWidget:
             dashboard_id=123,
             name="New Widget",
             widget_type="cgraph",
-            column_index=0,
-            row_span=2,
-            col_span=6,
         )
 
         assert len(result) == 1
@@ -605,6 +670,8 @@ class TestAddWidget:
         assert data["success"] is True
         assert data["widget"]["id"] == 789
         assert data["widget"]["name"] == "New Widget"
+        # No position requested -> no placement call, no position in the response.
+        assert "position" not in data["widget"]
 
     @respx.mock
     async def test_add_widget_dashboard_id_in_body(self, client, enable_writes):
@@ -632,6 +699,50 @@ class TestAddWidget:
 
         request_body = json.loads(route.calls[0].request.content)
         assert request_body["dashboardId"] == 456
+
+    @respx.mock
+    async def test_add_widget_positions_widget(self, client, enable_writes):
+        """add_widget writes the requested position into the dashboard widgetsConfig."""
+        from lm_mcp.tools.dashboards import add_widget
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/dashboard/widgets").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 789, "name": "Placed", "type": "cgraph", "dashboardId": 123},
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 123,
+                    "name": "Dash",
+                    "widgetsConfig": {"100": {"col": 1, "row": 1, "sizex": 12, "sizey": 4}},
+                },
+            )
+        )
+        patch_route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123"
+        ).mock(return_value=httpx.Response(200, json={"id": 123}))
+
+        result = await add_widget(
+            client,
+            dashboard_id=123,
+            name="Placed",
+            widget_type="cgraph",
+            column_index=3,
+            row=9,
+            col_span=4,
+            row_span=2,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["widget"]["position"] == {"col": 3, "row": 9, "sizex": 4, "sizey": 2}
+        # The new widget is merged into widgetsConfig and the sibling is preserved.
+        body = json.loads(patch_route.calls[0].request.content)
+        assert body["widgetsConfig"]["100"] == {"col": 1, "row": 1, "sizex": 12, "sizey": 4}
+        assert body["widgetsConfig"]["789"] == {"col": 3, "row": 9, "sizex": 4, "sizey": 2}
 
 
 class TestUpdateWidget:
@@ -698,6 +809,44 @@ class TestUpdateWidget:
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["widget"]["name"] == "Updated Widget"
+
+    @respx.mock
+    async def test_update_widget_position_writes_to_config(self, client, enable_writes):
+        """update_widget routes placement to the parent dashboard's widgetsConfig."""
+        from lm_mcp.tools.dashboards import update_widget
+
+        get_route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 123,
+                    "name": "Dash",
+                    "widgetsConfig": {"456": {"col": 1, "row": 1, "sizex": 6, "sizey": 1}},
+                },
+            )
+        )
+        patch_route = respx.patch(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123"
+        ).mock(return_value=httpx.Response(200, json={"id": 123}))
+
+        result = await update_widget(
+            client,
+            dashboard_id=123,
+            widget_id=456,
+            column_index=7,
+            col_span=4,
+            row_span=3,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        # Only the position PATCH fires (no content PUT), and the existing row is kept.
+        assert get_route.called
+        assert patch_route.called
+        body = json.loads(patch_route.calls[0].request.content)
+        assert body["widgetsConfig"]["456"] == {"col": 7, "row": 1, "sizex": 4, "sizey": 3}
 
 
 class TestDeleteWidget:
@@ -861,6 +1010,35 @@ class TestWidgetCountAccuracy:
         result = await get_dashboards(client)
         data = json.loads(result[0].text)
         assert data["dashboards"][0]["widget_count"] == 5
+
+    @respx.mock
+    async def test_widget_count_from_id_keyed_dict(self, client):
+        """get_dashboards counts a real widgetsConfig dict keyed by widget id."""
+        from lm_mcp.tools.dashboards import get_dashboards
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "name": "Dashboard",
+                            "widgetsConfig": {
+                                "21": {"col": 1, "row": 1, "sizex": 8, "sizey": 6},
+                                "22": {"col": 9, "row": 1, "sizex": 4, "sizey": 3},
+                                "23": {"col": 9, "row": 4, "sizex": 4, "sizey": 3},
+                            },
+                        }
+                    ],
+                    "total": 1,
+                },
+            )
+        )
+
+        result = await get_dashboards(client)
+        data = json.loads(result[0].text)
+        assert data["dashboards"][0]["widget_count"] == 3
 
 
 class TestAddWidgetSLADefaults:

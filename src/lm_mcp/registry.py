@@ -1180,14 +1180,20 @@ TOOLS.extend(
                     },
                     "column_index": {
                         "type": "integer",
-                        "default": 0,
-                        "description": "Column position (0-11)",
+                        "description": "Start column, 1-12. Omit to let the portal "
+                        "auto-place the widget below existing widgets.",
                     },
-                    "row_span": {"type": "integer", "default": 1, "description": "Row span"},
+                    "row": {
+                        "type": "integer",
+                        "description": "Start row. Omit to append below existing widgets.",
+                    },
+                    "row_span": {
+                        "type": "integer",
+                        "description": "Height in rows (default 1 when a position is set).",
+                    },
                     "col_span": {
                         "type": "integer",
-                        "default": 6,
-                        "description": "Column span (1-12)",
+                        "description": "Width in columns, 1-12 (default 6 when a position is set).",
                     },
                     "description": {"type": "string", "description": "Widget description"},
                     "config": {
@@ -1210,6 +1216,10 @@ TOOLS.extend(
                     "widget_id": {"type": "integer", "description": "Widget ID"},
                     "name": {"type": "string", "description": "New name"},
                     "description": {"type": "string", "description": "New description"},
+                    "column_index": {"type": "integer", "description": "New start column (1-12)"},
+                    "row": {"type": "integer", "description": "New start row"},
+                    "row_span": {"type": "integer", "description": "New height in rows"},
+                    "col_span": {"type": "integer", "description": "New width in columns (1-12)"},
                     "config": {"type": "object", "description": "New configuration"},
                 },
                 "required": ["dashboard_id", "widget_id"],

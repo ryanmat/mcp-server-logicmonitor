@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - Unreleased
+
+Dashboard and report correctness sweep. Surfaced while building a dashboard against a
+live portal; root causes confirmed against the LM v3 API shapes (widget placement
+lives on the dashboard's `widgetsConfig`, keyed by widget id).
+
+### Fixed
+
+- **`create_dashboard(template=...)` silently dropped every widget.** The handler
+  copied the exported definition into the create body and POSTed it once; the dashboard
+  create endpoint does not accept embedded widgets, so cloning an exported dashboard
+  produced an empty one (HTTP 200, `success: true`, zero widgets) while only
+  `widgetTokens` survived. `create_dashboard` now creates the shell, recreates each
+  widget from the template's `widgets_full` on the new dashboard (old id stripped, new
+  `dashboardId` set), and re-applies the exported `widgetsConfig` placement remapped to
+  the new widget ids. A single failed widget is logged with stack trace and surfaced as
+  a `widget_warnings` entry rather than aborting the clone or vanishing. This makes
+  `export_dashboard` -> `create_dashboard` round-trip widgets, not just the shell.
+- **`add_widget` silently discarded widget placement.** `columnIdx`/`rowSpan`/`colSpan`
+  were sent on the `/dashboard/widgets` body, which the API accepts and discards, so
+  every widget landed at the default cell and the position parameters were dead.
+  Placement lives on the parent dashboard's `widgetsConfig` (keyed by widget id);
+  `add_widget` now writes it there via a PATCH that preserves sibling positions, and
+  only when a position is requested (otherwise the portal auto-places). Added a `row`
+  parameter for explicit vertical placement.
+- **`get_dashboard_widgets` returned null `column`/`row_span`/`col_span` for every
+  widget.** It read those off the widget objects, which never carry them; it now sources
+  `column`/`row`/`col_span`/`row_span` from the parent dashboard's `widgetsConfig`.
+- **`get_dashboards` reported `widget_count: 0` for widget-bearing dashboards.**
+  `_count_widgets` only counted `widgetsConfig` as a list or a literal `count` key;
+  real portals return a dict keyed by widget id. It now counts the keyed dict, and the
+  same helper backs `delete_dashboard`'s count (previously `len(..., [])` on the wrong
+  default type).
+- **`update_widget` could 400 on echoed read-only fields and could not move a widget.**
+  Content updates now strip server-managed read-only fields (`lastUpdatedOn`,
+  `lastUpdatedBy`, `userPermission`) before the PUT; placement updates route to the
+  dashboard `widgetsConfig` PATCH. `update_dashboard` likewise strips dashboard
+  read-only fields (`fullName`, `userPermission`, `groupName`, `groupFullPath`,
+  `owner`) before its PUT.
+
+### Changed
+
+- `add_widget` and `update_widget` expose a `row` parameter and treat `column_index`,
+  `row_span`, and `col_span` as 1-indexed grid coordinates clamped to the 12-column
+  grid. Omitting all placement on `add_widget` lets the portal auto-place the widget
+  below existing ones.
+
+### Verified
+
+- Live-portal read validation of the `widgetsConfig` shape (dict keyed by widget id ->
+  {col, row, sizex, sizey}) on dashboards 3 and 15.
+- Full test suite green; ruff check and format clean. Dashboard mock fixtures corrected
+  from the prior list / `{"count": N}` shapes to the real keyed-by-id `widgetsConfig`.
+
 ## [3.8.3] - 2026-05-18
 
 ### Fixed
