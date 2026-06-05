@@ -76,6 +76,8 @@ WRITE_TOOL_PREFIXES = (
     "restart_",
     "sync_",
     "execute_",
+    "recover_",
+    "collect_",
     "terraform_apply",
     "terraform_destroy",
     "terraform_import",

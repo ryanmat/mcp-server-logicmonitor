@@ -29,6 +29,8 @@ WORKFLOW_TOOLS: frozenset[str] = frozenset(
         "compare_to_baseline",
         "save_baseline",
         "analyze_blast_radius",
+        "detect_site_outage",
+        "audit_network_monitoring_coverage",
         "search_tools",
         "update_logicmodule",
     }

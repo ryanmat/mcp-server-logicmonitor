@@ -14,6 +14,7 @@ from lm_mcp.tools.alerts import (
     get_alert_details,
     get_alerts,
 )
+from lm_mcp.tools.audit import get_audit_logs
 from lm_mcp.tools.collectors import get_collector, get_collectors
 from lm_mcp.tools.dashboards import (
     create_dashboard,
@@ -37,7 +38,6 @@ from lm_mcp.tools.metrics import (
 )
 from lm_mcp.tools.ops import (
     add_ops_note,
-    get_audit_logs,
     get_ops_note,
     get_ops_notes,
 )

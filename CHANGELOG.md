@@ -102,6 +102,21 @@ health verdicts.
   error (the wrong-definition-format case); the other seven reported `imported_id: null`
   as a success. All eight now route through a shared `_import_result_response` helper
   that returns `IMPORT_SILENT_FAILURE` for that shape.
+- **Registration / discoverability drift.**
+  - `LM_MCP_CATEGORIES=workflow` (the documented Cursor 40-tool-cap workaround) silently
+    dropped `detect_site_outage` and `audit_network_monitoring_coverage`: the curated
+    `WORKFLOW_TOOLS` set was never updated when those v3.8.0 composites landed. Both are
+    now included.
+  - `search_tools` searched only the core `TOOLS` list, so the 29 AWX/watsonx/Terraform
+    tools were unsearchable even when configured (and `search_tools(category="ansible"
+    |"terraform"|"watsonx")` always returned empty). It now builds its corpus the same
+    way the server advertises tools.
+  - `recover_device` and `collect_device_config` mutate the portal but lacked a write
+    prefix, so they executed with no audit-log entry; `recover_`/`collect_` were added to
+    `WRITE_TOOL_PREFIXES`.
+  - Removed the dead, unreachable `ops.get_audit_logs` duplicate (the registry routes
+    `get_audit_logs` to the more specific `audit.get_audit_logs`).
+  - Corrected stale tool counts in the README (272/225/220 -> 280/240/280).
 
 ### Changed
 

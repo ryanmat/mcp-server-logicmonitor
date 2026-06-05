@@ -1078,8 +1078,19 @@ async def search_tools(
         Matching tools with relevance scores.
     """
     try:
-        from lm_mcp.registry import TOOLS
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
         from lm_mcp.resources.guides import TOOL_CATEGORIES
+        from lm_mcp.server import get_awx_client, get_tf_runner, get_watsonx_client
+
+        # Mirror the server's advertised tool surface so configured AWX / watsonx /
+        # Terraform tools are searchable, not just the core TOOLS list.
+        search_corpus = list(TOOLS)
+        if get_awx_client() is not None:
+            search_corpus.extend(AWX_TOOLS)
+        if get_watsonx_client() is not None:
+            search_corpus.extend(WATSONX_TOOLS)
+        if get_tf_runner() is not None:
+            search_corpus.extend(TF_TOOLS)
 
         # Tokenize query into lowercase words
         query_words = re.findall(r"[a-z0-9_]+", query.lower())
@@ -1114,7 +1125,7 @@ async def search_tools(
 
         # Score each tool
         scored: list[tuple[float, dict]] = []
-        for tool in TOOLS:
+        for tool in search_corpus:
             name = tool.name
             desc = (tool.description or "").lower()
 

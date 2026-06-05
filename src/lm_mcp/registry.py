@@ -6903,7 +6903,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "add_ops_note": ops.add_ops_note,
         "update_ops_note": ops.update_ops_note,
         "delete_ops_note": ops.delete_ops_note,
-        # Audit (ops module has get_audit_logs too, but audit module is more specific)
+        # Audit logs are owned by the audit module.
         "get_audit_logs": audit.get_audit_logs,
         "get_api_token_audit": audit.get_api_token_audit,
         "get_login_audit": audit.get_login_audit,
