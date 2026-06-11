@@ -623,3 +623,21 @@ class TestBulkAcknowledgeAlerts:
 
         assert route.called
         assert "/alerts/789/ack" in str(route.calls[0].request.url)
+
+
+class TestIncludeMessageParam:
+    """needMessage passthrough on get_alert_details."""
+
+    @respx.mock
+    async def test_include_message_passes_need_message(self, client):
+        from lm_mcp.tools.alerts import get_alert_details
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts/1").mock(
+            return_value=httpx.Response(200, json={"id": "LMA1", "message": "full body"})
+        )
+
+        await get_alert_details(client, "LMA1", include_message=True)
+        assert route.calls[0].request.url.params["needMessage"] == "true"
+
+        await get_alert_details(client, "LMA1")
+        assert "needMessage" not in route.calls[1].request.url.params

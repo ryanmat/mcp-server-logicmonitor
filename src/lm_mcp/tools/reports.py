@@ -41,6 +41,7 @@ async def get_reports(
     group_id: int | None = None,
     report_type: str | None = None,
     filter: str | None = None,
+    include_nextgen: bool = False,
     limit: int = 50,
     offset: int = 0,
 ) -> list[TextContent]:
@@ -56,6 +57,7 @@ async def get_reports(
             : (equal), !: (not equal), > < >: <: (comparisons),
             ~ (contains), !~ (not contains).
             Examples: "name~monthly,type~Alert"
+        include_nextgen: Include NextGen reports (passes showNextGenReports).
         limit: Maximum number of reports to return.
         offset: Number of results to skip for pagination.
 
@@ -64,6 +66,8 @@ async def get_reports(
     """
     try:
         params: dict = {"size": limit, "offset": offset}
+        if include_nextgen:
+            params["showNextGenReports"] = "true"
         wildcards_stripped = False
 
         # If raw filter is provided, use it directly (power user mode)
@@ -264,6 +268,7 @@ async def run_report(
 async def get_scheduled_reports(
     client: LogicMonitorClient,
     enabled_only: bool = False,
+    include_nextgen: bool = False,
     limit: int = 50,
 ) -> list[TextContent]:
     """Get reports that have a schedule configured.
@@ -276,6 +281,7 @@ async def get_scheduled_reports(
         client: LogicMonitor API client.
         enabled_only: Accepted for compatibility; a non-empty schedule is already an
             active schedule, so this does not further filter.
+        include_nextgen: Include NextGen reports (passes showNextGenReports).
         limit: Maximum number of reports to return.
 
     Returns:
@@ -283,6 +289,8 @@ async def get_scheduled_reports(
     """
     try:
         params: dict = {"size": limit}
+        if include_nextgen:
+            params["showNextGenReports"] = "true"
 
         result = await client.get("/report/reports", params=params)
 
@@ -456,5 +464,39 @@ async def delete_report(
                 "report_id": report_id,
             }
         )
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_report_execution(
+    client: LogicMonitorClient,
+    report_id: int,
+    task_id: int,
+) -> list[TextContent]:
+    """Poll the status of a report generation task started by run_report.
+
+    Wraps GET /report/reports/{id}/tasks/{taskId}, the documented poll
+    endpoint for executions triggered via run_report.
+
+    Args:
+        client: LogicMonitor API client.
+        report_id: Report ID.
+        task_id: Task ID returned by run_report.
+
+    Returns:
+        List of TextContent with execution status (and result URL when
+        generation has finished) or error.
+    """
+    try:
+        result = await client.get(f"/report/reports/{report_id}/tasks/{task_id}")
+
+        response: dict = {
+            "report_id": report_id,
+            "task_id": task_id,
+            "status": result.get("status"),
+            "result_url": result.get("resulturl") or result.get("resultUrl"),
+            "execution": result,
+        }
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

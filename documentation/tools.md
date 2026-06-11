@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 297 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 298 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -198,6 +198,7 @@ Report management and execution
 | `get_report_groups` | List report groups | No |
 | `get_scheduled_reports` | Get reports with schedules configured | No |
 | `run_report` | Run/execute a report (requires write permission) | Yes |
+| `get_report_execution` | Poll the status of a report generation task started by run_report (returns status and result URL when finished) | No |
 | `create_report` | Create a new report (requires write permission) | Yes |
 | `update_report_schedule` | Update a report's schedule (requires write permission) | Yes |
 | `delete_report` | Delete a report (requires write permission) | Yes |

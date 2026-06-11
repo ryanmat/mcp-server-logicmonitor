@@ -173,6 +173,7 @@ TOOL_CATEGORIES = {
                 "get_report_groups",
                 "get_scheduled_reports",
                 "run_report",
+                "get_report_execution",
                 "create_report",
                 "update_report_schedule",
                 "delete_report",

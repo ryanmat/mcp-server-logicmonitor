@@ -3321,6 +3321,11 @@
         "alert_id": {
           "description": "Alert ID (with or without LMA prefix)",
           "type": "string"
+        },
+        "include_message": {
+          "default": false,
+          "description": "Include the full alert message body (needMessage)",
+          "type": "boolean"
         }
       },
       "required": [
@@ -6010,6 +6015,33 @@
       "type": "object"
     }
   },
+  "get_report_execution": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Poll the status of a report generation task started by run_report (returns status and result URL when finished)",
+    "inputSchema": {
+      "properties": {
+        "report_id": {
+          "description": "Report ID",
+          "type": "integer"
+        },
+        "task_id": {
+          "description": "Task ID returned by run_report",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "report_id",
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_report_groups": {
     "annotations": {
       "destructiveHint": false,
@@ -6052,6 +6084,11 @@
         "group_id": {
           "description": "Filter by group ID",
           "type": "integer"
+        },
+        "include_nextgen": {
+          "default": false,
+          "description": "Include NextGen reports",
+          "type": "boolean"
         },
         "limit": {
           "default": 50,
@@ -6164,6 +6201,11 @@
         "enabled_only": {
           "default": false,
           "description": "Only enabled schedules",
+          "type": "boolean"
+        },
+        "include_nextgen": {
+          "default": false,
+          "description": "Include NextGen reports",
           "type": "boolean"
         },
         "limit": {

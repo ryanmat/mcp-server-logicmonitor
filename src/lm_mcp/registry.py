@@ -390,6 +390,11 @@ TOOLS.extend(
                         "type": "string",
                         "description": "Alert ID (with or without LMA prefix)",
                     },
+                    "include_message": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include the full alert message body (needMessage)",
+                    },
                 },
                 "required": ["alert_id"],
             },
@@ -1511,6 +1516,11 @@ TOOLS.extend(
                         "description": "Raw filter expression (overrides other filters). "
                         "Example: name~monthly,type~Alert",
                     },
+                    "include_nextgen": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include NextGen reports",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -1552,6 +1562,11 @@ TOOLS.extend(
                         "default": False,
                         "description": "Only enabled schedules",
                     },
+                    "include_nextgen": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include NextGen reports",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -1570,6 +1585,25 @@ TOOLS.extend(
                     },
                 },
                 "required": ["report_id"],
+            },
+        ),
+        Tool(
+            name="get_report_execution",
+            description=(
+                "Poll the status of a report generation task started by run_report "
+                "(returns status and result URL when finished)"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "report_id": {"type": "integer", "description": "Report ID"},
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Task ID returned by run_report",
+                    },
+                },
+                "required": ["report_id", "task_id"],
             },
         ),
         Tool(
@@ -7376,6 +7410,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_report_groups": reports.get_report_groups,
         "get_scheduled_reports": reports.get_scheduled_reports,
         "run_report": reports.run_report,
+        "get_report_execution": reports.get_report_execution,
         "create_report": reports.create_report,
         "update_report_schedule": reports.update_report_schedule,
         "delete_report": reports.delete_report,
