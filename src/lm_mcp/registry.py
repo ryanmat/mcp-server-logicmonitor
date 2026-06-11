@@ -3010,34 +3010,48 @@ TOOLS.extend(
     [
         Tool(
             name="get_services",
-            description="List services from LogicMonitor",
+            description=(
+                "List Service Insight business services (deviceType 6 devices, "
+                "including APM trace services)"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by service name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
         ),
         Tool(
             name="get_service",
-            description="Get details about a specific service",
+            description="Get details about a specific Service Insight service",
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "service_id": {"type": "integer", "description": "Service ID"},
+                    "service_id": {
+                        "type": "integer",
+                        "description": "Service device ID (deviceType 6)",
+                    },
                 },
                 "required": ["service_id"],
             },
         ),
         Tool(
             name="get_service_groups",
-            description="List service groups",
+            description="List Service Insight service groups (BizService device groups)",
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by group name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
