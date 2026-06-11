@@ -5723,6 +5723,175 @@ TOOLS.extend(
                 "required": ["chain_id"],
             },
         ),
+        Tool(
+            name="get_action_rules",
+            description=(
+                "List action rules: alert conditions (severity, device groups, "
+                "datasource matchers) that trigger action chains"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by rule name (substring, client-side)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_action_rule",
+            description="Get details about a specific action rule",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="create_action_rule",
+            description=(
+                "Create an action rule binding an action chain to alert conditions "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Rule name"},
+                    "level": {
+                        "type": "string",
+                        "description": "Alert severity to match (e.g. Error, Critical)",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": 'Device group full paths (["*"] for all)',
+                    },
+                    "action_chain_id": {
+                        "type": "integer",
+                        "description": "Action chain to trigger",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": 'Device display names (["*"] for all)',
+                    },
+                    "datasource": {"type": "string", "description": "Datasource name matcher"},
+                    "instance": {"type": "string", "description": "Instance matcher"},
+                    "datapoint": {"type": "string", "description": "Datapoint matcher"},
+                    "resource_properties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "value": {"type": "string"},
+                            },
+                            "required": ["name", "value"],
+                        },
+                        "description": "Property matchers",
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Whether the rule starts enabled",
+                    },
+                },
+                "required": ["name", "level", "device_groups", "action_chain_id"],
+            },
+        ),
+        Tool(
+            name="update_action_rule",
+            description=(
+                "Update an action rule via PATCH; only provided fields are sent "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                    "name": {"type": "string", "description": "New rule name"},
+                    "level": {
+                        "type": "string",
+                        "description": "Alert severity to match (e.g. Error, Critical)",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Device group full paths",
+                    },
+                    "action_chain_id": {
+                        "type": "integer",
+                        "description": "Action chain to trigger",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Device display names",
+                    },
+                    "datasource": {"type": "string", "description": "Datasource name matcher"},
+                    "instance": {"type": "string", "description": "Instance matcher"},
+                    "datapoint": {"type": "string", "description": "Datapoint matcher"},
+                    "resource_properties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "value": {"type": "string"},
+                            },
+                            "required": ["name", "value"],
+                        },
+                        "description": "Property matchers",
+                    },
+                    "enabled": {"type": "boolean", "description": "Enable/disable the rule"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="delete_action_rule",
+            description="Delete an action rule (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="set_action_rule_status",
+            description=(
+                "Enable or disable an action rule without touching its matchers "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable, False to disable",
+                    },
+                },
+                "required": ["rule_id", "enabled"],
+            },
+        ),
     ]
 )
 
@@ -7258,6 +7427,12 @@ def get_tool_handler(tool_name: str) -> Any:
         "create_action_chain": actions.create_action_chain,
         "update_action_chain": actions.update_action_chain,
         "delete_action_chain": actions.delete_action_chain,
+        "get_action_rules": actions.get_action_rules,
+        "get_action_rule": actions.get_action_rule,
+        "create_action_rule": actions.create_action_rule,
+        "update_action_rule": actions.update_action_rule,
+        "delete_action_rule": actions.delete_action_rule,
+        "set_action_rule_status": actions.set_action_rule_status,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,

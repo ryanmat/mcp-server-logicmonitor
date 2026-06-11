@@ -789,6 +789,89 @@
       "type": "object"
     }
   },
+  "create_action_rule": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create an action rule binding an action chain to alert conditions (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "action_chain_id": {
+          "description": "Action chain to trigger",
+          "type": "integer"
+        },
+        "datapoint": {
+          "description": "Datapoint matcher",
+          "type": "string"
+        },
+        "datasource": {
+          "description": "Datasource name matcher",
+          "type": "string"
+        },
+        "device_groups": {
+          "description": "Device group full paths ([\"*\"] for all)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "devices": {
+          "description": "Device display names ([\"*\"] for all)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Whether the rule starts enabled",
+          "type": "boolean"
+        },
+        "instance": {
+          "description": "Instance matcher",
+          "type": "string"
+        },
+        "level": {
+          "description": "Alert severity to match (e.g. Error, Critical)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Rule name",
+          "type": "string"
+        },
+        "resource_properties": {
+          "description": "Property matchers",
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "level",
+        "device_groups",
+        "action_chain_id"
+      ],
+      "type": "object"
+    }
+  },
   "create_alert_rule": {
     "annotations": {
       "destructiveHint": false,
@@ -1841,6 +1924,28 @@
       },
       "required": [
         "chain_id"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_action_rule": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete an action rule (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id"
       ],
       "type": "object"
     }
@@ -3112,6 +3217,57 @@
         },
         "name_filter": {
           "description": "Filter by chain name (substring, client-side)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_action_rule": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get details about a specific action rule",
+    "inputSchema": {
+      "properties": {
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_action_rules": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List action rules: alert conditions (severity, device groups, datasource matchers) that trigger action chains",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by rule name (substring, client-side)",
           "type": "string"
         },
         "offset": {
@@ -7667,6 +7823,33 @@
       "type": "object"
     }
   },
+  "set_action_rule_status": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Enable or disable an action rule without touching its matchers (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "enabled": {
+          "description": "True to enable, False to disable",
+          "type": "boolean"
+        },
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id",
+        "enabled"
+      ],
+      "type": "object"
+    }
+  },
   "set_session_variable": {
     "annotations": {
       "destructiveHint": false,
@@ -8125,6 +8308,89 @@
       },
       "required": [
         "chain_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_action_rule": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Update an action rule via PATCH; only provided fields are sent (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "action_chain_id": {
+          "description": "Action chain to trigger",
+          "type": "integer"
+        },
+        "datapoint": {
+          "description": "Datapoint matcher",
+          "type": "string"
+        },
+        "datasource": {
+          "description": "Datasource name matcher",
+          "type": "string"
+        },
+        "device_groups": {
+          "description": "Device group full paths",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "devices": {
+          "description": "Device display names",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "description": "Enable/disable the rule",
+          "type": "boolean"
+        },
+        "instance": {
+          "description": "Instance matcher",
+          "type": "string"
+        },
+        "level": {
+          "description": "Alert severity to match (e.g. Error, Critical)",
+          "type": "string"
+        },
+        "name": {
+          "description": "New rule name",
+          "type": "string"
+        },
+        "resource_properties": {
+          "description": "Property matchers",
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id"
       ],
       "type": "object"
     }

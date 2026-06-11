@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 291 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 297 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -535,6 +535,12 @@ ADR automation: action chains (ordered diagnostic/remediation stages) and the ru
 | `create_action_chain` | Create an action chain from ordered diagnostic/remediation stages (requires write permission). Each stage references a DiagnosticSource or RemediationSource by ID. | Yes |
 | `update_action_chain` | Update an action chain via PATCH; only provided fields are sent (requires write permission) | Yes |
 | `delete_action_chain` | Delete an action chain (requires write permission). Action rules referencing it stop triggering. | Yes |
+| `get_action_rules` | List action rules: alert conditions (severity, device groups, datasource matchers) that trigger action chains | No |
+| `get_action_rule` | Get details about a specific action rule | No |
+| `create_action_rule` | Create an action rule binding an action chain to alert conditions (requires write permission) | Yes |
+| `update_action_rule` | Update an action rule via PATCH; only provided fields are sent (requires write permission) | Yes |
+| `delete_action_rule` | Delete an action rule (requires write permission) | Yes |
+| `set_action_rule_status` | Enable or disable an action rule without touching its matchers (requires write permission) | Yes |
 
 ## IBM watsonx.ai
 

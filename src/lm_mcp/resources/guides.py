@@ -476,6 +476,12 @@ TOOL_CATEGORIES = {
                 "create_action_chain",
                 "update_action_chain",
                 "delete_action_chain",
+                "get_action_rules",
+                "get_action_rule",
+                "create_action_rule",
+                "update_action_rule",
+                "delete_action_rule",
+                "set_action_rule_status",
             ],
         },
         "watsonx": {

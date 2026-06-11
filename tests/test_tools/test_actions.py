@@ -248,3 +248,204 @@ class TestDeleteActionChain:
         result = await delete_action_chain(client, chain_id=1)
 
         assert "Write operations are disabled" in result[0].text
+
+
+def _rule(**overrides) -> dict:
+    item = {
+        "id": 1,
+        "name": "Precursor Diagnostic Action Rule",
+        "levelStr": "Error",
+        "deviceGroups": ["*"],
+        "devices": ["*"],
+        "datasource": "Precursor Predictive",
+        "instance": "*",
+        "datapoint": "ClusterId",
+        "resourceProperties": [{"name": "precursor.enabled", "value": "true"}],
+        "actionChainId": 1,
+        "actionChain": {"id": 1, "name": "Precursor Diagnostic_Chain"},
+        "enabled": True,
+    }
+    item.update(overrides)
+    return item
+
+
+class TestGetActionRules:
+    @respx.mock
+    async def test_get_action_rules_returns_list(self, client):
+        from lm_mcp.tools.actions import get_action_rules
+
+        respx.get(f"{BASE}/setting/action/rules").mock(
+            return_value=httpx.Response(200, json={"items": [_rule()], "total": 1})
+        )
+
+        result = await get_action_rules(client)
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 1
+        rule = data["action_rules"][0]
+        assert rule["level"] == "Error"
+        assert rule["action_chain_name"] == "Precursor Diagnostic_Chain"
+        assert rule["resource_properties"] == [{"name": "precursor.enabled", "value": "true"}]
+
+    @respx.mock
+    async def test_get_action_rules_name_filter(self, client):
+        from lm_mcp.tools.actions import get_action_rules
+
+        respx.get(f"{BASE}/setting/action/rules").mock(
+            return_value=httpx.Response(
+                200, json={"items": [_rule(), _rule(id=2, name="Other Rule")], "total": 2}
+            )
+        )
+
+        result = await get_action_rules(client, name_filter="precursor")
+
+        data = json.loads(result[0].text)
+        assert data["count"] == 1
+
+
+class TestGetActionRule:
+    @respx.mock
+    async def test_get_action_rule_returns_details(self, client):
+        from lm_mcp.tools.actions import get_action_rule
+
+        respx.get(f"{BASE}/setting/action/rules/1").mock(
+            return_value=httpx.Response(200, json=_rule())
+        )
+
+        result = await get_action_rule(client, rule_id=1)
+
+        data = json.loads(result[0].text)
+        assert data["id"] == 1
+        assert data["enabled"] is True
+
+
+class TestCreateActionRule:
+    async def test_create_requires_write_permission(self, client, monkeypatch):
+        from lm_mcp.tools.actions import create_action_rule
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await create_action_rule(
+            client, name="X", level="Error", device_groups=["*"], action_chain_id=1
+        )
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_create_posts_rule_body(self, client, enable_writes):
+        from lm_mcp.tools.actions import create_action_rule
+
+        route = respx.post(f"{BASE}/setting/action/rules").mock(
+            return_value=httpx.Response(200, json=_rule(id=7, name="New Rule"))
+        )
+
+        result = await create_action_rule(
+            client,
+            name="New Rule",
+            level="Critical",
+            device_groups=["lm-mcp-test-nothing"],
+            action_chain_id=1,
+            enabled=False,
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert body == {
+            "name": "New Rule",
+            "levelStr": "Critical",
+            "deviceGroups": ["lm-mcp-test-nothing"],
+            "actionChainId": 1,
+            "enabled": False,
+        }
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+
+class TestUpdateActionRule:
+    @respx.mock
+    async def test_update_patches_only_provided_fields(self, client, enable_writes):
+        from lm_mcp.tools.actions import update_action_rule
+
+        route = respx.patch(f"{BASE}/setting/action/rules/1").mock(
+            return_value=httpx.Response(200, json=_rule(datapoint="NewDP"))
+        )
+
+        result = await update_action_rule(client, rule_id=1, datapoint="NewDP")
+
+        body = json.loads(route.calls[0].request.content)
+        assert body == {"datapoint": "NewDP"}
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+    async def test_update_no_changes_rejected(self, client, enable_writes):
+        from lm_mcp.tools.actions import update_action_rule
+
+        result = await update_action_rule(client, rule_id=1)
+
+        assert "Error" in result[0].text
+
+
+class TestDeleteActionRule:
+    @respx.mock
+    async def test_delete_success(self, client, enable_writes):
+        from lm_mcp.tools.actions import delete_action_rule
+
+        respx.get(f"{BASE}/setting/action/rules/1").mock(
+            return_value=httpx.Response(200, json=_rule())
+        )
+        respx.delete(f"{BASE}/setting/action/rules/1").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await delete_action_rule(client, rule_id=1)
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "Precursor Diagnostic Action Rule" in data["message"]
+
+
+class TestSetActionRuleStatus:
+    @respx.mock
+    async def test_status_toggle_puts_enabled(self, client, enable_writes):
+        from lm_mcp.tools.actions import set_action_rule_status
+
+        route = respx.put(f"{BASE}/setting/action/rules/1/status").mock(
+            return_value=httpx.Response(200, json={"enabled": False})
+        )
+
+        result = await set_action_rule_status(client, rule_id=1, enabled=False)
+
+        body = json.loads(route.calls[0].request.content)
+        assert body == {"enabled": False}
+        data = json.loads(result[0].text)
+        assert data["enabled"] is False
+        assert "disabled" in data["message"]
+
+    async def test_status_requires_write_permission(self, client, monkeypatch):
+        from lm_mcp.tools.actions import set_action_rule_status
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await set_action_rule_status(client, rule_id=1, enabled=True)
+
+        assert "Write operations are disabled" in result[0].text
+
+    def test_set_action_rule_status_classified_as_write(self):
+        """The precise prefix keeps session tools read-classified."""
+        from lm_mcp.logging import is_write_tool
+
+        assert is_write_tool("set_action_rule_status") is True
+        assert is_write_tool("set_session_variable") is False
