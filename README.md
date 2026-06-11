@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 298 structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 302 structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -70,6 +70,19 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
+## What's New in v4.1.0
+
+Native OTLP metrics arrive. LogicMonitor's new OTLP Metrics feature (feature-flag
+gated, Prometheus-backed) ships in its first phase with a single UI surface (the
+dashboard Advanced Metrics Widget) and no Metrics Explorer yet; these four tools
+are the first programmatic window into that data: `get_otlp_metric_names`,
+`get_otlp_metric_labels`, and `get_otlp_label_values` for discovery, and
+`query_otlp_metrics` for full PromQL range queries returning time-series matrices.
+All four were validated live against a flag-enabled portal fed by a real OTel
+collector (Kubernetes cAdvisor and application metrics), translate the
+feature-disabled portal responses into a clear availability notice, and cap large
+matrix responses with even-stride downsampling so they stay LLM-friendly.
+
 ## What's New in v4.0.0
 
 **Major.** Every tool now wraps an endpoint proven to exist, validated against a live
@@ -93,7 +106,7 @@ Full release history, including v3.9.x and earlier, is in [CHANGELOG.md](CHANGEL
 
 ## Features
 
-**298 Tools** across comprehensive LogicMonitor API coverage (269 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**302 Tools** across comprehensive LogicMonitor API coverage (273 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -111,6 +124,7 @@ Full release history, including v3.9.x and earlier, is in [CHANGELOG.md](CHANGEL
 - **User & Role Management**: View users, roles, access groups, API tokens
 - **Ops Management**: Audit logs, ops notes, login/change audits
 - **Automated Diagnostics & Remediation**: Assigned-source resolution, structured execution results with script output, diagnostic/remediation source CRUD, manual execution, action chains and rules
+- **Native OTLP Metrics (preview)**: Metric and label discovery plus PromQL range queries against the feature-flag-gated OTLP metrics store
 
 ### AI Analysis Tools
 
@@ -412,16 +426,16 @@ Cursor only loads the first 40 MCP tools, so the remaining ~240 are invisible to
 }
 ```
 
-`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 298 tools. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
+`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 302 tools. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
 
 ## Available Tools
 
-298 tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**, generated from the tool registry so it never drifts.
+302 tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**, generated from the tool registry so it never drifts.
 
 Discover tools at runtime without leaving your client:
 
 - `search_tools`: keyword search across every tool by name and description
-- the `lm://guide/tool-categories` resource: all 298 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 302 tools grouped by domain
 
 Tools are organized into these categories: Alerts, Alert Rules, Devices, Metrics, APM Traces, Dashboards, SDT, Collectors, Websites, Escalations, Device Properties, Reports, DataSources, LogicModules (Config/Event/Property/Topology/Log), Cost Optimization, Actions (Chains & Rules), Ingestion, Network & Topology, Batch Jobs, Ops & Audit, Users & Access, Services, Netscans, OIDs, Session, Correlation & Analysis, Baselines, ML/Statistical Analysis, Ansible Automation Platform, Remediation, Composite Workflows, and Error Budget.
 
@@ -465,7 +479,7 @@ The server exposes 26 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 298 tools organized by domain category |
+| `lm://guide/tool-categories` | All 302 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
@@ -495,7 +509,7 @@ Pre-built workflow templates for common tasks:
 
 ## Example Usage
 
-Once configured, ask your assistant in natural language. A representative sample (the server understands far more across all 298 tools):
+Once configured, ask your assistant in natural language. A representative sample (the server understands far more across all 302 tools):
 
 - "List the first 5 devices in LogicMonitor" (quick connectivity check)
 - "Show me all critical alerts from the last hour"

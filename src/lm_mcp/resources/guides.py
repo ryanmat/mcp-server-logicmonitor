@@ -358,6 +358,18 @@ TOOL_CATEGORIES = {
                 "push_metrics",
             ],
         },
+        "otlp_metrics": {
+            "description": (
+                "Native OTLP metrics: PromQL range queries and metric/label "
+                "discovery (feature-flag gated, [PREVIEW])"
+            ),
+            "tools": [
+                "get_otlp_metric_names",
+                "get_otlp_metric_labels",
+                "get_otlp_label_values",
+                "query_otlp_metrics",
+            ],
+        },
         "correlation": {
             "description": "Alert correlation and metric anomaly detection",
             "tools": [
