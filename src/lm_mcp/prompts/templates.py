@@ -242,14 +242,13 @@ Parameters:
 - Time range: {time_range}
 
 Steps to follow:
-1. Use get_cost_summary to review current spending trends
+1. Use get_cost_recommendation_categories to see categories with counts and savings
 2. Use get_cost_recommendations to identify optimization opportunities
 3. Use get_idle_resources to find underutilized or idle resources
 4. Prioritize recommendations by potential savings
 5. Cross-reference with active alerts for at-risk resources
 
 Provide a report with:
-- Current cost summary and trends
 - Top cost optimization recommendations
 - Idle resources that could be terminated or downsized
 - Estimated monthly savings if recommendations are applied
@@ -807,8 +806,7 @@ Execution Steps:
 3. Use get_device to verify the target device status and collector
 4. Use get_collector to verify collector build version
 5. If all checks pass, use execute_remediation to run the script
-6. Use get_remediation_status to monitor execution progress
-7. Use get_remediation_history to verify the execution result
+6. Review the execution response and re-check device alerts to verify the result
 
 Post-Execution:
 8. Verify the original alert condition has improved

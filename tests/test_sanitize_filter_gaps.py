@@ -152,35 +152,6 @@ class TestCostSanitizeGaps:
     """Tests for sanitize gaps in cost.py."""
 
     @respx.mock
-    async def test_get_cloud_cost_accounts_provider_wildcard_stripped(self, client):
-        """get_cloud_cost_accounts strips wildcards from provider filter."""
-        from lm_mcp.tools.cost import get_cloud_cost_accounts
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/cloudaccounts").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_cloud_cost_accounts(client, provider="aws*")
-
-        data = json.loads(result[0].text)
-        assert "note" in data
-        assert "Wildcard" in data["note"]
-
-    @respx.mock
-    async def test_get_cloud_cost_accounts_provider_clean_no_note(self, client):
-        """get_cloud_cost_accounts does not add note for clean provider."""
-        from lm_mcp.tools.cost import get_cloud_cost_accounts
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/cloudaccounts").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_cloud_cost_accounts(client, provider="aws")
-
-        data = json.loads(result[0].text)
-        assert "note" not in data
-
-    @respx.mock
     async def test_get_cost_recommendations_type_wildcard_stripped(self, client):
         """get_cost_recommendations strips wildcards from recommendation_type filter."""
         from lm_mcp.tools.cost import get_cost_recommendations

@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    safe_total,
     sanitize_filter_value,
 )
 
@@ -122,90 +123,49 @@ async def get_device_batchjobs(
     device_id: int,
     limit: int = 50,
 ) -> list[TextContent]:
-    """Get batch jobs configured for a specific device.
+    """List BatchJob datasources applied to a specific device.
+
+    BatchJob monitoring binds to devices as devicedatasources of type BJ;
+    there is no dedicated device batchjobs REST endpoint. Per-run output
+    and exit codes live in the BatchJob instance data (get_device_data).
 
     Args:
         client: LogicMonitor API client.
         device_id: Device ID.
-        limit: Maximum number of batch jobs to return.
+        limit: Maximum number of batch job datasources to return.
 
     Returns:
         List of TextContent with device batch job data or error.
     """
     try:
-        params: dict = {"size": limit}
-        result = await client.get(f"/device/devices/{device_id}/batchjobs", params=params)
+        params: dict = {"size": limit, "filter": 'dataSourceType:"BJ"'}
+        result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
 
         jobs = []
         for item in result.get("items", []):
             jobs.append(
                 {
                     "id": item.get("id"),
-                    "batchjob_id": item.get("batchJobId"),
-                    "batchjob_name": item.get("batchJobName"),
-                    "device_id": item.get("deviceId"),
-                    "device_name": item.get("deviceDisplayName"),
-                    "status": item.get("status"),
-                    "last_run_time": item.get("lastRunTime"),
-                    "last_run_status": item.get("lastRunStatus"),
+                    "datasource_id": item.get("dataSourceId"),
+                    "name": item.get("dataSourceName"),
+                    "display_name": item.get("dataSourceDisplayName"),
+                    "instance_count": item.get("instanceNumber"),
+                    "monitoring_instance_count": item.get("monitoringInstanceNumber"),
+                    "stop_monitoring": item.get("stopMonitoring"),
                 }
             )
 
         return format_response(
             {
                 "device_id": device_id,
-                "total": result.get("total", 0),
+                "total": safe_total(result),
                 "count": len(jobs),
                 "batchjobs": jobs,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def get_batchjob_history(
-    client: LogicMonitorClient,
-    device_id: int,
-    batchjob_id: int,
-    limit: int = 50,
-) -> list[TextContent]:
-    """Get execution history for a batch job on a device.
-
-    Args:
-        client: LogicMonitor API client.
-        device_id: Device ID.
-        batchjob_id: Batch job ID.
-        limit: Maximum number of history records to return.
-
-    Returns:
-        List of TextContent with batch job history or error.
-    """
-    try:
-        params: dict = {"size": limit}
-        result = await client.get(
-            f"/device/devices/{device_id}/batchjobs/{batchjob_id}/history", params=params
-        )
-
-        history = []
-        for item in result.get("items", []):
-            history.append(
-                {
-                    "id": item.get("id"),
-                    "run_time": item.get("runTime"),
-                    "status": item.get("status"),
-                    "exit_code": item.get("exitCode"),
-                    "duration": item.get("duration"),
-                    "output": item.get("output"),
-                }
-            )
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "batchjob_id": batchjob_id,
-                "total": result.get("total", 0),
-                "count": len(history),
-                "history": history,
+                "note": (
+                    "Per-run output, exit codes, and timing are datapoints on the "
+                    "BatchJob instance; use get_device_data with the id above as "
+                    "device_datasource_id."
+                ),
             }
         )
     except Exception as e:

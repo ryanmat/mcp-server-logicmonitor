@@ -246,11 +246,8 @@ TOOL_CATEGORIES = {
         "cost": {
             "description": "Cloud cost analysis and optimization",
             "tools": [
-                "get_cost_summary",
-                "get_resource_cost",
                 "get_cost_recommendations",
                 "get_idle_resources",
-                "get_cloud_cost_accounts",
                 "get_cost_recommendation_categories",
                 "get_cost_recommendation",
             ],
@@ -320,7 +317,6 @@ TOOL_CATEGORIES = {
             "tools": [
                 "get_batchjobs",
                 "get_batchjob",
-                "get_batchjob_history",
                 "get_device_batchjobs",
                 "get_scheduled_downtime_jobs",
             ],
@@ -455,8 +451,6 @@ TOOL_CATEGORIES = {
                 "get_remediationsources",
                 "get_remediationsource",
                 "execute_remediation",
-                "get_remediation_status",
-                "get_remediation_history",
             ],
         },
         "watsonx": {

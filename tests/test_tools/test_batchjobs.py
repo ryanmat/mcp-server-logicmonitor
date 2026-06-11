@@ -144,23 +144,24 @@ class TestGetDeviceBatchjobs:
 
     @respx.mock
     async def test_get_device_batchjobs_returns_list(self, client):
-        """get_device_batchjobs returns batch jobs for device."""
+        """get_device_batchjobs lists BJ-type devicedatasources for the device."""
         from lm_mcp.tools.batchjobs import get_device_batchjobs
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/456/batchjobs").mock(
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/456/devicedatasources"
+        ).mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "items": [
                         {
                             "id": 1001,
-                            "batchJobId": 123,
-                            "batchJobName": "DailyBackup",
-                            "deviceId": 456,
-                            "deviceDisplayName": "db-server-01",
-                            "status": "active",
-                            "lastRunTime": 1702400000,
-                            "lastRunStatus": "success",
+                            "dataSourceId": 123,
+                            "dataSourceName": "DailyBackup",
+                            "dataSourceDisplayName": "Daily Backup Job",
+                            "instanceNumber": 1,
+                            "monitoringInstanceNumber": 1,
+                            "stopMonitoring": False,
                         }
                     ],
                     "total": 1,
@@ -174,52 +175,7 @@ class TestGetDeviceBatchjobs:
         data = json.loads(result[0].text)
         assert data["device_id"] == 456
         assert data["total"] == 1
-        assert data["batchjobs"][0]["batchjob_name"] == "DailyBackup"
-
-
-class TestGetBatchjobHistory:
-    """Tests for get_batchjob_history tool."""
-
-    @respx.mock
-    async def test_get_batchjob_history_returns_history(self, client):
-        """get_batchjob_history returns execution history."""
-        from lm_mcp.tools.batchjobs import get_batchjob_history
-
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/456/batchjobs/123/history"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "id": 1,
-                            "runTime": 1702400000,
-                            "status": "success",
-                            "exitCode": 0,
-                            "duration": 300,
-                            "output": "Backup completed successfully",
-                        },
-                        {
-                            "id": 2,
-                            "runTime": 1702313600,
-                            "status": "failed",
-                            "exitCode": 1,
-                            "duration": 60,
-                            "output": "Connection timeout",
-                        },
-                    ],
-                    "total": 2,
-                },
-            )
-        )
-
-        result = await get_batchjob_history(client, device_id=456, batchjob_id=123)
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["device_id"] == 456
-        assert data["batchjob_id"] == 123
-        assert data["total"] == 2
-        assert data["history"][0]["status"] == "success"
-        assert data["history"][1]["status"] == "failed"
+        assert data["batchjobs"][0]["name"] == "DailyBackup"
+        assert data["batchjobs"][0]["datasource_id"] == 123
+        # BatchJob datasources are filtered server-side by type BJ
+        assert route.calls[0].request.url.params["filter"] == 'dataSourceType:"BJ"'

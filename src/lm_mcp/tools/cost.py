@@ -19,57 +19,6 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-async def get_cloud_cost_accounts(
-    client: LogicMonitorClient,
-    provider: str | None = None,
-    limit: int = 50,
-) -> list[TextContent]:
-    """List cloud accounts configured for cost tracking.
-
-    Args:
-        client: LogicMonitor API client.
-        provider: Filter by cloud provider (aws, azure, gcp).
-        limit: Maximum number of accounts to return.
-
-    Returns:
-        List of TextContent with cloud account data or error.
-    """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if provider:
-            clean_provider, was_modified = sanitize_filter_value(provider)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"provider:{quote_filter_value(clean_provider)}"
-
-        result = await client.get("/cost/cloudaccounts", params=params)
-
-        accounts = []
-        for item in result.get("items", []):
-            accounts.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "provider": item.get("provider"),
-                    "account_id": item.get("accountId"),
-                    "status": item.get("status"),
-                    "last_updated": item.get("lastUpdatedOn"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(accounts),
-            "cloud_accounts": accounts,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
-
-
 async def get_cost_recommendations(
     client: LogicMonitorClient,
     cloud_account_id: int | None = None,
@@ -128,75 +77,6 @@ async def get_cost_recommendations(
         if wildcards_stripped:
             response["note"] = WILDCARD_STRIP_NOTE
         return format_response(response)
-    except Exception as e:
-        return handle_error(e)
-
-
-async def get_cost_summary(
-    client: LogicMonitorClient,
-    cloud_account_id: int | None = None,
-    time_range: str = "last30days",
-) -> list[TextContent]:
-    """Get cost summary and trends.
-
-    Args:
-        client: LogicMonitor API client.
-        cloud_account_id: Filter by specific cloud account.
-        time_range: Time range for summary (last7days, last30days, last90days).
-
-    Returns:
-        List of TextContent with cost summary or error.
-    """
-    try:
-        params: dict = {"timeRange": time_range}
-
-        if cloud_account_id:
-            params["cloudAccountId"] = cloud_account_id
-
-        result = await client.get("/cost/summary", params=params)
-
-        return format_response(
-            {
-                "time_range": time_range,
-                "total_cost": result.get("totalCost"),
-                "cost_trend": result.get("costTrend"),
-                "cost_by_service": result.get("costByService", []),
-                "cost_by_region": result.get("costByRegion", []),
-                "projected_monthly": result.get("projectedMonthlyCost"),
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def get_resource_cost(
-    client: LogicMonitorClient,
-    device_id: int,
-    time_range: str = "last30days",
-) -> list[TextContent]:
-    """Get cost data for a specific resource/device.
-
-    Args:
-        client: LogicMonitor API client.
-        device_id: Device ID to get cost for.
-        time_range: Time range for cost data (last7days, last30days, last90days).
-
-    Returns:
-        List of TextContent with resource cost data or error.
-    """
-    try:
-        params: dict = {"timeRange": time_range}
-        result = await client.get(f"/device/devices/{device_id}/cost", params=params)
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "time_range": time_range,
-                "total_cost": result.get("totalCost"),
-                "cost_breakdown": result.get("costBreakdown", []),
-                "cost_trend": result.get("costTrend", []),
-            }
-        )
     except Exception as e:
         return handle_error(e)
 

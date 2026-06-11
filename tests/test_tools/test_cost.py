@@ -28,64 +28,6 @@ def client(auth):
     )
 
 
-class TestGetCloudCostAccounts:
-    """Tests for get_cloud_cost_accounts tool."""
-
-    @respx.mock
-    async def test_get_cloud_cost_accounts_returns_list(self, client):
-        """get_cloud_cost_accounts returns properly formatted list."""
-        from lm_mcp.tools.cost import get_cloud_cost_accounts
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/cloudaccounts").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "id": 1,
-                            "name": "Production AWS",
-                            "provider": "aws",
-                            "accountId": "123456789",
-                            "status": "active",
-                            "lastUpdatedOn": 1702400000,
-                        },
-                        {
-                            "id": 2,
-                            "name": "Dev Azure",
-                            "provider": "azure",
-                            "accountId": "subscription-id",
-                            "status": "active",
-                            "lastUpdatedOn": 1702400000,
-                        },
-                    ],
-                    "total": 2,
-                },
-            )
-        )
-
-        result = await get_cloud_cost_accounts(client)
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["total"] == 2
-        assert len(data["cloud_accounts"]) == 2
-        assert data["cloud_accounts"][0]["provider"] == "aws"
-
-    @respx.mock
-    async def test_get_cloud_cost_accounts_with_provider_filter(self, client):
-        """get_cloud_cost_accounts filters by provider."""
-        from lm_mcp.tools.cost import get_cloud_cost_accounts
-
-        route = respx.get("https://test.logicmonitor.com/santaba/rest/cost/cloudaccounts").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        await get_cloud_cost_accounts(client, provider="aws")
-
-        assert "filter" in route.calls[0].request.url.params
-        assert 'provider:"aws"' in route.calls[0].request.url.params.get("filter", "")
-
-
 class TestGetCostRecommendations:
     """Tests for get_cost_recommendations tool."""
 
@@ -123,38 +65,6 @@ class TestGetCostRecommendations:
         assert data["total"] == 1
         assert data["recommendations"][0]["type"] == "rightsizing"
         assert data["recommendations"][0]["projected_savings"] == 40.00
-
-
-class TestGetCostSummary:
-    """Tests for get_cost_summary tool."""
-
-    @respx.mock
-    async def test_get_cost_summary_returns_summary(self, client):
-        """get_cost_summary returns cost summary data."""
-        from lm_mcp.tools.cost import get_cost_summary
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/summary").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "totalCost": 5000.00,
-                    "costTrend": "increasing",
-                    "costByService": [
-                        {"service": "EC2", "cost": 3000.00},
-                        {"service": "RDS", "cost": 1500.00},
-                    ],
-                    "costByRegion": [{"region": "us-east-1", "cost": 4000.00}],
-                    "projectedMonthlyCost": 5500.00,
-                },
-            )
-        )
-
-        result = await get_cost_summary(client, time_range="last30days")
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["total_cost"] == 5000.00
-        assert data["projected_monthly"] == 5500.00
 
 
 class TestGetIdleResources:

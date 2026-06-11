@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 280 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 274 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -278,11 +278,8 @@ Cloud cost analysis and optimization
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_cost_summary` | Get cloud cost summary | No |
-| `get_resource_cost` | Get cost data for a specific resource | No |
 | `get_cost_recommendations` | Get cost optimization recommendations | No |
 | `get_idle_resources` | Get idle/underutilized resources | No |
-| `get_cloud_cost_accounts` | Get cloud accounts with cost data | No |
 | `get_cost_recommendation_categories` | Get cost recommendation categories with counts and savings | No |
 | `get_cost_recommendation` | Get a specific cost recommendation by ID (v224 API) | No |
 
@@ -360,8 +357,7 @@ Batch job monitoring
 |------|-------------|-------|
 | `get_batchjobs` | List batch jobs | No |
 | `get_batchjob` | Get details about a specific batch job | No |
-| `get_batchjob_history` | Get execution history for a batch job | No |
-| `get_device_batchjobs` | Get batch jobs for a specific device (resource) | No |
+| `get_device_batchjobs` | List BatchJob datasources applied to a device (resource); per-run output lives in instance data via get_device_data | No |
 | `get_scheduled_downtime_jobs` | Get batch jobs related to SDT automation | No |
 
 ## Exports
@@ -515,8 +511,6 @@ Diagnostic sources, remediation sources, and remediation execution.
 | `get_remediationsources` | List RemediationSources from LogicMonitor | No |
 | `get_remediationsource` | Get details about a specific RemediationSource including the Groovy script | No |
 | `execute_remediation` | Execute a RemediationSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Requires write permission. | Yes |
-| `get_remediation_status` | Get the current status of a remediation source execution on a device. Returns device state and source details. | No |
-| `get_remediation_history` | List past remediation executions for a device from audit logs. Output truncated at 32KB. | No |
 
 ## IBM watsonx.ai
 

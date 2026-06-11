@@ -3176,38 +3176,6 @@
       "type": "object"
     }
   },
-  "get_batchjob_history": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get execution history for a batch job",
-    "inputSchema": {
-      "properties": {
-        "batchjob_id": {
-          "description": "Batch job ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "limit": {
-          "default": 20,
-          "description": "Max results",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "device_id",
-        "batchjob_id"
-      ],
-      "type": "object"
-    }
-  },
   "get_batchjobs": {
     "annotations": {
       "destructiveHint": false,
@@ -3251,26 +3219,6 @@
         "resource_type": {
           "description": "Filter by resource type",
           "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_cloud_cost_accounts": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get cloud accounts with cost data",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
         }
       },
       "type": "object"
@@ -3578,30 +3526,6 @@
       "type": "object"
     }
   },
-  "get_cost_summary": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get cloud cost summary",
-    "inputSchema": {
-      "properties": {
-        "cloud_account_id": {
-          "description": "Filter by cloud account ID",
-          "type": "integer"
-        },
-        "time_range": {
-          "default": "last30days",
-          "description": "Time range (e.g. last7days, last30days, last90days)",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
   "get_credentials": {
     "annotations": {
       "destructiveHint": false,
@@ -3842,11 +3766,16 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get batch jobs for a specific device (resource)",
+    "description": "List BatchJob datasources applied to a device (resource); per-run output lives in instance data via get_device_data",
     "inputSchema": {
       "properties": {
         "device_id": {
           "description": "Device ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
           "type": "integer"
         }
       },
@@ -5433,64 +5362,6 @@
       "type": "object"
     }
   },
-  "get_remediation_history": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List past remediation executions for a device from audit logs. Output truncated at 32KB.",
-    "inputSchema": {
-      "properties": {
-        "host_id": {
-          "description": "Device/host ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours to look back (default: 24)",
-          "type": "integer"
-        },
-        "remediation_source_id": {
-          "description": "Filter to a specific remediation source",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "host_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_remediation_status": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get the current status of a remediation source execution on a device. Returns device state and source details.",
-    "inputSchema": {
-      "properties": {
-        "host_id": {
-          "description": "Device/host ID",
-          "type": "integer"
-        },
-        "remediation_source_id": {
-          "description": "Remediation source ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "host_id",
-        "remediation_source_id"
-      ],
-      "type": "object"
-    }
-  },
   "get_remediationsource": {
     "annotations": {
       "destructiveHint": false,
@@ -5632,33 +5503,6 @@
           "type": "string"
         }
       },
-      "type": "object"
-    }
-  },
-  "get_resource_cost": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get cost data for a specific resource",
-    "inputSchema": {
-      "properties": {
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "time_range": {
-          "default": "last30days",
-          "description": "Time range (e.g. last7days, last30days, last90days)",
-          "type": "string"
-        }
-      },
-      "required": [
-        "device_id"
-      ],
       "type": "object"
     }
   },

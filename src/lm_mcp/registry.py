@@ -3341,27 +3341,17 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="get_batchjob_history",
-            description="Get execution history for a batch job",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "integer", "description": "Device ID"},
-                    "batchjob_id": {"type": "integer", "description": "Batch job ID"},
-                    "limit": {"type": "integer", "default": 20, "description": "Max results"},
-                },
-                "required": ["device_id", "batchjob_id"],
-            },
-        ),
-        Tool(
             name="get_device_batchjobs",
-            description="Get batch jobs for a specific device (resource)",
+            description=(
+                "List BatchJob datasources applied to a device (resource); per-run "
+                "output lives in instance data via get_device_data"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
                 "required": ["device_id"],
             },
@@ -3383,42 +3373,6 @@ TOOLS.extend(
 # Cost/Cloud
 TOOLS.extend(
     [
-        Tool(
-            name="get_cost_summary",
-            description="Get cloud cost summary",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "cloud_account_id": {
-                        "type": "integer",
-                        "description": "Filter by cloud account ID",
-                    },
-                    "time_range": {
-                        "type": "string",
-                        "default": "last30days",
-                        "description": "Time range (e.g. last7days, last30days, last90days)",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="get_resource_cost",
-            description="Get cost data for a specific resource",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "integer", "description": "Device ID"},
-                    "time_range": {
-                        "type": "string",
-                        "default": "last30days",
-                        "description": "Time range (e.g. last7days, last30days, last90days)",
-                    },
-                },
-                "required": ["device_id"],
-            },
-        ),
         Tool(
             name="get_cost_recommendations",
             description="Get cost optimization recommendations",
@@ -3453,17 +3407,6 @@ TOOLS.extend(
                         "type": "string",
                         "description": "Filter by resource type",
                     },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                },
-            },
-        ),
-        Tool(
-            name="get_cloud_cost_accounts",
-            description="Get cloud accounts with cost data",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -5281,55 +5224,6 @@ TOOLS.extend(
                 "required": ["host_id", "remediation_source_id"],
             },
         ),
-        Tool(
-            name="get_remediation_status",
-            description=(
-                "Get the current status of a remediation source execution "
-                "on a device. Returns device state and source details."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "host_id": {
-                        "type": "integer",
-                        "description": "Device/host ID",
-                    },
-                    "remediation_source_id": {
-                        "type": "integer",
-                        "description": "Remediation source ID",
-                    },
-                },
-                "required": ["host_id", "remediation_source_id"],
-            },
-        ),
-        Tool(
-            name="get_remediation_history",
-            description=(
-                "List past remediation executions for a device from "
-                "audit logs. Output truncated at 32KB."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "host_id": {
-                        "type": "integer",
-                        "description": "Device/host ID",
-                    },
-                    "remediation_source_id": {
-                        "type": "integer",
-                        "description": "Filter to a specific remediation source",
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back (default: 24)",
-                    },
-                },
-                "required": ["host_id"],
-            },
-        ),
     ]
 )
 
@@ -6843,8 +6737,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
         "execute_remediation": remediationsources.execute_remediation,
-        "get_remediation_status": remediationsources.get_remediation_status,
-        "get_remediation_history": remediationsources.get_remediation_history,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,
@@ -6937,15 +6829,11 @@ def get_tool_handler(tool_name: str) -> Any:
         # Batch Jobs
         "get_batchjobs": batchjobs.get_batchjobs,
         "get_batchjob": batchjobs.get_batchjob,
-        "get_batchjob_history": batchjobs.get_batchjob_history,
         "get_device_batchjobs": batchjobs.get_device_batchjobs,
         "get_scheduled_downtime_jobs": batchjobs.get_scheduled_downtime_jobs,
         # Cost
-        "get_cost_summary": cost.get_cost_summary,
-        "get_resource_cost": cost.get_resource_cost,
         "get_cost_recommendations": cost.get_cost_recommendations,
         "get_idle_resources": cost.get_idle_resources,
-        "get_cloud_cost_accounts": cost.get_cloud_cost_accounts,
         "get_cost_recommendation_categories": cost.get_cost_recommendation_categories,
         "get_cost_recommendation": cost.get_cost_recommendation,
         # Imports/Exports
