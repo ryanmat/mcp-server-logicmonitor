@@ -712,3 +712,33 @@ async def import_diagnosticsource(
         return _import_result_response(result)
     except Exception as e:
         return _import_error_response(e, "diagnosticsource")
+
+
+async def export_remediationsource(
+    client: LogicMonitorClient,
+    remediationsource_id: int,
+) -> list[TextContent]:
+    """Export a RemediationSource definition as JSON via REST API.
+
+    Returns the REST API representation. RemediationSources have no LM
+    Exchange import endpoint; use create_remediationsource with this output.
+
+    Args:
+        client: LogicMonitor API client.
+        remediationsource_id: RemediationSource ID to export.
+
+    Returns:
+        List of TextContent with full RemediationSource definition or error.
+    """
+    try:
+        result = await client.get(f"/setting/remediationsources/{remediationsource_id}")
+        return format_response(
+            {
+                "remediationsource_id": remediationsource_id,
+                "name": result.get("name"),
+                "format": "json",
+                "definition": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)

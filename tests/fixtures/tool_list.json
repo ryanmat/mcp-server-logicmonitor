@@ -1452,6 +1452,33 @@
       "type": "object"
     }
   },
+  "create_remediationsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint.",
+    "inputSchema": {
+      "properties": {
+        "definition": {
+          "description": "Full RemediationSource definition in REST API format",
+          "type": "object"
+        },
+        "overwrite": {
+          "default": false,
+          "description": "If true, delete existing RemediationSource with same name before creating",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "create_report": {
     "annotations": {
       "destructiveHint": false,
@@ -2162,6 +2189,28 @@
       "type": "object"
     }
   },
+  "delete_remediationsource": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete a RemediationSource definition (requires write permission). Action chains referencing it lose that stage.",
+    "inputSchema": {
+      "properties": {
+        "remediationsource_id": {
+          "description": "RemediationSource ID to delete",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remediationsource_id"
+      ],
+      "type": "object"
+    }
+  },
   "delete_report": {
     "annotations": {
       "destructiveHint": true,
@@ -2821,6 +2870,28 @@
       },
       "required": [
         "propertysource_id"
+      ],
+      "type": "object"
+    }
+  },
+  "export_remediationsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource or update_remediationsource.",
+    "inputSchema": {
+      "properties": {
+        "remediationsource_id": {
+          "description": "RemediationSource ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remediationsource_id"
       ],
       "type": "object"
     }
@@ -8636,6 +8707,7 @@
             "eventsource",
             "logsource",
             "propertysource",
+            "remediationsource",
             "topologysource"
           ],
           "type": "string"
@@ -8793,6 +8865,38 @@
       },
       "required": [
         "group_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_remediationsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='remediationsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
+    "inputSchema": {
+      "properties": {
+        "confirm": {
+          "default": false,
+          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
+          "type": "boolean"
+        },
+        "definition": {
+          "description": "FULL RemediationSource definition with all fields (will replace)",
+          "type": "object"
+        },
+        "remediationsource_id": {
+          "description": "RemediationSource ID to update",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remediationsource_id",
+        "definition"
       ],
       "type": "object"
     }

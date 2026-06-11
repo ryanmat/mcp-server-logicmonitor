@@ -1207,6 +1207,11 @@ _LM_TYPES: dict[str, tuple[str, str, str]] = {
         "update_diagnosticsource",
         "diagnosticsource_id",
     ),
+    "remediationsource": (
+        "export_remediationsource",
+        "update_remediationsource",
+        "remediationsource_id",
+    ),
 }
 
 
@@ -1295,7 +1300,7 @@ async def update_logicmodule(
     Args:
         client: LogicMonitor API client.
         type: One of configsource, datasource, diagnosticsource, eventsource,
-            logsource, propertysource, topologysource.
+            logsource, propertysource, remediationsource, topologysource.
         id: LogicModule ID.
         changes: Partial update — only the fields to modify. Use None as a
             value to explicitly delete a key.

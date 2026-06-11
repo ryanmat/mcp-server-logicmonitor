@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
     require_write_permission,
     safe_total,
@@ -229,5 +230,151 @@ async def execute_remediation(
         )
 
         return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_remediationsource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create a RemediationSource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_remediationsource).
+    There is no LM Exchange import endpoint for RemediationSources; this is
+    the only programmatic creation path.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full RemediationSource definition dict in REST API format.
+        overwrite: If True, delete existing RemediationSource with the same
+            name before creating.
+
+    Returns:
+        List of TextContent with created RemediationSource info or error.
+    """
+    try:
+        payload = normalize_definition_fields(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/remediationsources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/remediationsources/{items[0]['id']}")
+
+        result = await client.post("/setting/remediationsources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"RemediationSource '{result.get('name')}' created successfully",
+                "remediationsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_remediationsource(
+    client: LogicMonitorClient,
+    remediationsource_id: int,
+    definition: dict,
+    confirm: bool = False,
+) -> list[TextContent]:
+    """Update an existing RemediationSource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked, including the Groovy script. PREFER
+    update_logicmodule(type='remediationsource', ...) for partial updates;
+    it exports, deep-merges, and previews a diff before writing.
+
+    Args:
+        client: LogicMonitor API client.
+        remediationsource_id: RemediationSource ID to update.
+        definition: Full RemediationSource definition dict with all fields.
+        confirm: Must be True to proceed. Defaults to False to prevent
+            accidental field-blanking via partial payloads.
+
+    Returns:
+        List of TextContent with updated RemediationSource info or error.
+    """
+    if not confirm:
+        return format_response(
+            {
+                "error": True,
+                "code": "CONFIRMATION_REQUIRED",
+                "message": (
+                    "update_remediationsource is full-replace -- any field omitted "
+                    "from `definition` will be BLANKED, including the script. Set "
+                    "confirm=true to proceed, OR use update_logicmodule"
+                    "(type='remediationsource', id, changes, mode='preview') for a "
+                    "safe partial update with diff preview."
+                ),
+            }
+        )
+    try:
+        payload = normalize_definition_fields(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/remediationsources/{remediationsource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"RemediationSource '{result.get('name')}' updated successfully",
+                "remediationsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_remediationsource(
+    client: LogicMonitorClient,
+    remediationsource_id: int,
+) -> list[TextContent]:
+    """Delete a RemediationSource from LogicMonitor.
+
+    WARNING: This removes the RemediationSource definition; any action chains
+    referencing it as a stage will lose that stage.
+
+    Args:
+        client: LogicMonitor API client.
+        remediationsource_id: RemediationSource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        source = await client.get(f"/setting/remediationsources/{remediationsource_id}")
+        source_name = source.get("name", f"ID:{remediationsource_id}")
+
+        await client.delete(f"/setting/remediationsources/{remediationsource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"RemediationSource '{source_name}' deleted",
+                "remediationsource_id": remediationsource_id,
+            }
+        )
     except Exception as e:
         return handle_error(e)

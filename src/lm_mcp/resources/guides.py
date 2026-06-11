@@ -333,6 +333,7 @@ TOOL_CATEGORIES = {
                 "export_propertysource",
                 "export_logsource",
                 "export_diagnosticsource",
+                "export_remediationsource",
             ],
         },
         "imports": {
@@ -459,6 +460,9 @@ TOOL_CATEGORIES = {
                 "create_diagnosticsource",
                 "update_diagnosticsource",
                 "delete_diagnosticsource",
+                "create_remediationsource",
+                "update_remediationsource",
+                "delete_remediationsource",
             ],
         },
         "watsonx": {

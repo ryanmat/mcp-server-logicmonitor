@@ -361,6 +361,7 @@ class TestUpdateLogicmodule:
             "eventsource",
             "logsource",
             "propertysource",
+            "remediationsource",
             "topologysource",
         }
 

@@ -3571,6 +3571,23 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="export_remediationsource",
+            description="Export a RemediationSource definition (REST API format). "
+            "Output can be used with create_remediationsource or "
+            "update_remediationsource.",
+            annotations=_EXPORT,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "remediationsource_id": {
+                        "type": "integer",
+                        "description": "RemediationSource ID",
+                    },
+                },
+                "required": ["remediationsource_id"],
+            },
+        ),
+        Tool(
             name="import_datasource",
             description="Import a DataSource from LM Exchange JSON format via "
             "multipart upload (requires write permission). This expects LM Exchange "
@@ -5387,6 +5404,88 @@ TOOLS.extend(
                 "required": ["host_id", "remediation_source_id"],
             },
         ),
+        Tool(
+            name="create_remediationsource",
+            description=(
+                "Create a RemediationSource via REST API from a full definition dict "
+                "(requires write permission). Accepts REST API format (same as "
+                "export_remediationsource output). RemediationSources have no LM "
+                "Exchange import endpoint."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full RemediationSource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "If true, delete existing RemediationSource with same name "
+                            "before creating"
+                        ),
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_remediationsource",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server, including the script. "
+                "PREFER update_logicmodule(type='remediationsource', id, changes, "
+                "mode='preview') for partial updates with diff preview. Requires "
+                "confirm=true to proceed."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "remediationsource_id": {
+                        "type": "integer",
+                        "description": "RemediationSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": (
+                            "FULL RemediationSource definition with all fields (will replace)"
+                        ),
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for "
+                            "safe partial updates."
+                        ),
+                    },
+                },
+                "required": ["remediationsource_id", "definition"],
+            },
+        ),
+        Tool(
+            name="delete_remediationsource",
+            description=(
+                "Delete a RemediationSource definition (requires write permission). "
+                "Action chains referencing it lose that stage."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "remediationsource_id": {
+                        "type": "integer",
+                        "description": "RemediationSource ID to delete",
+                    },
+                },
+                "required": ["remediationsource_id"],
+            },
+        ),
     ]
 )
 
@@ -5744,6 +5843,7 @@ TOOLS.extend(
                             "eventsource",
                             "logsource",
                             "propertysource",
+                            "remediationsource",
                             "topologysource",
                         ],
                         "description": "Source type to update",
@@ -7014,6 +7114,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
         "execute_remediation": remediationsources.execute_remediation,
+        "create_remediationsource": remediationsources.create_remediationsource,
+        "update_remediationsource": remediationsources.update_remediationsource,
+        "delete_remediationsource": remediationsources.delete_remediationsource,
         "get_diagnostic_remediation_assignments": (
             diagnostic_remediation.get_diagnostic_remediation_assignments
         ),
@@ -7129,6 +7232,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "export_propertysource": imports.export_propertysource,
         "export_logsource": imports.export_logsource,
         "export_diagnosticsource": imports.export_diagnosticsource,
+        "export_remediationsource": imports.export_remediationsource,
         "import_datasource": imports.import_datasource,
         "import_configsource": imports.import_configsource,
         "import_eventsource": imports.import_eventsource,

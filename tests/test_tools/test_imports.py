@@ -858,3 +858,31 @@ class TestDiagnosticSourceImportExport:
 
         text = result[0].text
         assert "create_diagnosticsource" in text
+
+
+class TestRemediationSourceExport:
+    """Tests for export_remediationsource (no import counterpart exists)."""
+
+    @respx.mock
+    async def test_export_remediationsource_returns_full_definition(self, client):
+        """export_remediationsource returns complete RemediationSource JSON."""
+        from lm_mcp.tools.imports import export_remediationsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 3,
+                    "name": "RestartSvc",
+                    "appliesTo": "false()",
+                    "groovyScript": "println 'restart'",
+                },
+            )
+        )
+
+        result = await export_remediationsource(client, remediationsource_id=3)
+
+        data = json.loads(result[0].text)
+        assert data["remediationsource_id"] == 3
+        assert data["format"] == "json"
+        assert data["definition"]["groovyScript"] == "println 'restart'"

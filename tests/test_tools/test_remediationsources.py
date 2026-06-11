@@ -518,3 +518,154 @@ class TestExecuteRemediation:
 
         result = await execute_remediation(client, host_id=1, remediation_source_id=100)
         assert "Error:" in result[0].text
+
+
+class TestCreateRemediationSource:
+    """Tests for create_remediationsource tool."""
+
+    async def test_create_requires_write_permission(self, client, monkeypatch):
+        """create_remediationsource is blocked when writes are disabled."""
+        from lm_mcp.tools.remediationsources import create_remediationsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await create_remediationsource(client, definition={"name": "X"})
+
+        assert "Write operations are disabled" in result[0].text
+
+    @respx.mock
+    async def test_create_posts_definition(self, client, enable_writes):
+        """create_remediationsource posts the normalized definition."""
+        from lm_mcp.tools.remediationsources import create_remediationsource
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
+        ).mock(
+            return_value=httpx.Response(
+                200, json={"id": 88, "name": "RestartSvc", "displayName": "Restart Service"}
+            )
+        )
+
+        definition = {
+            "name": "RestartSvc",
+            "displayName": "Restart Service",
+            "appliesTo": "false()",
+            "groovyScript": "println 'restart'",
+        }
+        result = await create_remediationsource(client, definition=definition)
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["name"] == "RestartSvc"
+        assert "id" not in body
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert data["remediationsource"]["id"] == 88
+
+    @respx.mock
+    async def test_create_handles_api_error(self, client, enable_writes):
+        """create_remediationsource surfaces 400 errors."""
+        from lm_mcp.tools.remediationsources import create_remediationsource
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/remediationsources").mock(
+            return_value=httpx.Response(400, json={"errorMessage": "name required"})
+        )
+
+        result = await create_remediationsource(client, definition={"displayName": "X"})
+
+        assert "error" in result[0].text.lower()
+
+
+class TestUpdateRemediationSource:
+    """Tests for update_remediationsource tool."""
+
+    async def test_update_without_confirm_is_guarded(self, client, enable_writes):
+        """update_remediationsource without confirm=True returns CONFIRMATION_REQUIRED."""
+        from lm_mcp.tools.remediationsources import update_remediationsource
+
+        result = await update_remediationsource(
+            client, remediationsource_id=3, definition={"name": "X"}
+        )
+
+        text = result[0].text
+        assert "confirm" in text.lower()
+        assert "update_logicmodule" in text
+
+    @respx.mock
+    async def test_update_with_confirm_puts_definition(self, client, enable_writes):
+        """update_remediationsource with confirm=True PUTs the full definition."""
+        from lm_mcp.tools.remediationsources import update_remediationsource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3"
+        ).mock(return_value=httpx.Response(200, json={"id": 3, "name": "RestartSvc"}))
+
+        definition = {"name": "RestartSvc", "displayName": "Restart", "groovyScript": "x"}
+        result = await update_remediationsource(
+            client, remediationsource_id=3, definition=definition, confirm=True
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["name"] == "RestartSvc"
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+    async def test_update_requires_write_permission(self, client, monkeypatch):
+        """update_remediationsource is blocked when writes are disabled."""
+        from lm_mcp.tools.remediationsources import update_remediationsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await update_remediationsource(
+            client, remediationsource_id=3, definition={"name": "X"}, confirm=True
+        )
+
+        assert "Write operations are disabled" in result[0].text
+
+
+class TestDeleteRemediationSource:
+    """Tests for delete_remediationsource tool."""
+
+    @respx.mock
+    async def test_delete_success(self, client, enable_writes):
+        """delete_remediationsource deletes and reports the source name."""
+        from lm_mcp.tools.remediationsources import delete_remediationsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3").mock(
+            return_value=httpx.Response(200, json={"id": 3, "name": "RestartSvc"})
+        )
+        respx.delete(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        result = await delete_remediationsource(client, remediationsource_id=3)
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "RestartSvc" in data["message"]
+
+    @respx.mock
+    async def test_delete_not_found(self, client, enable_writes):
+        """delete_remediationsource surfaces 404."""
+        from lm_mcp.tools.remediationsources import delete_remediationsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
+        )
+
+        result = await delete_remediationsource(client, remediationsource_id=999)
+
+        assert "error" in result[0].text.lower()
