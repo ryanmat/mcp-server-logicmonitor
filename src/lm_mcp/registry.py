@@ -5236,6 +5236,114 @@ TOOLS.extend(
     ]
 )
 
+# Automated Diagnostics & Remediation (ADR) composite endpoints
+TOOLS.extend(
+    [
+        Tool(
+            name="get_diagnostic_remediation_assignments",
+            description=(
+                "List the diagnostic and remediation sources assigned to a specific "
+                "resource or alert (Automated Diagnostics & Remediation). Unlike "
+                "get_diagnosticsources/get_remediationsources, this resolves which "
+                "modules actually apply to the target."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "resource_id": {
+                        "type": "integer",
+                        "description": "Device/resource ID (provide this or alert_id)",
+                    },
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Alert ID (provide this or resource_id)",
+                    },
+                    "module_type": {
+                        "type": "string",
+                        "enum": ["diagnosticsource", "remediationsource"],
+                        "description": "Restrict to one module type (both if omitted)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_diagnostic_remediation_results",
+            description=(
+                "Get structured execution results for diagnostic and remediation "
+                "source runs: status, trigger type, executor, script output, and "
+                "timing. Provide exactly one of alert_id or host_id. Time window "
+                "params are epoch milliseconds; result timestamps are epoch seconds."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Alert ID (exactly one of alert_id/host_id)",
+                    },
+                    "host_id": {
+                        "type": "integer",
+                        "description": "Device/host ID (exactly one of alert_id/host_id)",
+                    },
+                    "module_type": {
+                        "type": "string",
+                        "enum": ["diagnostic", "remediation", "both"],
+                        "default": "both",
+                        "description": "Which module results to return",
+                    },
+                    "diagnostic_source_id": {
+                        "type": "integer",
+                        "description": "Filter to one DiagnosticSource by ID",
+                    },
+                    "diagnostic_source_name": {
+                        "type": "string",
+                        "description": "Filter to one DiagnosticSource by name",
+                    },
+                    "remediation_source_id": {
+                        "type": "integer",
+                        "description": "Filter to one RemediationSource by ID",
+                    },
+                    "remediation_source_name": {
+                        "type": "string",
+                        "description": "Filter to one RemediationSource by name",
+                    },
+                    "start_time_ms": {
+                        "type": "integer",
+                        "description": "Window start, epoch milliseconds",
+                    },
+                    "end_time_ms": {
+                        "type": "integer",
+                        "description": "Window end, epoch milliseconds",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Max results per page",
+                    },
+                    "offset": {"type": "integer", "default": 0, "description": "Page offset"},
+                    "cursor": {
+                        "type": "string",
+                        "description": (
+                            "Diagnostic-side cursor from a previous response "
+                            '(not valid with module_type "both")'
+                        ),
+                    },
+                    "remediation_cursor": {
+                        "type": "string",
+                        "description": (
+                            "Remediation-side cursor from a previous response "
+                            '(not valid with module_type "both")'
+                        ),
+                    },
+                },
+            },
+        ),
+    ]
+)
+
 # Workflows — composite tools and discovery
 TOOLS.extend(
     [
@@ -6592,6 +6700,7 @@ def get_tool_handler(tool_name: str) -> Any:
         dashboards,
         datasources,
         devices,
+        diagnostic_remediation,
         diagnosticsources,
         escalations,
         event_correlation,
@@ -6746,6 +6855,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
         "execute_remediation": remediationsources.execute_remediation,
+        "get_diagnostic_remediation_assignments": diagnostic_remediation.get_diagnostic_remediation_assignments,
+        "get_diagnostic_remediation_results": diagnostic_remediation.get_diagnostic_remediation_results,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,

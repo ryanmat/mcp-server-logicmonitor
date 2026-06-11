@@ -450,6 +450,8 @@ TOOL_CATEGORIES = {
                 "get_diagnosticsource",
                 "get_remediationsources",
                 "get_remediationsource",
+                "get_diagnostic_remediation_assignments",
+                "get_diagnostic_remediation_results",
                 "execute_remediation",
             ],
         },

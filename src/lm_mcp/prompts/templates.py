@@ -806,7 +806,8 @@ Execution Steps:
 3. Use get_device to verify the target device status and collector
 4. Use get_collector to verify collector build version
 5. If all checks pass, use execute_remediation to run the script
-6. Review the execution response and re-check device alerts to verify the result
+6. Use get_diagnostic_remediation_results with the host_id to verify execution
+   status and review the script output
 
 Post-Execution:
 8. Verify the original alert condition has improved

@@ -4262,6 +4262,117 @@
       "type": "object"
     }
   },
+  "get_diagnostic_remediation_assignments": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the diagnostic and remediation sources assigned to a specific resource or alert (Automated Diagnostics & Remediation). Unlike get_diagnosticsources/get_remediationsources, this resolves which modules actually apply to the target.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Alert ID (provide this or resource_id)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "module_type": {
+          "description": "Restrict to one module type (both if omitted)",
+          "enum": [
+            "diagnosticsource",
+            "remediationsource"
+          ],
+          "type": "string"
+        },
+        "resource_id": {
+          "description": "Device/resource ID (provide this or alert_id)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_diagnostic_remediation_results": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get structured execution results for diagnostic and remediation source runs: status, trigger type, executor, script output, and timing. Provide exactly one of alert_id or host_id. Time window params are epoch milliseconds; result timestamps are epoch seconds.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Alert ID (exactly one of alert_id/host_id)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Diagnostic-side cursor from a previous response (not valid with module_type \"both\")",
+          "type": "string"
+        },
+        "diagnostic_source_id": {
+          "description": "Filter to one DiagnosticSource by ID",
+          "type": "integer"
+        },
+        "diagnostic_source_name": {
+          "description": "Filter to one DiagnosticSource by name",
+          "type": "string"
+        },
+        "end_time_ms": {
+          "description": "Window end, epoch milliseconds",
+          "type": "integer"
+        },
+        "host_id": {
+          "description": "Device/host ID (exactly one of alert_id/host_id)",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results per page",
+          "type": "integer"
+        },
+        "module_type": {
+          "default": "both",
+          "description": "Which module results to return",
+          "enum": [
+            "diagnostic",
+            "remediation",
+            "both"
+          ],
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Page offset",
+          "type": "integer"
+        },
+        "remediation_cursor": {
+          "description": "Remediation-side cursor from a previous response (not valid with module_type \"both\")",
+          "type": "string"
+        },
+        "remediation_source_id": {
+          "description": "Filter to one RemediationSource by ID",
+          "type": "integer"
+        },
+        "remediation_source_name": {
+          "description": "Filter to one RemediationSource by name",
+          "type": "string"
+        },
+        "start_time_ms": {
+          "description": "Window start, epoch milliseconds",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_diagnosticsource": {
     "annotations": {
       "destructiveHint": false,
