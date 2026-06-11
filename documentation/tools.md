@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 276 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 282 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -374,6 +374,7 @@ Export LogicModule definitions as JSON
 | `export_eventsource` | Export an EventSource definition (REST API format). Output can be used with create_eventsource or update_eventsource. | No |
 | `export_propertysource` | Export a PropertySource definition (REST API format). Output can be used with create_propertysource or update_propertysource. | No |
 | `export_logsource` | Export a LogSource definition (REST API format). Output can be used with create_logsource or update_logsource. | No |
+| `export_diagnosticsource` | Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource or update_diagnosticsource. | No |
 
 ## Imports
 
@@ -387,6 +388,7 @@ Import LogicModule definitions from JSON
 | `import_propertysource` | Import a PropertySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_propertysource), use create_propertysource instead. | Yes |
 | `import_logsource` | Import a LogSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_logsource), use create_logsource instead. | Yes |
 | `import_topologysource` | Import a TopologySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions, use create_topologysource instead. | Yes |
+| `import_diagnosticsource` | Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_diagnosticsource), use create_diagnosticsource instead. | Yes |
 | `import_jobmonitor` | Import a JobMonitor from JSON (requires write permission) | Yes |
 | `import_appliesto_function` | Import an AppliesTo function from JSON (requires write permission) | Yes |
 
@@ -513,6 +515,10 @@ Diagnostic sources, remediation sources, and remediation execution.
 | `get_diagnostic_remediation_assignments` | List the diagnostic and remediation sources assigned to a specific resource or alert (Automated Diagnostics & Remediation). Unlike get_diagnosticsources/get_remediationsources, this resolves which modules actually apply to the target. | No |
 | `get_diagnostic_remediation_results` | Get structured execution results for diagnostic and remediation source runs: status, trigger type, executor, script output, and timing. Provide exactly one of alert_id or host_id. Time window params are epoch milliseconds; result timestamps are epoch seconds. | No |
 | `execute_remediation` | Execute a RemediationSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Requires write permission. | Yes |
+| `execute_diagnostic` | Execute a DiagnosticSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Poll get_diagnostic_remediation_results for status and output. Requires write permission. | Yes |
+| `create_diagnosticsource` | Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource. | Yes |
+| `update_diagnosticsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='diagnosticsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
+| `delete_diagnosticsource` | Delete a DiagnosticSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
 
 ## IBM watsonx.ai
 

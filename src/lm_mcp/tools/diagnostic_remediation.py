@@ -16,6 +16,138 @@ if TYPE_CHECKING:
 # response; the full output remains available in the portal UI.
 _OUTPUT_CHAR_LIMIT = 10000
 
+# ADR manual execution requires this collector build or newer.
+_MIN_COLLECTOR_BUILD = 39.200
+
+_MUTATION_KEYWORDS = [
+    "restart",
+    "rm ",
+    "rm\t",
+    "delete",
+    "stop",
+    "kill",
+    "reboot",
+    "shutdown",
+]
+
+_SOURCE_PATHS = {
+    "diagnostic": "/setting/diagnosticsources",
+    "remediation": "/setting/remediationsources",
+}
+
+
+async def run_pre_execution_checks(
+    client: LogicMonitorClient,
+    host_id: int,
+    source_id: int,
+    source_kind: str,
+) -> tuple[dict | None, dict]:
+    """Run the shared ADR pre-execution checklist for manual executions.
+
+    Shared by execute_remediation and execute_diagnostic: verifies the
+    device is reachable, the collector build supports ADR execution, and
+    surfaces the source's appliesTo, a script preview, and a warning for
+    state-mutating keywords.
+
+    Args:
+        client: LogicMonitor API client.
+        host_id: Target device/host ID.
+        source_id: DiagnosticSource or RemediationSource ID.
+        source_kind: "diagnostic" or "remediation" (selects the settings
+            path and error wording).
+
+    Returns:
+        Tuple of (error, context). When error is not None the caller must
+        return it via format_response without executing. Context carries
+        warnings, collector_version, applies_to, script_preview, and
+        mutation_warning.
+    """
+    context: dict = {
+        "warnings": [],
+        "collector_version": "unknown",
+        "applies_to": "",
+        "script_preview": "",
+        "mutation_warning": None,
+    }
+
+    # Check: device reachable
+    device = await client.get(f"/device/devices/{host_id}")
+    if device.get("hostStatus", -1) == 1:
+        return (
+            {
+                "error": True,
+                "code": "DEVICE_UNREACHABLE",
+                "message": (
+                    f"Device {host_id} is dead (hostStatus=1). Cannot execute {source_kind}."
+                ),
+                "suggestion": f"Verify device connectivity before executing {source_kind}.",
+            },
+            context,
+        )
+
+    # Check: collector build version
+    collector_id = device.get("preferredCollectorId")
+    if collector_id:
+        try:
+            collector = await client.get(f"/setting/collector/collectors/{collector_id}")
+            build = collector.get("build", "0")
+            context["collector_version"] = str(build)
+            try:
+                version_num = float(str(build).replace(",", ""))
+                if version_num < _MIN_COLLECTOR_BUILD:
+                    return (
+                        {
+                            "error": True,
+                            "code": "COLLECTOR_VERSION_LOW",
+                            "message": (
+                                f"Collector {collector_id} build {build} is below "
+                                f"minimum {_MIN_COLLECTOR_BUILD:.3f} required for "
+                                f"{source_kind} execution."
+                            ),
+                            "suggestion": (
+                                f"Upgrade the collector before executing {source_kind}."
+                            ),
+                        },
+                        context,
+                    )
+            except (ValueError, TypeError):
+                context["warnings"].append(
+                    f"Could not parse collector build version '{build}'. Proceeding with caution."
+                )
+        except Exception:
+            context["warnings"].append(
+                f"Could not verify collector {collector_id} version. Proceeding with caution."
+            )
+
+    # Review: appliesTo, script preview, state-mutation keywords
+    try:
+        source = await client.get(f"{_SOURCE_PATHS[source_kind]}/{source_id}")
+        context["applies_to"] = source.get("appliesTo", source.get("appliesToScript", ""))
+        script_content = source.get("groovyScript", source.get("script", ""))
+
+        if script_content:
+            preview = script_content[:500]
+            if len(script_content) > 500:
+                preview += "... [truncated]"
+            context["script_preview"] = preview
+
+            found_keywords = [
+                kw.strip() for kw in _MUTATION_KEYWORDS if kw.lower() in script_content.lower()
+            ]
+            if found_keywords:
+                context["mutation_warning"] = (
+                    f"This script performs state-mutating operations: "
+                    f"{', '.join(found_keywords)}. "
+                    "Review carefully before proceeding."
+                )
+    except Exception:
+        context["warnings"].append(
+            f"Could not retrieve {source_kind} source details for pre-checks. "
+            "Proceeding with execution."
+        )
+
+    return None, context
+
 
 async def get_diagnostic_remediation_assignments(
     client: LogicMonitorClient,
@@ -175,9 +307,7 @@ async def get_diagnostic_remediation_results(
         if remediation_cursor:
             params["remediationCursor"] = remediation_cursor
 
-        result = await client.get(
-            "/setting/diagnosticRemediation/executionResults", params=params
-        )
+        result = await client.get("/setting/diagnosticRemediation/executionResults", params=params)
 
         executions = []
         for item in result.get("items", []):

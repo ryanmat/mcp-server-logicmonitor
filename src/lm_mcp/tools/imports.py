@@ -65,6 +65,7 @@ _CREATE_COUNTERPART: dict[str, str] = {
     "propertysource": "create_propertysource",
     "logsource": "create_logsource",
     "topologysource": "create_topologysource",
+    "diagnosticsource": "create_diagnosticsource",
 }
 
 
@@ -111,6 +112,7 @@ _IMPORT_TYPE_MAP: dict[str, str] = {
     "topologysource": "topologysource",
     "jobmonitor": "batchjob",
     "appliesto_function": "function",
+    "diagnosticsource": "diagnosticsource",
 }
 
 
@@ -649,3 +651,64 @@ async def import_appliesto_function(
         return _import_result_response(result)
     except Exception as e:
         return _import_error_response(e, "appliesto_function")
+
+
+async def export_diagnosticsource(
+    client: LogicMonitorClient,
+    diagnosticsource_id: int,
+) -> list[TextContent]:
+    """Export a DiagnosticSource definition as JSON via REST API.
+
+    Returns the REST API representation. This format differs from LM Exchange
+    format used by import endpoints.
+
+    Args:
+        client: LogicMonitor API client.
+        diagnosticsource_id: DiagnosticSource ID to export.
+
+    Returns:
+        List of TextContent with full DiagnosticSource definition or error.
+    """
+    try:
+        result = await client.get(f"/setting/diagnosticsources/{diagnosticsource_id}")
+        return format_response(
+            {
+                "diagnosticsource_id": diagnosticsource_id,
+                "name": result.get("name"),
+                "format": "json",
+                "definition": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def import_diagnosticsource(
+    client: LogicMonitorClient,
+    definition: dict | str,
+    handle_conflict: str | None = None,
+    fields_to_preserve: list[str] | None = None,
+) -> list[TextContent]:
+    """Import a DiagnosticSource from LM Exchange JSON definition via multipart upload.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: DiagnosticSource JSON definition to import.
+        handle_conflict: How to handle naming conflicts with existing modules.
+        fields_to_preserve: Fields to keep from existing module when overwriting.
+
+    Returns:
+        List of TextContent with imported DiagnosticSource info or error.
+    """
+    try:
+        definition = _ensure_dict(definition)
+        definition = _ensure_import_envelope(definition, "diagnosticsource")
+        result = await client.post_multipart(
+            "/setting/diagnosticsources/importjson",
+            definition=definition,
+            params=_build_import_params(handle_conflict, fields_to_preserve),
+        )
+        return _import_result_response(result)
+    except Exception as e:
+        return _import_error_response(e, "diagnosticsource")

@@ -332,6 +332,7 @@ TOOL_CATEGORIES = {
                 "export_eventsource",
                 "export_propertysource",
                 "export_logsource",
+                "export_diagnosticsource",
             ],
         },
         "imports": {
@@ -343,6 +344,7 @@ TOOL_CATEGORIES = {
                 "import_propertysource",
                 "import_logsource",
                 "import_topologysource",
+                "import_diagnosticsource",
                 "import_jobmonitor",
                 "import_appliesto_function",
             ],
@@ -453,6 +455,10 @@ TOOL_CATEGORIES = {
                 "get_diagnostic_remediation_assignments",
                 "get_diagnostic_remediation_results",
                 "execute_remediation",
+                "execute_diagnostic",
+                "create_diagnosticsource",
+                "update_diagnosticsource",
+                "delete_diagnosticsource",
             ],
         },
         "watsonx": {

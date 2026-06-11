@@ -17,6 +17,7 @@ from lm_mcp.tools import (
     safe_total,
     sanitize_filter_value,
 )
+from lm_mcp.tools.diagnostic_remediation import run_pre_execution_checks
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -180,100 +181,11 @@ async def execute_remediation(
         Execution result with pre-check details and warnings.
     """
     try:
-        warnings = []
-
-        # Check 1: Get device info and verify reachable
-        device = await client.get(f"/device/devices/{host_id}")
-        host_status = device.get("hostStatus", -1)
-        if host_status == 1:
-            return format_response(
-                {
-                    "error": True,
-                    "code": "DEVICE_UNREACHABLE",
-                    "message": (
-                        f"Device {host_id} is dead (hostStatus=1). Cannot execute remediation."
-                    ),
-                    "suggestion": "Verify device connectivity before executing remediation.",
-                }
-            )
-
-        # Check 2: Verify collector version
-        collector_id = device.get("preferredCollectorId")
-        collector_version = "unknown"
-        if collector_id:
-            try:
-                collector = await client.get(f"/setting/collector/collectors/{collector_id}")
-                build = collector.get("build", "0")
-                collector_version = str(build)
-                # Parse version: build is a string like "39.200" or an int
-                try:
-                    version_num = float(str(build).replace(",", ""))
-                    if version_num < 39.200:
-                        return format_response(
-                            {
-                                "error": True,
-                                "code": "COLLECTOR_VERSION_LOW",
-                                "message": (
-                                    f"Collector {collector_id} build {build} is below "
-                                    "minimum 39.200 required for remediation execution."
-                                ),
-                                "suggestion": (
-                                    "Upgrade the collector before executing remediation."
-                                ),
-                            }
-                        )
-                except (ValueError, TypeError):
-                    warnings.append(
-                        f"Could not parse collector build version '{build}'. "
-                        "Proceeding with caution."
-                    )
-            except Exception:
-                warnings.append(
-                    f"Could not verify collector {collector_id} version. Proceeding with caution."
-                )
-
-        # Check 5-8: Get remediation source details
-        applies_to = ""
-        script_preview = ""
-        mutation_warning = None
-
-        try:
-            # Try the settings endpoint for remediation source details
-            source = await client.get(f"/setting/remediationsources/{remediation_source_id}")
-            applies_to = source.get("appliesTo", source.get("appliesToScript", ""))
-            script_content = source.get("groovyScript", source.get("script", ""))
-
-            # Script preview (first 500 chars)
-            if script_content:
-                script_preview = script_content[:500]
-                if len(script_content) > 500:
-                    script_preview += "... [truncated]"
-
-                # Check for state-mutating keywords
-                mutation_keywords = [
-                    "restart",
-                    "rm ",
-                    "rm\t",
-                    "delete",
-                    "stop",
-                    "kill",
-                    "reboot",
-                    "shutdown",
-                ]
-                found_keywords = [
-                    kw.strip() for kw in mutation_keywords if kw.lower() in script_content.lower()
-                ]
-                if found_keywords:
-                    mutation_warning = (
-                        f"This script performs state-mutating operations: "
-                        f"{', '.join(found_keywords)}. "
-                        "Review carefully before proceeding."
-                    )
-        except Exception:
-            warnings.append(
-                "Could not retrieve remediation source details for pre-checks. "
-                "Proceeding with execution."
-            )
+        error, checks = await run_pre_execution_checks(
+            client, host_id, remediation_source_id, source_kind="remediation"
+        )
+        if error:
+            return format_response(error)
 
         # Execute the remediation
         payload: dict = {
@@ -296,19 +208,19 @@ async def execute_remediation(
             "host_id": host_id,
             "remediation_source_id": remediation_source_id,
             "alert_id": alert_id,
-            "collector_version": collector_version,
-            "applies_to": applies_to,
-            "script_preview": script_preview,
+            "collector_version": checks["collector_version"],
+            "applies_to": checks["applies_to"],
+            "script_preview": checks["script_preview"],
             "execution_response": exec_result,
-            "warnings": warnings,
+            "warnings": checks["warnings"],
             "important_notes": [
                 "Cannot pause or cancel once execution starts.",
                 "Success does not guarantee resolution -- verify independently.",
             ],
         }
 
-        if mutation_warning:
-            response["mutation_warning"] = mutation_warning
+        if checks["mutation_warning"]:
+            response["mutation_warning"] = checks["mutation_warning"]
 
         # Concurrency warning
         response["concurrency_note"] = (

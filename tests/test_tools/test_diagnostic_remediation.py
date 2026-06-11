@@ -69,9 +69,7 @@ class TestGetDiagnosticRemediationAssignments:
         )
 
         route = respx.get(f"{BASE}/setting/diagnosticRemediation/list").mock(
-            return_value=httpx.Response(
-                200, json={"items": [_assigned_source()], "total": 1}
-            )
+            return_value=httpx.Response(200, json={"items": [_assigned_source()], "total": 1})
         )
 
         result = await get_diagnostic_remediation_assignments(client, resource_id=1786)
@@ -124,9 +122,7 @@ class TestGetDiagnosticRemediationAssignments:
             return_value=httpx.Response(200, json={"items": items, "total": 5})
         )
 
-        result = await get_diagnostic_remediation_assignments(
-            client, resource_id=1, limit=2
-        )
+        result = await get_diagnostic_remediation_assignments(client, resource_id=1, limit=2)
 
         data = json.loads(result[0].text)
         assert data["count"] == 2
@@ -203,9 +199,7 @@ class TestGetDiagnosticRemediationResults:
         )
 
         neither = await get_diagnostic_remediation_results(client)
-        both = await get_diagnostic_remediation_results(
-            client, alert_id="DS1", host_id=1
-        )
+        both = await get_diagnostic_remediation_results(client, alert_id="DS1", host_id=1)
 
         for result in (neither, both):
             assert "Error" in result[0].text
@@ -216,9 +210,7 @@ class TestGetDiagnosticRemediationResults:
             get_diagnostic_remediation_results,
         )
 
-        result = await get_diagnostic_remediation_results(
-            client, host_id=1, cursor="abc"
-        )
+        result = await get_diagnostic_remediation_results(client, host_id=1, cursor="abc")
 
         assert "Error" in result[0].text
         assert "Cursors are not supported" in result[0].text
@@ -278,9 +270,7 @@ class TestGetDiagnosticRemediationResults:
         )
 
         respx.get(f"{BASE}/setting/diagnosticRemediation/executionResults").mock(
-            return_value=httpx.Response(
-                400, json={"errorMessage": "alertId and device mismatch"}
-            )
+            return_value=httpx.Response(400, json={"errorMessage": "alertId and device mismatch"})
         )
 
         result = await get_diagnostic_remediation_results(client, host_id=99999)

@@ -3555,6 +3555,22 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="export_diagnosticsource",
+            description="Export a DiagnosticSource definition (REST API format). "
+            "Output can be used with create_diagnosticsource or update_diagnosticsource.",
+            annotations=_EXPORT,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "diagnosticsource_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID",
+                    },
+                },
+                "required": ["diagnosticsource_id"],
+            },
+        ),
+        Tool(
             name="import_datasource",
             description="Import a DataSource from LM Exchange JSON format via "
             "multipart upload (requires write permission). This expects LM Exchange "
@@ -4050,6 +4066,33 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "TopologySource JSON"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_diagnosticsource",
+            description="Import a DiagnosticSource from LM Exchange JSON format via "
+            "multipart upload (requires write permission). For REST API format "
+            "definitions (e.g., from export_diagnosticsource), use "
+            "create_diagnosticsource instead.",
+            annotations=_IMPORT,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "DiagnosticSource JSON definition",
+                    },
                     "handle_conflict": {
                         "type": "string",
                         "description": "How to handle naming conflicts with existing modules",
@@ -5149,6 +5192,117 @@ TOOLS.extend(
                 "required": ["source_id"],
             },
         ),
+        Tool(
+            name="execute_diagnostic",
+            description=(
+                "Execute a DiagnosticSource script on a target device. Performs "
+                "pre-execution checks (collector version, device status, script "
+                "review) before triggering manual execution. Poll "
+                "get_diagnostic_remediation_results for status and output. "
+                "Requires write permission."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host_id": {
+                        "type": "integer",
+                        "description": "Target device/host ID",
+                    },
+                    "diagnostic_source_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID to execute",
+                    },
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Optional alert ID to associate with execution",
+                    },
+                },
+                "required": ["host_id", "diagnostic_source_id"],
+            },
+        ),
+        Tool(
+            name="create_diagnosticsource",
+            description=(
+                "Create a DiagnosticSource via REST API from a full definition dict "
+                "(requires write permission). Accepts REST API format (same as "
+                "export_diagnosticsource output). For LM Exchange format, use "
+                "import_diagnosticsource."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full DiagnosticSource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "If true, delete existing DiagnosticSource with same name "
+                            "before creating"
+                        ),
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_diagnosticsource",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server, including the script. "
+                "PREFER update_logicmodule(type='diagnosticsource', id, changes, "
+                "mode='preview') for partial updates with diff preview. Requires "
+                "confirm=true to proceed."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "diagnosticsource_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": (
+                            "FULL DiagnosticSource definition with all fields (will replace)"
+                        ),
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for "
+                            "safe partial updates."
+                        ),
+                    },
+                },
+                "required": ["diagnosticsource_id", "definition"],
+            },
+        ),
+        Tool(
+            name="delete_diagnosticsource",
+            description=(
+                "Delete a DiagnosticSource definition (requires write permission). "
+                "Action chains referencing it lose that stage."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "diagnosticsource_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID to delete",
+                    },
+                },
+                "required": ["diagnosticsource_id"],
+            },
+        ),
     ]
 )
 
@@ -5586,6 +5740,7 @@ TOOLS.extend(
                         "enum": [
                             "configsource",
                             "datasource",
+                            "diagnosticsource",
                             "eventsource",
                             "logsource",
                             "propertysource",
@@ -6851,12 +7006,20 @@ def get_tool_handler(tool_name: str) -> Any:
         # Diagnostic Sources
         "get_diagnosticsources": diagnosticsources.get_diagnosticsources,
         "get_diagnosticsource": diagnosticsources.get_diagnosticsource,
+        "execute_diagnostic": diagnosticsources.execute_diagnostic,
+        "create_diagnosticsource": diagnosticsources.create_diagnosticsource,
+        "update_diagnosticsource": diagnosticsources.update_diagnosticsource,
+        "delete_diagnosticsource": diagnosticsources.delete_diagnosticsource,
         # Remediation Sources
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
         "execute_remediation": remediationsources.execute_remediation,
-        "get_diagnostic_remediation_assignments": diagnostic_remediation.get_diagnostic_remediation_assignments,
-        "get_diagnostic_remediation_results": diagnostic_remediation.get_diagnostic_remediation_results,
+        "get_diagnostic_remediation_assignments": (
+            diagnostic_remediation.get_diagnostic_remediation_assignments
+        ),
+        "get_diagnostic_remediation_results": (
+            diagnostic_remediation.get_diagnostic_remediation_results
+        ),
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,
@@ -6965,12 +7128,14 @@ def get_tool_handler(tool_name: str) -> Any:
         "export_eventsource": imports.export_eventsource,
         "export_propertysource": imports.export_propertysource,
         "export_logsource": imports.export_logsource,
+        "export_diagnosticsource": imports.export_diagnosticsource,
         "import_datasource": imports.import_datasource,
         "import_configsource": imports.import_configsource,
         "import_eventsource": imports.import_eventsource,
         "import_propertysource": imports.import_propertysource,
         "import_logsource": imports.import_logsource,
         "import_topologysource": imports.import_topologysource,
+        "import_diagnosticsource": imports.import_diagnosticsource,
         "import_jobmonitor": imports.import_jobmonitor,
         "import_appliesto_function": imports.import_appliesto_function,
         # Ingestion

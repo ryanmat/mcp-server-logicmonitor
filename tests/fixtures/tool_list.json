@@ -1071,6 +1071,33 @@
       "type": "object"
     }
   },
+  "create_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource.",
+    "inputSchema": {
+      "properties": {
+        "definition": {
+          "description": "Full DiagnosticSource definition in REST API format",
+          "type": "object"
+        },
+        "overwrite": {
+          "default": false,
+          "description": "If true, delete existing DiagnosticSource with same name before creating",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "create_escalation_chain": {
     "annotations": {
       "destructiveHint": false,
@@ -1959,6 +1986,28 @@
       "type": "object"
     }
   },
+  "delete_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete a DiagnosticSource definition (requires write permission). Action chains referencing it lose that stage.",
+    "inputSchema": {
+      "properties": {
+        "diagnosticsource_id": {
+          "description": "DiagnosticSource ID to delete",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnosticsource_id"
+      ],
+      "type": "object"
+    }
+  },
   "delete_escalation_chain": {
     "annotations": {
       "destructiveHint": true,
@@ -2516,6 +2565,37 @@
       "type": "object"
     }
   },
+  "execute_diagnostic": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Execute a DiagnosticSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Poll get_diagnostic_remediation_results for status and output. Requires write permission.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Optional alert ID to associate with execution",
+          "type": "string"
+        },
+        "diagnostic_source_id": {
+          "description": "DiagnosticSource ID to execute",
+          "type": "integer"
+        },
+        "host_id": {
+          "description": "Target device/host ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host_id",
+        "diagnostic_source_id"
+      ],
+      "type": "object"
+    }
+  },
   "execute_remediation": {
     "annotations": {
       "destructiveHint": false,
@@ -2631,6 +2711,28 @@
       },
       "required": [
         "datasource_id"
+      ],
+      "type": "object"
+    }
+  },
+  "export_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource or update_diagnosticsource.",
+    "inputSchema": {
+      "properties": {
+        "diagnosticsource_id": {
+          "description": "DiagnosticSource ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnosticsource_id"
       ],
       "type": "object"
     }
@@ -6664,6 +6766,39 @@
       "type": "object"
     }
   },
+  "import_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_diagnosticsource), use create_diagnosticsource instead.",
+    "inputSchema": {
+      "properties": {
+        "definition": {
+          "description": "DiagnosticSource JSON definition",
+          "type": "object"
+        },
+        "fields_to_preserve": {
+          "description": "Fields to preserve from existing module when overwriting",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "handle_conflict": {
+          "description": "How to handle naming conflicts with existing modules",
+          "type": "string"
+        }
+      },
+      "required": [
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "import_eventsource": {
     "annotations": {
       "destructiveHint": false,
@@ -8207,6 +8342,38 @@
       "type": "object"
     }
   },
+  "update_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='diagnosticsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
+    "inputSchema": {
+      "properties": {
+        "confirm": {
+          "default": false,
+          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
+          "type": "boolean"
+        },
+        "definition": {
+          "description": "FULL DiagnosticSource definition with all fields (will replace)",
+          "type": "object"
+        },
+        "diagnosticsource_id": {
+          "description": "DiagnosticSource ID to update",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnosticsource_id",
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "update_escalation_chain": {
     "annotations": {
       "destructiveHint": false,
@@ -8465,6 +8632,7 @@
           "enum": [
             "configsource",
             "datasource",
+            "diagnosticsource",
             "eventsource",
             "logsource",
             "propertysource",
