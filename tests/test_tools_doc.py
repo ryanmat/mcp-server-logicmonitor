@@ -43,6 +43,7 @@ _TITLES = {
     "exports": "Exports",
     "imports": "Imports",
     "ingestion": "Ingestion",
+    "otlp_metrics": "OTLP Metrics",
     "correlation": "Correlation and Anomalies",
     "traces": "APM Traces",
     "ml_analysis": "ML and Statistical Analysis",

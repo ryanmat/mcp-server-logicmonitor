@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-06-11
+
+Native OTLP metrics query surface. LogicMonitor's new OTLP Metrics feature
+(feature-flag gated, AMP/Prometheus-backed; its only UI surface in this first
+phase is the dashboard Advanced Metrics Widget, with Metrics Explorer arriving
+later) gets its first programmatic client: four read tools wrapping the v3
+`/metrics` query APIs, live-validated against a flag-enabled portal fed by a
+real OTel collector. Core LM tools 269 -> 273 (full surface 302).
+
+### Added
+
+- `get_otlp_metric_names` -- list/autocomplete metric names (`contains` substring
+  filter; wildcards are not supported by the backend).
+- `get_otlp_metric_labels` -- label names across all metrics or narrowed to one
+  metric (`label_name` substring filter).
+- `get_otlp_label_values` -- values observed for one label key, optionally narrowed
+  to a metric.
+- `query_otlp_metrics` -- PromQL range queries via `POST /metrics/query-range`,
+  returning normalized time-series matrices (`[timestamp, value]` point pairs,
+  `__name__` lifted out of labels). Output is capped at 20 series and 500 points
+  per series via even-stride downsampling, flagged with `truncated` plus guidance.
+- New `otlp_metrics` tool category (search_tools and the tool-categories resource).
+
+### Behavior notes (live-verified against the real backend)
+
+- Under `X-Version: 3` these endpoints return bare bodies (no standard envelope),
+  and omit the `data` key entirely when nothing matches; tools normalize both.
+- Feature-unavailable portals are handled gracefully: flag-disabled portals return
+  404 (routes absent) and flag-deployed-but-off portals return an explicit 400;
+  both become a clear "OTLP Metrics is not available on this portal" notice.
+- Backend failures reported as HTTP 200 with an `errors` array are detected and
+  surfaced as proper error envelopes.
+- Query windows wider than ~30 days are rejected by the metrics backend; the
+  tool descriptions steer toward narrower windows and larger steps.
+
+### Validation
+
+- The v4.0.0 deferred live write validation was completed against a live portal
+  in this release cycle: diagnosticsource and remediationsource CRUD lifecycles
+  (create/get/update-with-confirm/delete), report execution polling
+  (`run_report` -> `get_report_execution`), and the full Tier 3 path -- manual
+  `execute_diagnostic` (plain `hostId`+`diagnosticId` body confirmed; the
+  response carries `hostDiagnosticSourceId`), assignment materialization via
+  `get_diagnostic_remediation_assignments`, and end-to-end execution-results
+  retrieval with captured script output via
+  `get_diagnostic_remediation_results`.
+- The action chain / action rule write lifecycle remains validated by mocked
+  tests only: the validation portal's API token lacked the action-chain write
+  permission (the API returns Permission denied). Read paths were live-validated
+  in v4.0.0.
+
 ## [4.0.0] - 2026-06-12
 
 Correctness major. A full bidirectional diff of the tool surface against the master v3

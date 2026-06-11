@@ -3481,6 +3481,146 @@ TOOLS.extend(
     ]
 )
 
+# OTLP Metrics (native OTLP ingest, PromQL query surface; feature-flag gated)
+TOOLS.extend(
+    [
+        Tool(
+            name="get_otlp_metric_names",
+            description=(
+                "[PREVIEW] List metric names ingested via native OpenTelemetry (OTLP). "
+                "Requires the OTLP Metrics feature flag; returns a friendly notice "
+                "when unavailable"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "contains": {
+                        "type": "string",
+                        "description": "Substring filter on metric names (wildcards unsupported)",
+                    },
+                    "start": {
+                        "type": "integer",
+                        "description": "Window start, unix epoch seconds",
+                    },
+                    "end": {
+                        "type": "integer",
+                        "description": "Window end, unix epoch seconds",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_otlp_metric_labels",
+            description=(
+                "[PREVIEW] List label names on native OTLP metrics, optionally "
+                "narrowed to one metric"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "metric": {
+                        "type": "string",
+                        "description": "Narrow to labels present on this metric name",
+                    },
+                    "label_name": {
+                        "type": "string",
+                        "description": "Substring filter on label names",
+                    },
+                    "start": {
+                        "type": "integer",
+                        "description": "Window start, unix epoch seconds",
+                    },
+                    "end": {
+                        "type": "integer",
+                        "description": "Window end, unix epoch seconds",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_otlp_label_values",
+            description=(
+                "[PREVIEW] List values observed for one native OTLP metric label "
+                "(e.g. all service_name values)"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": (
+                            "Label name to list values for, e.g. service_name; discover "
+                            "names with get_otlp_metric_labels"
+                        ),
+                    },
+                    "metric": {
+                        "type": "string",
+                        "description": "Narrow to values present on this metric name",
+                    },
+                    "start": {
+                        "type": "integer",
+                        "description": "Window start, unix epoch seconds",
+                    },
+                    "end": {
+                        "type": "integer",
+                        "description": "Window end, unix epoch seconds",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+                "required": ["key"],
+            },
+        ),
+        Tool(
+            name="query_otlp_metrics",
+            description=(
+                "[PREVIEW] Run a PromQL range query against native OTLP metrics. "
+                "Returns a time-series matrix"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "PromQL expression. Examples: container_memory_usage_bytes "
+                            "(raw series), avg(container_cpu_usage_seconds_total) "
+                            "(aggregate), rate(container_network_receive_bytes_total[5m]) "
+                            '(per-second rate), nginx_up{service_name="api"} (label '
+                            "matcher). Discover names and labels with "
+                            "get_otlp_metric_names / get_otlp_metric_labels"
+                        ),
+                    },
+                    "start": {
+                        "type": "integer",
+                        "description": (
+                            "Window start, unix epoch seconds. Keep windows under ~30 "
+                            "days; very wide windows fail in the metrics backend"
+                        ),
+                    },
+                    "end": {
+                        "type": "integer",
+                        "description": "Window end, unix epoch seconds",
+                    },
+                    "step": {
+                        "type": "string",
+                        "description": (
+                            "Resolution step, e.g. '30s', '5m', '1h'; use larger steps "
+                            "for wider windows"
+                        ),
+                    },
+                },
+                "required": ["query", "start", "end"],
+            },
+        ),
+    ]
+)
+
 # Imports/Exports
 TOOLS.extend(
     [
@@ -7303,6 +7443,7 @@ def get_tool_handler(tool_name: str) -> Any:
         networking,
         oids,
         ops,
+        otlp_metrics,
         propertysources,
         reference,
         remediationsources,
@@ -7567,6 +7708,11 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_idle_resources": cost.get_idle_resources,
         "get_cost_recommendation_categories": cost.get_cost_recommendation_categories,
         "get_cost_recommendation": cost.get_cost_recommendation,
+        # OTLP Metrics
+        "get_otlp_metric_names": otlp_metrics.get_otlp_metric_names,
+        "get_otlp_metric_labels": otlp_metrics.get_otlp_metric_labels,
+        "get_otlp_label_values": otlp_metrics.get_otlp_label_values,
+        "query_otlp_metrics": otlp_metrics.query_otlp_metrics,
         # Imports/Exports
         "export_datasource": imports.export_datasource,
         "export_dashboard": imports.export_dashboard,

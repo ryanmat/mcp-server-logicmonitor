@@ -5722,6 +5722,113 @@
       "type": "object"
     }
   },
+  "get_otlp_label_values": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "[PREVIEW] List values observed for one native OTLP metric label (e.g. all service_name values)",
+    "inputSchema": {
+      "properties": {
+        "end": {
+          "description": "Window end, unix epoch seconds",
+          "type": "integer"
+        },
+        "key": {
+          "description": "Label name to list values for, e.g. service_name; discover names with get_otlp_metric_labels",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "metric": {
+          "description": "Narrow to values present on this metric name",
+          "type": "string"
+        },
+        "start": {
+          "description": "Window start, unix epoch seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object"
+    }
+  },
+  "get_otlp_metric_labels": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "[PREVIEW] List label names on native OTLP metrics, optionally narrowed to one metric",
+    "inputSchema": {
+      "properties": {
+        "end": {
+          "description": "Window end, unix epoch seconds",
+          "type": "integer"
+        },
+        "label_name": {
+          "description": "Substring filter on label names",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "metric": {
+          "description": "Narrow to labels present on this metric name",
+          "type": "string"
+        },
+        "start": {
+          "description": "Window start, unix epoch seconds",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_otlp_metric_names": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "[PREVIEW] List metric names ingested via native OpenTelemetry (OTLP). Requires the OTLP Metrics feature flag; returns a friendly notice when unavailable",
+    "inputSchema": {
+      "properties": {
+        "contains": {
+          "description": "Substring filter on metric names (wildcards unsupported)",
+          "type": "string"
+        },
+        "end": {
+          "description": "Window end, unix epoch seconds",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "start": {
+          "description": "Window start, unix epoch seconds",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_power_events": {
     "annotations": {
       "destructiveHint": false,
@@ -7615,6 +7722,42 @@
       },
       "required": [
         "metrics"
+      ],
+      "type": "object"
+    }
+  },
+  "query_otlp_metrics": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "[PREVIEW] Run a PromQL range query against native OTLP metrics. Returns a time-series matrix",
+    "inputSchema": {
+      "properties": {
+        "end": {
+          "description": "Window end, unix epoch seconds",
+          "type": "integer"
+        },
+        "query": {
+          "description": "PromQL expression. Examples: container_memory_usage_bytes (raw series), avg(container_cpu_usage_seconds_total) (aggregate), rate(container_network_receive_bytes_total[5m]) (per-second rate), nginx_up{service_name=\"api\"} (label matcher). Discover names and labels with get_otlp_metric_names / get_otlp_metric_labels",
+          "type": "string"
+        },
+        "start": {
+          "description": "Window start, unix epoch seconds. Keep windows under ~30 days; very wide windows fail in the metrics backend",
+          "type": "integer"
+        },
+        "step": {
+          "description": "Resolution step, e.g. '30s', '5m', '1h'; use larger steps for wider windows",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "start",
+        "end"
       ],
       "type": "object"
     }

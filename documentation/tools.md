@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 298 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 302 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -402,6 +402,17 @@ Push custom logs and metrics
 |------|-------------|-------|
 | `ingest_logs` | Ingest log entries into LogicMonitor (requires LMv1 auth) | Yes |
 | `push_metrics` | Push custom metrics into LogicMonitor (requires LMv1 auth) | Yes |
+
+## OTLP Metrics
+
+Native OTLP metrics: PromQL range queries and metric/label discovery (feature-flag gated, [PREVIEW])
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_otlp_metric_names` | [PREVIEW] List metric names ingested via native OpenTelemetry (OTLP). Requires the OTLP Metrics feature flag; returns a friendly notice when unavailable | No |
+| `get_otlp_metric_labels` | [PREVIEW] List label names on native OTLP metrics, optionally narrowed to one metric | No |
+| `get_otlp_label_values` | [PREVIEW] List values observed for one native OTLP metric label (e.g. all service_name values) | No |
+| `query_otlp_metrics` | [PREVIEW] Run a PromQL range query against native OTLP metrics. Returns a time-series matrix | No |
 
 ## Correlation and Anomalies
 
