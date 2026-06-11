@@ -343,9 +343,9 @@ Operations notes, OIDs, and services
 |------|-------------|-------|
 | `get_oids` | List OID definitions | No |
 | `get_oid` | Get details about a specific OID | No |
-| `get_services` | List services from LogicMonitor | No |
-| `get_service` | Get details about a specific service | No |
-| `get_service_groups` | List service groups | No |
+| `get_services` | List Service Insight business services (deviceType 6 devices, including APM trace services) | No |
+| `get_service` | Get details about a specific Service Insight service | No |
+| `get_service_groups` | List Service Insight service groups (BizService device groups) | No |
 | `get_ops_notes` | List ops notes | No |
 | `get_ops_note` | Get details about a specific ops note | No |
 | `add_ops_note` | Add an ops note (requires write permission) | Yes |
