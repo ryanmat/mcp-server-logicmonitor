@@ -304,39 +304,11 @@ class TestRemediationSourceToolRegistration:
         tool_names = [t.name for t in TOOLS]
         assert "execute_remediation" in tool_names
 
-    def test_get_remediation_status_registered(self):
-        """get_remediation_status is registered in tool registry."""
-        from lm_mcp.registry import TOOLS
-
-        tool_names = [t.name for t in TOOLS]
-        assert "get_remediation_status" in tool_names
-
-    def test_get_remediation_history_registered(self):
-        """get_remediation_history is registered in tool registry."""
-        from lm_mcp.registry import TOOLS
-
-        tool_names = [t.name for t in TOOLS]
-        assert "get_remediation_history" in tool_names
-
     def test_execute_remediation_handler_registered(self):
         """execute_remediation handler is registered."""
         from lm_mcp.registry import get_tool_handler
 
         handler = get_tool_handler("execute_remediation")
-        assert handler is not None
-
-    def test_get_remediation_status_handler_registered(self):
-        """get_remediation_status handler is registered."""
-        from lm_mcp.registry import get_tool_handler
-
-        handler = get_tool_handler("get_remediation_status")
-        assert handler is not None
-
-    def test_get_remediation_history_handler_registered(self):
-        """get_remediation_history handler is registered."""
-        from lm_mcp.registry import get_tool_handler
-
-        handler = get_tool_handler("get_remediation_history")
         assert handler is not None
 
     def test_get_remediationsources_schema_includes_pagination(self):
@@ -548,170 +520,152 @@ class TestExecuteRemediation:
         assert "Error:" in result[0].text
 
 
-class TestGetRemediationStatus:
-    """Tests for get_remediation_status tool."""
+class TestCreateRemediationSource:
+    """Tests for create_remediationsource tool."""
+
+    async def test_create_requires_write_permission(self, client, monkeypatch):
+        """create_remediationsource is blocked when writes are disabled."""
+        from lm_mcp.tools.remediationsources import create_remediationsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await create_remediationsource(client, definition={"name": "X"})
+
+        assert "Write operations are disabled" in result[0].text
 
     @respx.mock
-    async def test_get_remediation_status_returns_info(self, client):
-        """get_remediation_status returns device and source info."""
-        from lm_mcp.tools.remediationsources import get_remediation_status
+    async def test_create_posts_definition(self, client, enable_writes):
+        """create_remediationsource posts the normalized definition."""
+        from lm_mcp.tools.remediationsources import create_remediationsource
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/100").mock(
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources"
+        ).mock(
             return_value=httpx.Response(
-                200,
-                json={"id": 100, "name": "RestartApache", "group": "Linux"},
-            )
-        )
-        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
-            return_value=httpx.Response(
-                200,
-                json={"id": 1, "displayName": "prod-web-01", "hostStatus": 0},
+                200, json={"id": 88, "name": "RestartSvc", "displayName": "Restart Service"}
             )
         )
 
-        result = await get_remediation_status(client, host_id=1, remediation_source_id=100)
+        definition = {
+            "name": "RestartSvc",
+            "displayName": "Restart Service",
+            "appliesTo": "false()",
+            "groovyScript": "println 'restart'",
+        }
+        result = await create_remediationsource(client, definition=definition)
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["name"] == "RestartSvc"
+        assert "id" not in body
         data = json.loads(result[0].text)
-        assert data["host_id"] == 1
-        assert data["source_name"] == "RestartApache"
-        assert data["device_name"] == "prod-web-01"
+        assert data["success"] is True
+        assert data["remediationsource"]["id"] == 88
 
     @respx.mock
-    async def test_get_remediation_status_not_found(self, client):
-        """get_remediation_status handles missing source gracefully."""
-        from lm_mcp.tools.remediationsources import get_remediation_status
+    async def test_create_handles_api_error(self, client, enable_writes):
+        """create_remediationsource surfaces 400 errors."""
+        from lm_mcp.tools.remediationsources import create_remediationsource
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/setting/remediationsources").mock(
+            return_value=httpx.Response(400, json={"errorMessage": "name required"})
+        )
+
+        result = await create_remediationsource(client, definition={"displayName": "X"})
+
+        assert "error" in result[0].text.lower()
+
+
+class TestUpdateRemediationSource:
+    """Tests for update_remediationsource tool."""
+
+    async def test_update_without_confirm_is_guarded(self, client, enable_writes):
+        """update_remediationsource without confirm=True returns CONFIRMATION_REQUIRED."""
+        from lm_mcp.tools.remediationsources import update_remediationsource
+
+        result = await update_remediationsource(
+            client, remediationsource_id=3, definition={"name": "X"}
+        )
+
+        text = result[0].text
+        assert "confirm" in text.lower()
+        assert "update_logicmodule" in text
+
+    @respx.mock
+    async def test_update_with_confirm_puts_definition(self, client, enable_writes):
+        """update_remediationsource with confirm=True PUTs the full definition."""
+        from lm_mcp.tools.remediationsources import update_remediationsource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3"
+        ).mock(return_value=httpx.Response(200, json={"id": 3, "name": "RestartSvc"}))
+
+        definition = {"name": "RestartSvc", "displayName": "Restart", "groovyScript": "x"}
+        result = await update_remediationsource(
+            client, remediationsource_id=3, definition=definition, confirm=True
+        )
+
+        body = json.loads(route.calls[0].request.content)
+        assert body["name"] == "RestartSvc"
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+
+    async def test_update_requires_write_permission(self, client, monkeypatch):
+        """update_remediationsource is blocked when writes are disabled."""
+        from lm_mcp.tools.remediationsources import update_remediationsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        result = await update_remediationsource(
+            client, remediationsource_id=3, definition={"name": "X"}, confirm=True
+        )
+
+        assert "Write operations are disabled" in result[0].text
+
+
+class TestDeleteRemediationSource:
+    """Tests for delete_remediationsource tool."""
+
+    @respx.mock
+    async def test_delete_success(self, client, enable_writes):
+        """delete_remediationsource deletes and reports the source name."""
+        from lm_mcp.tools.remediationsources import delete_remediationsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3").mock(
+            return_value=httpx.Response(200, json={"id": 3, "name": "RestartSvc"})
+        )
+        respx.delete(
+            "https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3"
+        ).mock(return_value=httpx.Response(200, json={}))
+
+        result = await delete_remediationsource(client, remediationsource_id=3)
+
+        data = json.loads(result[0].text)
+        assert data["success"] is True
+        assert "RestartSvc" in data["message"]
+
+    @respx.mock
+    async def test_delete_not_found(self, client, enable_writes):
+        """delete_remediationsource surfaces 404."""
+        from lm_mcp.tools.remediationsources import delete_remediationsource
 
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/999").mock(
-            return_value=httpx.Response(
-                404,
-                json={"errorMessage": "Not found"},
-            )
-        )
-        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/1").mock(
-            return_value=httpx.Response(
-                200,
-                json={"id": 1, "displayName": "prod-web-01", "hostStatus": 0},
-            )
+            return_value=httpx.Response(404, json={"errorMessage": "Not found"})
         )
 
-        result = await get_remediation_status(client, host_id=1, remediation_source_id=999)
-        data = json.loads(result[0].text)
-        assert data["source_name"] == "unknown"
+        result = await delete_remediationsource(client, remediationsource_id=999)
 
-
-class TestGetRemediationHistory:
-    """Tests for get_remediation_history tool."""
-
-    @respx.mock
-    async def test_get_remediation_history_returns_entries(self, client):
-        """get_remediation_history returns filtered audit entries."""
-        from lm_mcp.tools.remediationsources import get_remediation_history
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "happenedOn": 1710288000,
-                            "username": "admin",
-                            "description": ("Remediation source 100 executed on host 1"),
-                            "ip": "10.0.1.1",
-                        },
-                        {
-                            "happenedOn": 1710287000,
-                            "username": "admin",
-                            "description": "Device updated",
-                            "ip": "10.0.1.1",
-                        },
-                    ],
-                    "total": 2,
-                },
-            )
-        )
-
-        result = await get_remediation_history(client, host_id=1)
-        data = json.loads(result[0].text)
-        assert data["total_entries"] == 1  # Only the remediation entry
-        assert data["truncated"] is False
-
-    @respx.mock
-    async def test_get_remediation_history_empty(self, client):
-        """get_remediation_history handles no entries gracefully."""
-        from lm_mcp.tools.remediationsources import get_remediation_history
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(
-                200,
-                json={"items": [], "total": 0},
-            )
-        )
-
-        result = await get_remediation_history(client, host_id=1)
-        data = json.loads(result[0].text)
-        assert data["total_entries"] == 0
-        assert "note" in data
-
-    @respx.mock
-    async def test_get_remediation_history_with_source_filter(self, client):
-        """get_remediation_history filters by remediation_source_id."""
-        from lm_mcp.tools.remediationsources import get_remediation_history
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "happenedOn": 1710288000,
-                            "username": "admin",
-                            "description": "Remediation source 100 executed",
-                            "ip": "10.0.1.1",
-                        },
-                        {
-                            "happenedOn": 1710287000,
-                            "username": "admin",
-                            "description": "Remediation source 200 executed",
-                            "ip": "10.0.1.1",
-                        },
-                    ],
-                    "total": 2,
-                },
-            )
-        )
-
-        result = await get_remediation_history(client, host_id=1, remediation_source_id=100)
-        data = json.loads(result[0].text)
-        assert data["total_entries"] == 1
-        assert "100" in data["entries"][0]["description"]
-
-    @respx.mock
-    async def test_audit_read_failure_is_not_reported_as_empty(self, client):
-        """A failed audit-log read is surfaced as unavailable, not confirmed-empty."""
-        from lm_mcp.tools.remediationsources import get_remediation_history
-
-        # The audit log query 403s (audit access is privileged).
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(403, json={"errorMessage": "Permission denied"})
-        )
-
-        result = await get_remediation_history(client, host_id=100)
-        data = json.loads(result[0].text)
-
-        assert data["audit_read_failed"] is True
-        assert "UNAVAILABLE" in data["note"]
-        assert data["total_entries"] == 0
-
-    @respx.mock
-    async def test_empty_audit_log_reports_no_records(self, client):
-        """A successful but empty audit read reports the benign no-records note."""
-        from lm_mcp.tools.remediationsources import get_remediation_history
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(200, json={"items": []})
-        )
-
-        result = await get_remediation_history(client, host_id=100)
-        data = json.loads(result[0].text)
-
-        assert "audit_read_failed" not in data
-        assert "No remediation execution records" in data["note"]
+        assert "error" in result[0].text.lower()

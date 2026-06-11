@@ -390,6 +390,11 @@ TOOLS.extend(
                         "type": "string",
                         "description": "Alert ID (with or without LMA prefix)",
                     },
+                    "include_message": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include the full alert message body (needMessage)",
+                    },
                 },
                 "required": ["alert_id"],
             },
@@ -1511,6 +1516,11 @@ TOOLS.extend(
                         "description": "Raw filter expression (overrides other filters). "
                         "Example: name~monthly,type~Alert",
                     },
+                    "include_nextgen": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include NextGen reports",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -1552,6 +1562,11 @@ TOOLS.extend(
                         "default": False,
                         "description": "Only enabled schedules",
                     },
+                    "include_nextgen": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Include NextGen reports",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -1570,6 +1585,25 @@ TOOLS.extend(
                     },
                 },
                 "required": ["report_id"],
+            },
+        ),
+        Tool(
+            name="get_report_execution",
+            description=(
+                "Poll the status of a report generation task started by run_report "
+                "(returns status and result URL when finished)"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "report_id": {"type": "integer", "description": "Report ID"},
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Task ID returned by run_report",
+                    },
+                },
+                "required": ["report_id", "task_id"],
             },
         ),
         Tool(
@@ -3341,27 +3375,17 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="get_batchjob_history",
-            description="Get execution history for a batch job",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "integer", "description": "Device ID"},
-                    "batchjob_id": {"type": "integer", "description": "Batch job ID"},
-                    "limit": {"type": "integer", "default": 20, "description": "Max results"},
-                },
-                "required": ["device_id", "batchjob_id"],
-            },
-        ),
-        Tool(
             name="get_device_batchjobs",
-            description="Get batch jobs for a specific device (resource)",
+            description=(
+                "List BatchJob datasources applied to a device (resource); per-run "
+                "output lives in instance data via get_device_data"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
                 "required": ["device_id"],
             },
@@ -3384,86 +3408,48 @@ TOOLS.extend(
 TOOLS.extend(
     [
         Tool(
-            name="get_cost_summary",
-            description="Get cloud cost summary",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "cloud_account_id": {
-                        "type": "integer",
-                        "description": "Filter by cloud account ID",
-                    },
-                    "time_range": {
-                        "type": "string",
-                        "default": "last30days",
-                        "description": "Time range (e.g. last7days, last30days, last90days)",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="get_resource_cost",
-            description="Get cost data for a specific resource",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "integer", "description": "Device ID"},
-                    "time_range": {
-                        "type": "string",
-                        "default": "last30days",
-                        "description": "Time range (e.g. last7days, last30days, last90days)",
-                    },
-                },
-                "required": ["device_id"],
-            },
-        ),
-        Tool(
             name="get_cost_recommendations",
-            description="Get cost optimization recommendations",
+            description=(
+                "Get cost optimization recommendations. Category filter takes the "
+                "category description string from get_cost_recommendation_categories"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "cloud_account_id": {
-                        "type": "integer",
-                        "description": "Filter by cloud account ID",
-                    },
-                    "recommendation_type": {
+                    "category": {
                         "type": "string",
-                        "description": "Filter by recommendation type",
+                        "description": (
+                            'Category description string (e.g. "Idle AWS EC2 instances")'
+                        ),
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by recommendation status (e.g. active)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
+                    },
                 },
             },
         ),
         Tool(
             name="get_idle_resources",
-            description="Get idle/underutilized resources",
+            description=(
+                "Get idle/underutilized cloud resources (resolved from idle-type "
+                "cost recommendation categories)"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "cloud_account_id": {
-                        "type": "integer",
-                        "description": "Filter by cloud account ID",
-                    },
-                    "resource_type": {
+                    "provider": {
                         "type": "string",
-                        "description": "Filter by resource type",
+                        "description": "Narrow to one cloud provider (aws, azure, gcp)",
                     },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                },
-            },
-        ),
-        Tool(
-            name="get_cloud_cost_accounts",
-            description="Get cloud accounts with cost data",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
@@ -3600,6 +3586,39 @@ TOOLS.extend(
                     "logsource_id": {"type": "integer", "description": "LogSource ID"},
                 },
                 "required": ["logsource_id"],
+            },
+        ),
+        Tool(
+            name="export_diagnosticsource",
+            description="Export a DiagnosticSource definition (REST API format). "
+            "Output can be used with create_diagnosticsource or update_diagnosticsource.",
+            annotations=_EXPORT,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "diagnosticsource_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID",
+                    },
+                },
+                "required": ["diagnosticsource_id"],
+            },
+        ),
+        Tool(
+            name="export_remediationsource",
+            description="Export a RemediationSource definition (REST API format). "
+            "Output can be used with create_remediationsource or "
+            "update_remediationsource.",
+            annotations=_EXPORT,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "remediationsource_id": {
+                        "type": "integer",
+                        "description": "RemediationSource ID",
+                    },
+                },
+                "required": ["remediationsource_id"],
             },
         ),
         Tool(
@@ -4098,6 +4117,33 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "definition": {"type": "object", "description": "TopologySource JSON"},
+                    "handle_conflict": {
+                        "type": "string",
+                        "description": "How to handle naming conflicts with existing modules",
+                    },
+                    "fields_to_preserve": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to preserve from existing module when overwriting",
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="import_diagnosticsource",
+            description="Import a DiagnosticSource from LM Exchange JSON format via "
+            "multipart upload (requires write permission). For REST API format "
+            "definitions (e.g., from export_diagnosticsource), use "
+            "create_diagnosticsource instead.",
+            annotations=_IMPORT,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "DiagnosticSource JSON definition",
+                    },
                     "handle_conflict": {
                         "type": "string",
                         "description": "How to handle naming conflicts with existing modules",
@@ -5197,6 +5243,117 @@ TOOLS.extend(
                 "required": ["source_id"],
             },
         ),
+        Tool(
+            name="execute_diagnostic",
+            description=(
+                "Execute a DiagnosticSource script on a target device. Performs "
+                "pre-execution checks (collector version, device status, script "
+                "review) before triggering manual execution. Poll "
+                "get_diagnostic_remediation_results for status and output. "
+                "Requires write permission."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "host_id": {
+                        "type": "integer",
+                        "description": "Target device/host ID",
+                    },
+                    "diagnostic_source_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID to execute",
+                    },
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Optional alert ID to associate with execution",
+                    },
+                },
+                "required": ["host_id", "diagnostic_source_id"],
+            },
+        ),
+        Tool(
+            name="create_diagnosticsource",
+            description=(
+                "Create a DiagnosticSource via REST API from a full definition dict "
+                "(requires write permission). Accepts REST API format (same as "
+                "export_diagnosticsource output). For LM Exchange format, use "
+                "import_diagnosticsource."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "definition": {
+                        "type": "object",
+                        "description": "Full DiagnosticSource definition in REST API format",
+                    },
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "If true, delete existing DiagnosticSource with same name "
+                            "before creating"
+                        ),
+                    },
+                },
+                "required": ["definition"],
+            },
+        ),
+        Tool(
+            name="update_diagnosticsource",
+            description=(
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server, including the script. "
+                "PREFER update_logicmodule(type='diagnosticsource', id, changes, "
+                "mode='preview') for partial updates with diff preview. Requires "
+                "confirm=true to proceed."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "diagnosticsource_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": (
+                            "FULL DiagnosticSource definition with all fields (will replace)"
+                        ),
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for "
+                            "safe partial updates."
+                        ),
+                    },
+                },
+                "required": ["diagnosticsource_id", "definition"],
+            },
+        ),
+        Tool(
+            name="delete_diagnosticsource",
+            description=(
+                "Delete a DiagnosticSource definition (requires write permission). "
+                "Action chains referencing it lose that stage."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "diagnosticsource_id": {
+                        "type": "integer",
+                        "description": "DiagnosticSource ID to delete",
+                    },
+                },
+                "required": ["diagnosticsource_id"],
+            },
+        ),
     ]
 )
 
@@ -5282,52 +5439,491 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="get_remediation_status",
+            name="create_remediationsource",
             description=(
-                "Get the current status of a remediation source execution "
-                "on a device. Returns device state and source details."
+                "Create a RemediationSource via REST API from a full definition dict "
+                "(requires write permission). Accepts REST API format (same as "
+                "export_remediationsource output). RemediationSources have no LM "
+                "Exchange import endpoint."
             ),
-            annotations=_READ_ONLY,
+            annotations=_WRITE,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "host_id": {
-                        "type": "integer",
-                        "description": "Device/host ID",
+                    "definition": {
+                        "type": "object",
+                        "description": "Full RemediationSource definition in REST API format",
                     },
-                    "remediation_source_id": {
-                        "type": "integer",
-                        "description": "Remediation source ID",
+                    "overwrite": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "If true, delete existing RemediationSource with same name "
+                            "before creating"
+                        ),
                     },
                 },
-                "required": ["host_id", "remediation_source_id"],
+                "required": ["definition"],
             },
         ),
         Tool(
-            name="get_remediation_history",
+            name="update_remediationsource",
             description=(
-                "List past remediation executions for a device from "
-                "audit logs. Output truncated at 32KB."
+                "RAW UPDATE -- full-replace semantics. Any field omitted from "
+                "`definition` is BLANKED on the server, including the script. "
+                "PREFER update_logicmodule(type='remediationsource', id, changes, "
+                "mode='preview') for partial updates with diff preview. Requires "
+                "confirm=true to proceed."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "remediationsource_id": {
+                        "type": "integer",
+                        "description": "RemediationSource ID to update",
+                    },
+                    "definition": {
+                        "type": "object",
+                        "description": (
+                            "FULL RemediationSource definition with all fields (will replace)"
+                        ),
+                    },
+                    "confirm": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Must be true to proceed. Defaults to false to prevent "
+                            "accidental field-blanking. Use update_logicmodule for "
+                            "safe partial updates."
+                        ),
+                    },
+                },
+                "required": ["remediationsource_id", "definition"],
+            },
+        ),
+        Tool(
+            name="delete_remediationsource",
+            description=(
+                "Delete a RemediationSource definition (requires write permission). "
+                "Action chains referencing it lose that stage."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "remediationsource_id": {
+                        "type": "integer",
+                        "description": "RemediationSource ID to delete",
+                    },
+                },
+                "required": ["remediationsource_id"],
+            },
+        ),
+    ]
+)
+
+# Automated Diagnostics & Remediation (ADR) composite endpoints
+TOOLS.extend(
+    [
+        Tool(
+            name="get_diagnostic_remediation_assignments",
+            description=(
+                "List the diagnostic and remediation sources assigned to a specific "
+                "resource or alert (Automated Diagnostics & Remediation). Unlike "
+                "get_diagnosticsources/get_remediationsources, this resolves which "
+                "modules actually apply to the target."
             ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "resource_id": {
+                        "type": "integer",
+                        "description": "Device/resource ID (provide this or alert_id)",
+                    },
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Alert ID (provide this or resource_id)",
+                    },
+                    "module_type": {
+                        "type": "string",
+                        "enum": ["diagnosticsource", "remediationsource"],
+                        "description": "Restrict to one module type (both if omitted)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                },
+            },
+        ),
+        Tool(
+            name="get_diagnostic_remediation_results",
+            description=(
+                "Get structured execution results for diagnostic and remediation "
+                "source runs: status, trigger type, executor, script output, and "
+                "timing. Provide exactly one of alert_id or host_id. Time window "
+                "params are epoch milliseconds; result timestamps are epoch seconds."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "alert_id": {
+                        "type": "string",
+                        "description": "Alert ID (exactly one of alert_id/host_id)",
+                    },
                     "host_id": {
                         "type": "integer",
-                        "description": "Device/host ID",
+                        "description": "Device/host ID (exactly one of alert_id/host_id)",
+                    },
+                    "module_type": {
+                        "type": "string",
+                        "enum": ["diagnostic", "remediation", "both"],
+                        "default": "both",
+                        "description": "Which module results to return",
+                    },
+                    "diagnostic_source_id": {
+                        "type": "integer",
+                        "description": "Filter to one DiagnosticSource by ID",
+                    },
+                    "diagnostic_source_name": {
+                        "type": "string",
+                        "description": "Filter to one DiagnosticSource by name",
                     },
                     "remediation_source_id": {
                         "type": "integer",
-                        "description": "Filter to a specific remediation source",
+                        "description": "Filter to one RemediationSource by ID",
                     },
-                    "hours_back": {
+                    "remediation_source_name": {
+                        "type": "string",
+                        "description": "Filter to one RemediationSource by name",
+                    },
+                    "start_time_ms": {
                         "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back (default: 24)",
+                        "description": "Window start, epoch milliseconds",
+                    },
+                    "end_time_ms": {
+                        "type": "integer",
+                        "description": "Window end, epoch milliseconds",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Max results per page",
+                    },
+                    "offset": {"type": "integer", "default": 0, "description": "Page offset"},
+                    "cursor": {
+                        "type": "string",
+                        "description": (
+                            "Diagnostic-side cursor from a previous response "
+                            '(not valid with module_type "both")'
+                        ),
+                    },
+                    "remediation_cursor": {
+                        "type": "string",
+                        "description": (
+                            "Remediation-side cursor from a previous response "
+                            '(not valid with module_type "both")'
+                        ),
                     },
                 },
-                "required": ["host_id"],
+            },
+        ),
+    ]
+)
+
+# Action Chains (ADR automation)
+TOOLS.extend(
+    [
+        Tool(
+            name="get_action_chains",
+            description=(
+                "List action chains: ordered DiagnosticSource/RemediationSource "
+                "stages that action rules trigger on alerts (Automated "
+                "Diagnostics & Remediation)"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by chain name (substring, client-side)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_action_chain",
+            description="Get details about a specific action chain including its stages",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="create_action_chain",
+            description=(
+                "Create an action chain from ordered diagnostic/remediation stages "
+                "(requires write permission). Each stage references a "
+                "DiagnosticSource or RemediationSource by ID."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Chain name"},
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer",
+                                    "description": "DiagnosticSource/RemediationSource ID",
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["diagnosticSource", "remediationSource"],
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Source name (optional)",
+                                },
+                            },
+                            "required": ["id", "type"],
+                        },
+                        "description": "Ordered stage list",
+                    },
+                    "description": {"type": "string", "description": "Chain description"},
+                },
+                "required": ["name", "stages"],
+            },
+        ),
+        Tool(
+            name="update_action_chain",
+            description=(
+                "Update an action chain via PATCH; only provided fields are sent "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                    "name": {"type": "string", "description": "New chain name"},
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["diagnosticSource", "remediationSource"],
+                                },
+                                "name": {"type": "string"},
+                            },
+                            "required": ["id", "type"],
+                        },
+                        "description": "Replacement ordered stage list",
+                    },
+                    "description": {"type": "string", "description": "New description"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="delete_action_chain",
+            description=(
+                "Delete an action chain (requires write permission). Action rules "
+                "referencing it stop triggering."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="get_action_rules",
+            description=(
+                "List action rules: alert conditions (severity, device groups, "
+                "datasource matchers) that trigger action chains"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by rule name (substring, client-side)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_action_rule",
+            description="Get details about a specific action rule",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="create_action_rule",
+            description=(
+                "Create an action rule binding an action chain to alert conditions "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Rule name"},
+                    "level": {
+                        "type": "string",
+                        "description": "Alert severity to match (e.g. Error, Critical)",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": 'Device group full paths (["*"] for all)',
+                    },
+                    "action_chain_id": {
+                        "type": "integer",
+                        "description": "Action chain to trigger",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": 'Device display names (["*"] for all)',
+                    },
+                    "datasource": {"type": "string", "description": "Datasource name matcher"},
+                    "instance": {"type": "string", "description": "Instance matcher"},
+                    "datapoint": {"type": "string", "description": "Datapoint matcher"},
+                    "resource_properties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "value": {"type": "string"},
+                            },
+                            "required": ["name", "value"],
+                        },
+                        "description": "Property matchers",
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Whether the rule starts enabled",
+                    },
+                },
+                "required": ["name", "level", "device_groups", "action_chain_id"],
+            },
+        ),
+        Tool(
+            name="update_action_rule",
+            description=(
+                "Update an action rule via PATCH; only provided fields are sent "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                    "name": {"type": "string", "description": "New rule name"},
+                    "level": {
+                        "type": "string",
+                        "description": "Alert severity to match (e.g. Error, Critical)",
+                    },
+                    "device_groups": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Device group full paths",
+                    },
+                    "action_chain_id": {
+                        "type": "integer",
+                        "description": "Action chain to trigger",
+                    },
+                    "devices": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Device display names",
+                    },
+                    "datasource": {"type": "string", "description": "Datasource name matcher"},
+                    "instance": {"type": "string", "description": "Instance matcher"},
+                    "datapoint": {"type": "string", "description": "Datapoint matcher"},
+                    "resource_properties": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "value": {"type": "string"},
+                            },
+                            "required": ["name", "value"],
+                        },
+                        "description": "Property matchers",
+                    },
+                    "enabled": {"type": "boolean", "description": "Enable/disable the rule"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="delete_action_rule",
+            description="Delete an action rule (requires write permission)",
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                },
+                "required": ["rule_id"],
+            },
+        ),
+        Tool(
+            name="set_action_rule_status",
+            description=(
+                "Enable or disable an action rule without touching its matchers "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_id": {"type": "integer", "description": "Action rule ID"},
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable, False to disable",
+                    },
+                },
+                "required": ["rule_id", "enabled"],
             },
         ),
     ]
@@ -5575,9 +6171,11 @@ TOOLS.extend(
                         "enum": [
                             "configsource",
                             "datasource",
+                            "diagnosticsource",
                             "eventsource",
                             "logsource",
                             "propertysource",
+                            "remediationsource",
                             "topologysource",
                         ],
                         "description": "Source type to update",
@@ -6674,6 +7272,7 @@ def get_tool_handler(tool_name: str) -> Any:
     """
     from lm_mcp.tools import (
         access_groups,
+        actions,
         alert_rules,
         alerts,
         ansible,
@@ -6689,6 +7288,7 @@ def get_tool_handler(tool_name: str) -> Any:
         dashboards,
         datasources,
         devices,
+        diagnostic_remediation,
         diagnosticsources,
         escalations,
         event_correlation,
@@ -6810,6 +7410,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_report_groups": reports.get_report_groups,
         "get_scheduled_reports": reports.get_scheduled_reports,
         "run_report": reports.run_report,
+        "get_report_execution": reports.get_report_execution,
         "create_report": reports.create_report,
         "update_report_schedule": reports.update_report_schedule,
         "delete_report": reports.delete_report,
@@ -6839,12 +7440,34 @@ def get_tool_handler(tool_name: str) -> Any:
         # Diagnostic Sources
         "get_diagnosticsources": diagnosticsources.get_diagnosticsources,
         "get_diagnosticsource": diagnosticsources.get_diagnosticsource,
+        "execute_diagnostic": diagnosticsources.execute_diagnostic,
+        "create_diagnosticsource": diagnosticsources.create_diagnosticsource,
+        "update_diagnosticsource": diagnosticsources.update_diagnosticsource,
+        "delete_diagnosticsource": diagnosticsources.delete_diagnosticsource,
         # Remediation Sources
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
         "execute_remediation": remediationsources.execute_remediation,
-        "get_remediation_status": remediationsources.get_remediation_status,
-        "get_remediation_history": remediationsources.get_remediation_history,
+        "create_remediationsource": remediationsources.create_remediationsource,
+        "update_remediationsource": remediationsources.update_remediationsource,
+        "delete_remediationsource": remediationsources.delete_remediationsource,
+        "get_diagnostic_remediation_assignments": (
+            diagnostic_remediation.get_diagnostic_remediation_assignments
+        ),
+        "get_diagnostic_remediation_results": (
+            diagnostic_remediation.get_diagnostic_remediation_results
+        ),
+        "get_action_chains": actions.get_action_chains,
+        "get_action_chain": actions.get_action_chain,
+        "create_action_chain": actions.create_action_chain,
+        "update_action_chain": actions.update_action_chain,
+        "delete_action_chain": actions.delete_action_chain,
+        "get_action_rules": actions.get_action_rules,
+        "get_action_rule": actions.get_action_rule,
+        "create_action_rule": actions.create_action_rule,
+        "update_action_rule": actions.update_action_rule,
+        "delete_action_rule": actions.delete_action_rule,
+        "set_action_rule_status": actions.set_action_rule_status,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,
@@ -6937,15 +7560,11 @@ def get_tool_handler(tool_name: str) -> Any:
         # Batch Jobs
         "get_batchjobs": batchjobs.get_batchjobs,
         "get_batchjob": batchjobs.get_batchjob,
-        "get_batchjob_history": batchjobs.get_batchjob_history,
         "get_device_batchjobs": batchjobs.get_device_batchjobs,
         "get_scheduled_downtime_jobs": batchjobs.get_scheduled_downtime_jobs,
         # Cost
-        "get_cost_summary": cost.get_cost_summary,
-        "get_resource_cost": cost.get_resource_cost,
         "get_cost_recommendations": cost.get_cost_recommendations,
         "get_idle_resources": cost.get_idle_resources,
-        "get_cloud_cost_accounts": cost.get_cloud_cost_accounts,
         "get_cost_recommendation_categories": cost.get_cost_recommendation_categories,
         "get_cost_recommendation": cost.get_cost_recommendation,
         # Imports/Exports
@@ -6957,12 +7576,15 @@ def get_tool_handler(tool_name: str) -> Any:
         "export_eventsource": imports.export_eventsource,
         "export_propertysource": imports.export_propertysource,
         "export_logsource": imports.export_logsource,
+        "export_diagnosticsource": imports.export_diagnosticsource,
+        "export_remediationsource": imports.export_remediationsource,
         "import_datasource": imports.import_datasource,
         "import_configsource": imports.import_configsource,
         "import_eventsource": imports.import_eventsource,
         "import_propertysource": imports.import_propertysource,
         "import_logsource": imports.import_logsource,
         "import_topologysource": imports.import_topologysource,
+        "import_diagnosticsource": imports.import_diagnosticsource,
         "import_jobmonitor": imports.import_jobmonitor,
         "import_appliesto_function": imports.import_appliesto_function,
         # Ingestion

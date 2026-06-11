@@ -78,6 +78,7 @@ WRITE_TOOL_PREFIXES = (
     "execute_",
     "recover_",
     "collect_",
+    "set_action_rule",
     "terraform_apply",
     "terraform_destroy",
     "terraform_import",

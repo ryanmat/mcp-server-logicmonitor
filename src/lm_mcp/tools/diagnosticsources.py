@@ -1,5 +1,5 @@
 # Description: Diagnostic source tools for LogicMonitor MCP server.
-# Description: Provides read access to public /setting/diagnosticsources REST endpoints.
+# Description: CRUD and manual execution for /setting/diagnosticsources REST endpoints.
 
 from __future__ import annotations
 
@@ -11,10 +11,13 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    normalize_definition_fields,
     quote_filter_value,
+    require_write_permission,
     safe_total,
     sanitize_filter_value,
 )
+from lm_mcp.tools.diagnostic_remediation import run_pre_execution_checks
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -142,5 +145,218 @@ async def get_diagnosticsource(
         }
 
         return format_response(detail)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def execute_diagnostic(
+    client: LogicMonitorClient,
+    host_id: int,
+    diagnostic_source_id: int,
+    alert_id: str | None = None,
+) -> list[TextContent]:
+    """Execute a DiagnosticSource script on a target device.
+
+    Runs the shared ADR pre-execution checklist (device reachable,
+    collector build >= 39.200, appliesTo and script review with
+    state-mutation warning) before triggering manual execution via
+    POST /setting/diagnosticsources/executemanually.
+
+    Args:
+        client: LogicMonitor API client.
+        host_id: Device/host ID to execute on.
+        diagnostic_source_id: DiagnosticSource ID to execute.
+        alert_id: Optional alert ID to associate with the execution.
+
+    Returns:
+        Execution result with pre-check details and warnings.
+    """
+    try:
+        error, checks = await run_pre_execution_checks(
+            client, host_id, diagnostic_source_id, source_kind="diagnostic"
+        )
+        if error:
+            return format_response(error)
+
+        payload: dict = {
+            "hostId": host_id,
+            "diagnosticId": diagnostic_source_id,
+            "triggerType": "manual",
+        }
+        if alert_id:
+            payload["alertId"] = alert_id
+
+        exec_result = await client.post(
+            "/setting/diagnosticsources/executemanually",
+            json_body=payload,
+        )
+
+        response = {
+            "success": True,
+            "message": "Diagnostic execution initiated",
+            "host_id": host_id,
+            "diagnostic_source_id": diagnostic_source_id,
+            "alert_id": alert_id,
+            "collector_version": checks["collector_version"],
+            "applies_to": checks["applies_to"],
+            "script_preview": checks["script_preview"],
+            "execution_response": exec_result,
+            "warnings": checks["warnings"],
+            "next_step": (
+                "Poll get_diagnostic_remediation_results with this host_id for "
+                "execution status and script output."
+            ),
+        }
+
+        if checks["mutation_warning"]:
+            response["mutation_warning"] = checks["mutation_warning"]
+
+        return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def create_diagnosticsource(
+    client: LogicMonitorClient,
+    definition: dict,
+    overwrite: bool = False,
+) -> list[TextContent]:
+    """Create a DiagnosticSource via REST API using a full definition dict.
+
+    Accepts REST API format (same format returned by export_diagnosticsource).
+    For LM Exchange format imports, use import_diagnosticsource instead.
+
+    Args:
+        client: LogicMonitor API client.
+        definition: Full DiagnosticSource definition dict in REST API format.
+        overwrite: If True, delete existing DiagnosticSource with the same
+            name before creating.
+
+    Returns:
+        List of TextContent with created DiagnosticSource info or error.
+    """
+    try:
+        payload = normalize_definition_fields(definition)
+        payload.pop("id", None)
+
+        if overwrite and payload.get("name"):
+            existing = await client.get(
+                "/setting/diagnosticsources",
+                params={"filter": f'name:"{payload["name"]}"', "size": 1},
+            )
+            items = existing.get("items", [])
+            if items:
+                await client.delete(f"/setting/diagnosticsources/{items[0]['id']}")
+
+        result = await client.post("/setting/diagnosticsources", json_body=payload)
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"DiagnosticSource '{result.get('name')}' created successfully",
+                "diagnosticsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def update_diagnosticsource(
+    client: LogicMonitorClient,
+    diagnosticsource_id: int,
+    definition: dict,
+    confirm: bool = False,
+) -> list[TextContent]:
+    """Update an existing DiagnosticSource via REST API (full replace).
+
+    The LM API uses full-replace semantics: every field not included in the
+    definition will be blanked, including the Groovy script. PREFER
+    update_logicmodule(type='diagnosticsource', ...) for partial updates;
+    it exports, deep-merges, and previews a diff before writing.
+
+    Args:
+        client: LogicMonitor API client.
+        diagnosticsource_id: DiagnosticSource ID to update.
+        definition: Full DiagnosticSource definition dict with all fields.
+        confirm: Must be True to proceed. Defaults to False to prevent
+            accidental field-blanking via partial payloads.
+
+    Returns:
+        List of TextContent with updated DiagnosticSource info or error.
+    """
+    if not confirm:
+        return format_response(
+            {
+                "error": True,
+                "code": "CONFIRMATION_REQUIRED",
+                "message": (
+                    "update_diagnosticsource is full-replace -- any field omitted "
+                    "from `definition` will be BLANKED, including the script. Set "
+                    "confirm=true to proceed, OR use update_logicmodule"
+                    "(type='diagnosticsource', id, changes, mode='preview') for a "
+                    "safe partial update with diff preview."
+                ),
+            }
+        )
+    try:
+        payload = normalize_definition_fields(definition)
+        payload.pop("id", None)
+
+        result = await client.put(
+            f"/setting/diagnosticsources/{diagnosticsource_id}", json_body=payload
+        )
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"DiagnosticSource '{result.get('name')}' updated successfully",
+                "diagnosticsource": {
+                    "id": result.get("id"),
+                    "name": result.get("name"),
+                    "display_name": result.get("displayName"),
+                },
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def delete_diagnosticsource(
+    client: LogicMonitorClient,
+    diagnosticsource_id: int,
+) -> list[TextContent]:
+    """Delete a DiagnosticSource from LogicMonitor.
+
+    WARNING: This removes the DiagnosticSource definition; any action chains
+    referencing it as a stage will lose that stage.
+
+    Args:
+        client: LogicMonitor API client.
+        diagnosticsource_id: DiagnosticSource ID to delete.
+
+    Returns:
+        List of TextContent with deletion confirmation or error.
+    """
+    try:
+        source = await client.get(f"/setting/diagnosticsources/{diagnosticsource_id}")
+        source_name = source.get("name", f"ID:{diagnosticsource_id}")
+
+        await client.delete(f"/setting/diagnosticsources/{diagnosticsource_id}")
+
+        return format_response(
+            {
+                "success": True,
+                "message": f"DiagnosticSource '{source_name}' deleted",
+                "diagnosticsource_id": diagnosticsource_id,
+            }
+        )
     except Exception as e:
         return handle_error(e)

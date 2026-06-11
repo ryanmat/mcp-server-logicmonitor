@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     format_response,
     handle_error,
     quote_filter_value,
+    safe_total,
     sanitize_filter_value,
 )
 
@@ -19,109 +20,71 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-async def get_cloud_cost_accounts(
-    client: LogicMonitorClient,
-    provider: str | None = None,
-    limit: int = 50,
-) -> list[TextContent]:
-    """List cloud accounts configured for cost tracking.
-
-    Args:
-        client: LogicMonitor API client.
-        provider: Filter by cloud provider (aws, azure, gcp).
-        limit: Maximum number of accounts to return.
-
-    Returns:
-        List of TextContent with cloud account data or error.
-    """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if provider:
-            clean_provider, was_modified = sanitize_filter_value(provider)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"provider:{quote_filter_value(clean_provider)}"
-
-        result = await client.get("/cost/cloudaccounts", params=params)
-
-        accounts = []
-        for item in result.get("items", []):
-            accounts.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "provider": item.get("provider"),
-                    "account_id": item.get("accountId"),
-                    "status": item.get("status"),
-                    "last_updated": item.get("lastUpdatedOn"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(accounts),
-            "cloud_accounts": accounts,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+def _project_recommendation(item: dict) -> dict:
+    """Project a Cost Optimization recommendation item to snake_case."""
+    return {
+        "id": item.get("id"),
+        "recommendation_id": item.get("recommendationId"),
+        "category": item.get("recommendationCategory"),
+        "resource_id": item.get("resourceId"),
+        "resource_name": item.get("resourceDisplayName"),
+        "cloud_provider": item.get("cloudProvider"),
+        "cloud_service_type": item.get("cloudServiceType"),
+        "recommendation": item.get("recommendation"),
+        "criteria": item.get("criteria"),
+        "annual_savings": item.get("annualSavings"),
+        "status": item.get("recommendationStatus"),
+        "console_url": item.get("providerConsoleUrl"),
+    }
 
 
 async def get_cost_recommendations(
     client: LogicMonitorClient,
-    cloud_account_id: int | None = None,
-    recommendation_type: str | None = None,
+    category: str | None = None,
+    status: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get cost optimization recommendations.
 
+    The category filter matches the category DESCRIPTION string (e.g.
+    "Idle AWS EC2 instances"), not the enum name; the API silently
+    ignores unknown values. Use get_cost_recommendation_categories to
+    list valid descriptions.
+
     Args:
         client: LogicMonitor API client.
-        cloud_account_id: Filter by specific cloud account.
-        recommendation_type: Filter by type (rightsizing, idle, unused, etc.).
+        category: Filter by category description string.
+        status: Filter by recommendation status (e.g. active).
         limit: Maximum number of recommendations to return.
+        offset: Results to skip for pagination.
 
     Returns:
         List of TextContent with recommendations or error.
     """
     try:
-        params: dict = {"size": limit}
+        params: dict = {"size": limit, "offset": offset}
         wildcards_stripped = False
 
         filters = []
-        if cloud_account_id:
-            filters.append(f"cloudAccountId:{cloud_account_id}")
-        if recommendation_type:
-            clean_type, was_modified = sanitize_filter_value(recommendation_type)
+        if category:
+            clean_category, was_modified = sanitize_filter_value(category)
             wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"type:{quote_filter_value(clean_type)}")
+            filters.append(f"recommendationCategory:{quote_filter_value(clean_category)}")
+        if status:
+            clean_status, was_modified = sanitize_filter_value(status)
+            wildcards_stripped = wildcards_stripped or was_modified
+            filters.append(f"recommendationStatus:{quote_filter_value(clean_status.upper())}")
 
         if filters:
             params["filter"] = ",".join(filters)
 
-        result = await client.get("/cost/recommendations", params=params)
+        result = await client.get("/cost-optimization/recommendations", params=params)
 
-        recommendations = []
-        for item in result.get("items", []):
-            recommendations.append(
-                {
-                    "id": item.get("id"),
-                    "type": item.get("type"),
-                    "resource_name": item.get("resourceName"),
-                    "resource_type": item.get("resourceType"),
-                    "current_cost": item.get("currentCost"),
-                    "projected_savings": item.get("projectedSavings"),
-                    "recommendation": item.get("recommendation"),
-                    "confidence": item.get("confidence"),
-                    "status": item.get("status"),
-                }
-            )
+        recommendations = [_project_recommendation(item) for item in result.get("items", [])]
 
         response = {
-            "total": result.get("total", 0),
+            "total": safe_total(result),
             "count": len(recommendations),
             "recommendations": recommendations,
         }
@@ -132,130 +95,77 @@ async def get_cost_recommendations(
         return handle_error(e)
 
 
-async def get_cost_summary(
-    client: LogicMonitorClient,
-    cloud_account_id: int | None = None,
-    time_range: str = "last30days",
-) -> list[TextContent]:
-    """Get cost summary and trends.
-
-    Args:
-        client: LogicMonitor API client.
-        cloud_account_id: Filter by specific cloud account.
-        time_range: Time range for summary (last7days, last30days, last90days).
-
-    Returns:
-        List of TextContent with cost summary or error.
-    """
-    try:
-        params: dict = {"timeRange": time_range}
-
-        if cloud_account_id:
-            params["cloudAccountId"] = cloud_account_id
-
-        result = await client.get("/cost/summary", params=params)
-
-        return format_response(
-            {
-                "time_range": time_range,
-                "total_cost": result.get("totalCost"),
-                "cost_trend": result.get("costTrend"),
-                "cost_by_service": result.get("costByService", []),
-                "cost_by_region": result.get("costByRegion", []),
-                "projected_monthly": result.get("projectedMonthlyCost"),
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def get_resource_cost(
-    client: LogicMonitorClient,
-    device_id: int,
-    time_range: str = "last30days",
-) -> list[TextContent]:
-    """Get cost data for a specific resource/device.
-
-    Args:
-        client: LogicMonitor API client.
-        device_id: Device ID to get cost for.
-        time_range: Time range for cost data (last7days, last30days, last90days).
-
-    Returns:
-        List of TextContent with resource cost data or error.
-    """
-    try:
-        params: dict = {"timeRange": time_range}
-        result = await client.get(f"/device/devices/{device_id}/cost", params=params)
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "time_range": time_range,
-                "total_cost": result.get("totalCost"),
-                "cost_breakdown": result.get("costBreakdown", []),
-                "cost_trend": result.get("costTrend", []),
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+# Category enum-name markers that identify idle/waste recommendation types
+# (e.g. EC2_IDLE, AZURE_VM_UNDERUTILIZED, EBS_UNATTACHED, AZURE_VM_STOPPED).
+_IDLE_CATEGORY_MARKERS = ("_IDLE", "_UNDERUTILIZED", "_UNATTACHED", "_STOPPED")
 
 
 async def get_idle_resources(
     client: LogicMonitorClient,
-    cloud_account_id: int | None = None,
-    resource_type: str | None = None,
+    provider: str | None = None,
     limit: int = 50,
 ) -> list[TextContent]:
-    """Get list of idle/underutilized resources.
+    """Get idle/underutilized cloud resources from cost recommendations.
+
+    Resolves idle-type categories dynamically from the Cost Optimization
+    categories endpoint (enum names containing _IDLE, _UNDERUTILIZED,
+    _UNATTACHED, _STOPPED), then queries recommendations with an OR
+    filter on their description strings. The recommendation filter
+    matches descriptions, not enum names.
 
     Args:
         client: LogicMonitor API client.
-        cloud_account_id: Filter by specific cloud account.
-        resource_type: Filter by resource type (ec2, rds, ebs, etc.).
-        limit: Maximum number of resources to return.
+        provider: Narrow to one cloud provider (aws, azure, gcp).
+        limit: Maximum number of recommendations to fetch.
 
     Returns:
         List of TextContent with idle resources or error.
     """
     try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
+        categories = await client.get("/cost-optimization/recommendations/categories")
+        idle_descriptions = [
+            item.get("description")
+            for item in categories.get("items", [])
+            if item.get("description")
+            and any(marker in str(item.get("name", "")) for marker in _IDLE_CATEGORY_MARKERS)
+        ]
 
-        filters = [f"status:{quote_filter_value('idle')}"]
-        if cloud_account_id:
-            filters.append(f"cloudAccountId:{cloud_account_id}")
-        if resource_type:
-            clean_type, was_modified = sanitize_filter_value(resource_type)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"resourceType:{quote_filter_value(clean_type)}")
-
-        params["filter"] = ",".join(filters)
-
-        result = await client.get("/cost/resources", params=params)
-
-        resources = []
-        for item in result.get("items", []):
-            resources.append(
+        if not idle_descriptions:
+            return format_response(
                 {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "resource_type": item.get("resourceType"),
-                    "cloud_account": item.get("cloudAccountName"),
-                    "region": item.get("region"),
-                    "utilization": item.get("utilization"),
-                    "monthly_cost": item.get("monthlyCost"),
-                    "idle_since": item.get("idleSince"),
+                    "total": 0,
+                    "count": 0,
+                    "idle_resources": [],
+                    "note": "No idle-type recommendation categories available on this portal.",
                 }
             )
 
-        response = {
-            "total": result.get("total", 0),
+        or_values = "|".join(quote_filter_value(desc) for desc in idle_descriptions)
+        params: dict = {"size": limit, "filter": f"recommendationCategory:{or_values}"}
+
+        result = await client.get("/cost-optimization/recommendations", params=params)
+
+        resources = []
+        for item in result.get("items", []):
+            if provider and str(item.get("cloudProvider", "")).lower() != provider.lower():
+                continue
+            # Defensive re-filter: the API matches description strings, so keep
+            # only items whose category resolved from the idle-type enum names.
+            if item.get("recommendationCategory") not in idle_descriptions:
+                continue
+            resources.append(_project_recommendation(item))
+
+        response: dict = {
+            "total": safe_total(result),
             "count": len(resources),
             "idle_resources": resources,
         }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
+        if provider:
+            response["provider"] = provider.lower()
+            response["note"] = (
+                "Provider filtering is applied client-side after fetching; "
+                "increase limit if results appear truncated."
+            )
         return format_response(response)
     except Exception as e:
         return handle_error(e)

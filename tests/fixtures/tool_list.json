@@ -734,6 +734,144 @@
       "type": "object"
     }
   },
+  "create_action_chain": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create an action chain from ordered diagnostic/remediation stages (requires write permission). Each stage references a DiagnosticSource or RemediationSource by ID.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Chain description",
+          "type": "string"
+        },
+        "name": {
+          "description": "Chain name",
+          "type": "string"
+        },
+        "stages": {
+          "description": "Ordered stage list",
+          "items": {
+            "properties": {
+              "id": {
+                "description": "DiagnosticSource/RemediationSource ID",
+                "type": "integer"
+              },
+              "name": {
+                "description": "Source name (optional)",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "diagnosticSource",
+                  "remediationSource"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "stages"
+      ],
+      "type": "object"
+    }
+  },
+  "create_action_rule": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create an action rule binding an action chain to alert conditions (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "action_chain_id": {
+          "description": "Action chain to trigger",
+          "type": "integer"
+        },
+        "datapoint": {
+          "description": "Datapoint matcher",
+          "type": "string"
+        },
+        "datasource": {
+          "description": "Datasource name matcher",
+          "type": "string"
+        },
+        "device_groups": {
+          "description": "Device group full paths ([\"*\"] for all)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "devices": {
+          "description": "Device display names ([\"*\"] for all)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Whether the rule starts enabled",
+          "type": "boolean"
+        },
+        "instance": {
+          "description": "Instance matcher",
+          "type": "string"
+        },
+        "level": {
+          "description": "Alert severity to match (e.g. Error, Critical)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Rule name",
+          "type": "string"
+        },
+        "resource_properties": {
+          "description": "Property matchers",
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "level",
+        "device_groups",
+        "action_chain_id"
+      ],
+      "type": "object"
+    }
+  },
   "create_alert_rule": {
     "annotations": {
       "destructiveHint": false,
@@ -1067,6 +1205,33 @@
       },
       "required": [
         "name"
+      ],
+      "type": "object"
+    }
+  },
+  "create_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource.",
+    "inputSchema": {
+      "properties": {
+        "definition": {
+          "description": "Full DiagnosticSource definition in REST API format",
+          "type": "object"
+        },
+        "overwrite": {
+          "default": false,
+          "description": "If true, delete existing DiagnosticSource with same name before creating",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "definition"
       ],
       "type": "object"
     }
@@ -1425,6 +1590,33 @@
       "type": "object"
     }
   },
+  "create_remediationsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint.",
+    "inputSchema": {
+      "properties": {
+        "definition": {
+          "description": "Full RemediationSource definition in REST API format",
+          "type": "object"
+        },
+        "overwrite": {
+          "default": false,
+          "description": "If true, delete existing RemediationSource with same name before creating",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "create_report": {
     "annotations": {
       "destructiveHint": false,
@@ -1714,6 +1906,50 @@
       "type": "object"
     }
   },
+  "delete_action_chain": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete an action chain (requires write permission). Action rules referencing it stop triggering.",
+    "inputSchema": {
+      "properties": {
+        "chain_id": {
+          "description": "Action chain ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain_id"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_action_rule": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete an action rule (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
   "delete_alert_rule": {
     "annotations": {
       "destructiveHint": true,
@@ -1959,6 +2195,28 @@
       "type": "object"
     }
   },
+  "delete_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete a DiagnosticSource definition (requires write permission). Action chains referencing it lose that stage.",
+    "inputSchema": {
+      "properties": {
+        "diagnosticsource_id": {
+          "description": "DiagnosticSource ID to delete",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnosticsource_id"
+      ],
+      "type": "object"
+    }
+  },
   "delete_escalation_chain": {
     "annotations": {
       "destructiveHint": true,
@@ -2109,6 +2367,28 @@
       },
       "required": [
         "group_id"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_remediationsource": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete a RemediationSource definition (requires write permission). Action chains referencing it lose that stage.",
+    "inputSchema": {
+      "properties": {
+        "remediationsource_id": {
+          "description": "RemediationSource ID to delete",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remediationsource_id"
       ],
       "type": "object"
     }
@@ -2516,6 +2796,37 @@
       "type": "object"
     }
   },
+  "execute_diagnostic": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Execute a DiagnosticSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Poll get_diagnostic_remediation_results for status and output. Requires write permission.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Optional alert ID to associate with execution",
+          "type": "string"
+        },
+        "diagnostic_source_id": {
+          "description": "DiagnosticSource ID to execute",
+          "type": "integer"
+        },
+        "host_id": {
+          "description": "Target device/host ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host_id",
+        "diagnostic_source_id"
+      ],
+      "type": "object"
+    }
+  },
   "execute_remediation": {
     "annotations": {
       "destructiveHint": false,
@@ -2635,6 +2946,28 @@
       "type": "object"
     }
   },
+  "export_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource or update_diagnosticsource.",
+    "inputSchema": {
+      "properties": {
+        "diagnosticsource_id": {
+          "description": "DiagnosticSource ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnosticsource_id"
+      ],
+      "type": "object"
+    }
+  },
   "export_escalation_chain": {
     "annotations": {
       "destructiveHint": false,
@@ -2719,6 +3052,28 @@
       },
       "required": [
         "propertysource_id"
+      ],
+      "type": "object"
+    }
+  },
+  "export_remediationsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource or update_remediationsource.",
+    "inputSchema": {
+      "properties": {
+        "remediationsource_id": {
+          "description": "RemediationSource ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remediationsource_id"
       ],
       "type": "object"
     }
@@ -2822,6 +3177,108 @@
       "type": "object"
     }
   },
+  "get_action_chain": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get details about a specific action chain including its stages",
+    "inputSchema": {
+      "properties": {
+        "chain_id": {
+          "description": "Action chain ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_action_chains": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List action chains: ordered DiagnosticSource/RemediationSource stages that action rules trigger on alerts (Automated Diagnostics & Remediation)",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by chain name (substring, client-side)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_action_rule": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get details about a specific action rule",
+    "inputSchema": {
+      "properties": {
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_action_rules": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List action rules: alert conditions (severity, device groups, datasource matchers) that trigger action chains",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by rule name (substring, client-side)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_active_sdts": {
     "annotations": {
       "destructiveHint": false,
@@ -2864,6 +3321,11 @@
         "alert_id": {
           "description": "Alert ID (with or without LMA prefix)",
           "type": "string"
+        },
+        "include_message": {
+          "default": false,
+          "description": "Include the full alert message body (needMessage)",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3176,38 +3638,6 @@
       "type": "object"
     }
   },
-  "get_batchjob_history": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get execution history for a batch job",
-    "inputSchema": {
-      "properties": {
-        "batchjob_id": {
-          "description": "Batch job ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "limit": {
-          "default": 20,
-          "description": "Max results",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "device_id",
-        "batchjob_id"
-      ],
-      "type": "object"
-    }
-  },
   "get_batchjobs": {
     "annotations": {
       "destructiveHint": false,
@@ -3251,26 +3681,6 @@
         "resource_type": {
           "description": "Filter by resource type",
           "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_cloud_cost_accounts": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get cloud accounts with cost data",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
         }
       },
       "type": "object"
@@ -3558,44 +3968,25 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get cost optimization recommendations",
+    "description": "Get cost optimization recommendations. Category filter takes the category description string from get_cost_recommendation_categories",
     "inputSchema": {
       "properties": {
-        "cloud_account_id": {
-          "description": "Filter by cloud account ID",
-          "type": "integer"
+        "category": {
+          "description": "Category description string (e.g. \"Idle AWS EC2 instances\")",
+          "type": "string"
         },
         "limit": {
           "default": 50,
           "description": "Max results",
           "type": "integer"
         },
-        "recommendation_type": {
-          "description": "Filter by recommendation type",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_cost_summary": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get cloud cost summary",
-    "inputSchema": {
-      "properties": {
-        "cloud_account_id": {
-          "description": "Filter by cloud account ID",
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
           "type": "integer"
         },
-        "time_range": {
-          "default": "last30days",
-          "description": "Time range (e.g. last7days, last30days, last90days)",
+        "status": {
+          "description": "Filter by recommendation status (e.g. active)",
           "type": "string"
         }
       },
@@ -3842,11 +4233,16 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get batch jobs for a specific device (resource)",
+    "description": "List BatchJob datasources applied to a device (resource); per-run output lives in instance data via get_device_data",
     "inputSchema": {
       "properties": {
         "device_id": {
           "description": "Device ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
           "type": "integer"
         }
       },
@@ -4328,6 +4724,117 @@
       "type": "object"
     }
   },
+  "get_diagnostic_remediation_assignments": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the diagnostic and remediation sources assigned to a specific resource or alert (Automated Diagnostics & Remediation). Unlike get_diagnosticsources/get_remediationsources, this resolves which modules actually apply to the target.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Alert ID (provide this or resource_id)",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "module_type": {
+          "description": "Restrict to one module type (both if omitted)",
+          "enum": [
+            "diagnosticsource",
+            "remediationsource"
+          ],
+          "type": "string"
+        },
+        "resource_id": {
+          "description": "Device/resource ID (provide this or alert_id)",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_diagnostic_remediation_results": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get structured execution results for diagnostic and remediation source runs: status, trigger type, executor, script output, and timing. Provide exactly one of alert_id or host_id. Time window params are epoch milliseconds; result timestamps are epoch seconds.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Alert ID (exactly one of alert_id/host_id)",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "Diagnostic-side cursor from a previous response (not valid with module_type \"both\")",
+          "type": "string"
+        },
+        "diagnostic_source_id": {
+          "description": "Filter to one DiagnosticSource by ID",
+          "type": "integer"
+        },
+        "diagnostic_source_name": {
+          "description": "Filter to one DiagnosticSource by name",
+          "type": "string"
+        },
+        "end_time_ms": {
+          "description": "Window end, epoch milliseconds",
+          "type": "integer"
+        },
+        "host_id": {
+          "description": "Device/host ID (exactly one of alert_id/host_id)",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results per page",
+          "type": "integer"
+        },
+        "module_type": {
+          "default": "both",
+          "description": "Which module results to return",
+          "enum": [
+            "diagnostic",
+            "remediation",
+            "both"
+          ],
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Page offset",
+          "type": "integer"
+        },
+        "remediation_cursor": {
+          "description": "Remediation-side cursor from a previous response (not valid with module_type \"both\")",
+          "type": "string"
+        },
+        "remediation_source_id": {
+          "description": "Filter to one RemediationSource by ID",
+          "type": "integer"
+        },
+        "remediation_source_name": {
+          "description": "Filter to one RemediationSource by name",
+          "type": "string"
+        },
+        "start_time_ms": {
+          "description": "Window start, epoch milliseconds",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_diagnosticsource": {
     "annotations": {
       "destructiveHint": false,
@@ -4567,20 +5074,16 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get idle/underutilized resources",
+    "description": "Get idle/underutilized cloud resources (resolved from idle-type cost recommendation categories)",
     "inputSchema": {
       "properties": {
-        "cloud_account_id": {
-          "description": "Filter by cloud account ID",
-          "type": "integer"
-        },
         "limit": {
           "default": 50,
           "description": "Max results",
           "type": "integer"
         },
-        "resource_type": {
-          "description": "Filter by resource type",
+        "provider": {
+          "description": "Narrow to one cloud provider (aws, azure, gcp)",
           "type": "string"
         }
       },
@@ -5433,64 +5936,6 @@
       "type": "object"
     }
   },
-  "get_remediation_history": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List past remediation executions for a device from audit logs. Output truncated at 32KB.",
-    "inputSchema": {
-      "properties": {
-        "host_id": {
-          "description": "Device/host ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours to look back (default: 24)",
-          "type": "integer"
-        },
-        "remediation_source_id": {
-          "description": "Filter to a specific remediation source",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "host_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_remediation_status": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get the current status of a remediation source execution on a device. Returns device state and source details.",
-    "inputSchema": {
-      "properties": {
-        "host_id": {
-          "description": "Device/host ID",
-          "type": "integer"
-        },
-        "remediation_source_id": {
-          "description": "Remediation source ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "host_id",
-        "remediation_source_id"
-      ],
-      "type": "object"
-    }
-  },
   "get_remediationsource": {
     "annotations": {
       "destructiveHint": false,
@@ -5570,6 +6015,33 @@
       "type": "object"
     }
   },
+  "get_report_execution": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Poll the status of a report generation task started by run_report (returns status and result URL when finished)",
+    "inputSchema": {
+      "properties": {
+        "report_id": {
+          "description": "Report ID",
+          "type": "integer"
+        },
+        "task_id": {
+          "description": "Task ID returned by run_report",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "report_id",
+        "task_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_report_groups": {
     "annotations": {
       "destructiveHint": false,
@@ -5613,6 +6085,11 @@
           "description": "Filter by group ID",
           "type": "integer"
         },
+        "include_nextgen": {
+          "default": false,
+          "description": "Include NextGen reports",
+          "type": "boolean"
+        },
         "limit": {
           "default": 50,
           "description": "Max results",
@@ -5632,33 +6109,6 @@
           "type": "string"
         }
       },
-      "type": "object"
-    }
-  },
-  "get_resource_cost": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get cost data for a specific resource",
-    "inputSchema": {
-      "properties": {
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "time_range": {
-          "default": "last30days",
-          "description": "Time range (e.g. last7days, last30days, last90days)",
-          "type": "string"
-        }
-      },
-      "required": [
-        "device_id"
-      ],
       "type": "object"
     }
   },
@@ -5751,6 +6201,11 @@
         "enabled_only": {
           "default": false,
           "description": "Only enabled schedules",
+          "type": "boolean"
+        },
+        "include_nextgen": {
+          "default": false,
+          "description": "Include NextGen reports",
           "type": "boolean"
         },
         "limit": {
@@ -6708,6 +7163,39 @@
       "type": "object"
     }
   },
+  "import_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_diagnosticsource), use create_diagnosticsource instead.",
+    "inputSchema": {
+      "properties": {
+        "definition": {
+          "description": "DiagnosticSource JSON definition",
+          "type": "object"
+        },
+        "fields_to_preserve": {
+          "description": "Fields to preserve from existing module when overwriting",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "handle_conflict": {
+          "description": "How to handle naming conflicts with existing modules",
+          "type": "string"
+        }
+      },
+      "required": [
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "import_eventsource": {
     "annotations": {
       "destructiveHint": false,
@@ -7377,6 +7865,33 @@
       "type": "object"
     }
   },
+  "set_action_rule_status": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Enable or disable an action rule without touching its matchers (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "enabled": {
+          "description": "True to enable, False to disable",
+          "type": "boolean"
+        },
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id",
+        "enabled"
+      ],
+      "type": "object"
+    }
+  },
   "set_session_variable": {
     "annotations": {
       "destructiveHint": false,
@@ -7780,6 +8295,145 @@
           "type": "boolean"
         }
       },
+      "type": "object"
+    }
+  },
+  "update_action_chain": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Update an action chain via PATCH; only provided fields are sent (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "chain_id": {
+          "description": "Action chain ID",
+          "type": "integer"
+        },
+        "description": {
+          "description": "New description",
+          "type": "string"
+        },
+        "name": {
+          "description": "New chain name",
+          "type": "string"
+        },
+        "stages": {
+          "description": "Replacement ordered stage list",
+          "items": {
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "diagnosticSource",
+                  "remediationSource"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "chain_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_action_rule": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Update an action rule via PATCH; only provided fields are sent (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "action_chain_id": {
+          "description": "Action chain to trigger",
+          "type": "integer"
+        },
+        "datapoint": {
+          "description": "Datapoint matcher",
+          "type": "string"
+        },
+        "datasource": {
+          "description": "Datasource name matcher",
+          "type": "string"
+        },
+        "device_groups": {
+          "description": "Device group full paths",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "devices": {
+          "description": "Device display names",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "description": "Enable/disable the rule",
+          "type": "boolean"
+        },
+        "instance": {
+          "description": "Instance matcher",
+          "type": "string"
+        },
+        "level": {
+          "description": "Alert severity to match (e.g. Error, Critical)",
+          "type": "string"
+        },
+        "name": {
+          "description": "New rule name",
+          "type": "string"
+        },
+        "resource_properties": {
+          "description": "Property matchers",
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "rule_id": {
+          "description": "Action rule ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id"
+      ],
       "type": "object"
     }
   },
@@ -8251,6 +8905,38 @@
       "type": "object"
     }
   },
+  "update_diagnosticsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='diagnosticsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
+    "inputSchema": {
+      "properties": {
+        "confirm": {
+          "default": false,
+          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
+          "type": "boolean"
+        },
+        "definition": {
+          "description": "FULL DiagnosticSource definition with all fields (will replace)",
+          "type": "object"
+        },
+        "diagnosticsource_id": {
+          "description": "DiagnosticSource ID to update",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "diagnosticsource_id",
+        "definition"
+      ],
+      "type": "object"
+    }
+  },
   "update_escalation_chain": {
     "annotations": {
       "destructiveHint": false,
@@ -8509,9 +9195,11 @@
           "enum": [
             "configsource",
             "datasource",
+            "diagnosticsource",
             "eventsource",
             "logsource",
             "propertysource",
+            "remediationsource",
             "topologysource"
           ],
           "type": "string"
@@ -8669,6 +9357,38 @@
       },
       "required": [
         "group_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_remediationsource": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='remediationsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
+    "inputSchema": {
+      "properties": {
+        "confirm": {
+          "default": false,
+          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
+          "type": "boolean"
+        },
+        "definition": {
+          "description": "FULL RemediationSource definition with all fields (will replace)",
+          "type": "object"
+        },
+        "remediationsource_id": {
+          "description": "RemediationSource ID to update",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "remediationsource_id",
+        "definition"
       ],
       "type": "object"
     }

@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 280+ structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
+Model Context Protocol (MCP) server for LogicMonitor REST API v3 integration. Enables AI assistants to interact with LogicMonitor monitoring data through 298 structured tools, 15 workflow prompts, and 26 resources. Optional integrations: IBM watsonx.ai for Granite TTM forecasting and NL summaries, Terraform IaC for any provider, and HuggingFace local Granite model fallback.
 
 Works with any MCP-compatible client: Claude Desktop, Claude Code, Cursor, Continue, Cline, and more.
 
@@ -70,15 +70,30 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v3.9.0
+## What's New in v4.0.0
 
-**Minor.** Correctness and reliability sweep, every behavioral fix validated against a live portal. Dashboards and widgets now round-trip: widget placement persists via the dashboard `widgetsConfig` (keyed by widget id), `export_dashboard` -> `create_dashboard` recreates widgets and their layout, and `create_dashboard` gains a `template_path` to clone an exported definition from a file by reference. Reports run via the `/report/reports/{id}/executions` endpoint with the schedule modeled as a flat cron string plus `scheduleTimezone`. Silent failures that corrupted health verdicts (collector down-signal, blast radius, remediation history) and swallowed composite-workflow sub-steps now log a stack trace and surface a warning instead of degrading quietly. The eight `import_*` tools redirect REST/exported-JSON definitions to the matching `create_*` with `IMPORT_FORMAT_MISMATCH`, ending the import/create confusion. New server instructions steer the model to call `search_tools` first, and a tool-contract snapshot test guards all 280 tools against accidental name, parameter, or schema drift.
+**Major.** Every tool now wraps an endpoint proven to exist, validated against a live
+portal. Six tools that called nonexistent API paths since introduction are removed
+(`get_cloud_cost_accounts`, `get_cost_summary`, `get_resource_cost`,
+`get_remediation_status`, `get_remediation_history`, `get_batchjob_history`); the cost
+recommendation tools move onto the working `/cost-optimization` API; the Service Insight
+tools query real Service Insight objects (deviceType 6 devices and BizService groups)
+instead of the legacy v1 websites API. The Automated Diagnostics & Remediation surface
+arrives in full: `get_diagnostic_remediation_assignments` and
+`get_diagnostic_remediation_results` (structured execution records with script output,
+replacing audit-log scraping), `execute_diagnostic`, full CRUD plus import/export for
+diagnostic and remediation sources, and the new action chain / action rule namespace
+(11 tools including the `set_action_rule_status` toggle). `update_logicmodule` gains the
+two new source types and its apply mode actually applies now (it previously tripped its
+own sub-tools' confirm guards). `run_report` executions are pollable via
+`get_report_execution`, `get_alert_details` can fetch the full message body, and NextGen
+reports are visible to the report list tools.
 
-Full release history, including v3.8.x and earlier, is in [CHANGELOG.md](CHANGELOG.md). The v3.8.0 networking intelligence tools have a dedicated reference: [documentation/networking-intelligence.md](documentation/networking-intelligence.md).
+Full release history, including v3.9.x and earlier, is in [CHANGELOG.md](CHANGELOG.md). The v3.8.0 networking intelligence tools have a dedicated reference: [documentation/networking-intelligence.md](documentation/networking-intelligence.md).
 
 ## Features
 
-**280+ Tools** across comprehensive LogicMonitor API coverage (251 LM + 18 AAP + 10 Terraform + 1 watsonx):
+**298 Tools** across comprehensive LogicMonitor API coverage (269 LM + 18 AAP + 10 Terraform + 1 watsonx):
 
 ### Core Monitoring
 - **Alert Management**: Query, acknowledge, bulk acknowledge, add notes, view rules
@@ -95,6 +110,7 @@ Full release history, including v3.8.x and earlier, is in [CHANGELOG.md](CHANGEL
 - **Alert Rules**: Full CRUD for alert routing rules
 - **User & Role Management**: View users, roles, access groups, API tokens
 - **Ops Management**: Audit logs, ops notes, login/change audits
+- **Automated Diagnostics & Remediation**: Assigned-source resolution, structured execution results with script output, diagnostic/remediation source CRUD, manual execution, action chains and rules
 
 ### AI Analysis Tools
 
@@ -218,7 +234,7 @@ When watsonx.ai API credentials are not configured, TTM forecasting and NL summa
 - **Import Support**: Import LogicModules from JSON definitions
 
 ### Advanced Capabilities
-- **Cost Optimization**: Cloud cost analysis, recommendations, idle resources (LM Envision)
+- **Cost Optimization**: Cost recommendations, recommendation categories, idle resources (LM Envision)
 - **Network Topology**: Device neighbors, interfaces, flows, connections
 - **Batch Jobs**: View and manage batch job execution history
 - **Log/Metric Ingestion**: Push logs and metrics via LMv1 authentication
@@ -396,18 +412,18 @@ Cursor only loads the first 40 MCP tools, so the remaining ~240 are invisible to
 }
 ```
 
-`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 280 tools. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
+`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 298 tools. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
 
 ## Available Tools
 
-280+ tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**, generated from the tool registry so it never drifts.
+298 tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**, generated from the tool registry so it never drifts.
 
 Discover tools at runtime without leaving your client:
 
 - `search_tools`: keyword search across every tool by name and description
-- the `lm://guide/tool-categories` resource: all 280 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 298 tools grouped by domain
 
-Tools are organized into these categories: Alerts, Alert Rules, Devices, Metrics, APM Traces, Dashboards, SDT, Collectors, Websites, Escalations, Device Properties, Reports, DataSources, LogicModules (Config/Event/Property/Topology/Log), Cost Optimization, Ingestion, Network & Topology, Batch Jobs, Ops & Audit, Users & Access, Services, Netscans, OIDs, Session, Correlation & Analysis, Baselines, ML/Statistical Analysis, Ansible Automation Platform, Remediation, Composite Workflows, and Error Budget.
+Tools are organized into these categories: Alerts, Alert Rules, Devices, Metrics, APM Traces, Dashboards, SDT, Collectors, Websites, Escalations, Device Properties, Reports, DataSources, LogicModules (Config/Event/Property/Topology/Log), Cost Optimization, Actions (Chains & Rules), Ingestion, Network & Topology, Batch Jobs, Ops & Audit, Users & Access, Services, Netscans, OIDs, Session, Correlation & Analysis, Baselines, ML/Statistical Analysis, Ansible Automation Platform, Remediation, Composite Workflows, and Error Budget.
 
 ## MCP Resources
 
@@ -449,7 +465,7 @@ The server exposes 26 resources for API reference:
 ### Guide Resources
 | URI | Description |
 |-----|-------------|
-| `lm://guide/tool-categories` | All 280 tools organized by domain category |
+| `lm://guide/tool-categories` | All 298 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
@@ -479,7 +495,7 @@ Pre-built workflow templates for common tasks:
 
 ## Example Usage
 
-Once configured, ask your assistant in natural language. A representative sample (the server understands far more across all 280 tools):
+Once configured, ask your assistant in natural language. A representative sample (the server understands far more across all 298 tools):
 
 - "List the first 5 devices in LogicMonitor" (quick connectivity check)
 - "Show me all critical alerts from the last hour"
@@ -491,6 +507,7 @@ Once configured, ask your assistant in natural language. A representative sample
 - "Run a health check on device 123, then give me a portal overview for shift handoff"
 - "Forecast when memory on device 123 will hit 90%"
 - "What's the blast radius if device 789 goes down?"
+- "What diagnostics ran on device 123 today, and what did the scripts output?"
 
 For power users, the server accepts LogicMonitor filter syntax directly, for example "Get devices where filter is 'displayName~prod,hostStatus:alive'".
 

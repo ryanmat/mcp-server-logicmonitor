@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 280 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 298 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -198,6 +198,7 @@ Report management and execution
 | `get_report_groups` | List report groups | No |
 | `get_scheduled_reports` | Get reports with schedules configured | No |
 | `run_report` | Run/execute a report (requires write permission) | Yes |
+| `get_report_execution` | Poll the status of a report generation task started by run_report (returns status and result URL when finished) | No |
 | `create_report` | Create a new report (requires write permission) | Yes |
 | `update_report_schedule` | Update a report's schedule (requires write permission) | Yes |
 | `delete_report` | Delete a report (requires write permission) | Yes |
@@ -278,11 +279,8 @@ Cloud cost analysis and optimization
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_cost_summary` | Get cloud cost summary | No |
-| `get_resource_cost` | Get cost data for a specific resource | No |
-| `get_cost_recommendations` | Get cost optimization recommendations | No |
-| `get_idle_resources` | Get idle/underutilized resources | No |
-| `get_cloud_cost_accounts` | Get cloud accounts with cost data | No |
+| `get_cost_recommendations` | Get cost optimization recommendations. Category filter takes the category description string from get_cost_recommendation_categories | No |
+| `get_idle_resources` | Get idle/underutilized cloud resources (resolved from idle-type cost recommendation categories) | No |
 | `get_cost_recommendation_categories` | Get cost recommendation categories with counts and savings | No |
 | `get_cost_recommendation` | Get a specific cost recommendation by ID (v224 API) | No |
 
@@ -360,8 +358,7 @@ Batch job monitoring
 |------|-------------|-------|
 | `get_batchjobs` | List batch jobs | No |
 | `get_batchjob` | Get details about a specific batch job | No |
-| `get_batchjob_history` | Get execution history for a batch job | No |
-| `get_device_batchjobs` | Get batch jobs for a specific device (resource) | No |
+| `get_device_batchjobs` | List BatchJob datasources applied to a device (resource); per-run output lives in instance data via get_device_data | No |
 | `get_scheduled_downtime_jobs` | Get batch jobs related to SDT automation | No |
 
 ## Exports
@@ -378,6 +375,8 @@ Export LogicModule definitions as JSON
 | `export_eventsource` | Export an EventSource definition (REST API format). Output can be used with create_eventsource or update_eventsource. | No |
 | `export_propertysource` | Export a PropertySource definition (REST API format). Output can be used with create_propertysource or update_propertysource. | No |
 | `export_logsource` | Export a LogSource definition (REST API format). Output can be used with create_logsource or update_logsource. | No |
+| `export_diagnosticsource` | Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource or update_diagnosticsource. | No |
+| `export_remediationsource` | Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource or update_remediationsource. | No |
 
 ## Imports
 
@@ -391,6 +390,7 @@ Import LogicModule definitions from JSON
 | `import_propertysource` | Import a PropertySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_propertysource), use create_propertysource instead. | Yes |
 | `import_logsource` | Import a LogSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_logsource), use create_logsource instead. | Yes |
 | `import_topologysource` | Import a TopologySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions, use create_topologysource instead. | Yes |
+| `import_diagnosticsource` | Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_diagnosticsource), use create_diagnosticsource instead. | Yes |
 | `import_jobmonitor` | Import a JobMonitor from JSON (requires write permission) | Yes |
 | `import_appliesto_function` | Import an AppliesTo function from JSON (requires write permission) | Yes |
 
@@ -514,9 +514,34 @@ Diagnostic sources, remediation sources, and remediation execution.
 | `get_diagnosticsource` | Get details about a specific DiagnosticSource including datapoints | No |
 | `get_remediationsources` | List RemediationSources from LogicMonitor | No |
 | `get_remediationsource` | Get details about a specific RemediationSource including the Groovy script | No |
+| `get_diagnostic_remediation_assignments` | List the diagnostic and remediation sources assigned to a specific resource or alert (Automated Diagnostics & Remediation). Unlike get_diagnosticsources/get_remediationsources, this resolves which modules actually apply to the target. | No |
+| `get_diagnostic_remediation_results` | Get structured execution results for diagnostic and remediation source runs: status, trigger type, executor, script output, and timing. Provide exactly one of alert_id or host_id. Time window params are epoch milliseconds; result timestamps are epoch seconds. | No |
 | `execute_remediation` | Execute a RemediationSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Requires write permission. | Yes |
-| `get_remediation_status` | Get the current status of a remediation source execution on a device. Returns device state and source details. | No |
-| `get_remediation_history` | List past remediation executions for a device from audit logs. Output truncated at 32KB. | No |
+| `execute_diagnostic` | Execute a DiagnosticSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Poll get_diagnostic_remediation_results for status and output. Requires write permission. | Yes |
+| `create_diagnosticsource` | Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource. | Yes |
+| `update_diagnosticsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='diagnosticsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
+| `delete_diagnosticsource` | Delete a DiagnosticSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
+| `create_remediationsource` | Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint. | Yes |
+| `update_remediationsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='remediationsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
+| `delete_remediationsource` | Delete a RemediationSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
+
+## Actions
+
+ADR automation: action chains (ordered diagnostic/remediation stages) and the rules that bind them to alerts.
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_action_chains` | List action chains: ordered DiagnosticSource/RemediationSource stages that action rules trigger on alerts (Automated Diagnostics & Remediation) | No |
+| `get_action_chain` | Get details about a specific action chain including its stages | No |
+| `create_action_chain` | Create an action chain from ordered diagnostic/remediation stages (requires write permission). Each stage references a DiagnosticSource or RemediationSource by ID. | Yes |
+| `update_action_chain` | Update an action chain via PATCH; only provided fields are sent (requires write permission) | Yes |
+| `delete_action_chain` | Delete an action chain (requires write permission). Action rules referencing it stop triggering. | Yes |
+| `get_action_rules` | List action rules: alert conditions (severity, device groups, datasource matchers) that trigger action chains | No |
+| `get_action_rule` | Get details about a specific action rule | No |
+| `create_action_rule` | Create an action rule binding an action chain to alert conditions (requires write permission) | Yes |
+| `update_action_rule` | Update an action rule via PATCH; only provided fields are sent (requires write permission) | Yes |
+| `delete_action_rule` | Delete an action rule (requires write permission) | Yes |
+| `set_action_rule_status` | Enable or disable an action rule without touching its matchers (requires write permission) | Yes |
 
 ## IBM watsonx.ai
 

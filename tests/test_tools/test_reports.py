@@ -431,3 +431,67 @@ class TestCreateReport:
         assert isinstance(body["schedule"], str)
         assert body["schedule"] == "0 8 * * 1"
         assert body["scheduleTimezone"] == "UTC"
+
+
+class TestGetReportExecution:
+    """Tests for get_report_execution (run_report poll loop)."""
+
+    @respx.mock
+    async def test_get_report_execution_returns_status(self, client):
+        from lm_mcp.tools.reports import get_report_execution
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports/6/tasks/42").mock(
+            return_value=httpx.Response(
+                200,
+                json={"status": "FINISHED", "resulturl": "https://example/report.pdf"},
+            )
+        )
+
+        result = await get_report_execution(client, report_id=6, task_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["report_id"] == 6
+        assert data["task_id"] == 42
+        assert data["status"] == "FINISHED"
+        assert data["result_url"] == "https://example/report.pdf"
+
+    @respx.mock
+    async def test_get_report_execution_not_found(self, client):
+        from lm_mcp.tools.reports import get_report_execution
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports/6/tasks/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Task not found"})
+        )
+
+        result = await get_report_execution(client, report_id=6, task_id=999)
+
+        assert "error" in result[0].text.lower()
+
+
+class TestIncludeNextgenParam:
+    """showNextGenReports passthrough on report list tools."""
+
+    @respx.mock
+    async def test_get_reports_include_nextgen(self, client):
+        from lm_mcp.tools.reports import get_reports
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_reports(client, include_nextgen=True)
+        assert route.calls[0].request.url.params["showNextGenReports"] == "true"
+
+        await get_reports(client)
+        assert "showNextGenReports" not in route.calls[1].request.url.params
+
+    @respx.mock
+    async def test_get_scheduled_reports_include_nextgen(self, client):
+        from lm_mcp.tools.reports import get_scheduled_reports
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_scheduled_reports(client, include_nextgen=True)
+        assert route.calls[0].request.url.params["showNextGenReports"] == "true"

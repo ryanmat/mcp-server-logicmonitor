@@ -174,6 +174,7 @@ async def get_alerts(
 async def get_alert_details(
     client: LogicMonitorClient,
     alert_id: str,
+    include_message: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific alert.
 
@@ -186,7 +187,8 @@ async def get_alert_details(
     """
     try:
         clean_id = _normalize_alert_id(alert_id)
-        result = await client.get(f"/alert/alerts/{clean_id}")
+        params = {"needMessage": "true"} if include_message else None
+        result = await client.get(f"/alert/alerts/{clean_id}", params=params)
         result["portal_url"] = portal_url("alert", clean_id)
         return format_response(result)
     except Exception as e:

@@ -778,3 +778,111 @@ class TestImportHandleConflict:
         url_str = str(route.calls[0].request.url)
         assert "handleConflict" not in url_str
         assert "fieldsToPreserve" not in url_str
+
+
+class TestDiagnosticSourceImportExport:
+    """Tests for export_diagnosticsource and import_diagnosticsource."""
+
+    @respx.mock
+    async def test_export_diagnosticsource_returns_full_definition(self, client):
+        """export_diagnosticsource returns complete DiagnosticSource JSON."""
+        from lm_mcp.tools.imports import export_diagnosticsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/12").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 12,
+                    "name": "Top CPU",
+                    "appliesTo": "isLinux()",
+                    "groovyScript": "println 'top'",
+                    "scriptType": "groovy",
+                },
+            )
+        )
+
+        result = await export_diagnosticsource(client, diagnosticsource_id=12)
+
+        data = json.loads(result[0].text)
+        assert data["diagnosticsource_id"] == 12
+        assert data["format"] == "json"
+        assert data["definition"]["groovyScript"] == "println 'top'"
+
+    @respx.mock
+    async def test_import_diagnosticsource_success(self, client, monkeypatch):
+        """import_diagnosticsource uploads multipart and returns imported id."""
+        from lm_mcp.tools.imports import import_diagnosticsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/importjson"
+        ).mock(return_value=httpx.Response(200, json={"id": 31, "name": "ImportedDiag"}))
+
+        result = await import_diagnosticsource(client, definition={"name": "ImportedDiag"})
+
+        data = json.loads(result[0].text)
+        assert data["imported_id"] == 31
+
+    @respx.mock
+    async def test_import_diagnosticsource_format_mismatch_redirects(self, client, monkeypatch):
+        """REST-format definitions get redirected to create_diagnosticsource."""
+        from lm_mcp.tools.imports import import_diagnosticsource
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/importjson"
+        ).mock(
+            return_value=httpx.Response(
+                400,
+                json={"errorMessage": "The file does not match the expected module type"},
+            )
+        )
+
+        result = await import_diagnosticsource(client, definition={"name": "RestFormat"})
+
+        text = result[0].text
+        assert "create_diagnosticsource" in text
+
+
+class TestRemediationSourceExport:
+    """Tests for export_remediationsource (no import counterpart exists)."""
+
+    @respx.mock
+    async def test_export_remediationsource_returns_full_definition(self, client):
+        """export_remediationsource returns complete RemediationSource JSON."""
+        from lm_mcp.tools.imports import export_remediationsource
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": 3,
+                    "name": "RestartSvc",
+                    "appliesTo": "false()",
+                    "groovyScript": "println 'restart'",
+                },
+            )
+        )
+
+        result = await export_remediationsource(client, remediationsource_id=3)
+
+        data = json.loads(result[0].text)
+        assert data["remediationsource_id"] == 3
+        assert data["format"] == "json"
+        assert data["definition"]["groovyScript"] == "println 'restart'"

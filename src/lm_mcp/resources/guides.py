@@ -173,6 +173,7 @@ TOOL_CATEGORIES = {
                 "get_report_groups",
                 "get_scheduled_reports",
                 "run_report",
+                "get_report_execution",
                 "create_report",
                 "update_report_schedule",
                 "delete_report",
@@ -246,11 +247,8 @@ TOOL_CATEGORIES = {
         "cost": {
             "description": "Cloud cost analysis and optimization",
             "tools": [
-                "get_cost_summary",
-                "get_resource_cost",
                 "get_cost_recommendations",
                 "get_idle_resources",
-                "get_cloud_cost_accounts",
                 "get_cost_recommendation_categories",
                 "get_cost_recommendation",
             ],
@@ -320,7 +318,6 @@ TOOL_CATEGORIES = {
             "tools": [
                 "get_batchjobs",
                 "get_batchjob",
-                "get_batchjob_history",
                 "get_device_batchjobs",
                 "get_scheduled_downtime_jobs",
             ],
@@ -336,6 +333,8 @@ TOOL_CATEGORIES = {
                 "export_eventsource",
                 "export_propertysource",
                 "export_logsource",
+                "export_diagnosticsource",
+                "export_remediationsource",
             ],
         },
         "imports": {
@@ -347,6 +346,7 @@ TOOL_CATEGORIES = {
                 "import_propertysource",
                 "import_logsource",
                 "import_topologysource",
+                "import_diagnosticsource",
                 "import_jobmonitor",
                 "import_appliesto_function",
             ],
@@ -454,9 +454,35 @@ TOOL_CATEGORIES = {
                 "get_diagnosticsource",
                 "get_remediationsources",
                 "get_remediationsource",
+                "get_diagnostic_remediation_assignments",
+                "get_diagnostic_remediation_results",
                 "execute_remediation",
-                "get_remediation_status",
-                "get_remediation_history",
+                "execute_diagnostic",
+                "create_diagnosticsource",
+                "update_diagnosticsource",
+                "delete_diagnosticsource",
+                "create_remediationsource",
+                "update_remediationsource",
+                "delete_remediationsource",
+            ],
+        },
+        "actions": {
+            "description": (
+                "ADR automation: action chains (ordered diagnostic/remediation "
+                "stages) and the rules that bind them to alerts."
+            ),
+            "tools": [
+                "get_action_chains",
+                "get_action_chain",
+                "create_action_chain",
+                "update_action_chain",
+                "delete_action_chain",
+                "get_action_rules",
+                "get_action_rule",
+                "create_action_rule",
+                "update_action_rule",
+                "delete_action_rule",
+                "set_action_rule_status",
             ],
         },
         "watsonx": {
@@ -549,8 +575,8 @@ COMMON_QUERY_EXAMPLES = {
         {
             "description": "Get idle cloud resources",
             "tool": "get_idle_resources",
-            "args": {"resource_type": "ec2"},
-            "notes": "Filter by resource type for targeted cost review.",
+            "args": {"provider": "aws"},
+            "notes": "Narrow by cloud provider for targeted cost review.",
         },
         {
             "description": "Check device neighbors for topology context",

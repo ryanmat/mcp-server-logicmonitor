@@ -357,8 +357,44 @@ class TestUpdateLogicmodule:
         assert set(_LM_TYPES) == {
             "configsource",
             "datasource",
+            "diagnosticsource",
             "eventsource",
             "logsource",
             "propertysource",
+            "remediationsource",
             "topologysource",
         }
+
+
+class TestApplyPassesConfirm:
+    """Regression: apply mode must satisfy the update tools' confirm guard.
+
+    Every update_<type> tool requires confirm=True; without it the sub-tool
+    returns CONFIRMATION_REQUIRED, call_sub_tool raises, and apply mode can
+    never apply. The handler-level mocks in the other tests cannot catch
+    this, so assert on the forwarded kwargs explicitly.
+    """
+
+    async def test_apply_forwards_confirm_true(self, patched_handlers):
+        export_mock, update_mock = patched_handlers
+        export_mock.return_value = _wrap(
+            {
+                "datasource_id": 1,
+                "name": "DS",
+                "format": "json",
+                "definition": {"name": "DS", "displayName": "Old"},
+            }
+        )
+        update_mock.return_value = _wrap({"success": True})
+
+        from lm_mcp.tools.workflows import update_logicmodule
+
+        await update_logicmodule(
+            client=None,
+            type="datasource",
+            id=1,
+            changes={"displayName": "New"},
+            mode="apply",
+        )
+
+        assert update_mock.await_args.kwargs["confirm"] is True

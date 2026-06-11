@@ -1202,6 +1202,16 @@ _LM_TYPES: dict[str, tuple[str, str, str]] = {
     "logsource": ("export_logsource", "update_logsource", "logsource_id"),
     "propertysource": ("export_propertysource", "update_propertysource", "propertysource_id"),
     "topologysource": ("export_topologysource", "update_topologysource", "topologysource_id"),
+    "diagnosticsource": (
+        "export_diagnosticsource",
+        "update_diagnosticsource",
+        "diagnosticsource_id",
+    ),
+    "remediationsource": (
+        "export_remediationsource",
+        "update_remediationsource",
+        "remediationsource_id",
+    ),
 }
 
 
@@ -1289,8 +1299,8 @@ async def update_logicmodule(
 
     Args:
         client: LogicMonitor API client.
-        type: One of configsource, datasource, eventsource, logsource,
-            propertysource, topologysource.
+        type: One of configsource, datasource, diagnosticsource, eventsource,
+            logsource, propertysource, remediationsource, topologysource.
         id: LogicModule ID.
         changes: Partial update — only the fields to modify. Use None as a
             value to explicitly delete a key.
@@ -1388,7 +1398,7 @@ async def update_logicmodule(
         )
         try:
             result = await call_sub_tool(
-                update_handler, client, **{id_arg: id, "definition": merged}
+                update_handler, client, **{id_arg: id, "definition": merged, "confirm": True}
             )
         except Exception as exc:
             _AUDIT.error("update_logicmodule failed type=%s id=%s error=%s", type, id, exc)
