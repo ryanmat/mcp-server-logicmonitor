@@ -543,8 +543,8 @@ COMMON_QUERY_EXAMPLES = {
         {
             "description": "Get idle cloud resources",
             "tool": "get_idle_resources",
-            "args": {"resource_type": "ec2"},
-            "notes": "Filter by resource type for targeted cost review.",
+            "args": {"provider": "aws"},
+            "notes": "Narrow by cloud provider for targeted cost review.",
         },
         {
             "description": "Check device neighbors for topology context",

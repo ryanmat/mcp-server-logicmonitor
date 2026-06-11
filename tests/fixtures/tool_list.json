@@ -3506,20 +3506,25 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get cost optimization recommendations",
+    "description": "Get cost optimization recommendations. Category filter takes the category description string from get_cost_recommendation_categories",
     "inputSchema": {
       "properties": {
-        "cloud_account_id": {
-          "description": "Filter by cloud account ID",
-          "type": "integer"
+        "category": {
+          "description": "Category description string (e.g. \"Idle AWS EC2 instances\")",
+          "type": "string"
         },
         "limit": {
           "default": 50,
           "description": "Max results",
           "type": "integer"
         },
-        "recommendation_type": {
-          "description": "Filter by recommendation type",
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
+          "type": "integer"
+        },
+        "status": {
+          "description": "Filter by recommendation status (e.g. active)",
           "type": "string"
         }
       },
@@ -4496,20 +4501,16 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get idle/underutilized resources",
+    "description": "Get idle/underutilized cloud resources (resolved from idle-type cost recommendation categories)",
     "inputSchema": {
       "properties": {
-        "cloud_account_id": {
-          "description": "Filter by cloud account ID",
-          "type": "integer"
-        },
         "limit": {
           "default": 50,
           "description": "Max results",
           "type": "integer"
         },
-        "resource_type": {
-          "description": "Filter by resource type",
+        "provider": {
+          "description": "Narrow to one cloud provider (aws, azure, gcp)",
           "type": "string"
         }
       },

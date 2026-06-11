@@ -278,8 +278,8 @@ Cloud cost analysis and optimization
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_cost_recommendations` | Get cost optimization recommendations | No |
-| `get_idle_resources` | Get idle/underutilized resources | No |
+| `get_cost_recommendations` | Get cost optimization recommendations. Category filter takes the category description string from get_cost_recommendation_categories | No |
+| `get_idle_resources` | Get idle/underutilized cloud resources (resolved from idle-type cost recommendation categories) | No |
 | `get_cost_recommendation_categories` | Get cost recommendation categories with counts and savings | No |
 | `get_cost_recommendation` | Get a specific cost recommendation by ID (v224 API) | No |
 

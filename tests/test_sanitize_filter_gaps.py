@@ -152,59 +152,30 @@ class TestCostSanitizeGaps:
     """Tests for sanitize gaps in cost.py."""
 
     @respx.mock
-    async def test_get_cost_recommendations_type_wildcard_stripped(self, client):
-        """get_cost_recommendations strips wildcards from recommendation_type filter."""
+    async def test_get_cost_recommendations_category_wildcard_stripped(self, client):
+        """get_cost_recommendations strips wildcards from the category filter."""
         from lm_mcp.tools.cost import get_cost_recommendations
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/recommendations").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        result = await get_cost_recommendations(client, recommendation_type="idle*")
+        result = await get_cost_recommendations(client, category="Idle AWS EC2 instances*")
 
         data = json.loads(result[0].text)
         assert "note" in data
         assert "Wildcard" in data["note"]
 
     @respx.mock
-    async def test_get_cost_recommendations_type_clean_no_note(self, client):
-        """get_cost_recommendations does not add note for clean recommendation_type."""
+    async def test_get_cost_recommendations_category_clean_no_note(self, client):
+        """get_cost_recommendations does not add note for a clean category."""
         from lm_mcp.tools.cost import get_cost_recommendations
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/recommendations").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        result = await get_cost_recommendations(client, recommendation_type="idle")
-
-        data = json.loads(result[0].text)
-        assert "note" not in data
-
-    @respx.mock
-    async def test_get_idle_resources_type_wildcard_stripped(self, client):
-        """get_idle_resources strips wildcards from resource_type filter."""
-        from lm_mcp.tools.cost import get_idle_resources
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/resources").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_idle_resources(client, resource_type="ec2*")
-
-        data = json.loads(result[0].text)
-        assert "note" in data
-        assert "Wildcard" in data["note"]
-
-    @respx.mock
-    async def test_get_idle_resources_type_clean_no_note(self, client):
-        """get_idle_resources does not add note for clean resource_type."""
-        from lm_mcp.tools.cost import get_idle_resources
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/resources").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_idle_resources(client, resource_type="ec2")
+        result = await get_cost_recommendations(client, category="Idle AWS EC2 instances")
 
         data = json.loads(result[0].text)
         assert "note" not in data

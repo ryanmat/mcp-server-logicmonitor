@@ -35,9 +35,9 @@ class TestCostToolErrors:
         """get_cost_recommendations handles 500 response."""
         from lm_mcp.tools.cost import get_cost_recommendations
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/recommendations").mock(
-            return_value=httpx.Response(500, json={"errorMessage": "Internal server error"})
-        )
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(return_value=httpx.Response(500, json={"errorMessage": "Internal server error"}))
 
         result = await get_cost_recommendations(client)
         assert "Error" in result[0].text or "error" in result[0].text.lower()

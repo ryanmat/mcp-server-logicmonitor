@@ -3375,37 +3375,46 @@ TOOLS.extend(
     [
         Tool(
             name="get_cost_recommendations",
-            description="Get cost optimization recommendations",
+            description=(
+                "Get cost optimization recommendations. Category filter takes the "
+                "category description string from get_cost_recommendation_categories"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "cloud_account_id": {
-                        "type": "integer",
-                        "description": "Filter by cloud account ID",
-                    },
-                    "recommendation_type": {
+                    "category": {
                         "type": "string",
-                        "description": "Filter by recommendation type",
+                        "description": (
+                            'Category description string (e.g. "Idle AWS EC2 instances")'
+                        ),
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Filter by recommendation status (e.g. active)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
+                    },
                 },
             },
         ),
         Tool(
             name="get_idle_resources",
-            description="Get idle/underutilized resources",
+            description=(
+                "Get idle/underutilized cloud resources (resolved from idle-type "
+                "cost recommendation categories)"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "cloud_account_id": {
-                        "type": "integer",
-                        "description": "Filter by cloud account ID",
-                    },
-                    "resource_type": {
+                    "provider": {
                         "type": "string",
-                        "description": "Filter by resource type",
+                        "description": "Narrow to one cloud provider (aws, azure, gcp)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },

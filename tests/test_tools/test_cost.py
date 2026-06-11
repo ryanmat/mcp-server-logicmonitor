@@ -28,34 +28,48 @@ def client(auth):
     )
 
 
+def _recommendation_item(**overrides) -> dict:
+    """Live-shaped Cost Optimization recommendation item."""
+    item = {
+        "id": "397-449492-AZURE_VM_UNDERUTILIZED",
+        "recommendationId": 9905,
+        "recommendationCategory": "Underutilized Azure VM instances",
+        "cloudAccountId": "sub-1",
+        "resourceId": 449492,
+        "providerConsoleUrl": "https://portal.azure.com/#@x/resource/y",
+        "annualSavings": 5220.96,
+        "resourceDisplayName": "us-e1:vm:openshift-odf",
+        "cloudProvider": "Azure",
+        "cloudServiceType": "AZURE_VM",
+        "recommendation": "Change Azure VM type to Standard_DC4as_v5",
+        "criteria": "Max CPU < 40.00% for the last 14 days",
+        "recommendationStatus": "ACTIVE",
+    }
+    item.update(overrides)
+    return item
+
+
+_CATEGORY_ITEMS = [
+    {"name": "EC2_IDLE", "description": "Idle AWS EC2 instances"},
+    {"name": "AZURE_VM_UNDERUTILIZED", "description": "Underutilized Azure VM instances"},
+    {"name": "EBS_UNATTACHED", "description": "Unattached AWS EBS volumes"},
+    # Not idle-type: must be excluded from get_idle_resources resolution
+    {"name": "RESERVED_INSTANCE_PURCHASE", "description": "Reserved instance purchase options"},
+]
+
+
 class TestGetCostRecommendations:
-    """Tests for get_cost_recommendations tool."""
+    """Tests for get_cost_recommendations tool (Cost Optimization API)."""
 
     @respx.mock
     async def test_get_cost_recommendations_returns_list(self, client):
-        """get_cost_recommendations returns recommendations."""
+        """get_cost_recommendations returns projected recommendations."""
         from lm_mcp.tools.cost import get_cost_recommendations
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/recommendations").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "id": 1,
-                            "type": "rightsizing",
-                            "resourceName": "web-server-01",
-                            "resourceType": "ec2",
-                            "currentCost": 100.00,
-                            "projectedSavings": 40.00,
-                            "recommendation": "Downsize from m5.xlarge to m5.large",
-                            "confidence": "high",
-                            "status": "open",
-                        }
-                    ],
-                    "total": 1,
-                },
-            )
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(
+            return_value=httpx.Response(200, json={"items": [_recommendation_item()], "total": 1})
         )
 
         result = await get_cost_recommendations(client)
@@ -63,46 +77,114 @@ class TestGetCostRecommendations:
         assert len(result) == 1
         data = json.loads(result[0].text)
         assert data["total"] == 1
-        assert data["recommendations"][0]["type"] == "rightsizing"
-        assert data["recommendations"][0]["projected_savings"] == 40.00
+        rec = data["recommendations"][0]
+        assert rec["category"] == "Underutilized Azure VM instances"
+        assert rec["annual_savings"] == 5220.96
+        assert rec["status"] == "ACTIVE"
+        assert rec["cloud_provider"] == "Azure"
+
+    @respx.mock
+    async def test_get_cost_recommendations_category_and_status_filters(self, client):
+        """Category uses the description string; status is uppercased."""
+        from lm_mcp.tools.cost import get_cost_recommendations
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_cost_recommendations(client, category="Idle AWS EC2 instances", status="active")
+
+        sent_filter = route.calls[0].request.url.params["filter"]
+        assert 'recommendationCategory:"Idle AWS EC2 instances"' in sent_filter
+        assert 'recommendationStatus:"ACTIVE"' in sent_filter
 
 
 class TestGetIdleResources:
-    """Tests for get_idle_resources tool."""
+    """Tests for get_idle_resources tool (dynamic category resolution)."""
 
     @respx.mock
     async def test_get_idle_resources_returns_list(self, client):
-        """get_idle_resources returns idle resources."""
+        """get_idle_resources resolves idle categories and OR-filters by description."""
         from lm_mcp.tools.cost import get_idle_resources
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/cost/resources").mock(
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations/categories"
+        ).mock(return_value=httpx.Response(200, json={"items": _CATEGORY_ITEMS, "total": 4}))
+        rec_route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(
+            return_value=httpx.Response(200, json={"items": [_recommendation_item()], "total": 1})
+        )
+
+        result = await get_idle_resources(client)
+
+        data = json.loads(result[0].text)
+        assert data["total"] == 1
+        assert data["idle_resources"][0]["category"] == "Underutilized Azure VM instances"
+
+        sent_filter = rec_route.calls[0].request.url.params["filter"]
+        # OR-joined idle-type descriptions only; non-idle category excluded
+        assert sent_filter.startswith("recommendationCategory:")
+        assert '"Idle AWS EC2 instances"' in sent_filter
+        assert '"Underutilized Azure VM instances"' in sent_filter
+        assert '"Unattached AWS EBS volumes"' in sent_filter
+        assert "Reserved instance" not in sent_filter
+        assert sent_filter.count("|") == 2
+
+    @respx.mock
+    async def test_get_idle_resources_provider_filter_client_side(self, client):
+        """Provider narrowing is applied client-side on cloudProvider."""
+        from lm_mcp.tools.cost import get_idle_resources
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations/categories"
+        ).mock(return_value=httpx.Response(200, json={"items": _CATEGORY_ITEMS, "total": 4}))
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations"
+        ).mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "items": [
-                        {
-                            "id": 1,
-                            "name": "unused-ebs-vol",
-                            "resourceType": "ebs",
-                            "cloudAccountName": "Production AWS",
-                            "region": "us-east-1",
-                            "utilization": 0,
-                            "monthlyCost": 50.00,
-                            "idleSince": 1702400000,
-                        }
+                        _recommendation_item(),
+                        _recommendation_item(
+                            id="1-2-EC2_IDLE",
+                            recommendationCategory="Idle AWS EC2 instances",
+                            cloudProvider="AWS",
+                            resourceDisplayName="i-0abc",
+                        ),
                     ],
-                    "total": 1,
+                    "total": 2,
                 },
+            )
+        )
+
+        result = await get_idle_resources(client, provider="aws")
+
+        data = json.loads(result[0].text)
+        assert data["count"] == 1
+        assert data["idle_resources"][0]["cloud_provider"] == "AWS"
+        assert data["provider"] == "aws"
+
+    @respx.mock
+    async def test_get_idle_resources_no_idle_categories(self, client):
+        """Portals without idle-type categories get a clear note, no rec query."""
+        from lm_mcp.tools.cost import get_idle_resources
+
+        respx.get(
+            "https://test.logicmonitor.com/santaba/rest/cost-optimization/recommendations/categories"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": [{"name": "OTHER", "description": "Other"}], "total": 1},
             )
         )
 
         result = await get_idle_resources(client)
 
-        assert len(result) == 1
         data = json.loads(result[0].text)
-        assert data["total"] == 1
-        assert data["idle_resources"][0]["resource_type"] == "ebs"
-        assert data["idle_resources"][0]["utilization"] == 0
+        assert data["count"] == 0
+        assert "No idle-type recommendation categories" in data["note"]
 
 
 class TestGetCostRecommendationCategories:
