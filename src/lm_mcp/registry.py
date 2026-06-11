@@ -5597,6 +5597,135 @@ TOOLS.extend(
     ]
 )
 
+# Action Chains (ADR automation)
+TOOLS.extend(
+    [
+        Tool(
+            name="get_action_chains",
+            description=(
+                "List action chains: ordered DiagnosticSource/RemediationSource "
+                "stages that action rules trigger on alerts (Automated "
+                "Diagnostics & Remediation)"
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by chain name (substring, client-side)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_action_chain",
+            description="Get details about a specific action chain including its stages",
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="create_action_chain",
+            description=(
+                "Create an action chain from ordered diagnostic/remediation stages "
+                "(requires write permission). Each stage references a "
+                "DiagnosticSource or RemediationSource by ID."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Chain name"},
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer",
+                                    "description": "DiagnosticSource/RemediationSource ID",
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["diagnosticSource", "remediationSource"],
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "description": "Source name (optional)",
+                                },
+                            },
+                            "required": ["id", "type"],
+                        },
+                        "description": "Ordered stage list",
+                    },
+                    "description": {"type": "string", "description": "Chain description"},
+                },
+                "required": ["name", "stages"],
+            },
+        ),
+        Tool(
+            name="update_action_chain",
+            description=(
+                "Update an action chain via PATCH; only provided fields are sent "
+                "(requires write permission)"
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                    "name": {"type": "string", "description": "New chain name"},
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["diagnosticSource", "remediationSource"],
+                                },
+                                "name": {"type": "string"},
+                            },
+                            "required": ["id", "type"],
+                        },
+                        "description": "Replacement ordered stage list",
+                    },
+                    "description": {"type": "string", "description": "New description"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+        Tool(
+            name="delete_action_chain",
+            description=(
+                "Delete an action chain (requires write permission). Action rules "
+                "referencing it stop triggering."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "chain_id": {"type": "integer", "description": "Action chain ID"},
+                },
+                "required": ["chain_id"],
+            },
+        ),
+    ]
+)
+
 # Workflows — composite tools and discovery
 TOOLS.extend(
     [
@@ -6940,6 +7069,7 @@ def get_tool_handler(tool_name: str) -> Any:
     """
     from lm_mcp.tools import (
         access_groups,
+        actions,
         alert_rules,
         alerts,
         ansible,
@@ -7123,6 +7253,11 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_diagnostic_remediation_results": (
             diagnostic_remediation.get_diagnostic_remediation_results
         ),
+        "get_action_chains": actions.get_action_chains,
+        "get_action_chain": actions.get_action_chain,
+        "create_action_chain": actions.create_action_chain,
+        "update_action_chain": actions.update_action_chain,
+        "delete_action_chain": actions.delete_action_chain,
         # Users
         "get_users": users.get_users,
         "get_user": users.get_user,

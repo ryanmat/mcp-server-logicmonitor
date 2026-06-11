@@ -465,6 +465,19 @@ TOOL_CATEGORIES = {
                 "delete_remediationsource",
             ],
         },
+        "actions": {
+            "description": (
+                "ADR automation: action chains (ordered diagnostic/remediation "
+                "stages) and the rules that bind them to alerts."
+            ),
+            "tools": [
+                "get_action_chains",
+                "get_action_chain",
+                "create_action_chain",
+                "update_action_chain",
+                "delete_action_chain",
+            ],
+        },
         "watsonx": {
             "description": "IBM watsonx.ai summarization and forecasting",
             "tools": [

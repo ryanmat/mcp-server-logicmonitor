@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 286 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 291 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -523,6 +523,18 @@ Diagnostic sources, remediation sources, and remediation execution.
 | `create_remediationsource` | Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint. | Yes |
 | `update_remediationsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='remediationsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_remediationsource` | Delete a RemediationSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
+
+## Actions
+
+ADR automation: action chains (ordered diagnostic/remediation stages) and the rules that bind them to alerts.
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_action_chains` | List action chains: ordered DiagnosticSource/RemediationSource stages that action rules trigger on alerts (Automated Diagnostics & Remediation) | No |
+| `get_action_chain` | Get details about a specific action chain including its stages | No |
+| `create_action_chain` | Create an action chain from ordered diagnostic/remediation stages (requires write permission). Each stage references a DiagnosticSource or RemediationSource by ID. | Yes |
+| `update_action_chain` | Update an action chain via PATCH; only provided fields are sent (requires write permission) | Yes |
+| `delete_action_chain` | Delete an action chain (requires write permission). Action rules referencing it stop triggering. | Yes |
 
 ## IBM watsonx.ai
 

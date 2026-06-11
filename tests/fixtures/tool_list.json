@@ -734,6 +734,61 @@
       "type": "object"
     }
   },
+  "create_action_chain": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Create an action chain from ordered diagnostic/remediation stages (requires write permission). Each stage references a DiagnosticSource or RemediationSource by ID.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "description": "Chain description",
+          "type": "string"
+        },
+        "name": {
+          "description": "Chain name",
+          "type": "string"
+        },
+        "stages": {
+          "description": "Ordered stage list",
+          "items": {
+            "properties": {
+              "id": {
+                "description": "DiagnosticSource/RemediationSource ID",
+                "type": "integer"
+              },
+              "name": {
+                "description": "Source name (optional)",
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "diagnosticSource",
+                  "remediationSource"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "stages"
+      ],
+      "type": "object"
+    }
+  },
   "create_alert_rule": {
     "annotations": {
       "destructiveHint": false,
@@ -1764,6 +1819,28 @@
       },
       "required": [
         "name"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_action_chain": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete an action chain (requires write permission). Action rules referencing it stop triggering.",
+    "inputSchema": {
+      "properties": {
+        "chain_id": {
+          "description": "Action chain ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain_id"
       ],
       "type": "object"
     }
@@ -2989,6 +3066,57 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_action_chain": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get details about a specific action chain including its stages",
+    "inputSchema": {
+      "properties": {
+        "chain_id": {
+          "description": "Action chain ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "chain_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_action_chains": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List action chains: ordered DiagnosticSource/RemediationSource stages that action rules trigger on alerts (Automated Diagnostics & Remediation)",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by chain name (substring, client-side)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
           "type": "integer"
         }
       },
@@ -7942,6 +8070,62 @@
           "type": "boolean"
         }
       },
+      "type": "object"
+    }
+  },
+  "update_action_chain": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Update an action chain via PATCH; only provided fields are sent (requires write permission)",
+    "inputSchema": {
+      "properties": {
+        "chain_id": {
+          "description": "Action chain ID",
+          "type": "integer"
+        },
+        "description": {
+          "description": "New description",
+          "type": "string"
+        },
+        "name": {
+          "description": "New chain name",
+          "type": "string"
+        },
+        "stages": {
+          "description": "Replacement ordered stage list",
+          "items": {
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "diagnosticSource",
+                  "remediationSource"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "chain_id"
+      ],
       "type": "object"
     }
   },
