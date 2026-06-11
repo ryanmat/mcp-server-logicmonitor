@@ -89,7 +89,7 @@ own sub-tools' confirm guards). `run_report` executions are pollable via
 `get_report_execution`, `get_alert_details` can fetch the full message body, and NextGen
 reports are visible to the report list tools.
 
-Full release history, including v3.8.x and earlier, is in [CHANGELOG.md](CHANGELOG.md). The v3.8.0 networking intelligence tools have a dedicated reference: [documentation/networking-intelligence.md](documentation/networking-intelligence.md).
+Full release history, including v3.9.x and earlier, is in [CHANGELOG.md](CHANGELOG.md). The v3.8.0 networking intelligence tools have a dedicated reference: [documentation/networking-intelligence.md](documentation/networking-intelligence.md).
 
 ## Features
 
@@ -110,6 +110,7 @@ Full release history, including v3.8.x and earlier, is in [CHANGELOG.md](CHANGEL
 - **Alert Rules**: Full CRUD for alert routing rules
 - **User & Role Management**: View users, roles, access groups, API tokens
 - **Ops Management**: Audit logs, ops notes, login/change audits
+- **Automated Diagnostics & Remediation**: Assigned-source resolution, structured execution results with script output, diagnostic/remediation source CRUD, manual execution, action chains and rules
 
 ### AI Analysis Tools
 
@@ -233,7 +234,7 @@ When watsonx.ai API credentials are not configured, TTM forecasting and NL summa
 - **Import Support**: Import LogicModules from JSON definitions
 
 ### Advanced Capabilities
-- **Cost Optimization**: Cloud cost analysis, recommendations, idle resources (LM Envision)
+- **Cost Optimization**: Cost recommendations, recommendation categories, idle resources (LM Envision)
 - **Network Topology**: Device neighbors, interfaces, flows, connections
 - **Batch Jobs**: View and manage batch job execution history
 - **Log/Metric Ingestion**: Push logs and metrics via LMv1 authentication
@@ -422,7 +423,7 @@ Discover tools at runtime without leaving your client:
 - `search_tools`: keyword search across every tool by name and description
 - the `lm://guide/tool-categories` resource: all 298 tools grouped by domain
 
-Tools are organized into these categories: Alerts, Alert Rules, Devices, Metrics, APM Traces, Dashboards, SDT, Collectors, Websites, Escalations, Device Properties, Reports, DataSources, LogicModules (Config/Event/Property/Topology/Log), Cost Optimization, Ingestion, Network & Topology, Batch Jobs, Ops & Audit, Users & Access, Services, Netscans, OIDs, Session, Correlation & Analysis, Baselines, ML/Statistical Analysis, Ansible Automation Platform, Remediation, Composite Workflows, and Error Budget.
+Tools are organized into these categories: Alerts, Alert Rules, Devices, Metrics, APM Traces, Dashboards, SDT, Collectors, Websites, Escalations, Device Properties, Reports, DataSources, LogicModules (Config/Event/Property/Topology/Log), Cost Optimization, Actions (Chains & Rules), Ingestion, Network & Topology, Batch Jobs, Ops & Audit, Users & Access, Services, Netscans, OIDs, Session, Correlation & Analysis, Baselines, ML/Statistical Analysis, Ansible Automation Platform, Remediation, Composite Workflows, and Error Budget.
 
 ## MCP Resources
 
@@ -506,6 +507,7 @@ Once configured, ask your assistant in natural language. A representative sample
 - "Run a health check on device 123, then give me a portal overview for shift handoff"
 - "Forecast when memory on device 123 will hit 90%"
 - "What's the blast radius if device 789 goes down?"
+- "What diagnostics ran on device 123 today, and what did the scripts output?"
 
 For power users, the server accepts LogicMonitor filter syntax directly, for example "Get devices where filter is 'displayName~prod,hostStatus:alive'".
 
