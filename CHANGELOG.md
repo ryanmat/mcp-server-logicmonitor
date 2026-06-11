@@ -56,7 +56,7 @@ real OTel collector. Core LM tools 269 -> 273 (full surface 302).
   permission (the API returns Permission denied). Read paths were live-validated
   in v4.0.0.
 
-## [4.0.0] - 2026-06-12
+## [4.0.0] - 2026-06-11
 
 Correctness major. A full bidirectional diff of the tool surface against the master v3
 swagger, backed by live-portal probes, found shipped tools calling endpoints that do not
