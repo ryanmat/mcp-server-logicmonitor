@@ -5,6 +5,93 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-06-12
+
+Correctness major. A full bidirectional diff of the tool surface against the master v3
+swagger, backed by live-portal probes, found shipped tools calling endpoints that do not
+exist and a new Automated Diagnostics & Remediation (ADR) API surface we lacked. Every
+change in this release was validated against a live portal or carries an explicit
+deferred-validation note. Core LM tools 251 -> 269 (full surface 298).
+
+### Removed (BREAKING)
+
+Six tools wrapped endpoints that have never existed on any portal (all 404/415 live):
+
+| Removed tool | Replacement |
+|---|---|
+| `get_cloud_cost_accounts` | none (the `/cost/*` namespace never existed) |
+| `get_cost_summary` | none |
+| `get_resource_cost` | none |
+| `get_remediation_status` | `get_diagnostic_remediation_results` |
+| `get_remediation_history` | `get_diagnostic_remediation_results` |
+| `get_batchjob_history` | `get_device_data` on the BatchJob instance |
+
+### Changed (BREAKING)
+
+- **`get_cost_recommendations`** remapped onto `GET /cost-optimization/recommendations`
+  (the old `/cost/recommendations` 404s everywhere). Params change from
+  `cloud_account_id`/`recommendation_type` to `category` (a category DESCRIPTION string,
+  e.g. "Idle AWS EC2 instances" -- the API matches descriptions, not enum names, and
+  silently ignores unknown values), `status`, and `offset`. Projects the live item shape
+  (annualSavings, cloudProvider, criteria, providerConsoleUrl, recommendationStatus).
+- **`get_idle_resources`** rebuilt on the same API: idle-type categories are resolved
+  dynamically from the categories endpoint (enum names containing `_IDLE`,
+  `_UNDERUTILIZED`, `_UNATTACHED`, `_STOPPED`), OR-joined into a description filter, and
+  re-filtered defensively client-side. Gains `provider` (aws/azure/gcp, client-side).
+- **`get_services`/`get_service`/`get_service_groups`** rewired onto Service Insight.
+  The old `/service/services` path is the legacy v1 websites API: it 415s under
+  `X-Version: 3`, and under v1 it returns website objects (verified: same object ids as
+  `/website/websites`), so these tools have never returned a service. They now query
+  `GET /device/devices?filter=deviceType:6` and
+  `GET /device/groups?filter=groupType:"BizService"`, expose `name_filter`, and project
+  alert/SDT/host status. `get_service` flags non-service devices instead of mislabeling.
+- **`get_device_batchjobs`** rewired onto
+  `GET /device/devices/{id}/devicedatasources?filter=dataSourceType:"BJ"` (the old
+  device batchjobs path does not exist); gains `limit`.
+
+### Added
+
+Automated Diagnostics & Remediation, complete (21 tools):
+
+- `get_diagnostic_remediation_assignments` -- ADR sources assigned to a resource/alert
+  (`GET /setting/diagnosticRemediation/list`).
+- `get_diagnostic_remediation_results` -- structured execution records: status, trigger
+  type, executor, script output, timing (`GET /setting/diagnosticRemediation/
+  executionResults`). Replaces audit-log scraping. Window params are epoch milliseconds;
+  result timestamps are epoch seconds; cursors rejected when `module_type="both"`;
+  per-execution output capped at 10k chars with an `output_truncated` marker.
+- `execute_diagnostic` -- manual DiagnosticSource execution with the shared
+  pre-execution checklist (device reachable, collector >= 39.200, script review with
+  state-mutation warning), now extracted to one implementation shared with
+  `execute_remediation`.
+- `create_/update_/delete_diagnosticsource` and `create_/update_/delete_
+  remediationsource` -- full source CRUD with field normalization and full-replace
+  confirm guards. `import_diagnosticsource` (LM Exchange multipart) and
+  `export_diagnosticsource`/`export_remediationsource`. `import_remediationsource` is
+  deliberately absent: the API has no importjson endpoint for remediationsources.
+- Action chains and rules (`/setting/action/*`, 11 tools): `get_/create_/update_/
+  delete_action_chain`, `get_/create_/update_/delete_action_rule`, plus
+  `set_action_rule_status` for enable/disable without touching matchers. Chain stages
+  are client-validated ({id, type: diagnosticSource|remediationSource}).
+- `get_report_execution` -- polls `GET /report/reports/{id}/tasks/{taskId}`, closing the
+  loop `run_report` documented but never implemented.
+- `get_alert_details` gains `include_message` (`needMessage=true`, full alert message
+  body); `get_reports`/`get_scheduled_reports` gain `include_nextgen`
+  (`showNextGenReports=true`; NextGen reports were previously invisible).
+- `update_logicmodule` supports the two new source types (`diagnosticsource`,
+  `remediationsource`).
+
+### Fixed
+
+- **`update_logicmodule(mode="apply")` could never apply.** Every `update_<type>` tool
+  requires `confirm=true`; the apply path never passed it, so the sub-tool returned
+  CONFIRMATION_REQUIRED and `call_sub_tool` raised. The existing apply tests mocked the
+  update handler and could not see it. Apply now forwards `confirm=true` (regression
+  test asserts the forwarded kwargs).
+- `set_action_rule_status` is write-classified via a precise `"set_action_rule"` prefix
+  in `WRITE_TOOL_PREFIXES` (a bare `set_` would have reclassified the read-only session
+  tools).
+
 ## [3.9.0] - 2026-06-05
 
 Correctness and reliability sweep. Started from dashboard/report bugs hit against a
