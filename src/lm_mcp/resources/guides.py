@@ -420,6 +420,15 @@ TOOL_CATEGORIES = {
                 "compare_to_baseline",
             ],
         },
+        "portals": {
+            "description": "Multi-portal switching: one server, many customer portals",
+            "tools": [
+                "list_portals",
+                "use_portal",
+                "current_portal",
+                "reload_portals",
+            ],
+        },
         "ansible": {
             "description": "Ansible Automation Platform for observability-driven remediation",
             "tools": [

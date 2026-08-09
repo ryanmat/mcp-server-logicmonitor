@@ -1906,6 +1906,20 @@
       "type": "object"
     }
   },
+  "current_portal": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Show which customer portal is currently active.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
   "delete_action_chain": {
     "annotations": {
       "destructiveHint": true,
@@ -7583,6 +7597,20 @@
       "type": "object"
     }
   },
+  "list_portals": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the customer portals available in this multi-portal server.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
   "list_sdts": {
     "annotations": {
       "destructiveHint": false,
@@ -7807,6 +7835,20 @@
       "required": [
         "job_id"
       ],
+      "type": "object"
+    }
+  },
+  "reload_portals": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Re-read the vault so portals added or removed since startup take effect without restarting the client.",
+    "inputSchema": {
+      "properties": {},
       "type": "object"
     }
   },
@@ -9790,6 +9832,28 @@
       "required": [
         "dashboard_id",
         "widget_id"
+      ],
+      "type": "object"
+    }
+  },
+  "use_portal": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Switch the active customer portal for subsequent tool calls.",
+    "inputSchema": {
+      "properties": {
+        "customer": {
+          "description": "Portal key from list_portals",
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer"
       ],
       "type": "object"
     }

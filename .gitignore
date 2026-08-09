@@ -98,3 +98,12 @@ parse_har.py
 
 # MCP server config (contains credentials)
 .mcp.json
+
+# Multi-portal vault — NEVER commit these (credentials / decryption key)
+secrets.age
+secrets.age.bak.*
+secrets*.json
+!secrets.example.json
+age-key.txt
+*.age
+*.agekey

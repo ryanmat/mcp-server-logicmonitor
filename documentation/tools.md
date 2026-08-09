@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 302 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 306 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -471,6 +471,17 @@ Session context, variable management, and baselines
 | `list_session_history` | List recent tool call history | No |
 | `save_baseline` | Save a metric baseline from historical data. Computes mean, min, max, stddev per datapoint and stores as a session variable for later comparison. | No |
 | `compare_to_baseline` | Compare current metrics against a stored baseline. Reports deviation percentage and status (normal, elevated, reduced, anomalous) per datapoint. | No |
+
+## Portals
+
+Multi-portal switching: one server, many customer portals
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `list_portals` | List the customer portals available in this multi-portal server. | No |
+| `use_portal` | Switch the active customer portal for subsequent tool calls. | No |
+| `current_portal` | Show which customer portal is currently active. | No |
+| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
 
 ## Ansible Automation Platform
 

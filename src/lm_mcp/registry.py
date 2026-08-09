@@ -7398,6 +7398,46 @@ TF_TOOLS: list[Tool] = [
 
 
 # Map tool names to their handler functions
+# Multi-portal switching
+TOOLS.extend(
+    [
+        Tool(
+            name="list_portals",
+            description="List the customer portals available in this multi-portal server.",
+            annotations=_SESSION_READ,
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="use_portal",
+            description="Switch the active customer portal for subsequent tool calls.",
+            annotations=_SESSION_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "customer": {"type": "string", "description": "Portal key from list_portals"}
+                },
+                "required": ["customer"],
+            },
+        ),
+        Tool(
+            name="current_portal",
+            description="Show which customer portal is currently active.",
+            annotations=_SESSION_READ,
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="reload_portals",
+            description=(
+                "Re-read the vault so portals added or removed since startup take "
+                "effect without restarting the client."
+            ),
+            annotations=_SESSION_WRITE,
+            inputSchema={"type": "object", "properties": {}},
+        ),
+    ]
+)
+
+
 def get_tool_handler(tool_name: str) -> Any:
     """Get the handler function for a tool.
 
@@ -7463,8 +7503,16 @@ def get_tool_handler(tool_name: str) -> Any:
         websites,
         workflows,
     )
+    from lm_mcp.tools import (
+        portals as portal_tools,
+    )
 
     handlers = {
+        # Multi-portal
+        "list_portals": portal_tools.list_portals,
+        "use_portal": portal_tools.use_portal,
+        "current_portal": portal_tools.current_portal,
+        "reload_portals": portal_tools.reload_portals,
         # Devices
         "get_devices": devices.get_devices,
         "get_device": devices.get_device,
