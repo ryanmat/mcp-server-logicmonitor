@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `lm_mcp.__version__` synced to the release version (the published 4.2.0 wheel
+  self-reports "4.1.0" at the HTTP root endpoint); the foundation test now
+  asserts `__version__` against the installed package metadata so a bump that
+  misses `__init__.py` fails the suite instead of shipping.
+
 ## [4.2.0] - 2026-08-11
 
 Optional **multi-portal mode**: a single server can serve many customer portals,
