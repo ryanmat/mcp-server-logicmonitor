@@ -17,6 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runner is configured. They were dispatchable over HTTP but invisible to HTTP
   clients, unlike stdio which listed them correctly.
 
+## [Unreleased]
+
+### Added
+
+- `CONTRIBUTING.md`: fork-and-pull-request workflow, development setup, PR
+  expectations, and the tool-surface regeneration commands.
+- `deploy/k8s/deployment.yaml`: vendor-neutral Kubernetes Deployment and
+  Service for the published container image, with credentials read from a
+  user-created secret and probes wired to the health endpoints.
+
+### Fixed
+
+- Documentation: removed the `LM_ANALYSIS_TTL_MINUTES` row from the README
+  (not a config field), corrected the `LM_CORS_ORIGINS` default, and dropped a
+  `.gitignore` negation for a file that does not exist.
+
 ## [4.2.0] - 2026-08-11
 
 Optional **multi-portal mode**: a single server can serve many customer portals,
