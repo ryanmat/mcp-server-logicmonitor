@@ -23,7 +23,9 @@ demand, so the full tool set is registered once rather than per portal. Core LM 
 - `current_portal` -- show the active portal.
 - `reload_portals` -- re-read the vault so portals added/removed since startup take
   effect without a client restart (keeps the active portal if it still exists).
-- New `portals` tool category (search_tools and the tool-categories resource).
+- New `portals` grouping in search_tools and the tool-categories resource (not an
+  `LM_MCP_CATEGORIES` token; portal tools are exempt from category filtering in
+  multi-portal mode).
 
 ### Behavior and safety
 
@@ -40,6 +42,41 @@ demand, so the full tool set is registered once rather than per portal. Core LM 
 - `portal` is now optional (multi-portal selects at runtime); added `multi_portal`,
   `vault_file`, `age_key`, and `portals_file`. Authentication validation is skipped in
   multi-portal mode; `base_url` guards a missing portal.
+
+### Fixed (multi-portal hardening)
+
+- Multi-portal mode is stdio-only: config construction rejects it with the HTTP
+  transport, whose process-global client would leak the active portal across
+  concurrent callers (this also removes the unreachable-healthy `healthz` state).
+- Portal tools are hidden and rejected outside multi-portal mode; a vault in the
+  environment can no longer repoint a single-portal server or bypass the per-portal
+  write gate.
+- Multi-portal config fails fast at startup when no vault source is configured;
+  vault paths expand `~`; the encrypted vault takes precedence over
+  `LM_PORTALS_FILE` with a warning when both are set.
+- age failures surface stderr, a missing age binary gets a clear error, and
+  decryption has a 30s timeout.
+- Vault record hostnames are normalized like `LM_PORTAL` (scheme stripped,
+  validated); one invalid record warns instead of breaking the vault.
+- `reload_portals` is atomic (a failed reload leaves the old registry, active
+  portal, and client intact) and closes replaced clients instead of leaking
+  connection pools; shutdown clears the global client reference.
+- `LM_MCP_CATEGORIES` no longer filters out the portal tools in multi-portal mode
+  (the documented Cursor recipe previously made the mode unusable).
+- `search_tools`, `get_reference`, and `get_workflow` work before a portal is
+  selected.
+- Terraform tools return a clear unsupported error in multi-portal mode instead of
+  running with no credentials.
+- `portal_url` deep links use the active portal instead of emitting
+  `https://None/...`; `ingest_url` guards a missing portal.
+- The write gate reports "No portal selected" before claiming a portal is
+  read-only; portal switches are recorded in session history and the write audit
+  log, and audit lines carry the active portal name.
+- Deploy scripts and MULTIPORTAL.md: `lm-mcp-add.sh` creates the age identity on
+  first run (the referenced vault setup now exists), the launcher honors
+  `LM_PORTALS_FILE` and falls back to the published package when no clone is
+  present, hardcoded personal paths are gone, and the manual re-encrypt snippet
+  can no longer truncate the vault via an unset variable.
 
 ## [4.1.0] - 2026-06-11
 

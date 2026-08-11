@@ -209,3 +209,21 @@ class TestPortalToolVisibility:
         result = _filter_tools(TOOLS, _MockConfig(multi_portal=True))
         names = {t.name for t in result}
         assert names >= PORTAL_TOOLS
+
+
+class TestPortalToolCategoryExemption:
+    """Portal tools bypass LM_MCP_CATEGORIES in multi-portal mode (control plane)."""
+
+    def test_portal_tools_survive_category_filter_in_multi_portal(self):
+        result = _filter_tools(
+            TOOLS, _MockConfig(mcp_categories="read,workflow", multi_portal=True)
+        )
+        names = {t.name for t in result}
+        assert names >= PORTAL_TOOLS
+
+    def test_category_filter_still_applies_to_data_tools_in_multi_portal(self):
+        result = _filter_tools(TOOLS, _MockConfig(mcp_categories="workflow", multi_portal=True))
+        names = {t.name for t in result} - PORTAL_TOOLS
+        from lm_mcp.categories import WORKFLOW_TOOLS
+
+        assert names <= WORKFLOW_TOOLS

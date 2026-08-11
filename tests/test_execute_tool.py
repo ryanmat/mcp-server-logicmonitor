@@ -230,3 +230,91 @@ class TestPortalToolGating:
             result = await execute_tool(name, args)
             assert result[0].text.startswith("Error:")
             assert "multi-portal" in result[0].text
+
+
+class TestMultiPortalDispatch:
+    """execute_tool behavior in multi-portal mode before and around portal selection."""
+
+    def _multi_env(self, monkeypatch, tmp_path):
+        p = tmp_path / "portals.json"
+        p.write_text(json.dumps({"acme": {"portal": "acme.example.com", "bearer_token": "t"}}))
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(p))
+        monkeypatch.delenv("LM_PORTAL", raising=False)
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_allows_portal_tools_despite_categories(
+        self, monkeypatch, tmp_path, reset_portals
+    ):
+        self._multi_env(monkeypatch, tmp_path)
+        monkeypatch.setenv("LM_MCP_CATEGORIES", "read")
+
+        from lm_mcp.server import execute_tool
+
+        result = await execute_tool("current_portal", {})
+        data = json.loads(result[0].text)
+        assert "active" in data
+
+    @pytest.mark.asyncio
+    async def test_search_tools_works_before_use_portal(self, monkeypatch, tmp_path, reset_portals):
+        self._multi_env(monkeypatch, tmp_path)
+
+        from lm_mcp.server import execute_tool
+
+        result = await execute_tool("search_tools", {"query": "device"})
+        text = result[0].text
+        assert "No portal selected" not in text
+        assert "device" in text
+
+    @pytest.mark.asyncio
+    async def test_get_reference_works_before_use_portal(
+        self, monkeypatch, tmp_path, reset_portals
+    ):
+        self._multi_env(monkeypatch, tmp_path)
+
+        from lm_mcp.server import execute_tool
+
+        result = await execute_tool("get_reference", {"list": True})
+        assert "No portal selected" not in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_get_workflow_works_before_use_portal(self, monkeypatch, tmp_path, reset_portals):
+        self._multi_env(monkeypatch, tmp_path)
+
+        from lm_mcp.server import execute_tool
+
+        result = await execute_tool("get_workflow", {"list": True})
+        assert "No portal selected" not in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_terraform_tools_unsupported_in_multi_portal(
+        self, monkeypatch, tmp_path, reset_portals
+    ):
+        self._multi_env(monkeypatch, tmp_path)
+
+        from lm_mcp.server import _set_tf_runner, execute_tool
+
+        _set_tf_runner(MagicMock())
+        try:
+            result = await execute_tool("terraform_init", {})
+            assert "not supported in multi-portal mode" in result[0].text
+        finally:
+            _set_tf_runner(None)
+
+    @pytest.mark.asyncio
+    async def test_use_portal_recorded_in_session_history(
+        self, monkeypatch, tmp_path, reset_portals
+    ):
+        self._multi_env(monkeypatch, tmp_path)
+
+        from lm_mcp.server import execute_tool
+        from lm_mcp.session import get_session, reset_session
+
+        reset_session()
+        try:
+            await execute_tool("use_portal", {"customer": "acme"})
+            history = get_session().history
+            assert history and history[-1].tool_name == "use_portal"
+        finally:
+            reset_session()
