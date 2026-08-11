@@ -301,23 +301,18 @@ async def create_http_server() -> None:
     from lm_mcp.server import _set_awx_client, _set_client, _set_tf_runner, _set_watsonx_client
     from lm_mcp.session import get_session
 
-    # Load config. In multi-portal mode client creation is deferred to use_portal.
+    # Load config. Multi-portal mode is stdio-only and is rejected at config
+    # construction, so the HTTP transport always binds a fixed client at startup.
     config = get_config()
-    client = None
-    if config.multi_portal:
-        from lm_mcp import portals
-
-        portals.load()
-    else:
-        auth = create_auth_provider(config)
-        client = LogicMonitorClient(
-            base_url=config.base_url,
-            auth=auth,
-            timeout=config.timeout,
-            api_version=config.api_version,
-            ingest_url=config.ingest_url,
-        )
-        _set_client(client)
+    auth = create_auth_provider(config)
+    client = LogicMonitorClient(
+        base_url=config.base_url,
+        auth=auth,
+        timeout=config.timeout,
+        api_version=config.api_version,
+        ingest_url=config.ingest_url,
+    )
+    _set_client(client)
 
     # Initialize AWX client if configured
     awx_client = None
@@ -437,6 +432,3 @@ async def create_http_server() -> None:
             await awx_client.close()
         if client is not None:
             await client.close()
-        from lm_mcp import portals
-
-        await portals.close_all()

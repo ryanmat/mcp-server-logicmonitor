@@ -341,3 +341,35 @@ class TestLMConfigSSL:
 
         config = LMConfig()
         assert config.http_ssl_keyfile_password == "s3cret"
+
+
+class TestMultiPortalTransport:
+    """Multi-portal mode is stdio-only; the HTTP transport shares one process."""
+
+    def _vault(self, tmp_path):
+        p = tmp_path / "portals.json"
+        p.write_text('{"acme": {"portal": "acme.example.com", "bearer_token": "t"}}')
+        return str(p)
+
+    def test_multi_portal_rejects_http_transport(self, monkeypatch, tmp_path):
+        """Multi-portal + HTTP transport must fail fast at config construction."""
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", self._vault(tmp_path))
+        monkeypatch.setenv("LM_TRANSPORT", "http")
+        monkeypatch.delenv("LM_PORTAL", raising=False)
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+
+        with pytest.raises(ValidationError, match="stdio"):
+            LMConfig()
+
+    def test_multi_portal_allows_stdio_transport(self, monkeypatch, tmp_path):
+        """Multi-portal with the default stdio transport constructs fine."""
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", self._vault(tmp_path))
+        monkeypatch.delenv("LM_TRANSPORT", raising=False)
+        monkeypatch.delenv("LM_PORTAL", raising=False)
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+
+        config = LMConfig()
+        assert config.multi_portal is True
+        assert config.transport == "stdio"

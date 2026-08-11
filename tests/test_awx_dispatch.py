@@ -145,12 +145,12 @@ class TestListToolsWithAwx:
         monkeypatch.delenv("AWX_TOKEN", raising=False)
 
         from lm_mcp.registry import TOOLS
-        from lm_mcp.server import _set_awx_client, list_tools
+        from lm_mcp.server import PORTAL_TOOLS, _set_awx_client, list_tools
 
         _set_awx_client(None)
 
         result = await list_tools()
-        assert len(result) == len(TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
 
     @pytest.mark.asyncio
     async def test_list_tools_includes_awx_when_configured(self, monkeypatch):
@@ -159,12 +159,12 @@ class TestListToolsWithAwx:
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
 
         from lm_mcp.registry import AWX_TOOLS, TOOLS
-        from lm_mcp.server import _set_awx_client, list_tools
+        from lm_mcp.server import PORTAL_TOOLS, _set_awx_client, list_tools
 
         _set_awx_client(MagicMock())
 
         result = await list_tools()
-        assert len(result) == len(TOOLS) + len(AWX_TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS) + len(AWX_TOOLS)
 
         _set_awx_client(None)
 

@@ -73,6 +73,7 @@ class TestHttpToolsListFiltering:
         from httpx import ASGITransport, AsyncClient
 
         from lm_mcp.registry import TOOLS
+        from lm_mcp.server import PORTAL_TOOLS
         from lm_mcp.transport.http import create_asgi_app
 
         app = create_asgi_app()
@@ -85,7 +86,7 @@ class TestHttpToolsListFiltering:
             )
 
         data = resp.json()
-        assert len(data["result"]) == len(TOOLS)
+        assert len(data["result"]) == len(TOOLS) - len(PORTAL_TOOLS)
 
 
 class TestHttpToolsListWithAwx:
@@ -102,7 +103,7 @@ class TestHttpToolsListWithAwx:
         from unittest.mock import MagicMock
 
         from lm_mcp.registry import AWX_TOOLS, TOOLS
-        from lm_mcp.server import _set_awx_client
+        from lm_mcp.server import PORTAL_TOOLS, _set_awx_client
 
         _set_awx_client(MagicMock())
 
@@ -120,7 +121,7 @@ class TestHttpToolsListWithAwx:
             )
 
         data = resp.json()
-        assert len(data["result"]) == len(TOOLS) + len(AWX_TOOLS)
+        assert len(data["result"]) == len(TOOLS) - len(PORTAL_TOOLS) + len(AWX_TOOLS)
 
         _set_awx_client(None)
 
@@ -234,3 +235,23 @@ class TestHttpToolsCallMiddleware:
         data = resp.json()
         assert "error" in data
         assert data["error"]["code"] == -32602
+
+
+class TestHttpMultiPortalRefused:
+    """Multi-portal mode is stdio-only; the HTTP app must refuse to construct."""
+
+    def test_asgi_app_refuses_multi_portal(self, monkeypatch, tmp_path):
+        from pydantic import ValidationError
+
+        p = tmp_path / "portals.json"
+        p.write_text('{"acme": {"portal": "acme.example.com", "bearer_token": "t"}}')
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(p))
+        monkeypatch.setenv("LM_TRANSPORT", "http")
+        monkeypatch.delenv("LM_PORTAL", raising=False)
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+
+        from lm_mcp.transport.http import create_asgi_app
+
+        with pytest.raises(ValidationError, match="stdio"):
+            create_asgi_app()

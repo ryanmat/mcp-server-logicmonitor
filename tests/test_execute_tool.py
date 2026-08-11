@@ -213,3 +213,20 @@ class TestCallToolDelegatesToExecuteTool:
 
         mock_exec.assert_called_once_with("get_devices", {"limit": 10})
         assert result == expected
+
+
+class TestPortalToolGating:
+    """Portal tools are dispatchable only in multi-portal mode."""
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_rejects_portal_tools_in_single_portal_mode(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+
+        from lm_mcp.server import execute_tool
+
+        for name, args in (("use_portal", {"customer": "x"}), ("list_portals", {})):
+            result = await execute_tool(name, args)
+            assert result[0].text.startswith("Error:")
+            assert "multi-portal" in result[0].text

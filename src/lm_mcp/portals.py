@@ -23,6 +23,22 @@ _state: dict[str, Any] = {
 }
 
 
+def _require_multi_portal() -> None:
+    """Refuse portal-registry access unless multi-portal mode is enabled.
+
+    Guards the single-portal invariant: with LM_MULTI_PORTAL off, the client is
+    bound once at startup and no tool call may replace it, even when vault
+    environment variables happen to be present.
+    """
+    from lm_mcp.config import get_config
+
+    if not get_config().multi_portal:
+        raise RuntimeError(
+            "Multi-portal mode is disabled. Set LM_MULTI_PORTAL=true (and configure "
+            "a vault) to use portal tools."
+        )
+
+
 def _load_vault() -> dict[str, dict]:
     """Load the portal map from a plaintext file or the age-encrypted vault."""
     from lm_mcp.config import get_config
@@ -43,6 +59,7 @@ def _load_vault() -> dict[str, dict]:
 
 def load(force: bool = False) -> None:
     """Parse the vault once (idempotent) into the in-memory portal map."""
+    _require_multi_portal()
     if _state["loaded"] and not force:
         return
     portals = _load_vault()

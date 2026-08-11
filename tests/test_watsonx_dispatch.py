@@ -94,12 +94,12 @@ class TestListToolsWithWatsonx:
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
 
         from lm_mcp.registry import TOOLS
-        from lm_mcp.server import _set_watsonx_client, list_tools
+        from lm_mcp.server import PORTAL_TOOLS, _set_watsonx_client, list_tools
 
         _set_watsonx_client(None)
 
         result = await list_tools()
-        assert len(result) == len(TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
 
     @pytest.mark.asyncio
     async def test_list_tools_includes_watsonx_when_configured(self, monkeypatch):
@@ -108,12 +108,12 @@ class TestListToolsWithWatsonx:
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
 
         from lm_mcp.registry import TOOLS, WATSONX_TOOLS
-        from lm_mcp.server import _set_watsonx_client, list_tools
+        from lm_mcp.server import PORTAL_TOOLS, _set_watsonx_client, list_tools
 
         _set_watsonx_client(MagicMock())
 
         result = await list_tools()
-        assert len(result) == len(TOOLS) + len(WATSONX_TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS) + len(WATSONX_TOOLS)
 
         _set_watsonx_client(None)
 
