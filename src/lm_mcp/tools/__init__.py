@@ -387,8 +387,7 @@ def require_write_permission(func: F) -> F:
                         "code": "PORTAL_READ_ONLY",
                         "message": "The active portal is read-only",
                         "suggestion": (
-                            'Set "writable": true on this portal\'s vault record '
-                            "to allow writes"
+                            'Set "writable": true on this portal\'s vault record to allow writes'
                         ),
                     }
                 )
