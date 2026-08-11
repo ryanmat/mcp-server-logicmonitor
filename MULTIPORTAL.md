@@ -1,8 +1,14 @@
-# Multi-portal mode (our fork addition)
+# Multi-portal mode
 
-This fork adds a **single-server, many-portals** mode so you can work across 20-30 customer
-LogicMonitor portals from one MCP server entry, switching the active portal at runtime — no
+A **single-server, many-portals** mode: work across 20-30 customer LogicMonitor portals
+from one MCP server entry, switching the active portal at runtime — no
 process-per-customer, and the full tool set is loaded **once**, not per portal.
+
+Multi-portal mode is **stdio-only**. The server refuses to start with
+`LM_TRANSPORT=http`: the HTTP transport serves every caller from one process, so a
+shared "active portal" would leak data between users. Terraform tools are also
+unavailable in this mode (the LM Terraform provider needs fixed credentials) — run a
+single-portal server for IaC work. Health endpoints do not exist under stdio.
 
 ## What it adds
 
@@ -28,7 +34,13 @@ Unmodified upstream tools are untouched — they simply use whichever portal is 
 | `LM_AGE_KEY` | path to the age identity used to decrypt it |
 | `LM_PORTALS_FILE` | alternative: a plaintext JSON vault (testing only) |
 
-Vault format (same as the `secrets.example.json` from the vault setup):
+When both sources are set, the encrypted vault wins and a warning is logged — a stale
+testing file can never shadow production credentials. Tilde paths (`~/...`) are
+expanded by the server, so they work in client `env` blocks that bypass a shell. If you
+curate tools with `LM_ENABLED_TOOLS`, include the four portal tools; `LM_MCP_CATEGORIES`
+never filters them out in multi-portal mode (they are the control plane).
+
+Vault format (a JSON object of nickname -> record):
 
 ```json
 {
@@ -40,8 +52,10 @@ Vault format (same as the `secrets.example.json` from the vault setup):
 ## Run it locally (from your clone)
 
 ```bash
-# one-time: create the age vault (reuse the setup script from the vault toolkit)
+# one-time: create the vault. deploy/lm-mcp-add.sh generates the age identity on
+# first run and prompts for the first portal:
 #   -> produces ~/.config/lm-mcp/age-key.txt and ~/.config/lm-mcp/secrets.age
+deploy/lm-mcp-add.sh
 
 # run the multi-portal server from this clone
 LM_MULTI_PORTAL=true \
@@ -60,7 +74,7 @@ Claude Desktop — `~/Library/Application Support/Claude/claude_desktop_config.j
 {
   "mcpServers": {
     "logicmonitor": {
-      "command": "/Users/barun/.config/lm-mcp/lm-mcp-multiportal.sh",
+      "command": "/home/you/.config/lm-mcp/lm-mcp-multiportal.sh",
       "args": []
     }
   }
@@ -70,7 +84,7 @@ Claude Desktop — `~/Library/Application Support/Claude/claude_desktop_config.j
 Codex — `~/.codex/config.toml`:
 ```toml
 [mcp_servers.logicmonitor]
-command = "/Users/barun/.config/lm-mcp/lm-mcp-multiportal.sh"
+command = "/home/you/.config/lm-mcp/lm-mcp-multiportal.sh"
 args = []
 ```
 
@@ -120,7 +134,9 @@ PUB="$(age-keygen -y ~/.config/lm-mcp/age-key.txt)"
 printf '%s' "$UPDATED" | age -r "$PUB" -o ~/.config/lm-mcp/secrets.age
 ```
 
-## Publishing later
+## Running from a clone vs the published package
 
-This is a local git repo. When ready: `git remote add origin <your-repo>` and push, then
-point the launcher at it with `LM_MCP_SOURCE="git+https://github.com/you/lm-mcp@main"`.
+The launcher runs `uv run --project "$LM_MCP_SOURCE"` when that path is a local clone
+(default `~/src/lm-mcp`), so source edits take effect on the next client restart. When
+no clone exists it falls back to the published package via `uvx --from lm-mcp`.
+`LM_MCP_SOURCE` must be a directory — `uv run --project` does not accept git URLs.

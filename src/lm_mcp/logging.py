@@ -83,6 +83,8 @@ WRITE_TOOL_PREFIXES = (
     "terraform_destroy",
     "terraform_import",
     "terraform_write",
+    "use_portal",
+    "reload_portals",
 )
 
 
@@ -98,6 +100,26 @@ def is_write_tool(tool_name: str) -> bool:
     return any(tool_name.startswith(prefix) for prefix in WRITE_TOOL_PREFIXES)
 
 
+def _portal_marker() -> str:
+    """Return " portal=<name>" for audit lines in multi-portal mode, else "".
+
+    Looked up lazily so single-portal deployments pay nothing and audit logging
+    never depends on portal state being importable.
+    """
+    try:
+        from lm_mcp.config import get_config
+
+        if not get_config().multi_portal:
+            return ""
+        from lm_mcp import portals
+
+        name = portals.active().get("active")
+        return f" portal={name}" if name else ""
+    except Exception:
+        _audit_logger.debug("could not resolve active portal for audit line", exc_info=True)
+        return ""
+
+
 def log_write_operation(
     tool_name: str,
     arguments: dict,
@@ -107,6 +129,7 @@ def log_write_operation(
 
     Successful operations are logged at INFO level.
     Failed operations are logged at WARNING level.
+    In multi-portal mode each line carries the active portal name.
 
     Args:
         tool_name: Name of the MCP tool.
@@ -115,13 +138,15 @@ def log_write_operation(
     """
     if success:
         _audit_logger.info(
-            "Write operation: %s args=%s",
+            "Write operation: %s args=%s%s",
             tool_name,
             arguments,
+            _portal_marker(),
         )
     else:
         _audit_logger.warning(
-            "Write operation failed: %s args=%s",
+            "Write operation failed: %s args=%s%s",
             tool_name,
             arguments,
+            _portal_marker(),
         )

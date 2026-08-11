@@ -1,11 +1,35 @@
 # Description: Configuration module for LogicMonitor MCP Server.
 # Description: Handles environment variable loading and validation for LM API credentials.
 
+import os
 import re
 from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
+
+
+def normalize_portal_host(v: str) -> str:
+    """Strip scheme and trailing slashes from a portal hostname and validate it.
+
+    Shared by the LM_PORTAL field validator and the multi-portal vault records,
+    so both sources yield the same canonical host form.
+    """
+    v = str(v)
+    if v.startswith("https://"):
+        v = v[8:]
+    elif v.startswith("http://"):
+        v = v[7:]
+    v = v.rstrip("/")
+
+    if not v or len(v) < 5:
+        raise ValueError("portal must be a valid hostname (e.g., company.logicmonitor.com)")
+    if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9\-]+)+$", v):
+        raise ValueError(
+            f"portal '{v}' is not a valid hostname format (expected: company.logicmonitor.com)"
+        )
+    return v
+
 
 _cached_config: "LMConfig | None" = None
 
@@ -47,6 +71,12 @@ class LMConfig(BaseSettings):
         LM_ENABLE_WRITE_OPERATIONS: Enable write operations (default: false)
         LM_MAX_RETRIES: Max retry attempts for rate limits (default: 3, range: 0-10)
         LM_TRANSPORT: Transport mode - stdio or http (default: stdio)
+        LM_MULTI_PORTAL: Serve many customer portals from one server, selected at
+            runtime via use_portal (default: false; stdio-only)
+        LM_VAULT_FILE: Path to the age-encrypted portal vault (multi-portal)
+        LM_AGE_KEY: Path to the age identity file that decrypts the vault
+        LM_PORTALS_FILE: Plaintext JSON portal map (multi-portal, testing only;
+            the encrypted vault takes precedence when both are set)
         LM_HTTP_HOST: HTTP server bind address (default: 0.0.0.0)
         LM_HTTP_PORT: HTTP server port (default: 8080)
         LM_CORS_ORIGINS: Comma-separated CORS origins (default: empty, no CORS)
@@ -121,21 +151,15 @@ class LMConfig(BaseSettings):
         """Strip protocol prefix and trailing slashes from portal hostname."""
         if v is None:
             return v
-        v = str(v)
-        if v.startswith("https://"):
-            v = v[8:]
-        elif v.startswith("http://"):
-            v = v[7:]
-        v = v.rstrip("/")
+        return normalize_portal_host(v)
 
-        # Validate portal hostname format
-        if not v or len(v) < 5:
-            raise ValueError("portal must be a valid hostname (e.g., company.logicmonitor.com)")
-        if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9\-]+)+$", v):
-            raise ValueError(
-                f"portal '{v}' is not a valid hostname format (expected: company.logicmonitor.com)"
-            )
-        return v
+    @field_validator("portals_file", "vault_file", "age_key", mode="before")
+    @classmethod
+    def expand_vault_paths(cls, v: str | None) -> str | None:
+        """Expand ~ in vault paths; GUI-launched stdio servers get no shell expansion."""
+        if v is None:
+            return v
+        return os.path.expanduser(str(v))
 
     @field_validator("timeout", mode="after")
     @classmethod
@@ -186,6 +210,10 @@ class LMConfig(BaseSettings):
                 raise ValueError(
                     "LM_MULTI_PORTAL is stdio-only; the HTTP transport shares one "
                     "process across clients. Use LM_TRANSPORT=stdio."
+                )
+            if not self.portals_file and not (self.vault_file and self.age_key):
+                raise ValueError(
+                    "Multi-portal mode needs LM_PORTALS_FILE, or LM_VAULT_FILE + LM_AGE_KEY"
                 )
             return self
 
@@ -245,6 +273,8 @@ class LMConfig(BaseSettings):
         Ingestion APIs (logs, metrics) use a different path structure
         than the standard REST API.
         """
+        if not self.portal:
+            raise ValueError("no portal set (multi-portal mode: select a portal via use_portal)")
         return f"https://{self.portal}"
 
     @property

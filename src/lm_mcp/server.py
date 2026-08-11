@@ -191,7 +191,12 @@ def _filter_tools(tools: list, config) -> list:
     if config.mcp_categories:
         from lm_mcp.categories import filter_by_categories
 
-        tools, unknown = filter_by_categories(tools, config.mcp_categories)
+        # In multi-portal mode the portal tools are the control plane: filtering
+        # them out would leave every data tool stuck at "No portal selected".
+        exempt = [t for t in tools if config.multi_portal and t.name in PORTAL_TOOLS]
+        candidates = [t for t in tools if t not in exempt]
+        tools, unknown = filter_by_categories(candidates, config.mcp_categories)
+        tools.extend(exempt)
         if unknown:
             logger.warning(
                 "LM_MCP_CATEGORIES contains unknown tokens %s — ignored. "
@@ -234,6 +239,14 @@ PORTAL_TOOLS = {
     "use_portal",
     "current_portal",
     "reload_portals",
+}
+
+# Discovery tools that take the client argument by convention but never use it,
+# so they must work before a portal is selected in multi-portal mode.
+CLIENT_OPTIONAL_TOOLS = {
+    "search_tools",
+    "get_reference",
+    "get_workflow",
 }
 
 
@@ -288,7 +301,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                     )
                 ]
 
-        if config.mcp_categories:
+        if config.mcp_categories and not (name in PORTAL_TOOLS and config.multi_portal):
             from lm_mcp.categories import tool_in_categories
 
             tools_index = {t.name: t for t in TOOLS}
@@ -400,6 +413,17 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                 ]
             result = await handler(_watsonx_client, **arguments)
         elif name in TF_TOOL_NAMES:
+            # The LM Terraform provider needs fixed LM_* credentials; multi-portal
+            # credentials are selected at runtime and never reach the subprocess.
+            if config.multi_portal:
+                return [
+                    TextContent(
+                        type="text",
+                        text="Error: Terraform tools are not supported in multi-portal mode "
+                        "(the Terraform provider needs fixed LM_* credentials). "
+                        "Run a single-portal server for Terraform.",
+                    )
+                ]
             # Terraform tools use the Terraform runner
             if _tf_runner is None:
                 return [
@@ -410,6 +434,10 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                     )
                 ]
             result = await handler(_tf_runner, **arguments)
+        elif name in CLIENT_OPTIONAL_TOOLS:
+            # These handlers ignore the client; pass the global as-is (possibly
+            # None before use_portal) so discovery works portal-free.
+            result = await handler(_client, **arguments)
         else:
             client = get_client()
             result = await handler(client, **arguments)
@@ -418,8 +446,9 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         if is_write_tool(name):
             log_write_operation(name, arguments, success=True)
 
-        # Record result in session if enabled
-        if config.session_enabled and name not in SESSION_TOOLS and name not in PORTAL_TOOLS:
+        # Record result in session if enabled. Portal tools are recorded too:
+        # a portal switch is the marker that scopes every entry around it.
+        if config.session_enabled and name not in SESSION_TOOLS:
             session = get_session()
             # Try to parse the result for session storage
             if result and len(result) > 0:

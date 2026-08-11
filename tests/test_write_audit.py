@@ -106,3 +106,46 @@ class TestWriteAuditLogging:
 
         assert "delete_device" in caplog.text
         assert "failed" in caplog.text.lower()
+
+
+class TestPortalAuditVisibility:
+    """Portal switches are auditable and audit lines carry portal identity."""
+
+    def test_use_portal_and_reload_portals_are_write_tools(self):
+        from lm_mcp.logging import is_write_tool
+
+        assert is_write_tool("use_portal")
+        assert is_write_tool("reload_portals")
+        assert not is_write_tool("list_portals")
+        assert not is_write_tool("current_portal")
+
+    def test_audit_line_includes_active_portal_in_multi_portal(
+        self, monkeypatch, tmp_path, reset_portals, caplog
+    ):
+        import json
+
+        from lm_mcp import portals
+        from lm_mcp.logging import log_write_operation
+
+        p = tmp_path / "portals.json"
+        p.write_text(json.dumps({"acme": {"portal": "acme.example.com", "bearer_token": "t"}}))
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(p))
+        monkeypatch.delenv("LM_PORTAL", raising=False)
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+        portals.activate("acme")
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            log_write_operation("create_device", {}, success=True)
+        assert any("portal=acme" in r.getMessage() for r in caplog.records)
+
+    def test_audit_line_has_no_portal_marker_in_single_portal(self, monkeypatch, caplog):
+        from lm_mcp.logging import log_write_operation
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            log_write_operation("create_device", {}, success=True)
+        assert not any("portal=" in r.getMessage() for r in caplog.records)

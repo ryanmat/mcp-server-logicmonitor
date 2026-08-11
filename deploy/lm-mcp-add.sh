@@ -23,7 +23,14 @@ KEY="${LM_AGE_KEY:-$DIR/age-key.txt}"
 command -v age        >/dev/null || { echo "age not found (brew install age)"        >&2; exit 69; }
 command -v age-keygen >/dev/null || { echo "age-keygen not found (brew install age)" >&2; exit 69; }
 command -v jq         >/dev/null || { echo "jq not found (brew install jq)"          >&2; exit 69; }
-[ -f "$KEY" ] || { echo "missing age identity: $KEY (run the vault setup first)" >&2; exit 66; }
+
+# First run: create the age identity so this script is the whole vault setup.
+if [ ! -f "$KEY" ]; then
+  mkdir -p "$DIR"
+  age-keygen -o "$KEY"
+  chmod 600 "$KEY"
+  echo "created new age identity: $KEY (back it up — it decrypts the vault)"
+fi
 
 # Recipient (public key) is derived from the identity, so we always re-encrypt
 # to the same key that can decrypt it.
@@ -86,5 +93,5 @@ echo
 echo "Saved. Portals now in the vault:"
 CUR="$NEW" jq -r -n 'env.CUR|fromjson | keys[] | "  - " + .'
 echo
-echo "Restart your MCP client (Cmd+Q and reopen Claude Desktop, or restart Codex)"
-echo "so the server re-reads the vault, then: use_portal $NAME"
+echo "Run reload_portals in your client (or restart it) so the server re-reads"
+echo "the vault, then: use_portal $NAME"

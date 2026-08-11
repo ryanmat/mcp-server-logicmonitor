@@ -40,33 +40,85 @@ def _require_multi_portal() -> None:
 
 
 def _load_vault() -> dict[str, dict]:
-    """Load the portal map from a plaintext file or the age-encrypted vault."""
+    """Load the portal map from the age-encrypted vault or a plaintext file.
+
+    The encrypted vault takes precedence: a stale LM_PORTALS_FILE left over from
+    testing must not silently serve credentials in place of the production vault.
+    """
     from lm_mcp.config import get_config
 
     cfg = get_config()
+    vault_file = getattr(cfg, "vault_file", None)
+    age_key = getattr(cfg, "age_key", None)
+    if vault_file and age_key:
+        if getattr(cfg, "portals_file", None):
+            logger.warning(
+                "both LM_PORTALS_FILE and the age vault are configured; using the encrypted vault"
+            )
+        try:
+            proc = subprocess.run(
+                ["age", "-d", "-i", age_key, vault_file],
+                capture_output=True,
+                check=True,
+                timeout=30,
+            )
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                "age binary not found - install age (https://age-encryption.org)"
+            ) from e
+        except subprocess.CalledProcessError as e:
+            stderr = (e.stderr or b"").decode(errors="replace").strip()
+            raise RuntimeError(f"age decryption failed: {stderr}") from e
+        except subprocess.TimeoutExpired as e:
+            raise RuntimeError("age decryption timed out after 30s") from e
+        return json.loads(proc.stdout)
     if getattr(cfg, "portals_file", None):
         with open(cfg.portals_file) as f:
             return json.load(f)
-    if getattr(cfg, "vault_file", None) and getattr(cfg, "age_key", None):
-        proc = subprocess.run(
-            ["age", "-d", "-i", cfg.age_key, cfg.vault_file],
-            capture_output=True,
-            check=True,
-        )
-        return json.loads(proc.stdout)
     raise RuntimeError("Multi-portal mode needs LM_PORTALS_FILE, or LM_VAULT_FILE + LM_AGE_KEY.")
 
 
-def load(force: bool = False) -> None:
-    """Parse the vault once (idempotent) into the in-memory portal map."""
-    _require_multi_portal()
-    if _state["loaded"] and not force:
-        return
-    portals = _load_vault()
-    if not isinstance(portals, dict) or not portals:
+def _normalize_records(portals_map: dict[str, dict]) -> dict[str, dict]:
+    """Canonicalize each record's portal host; warn and keep raw on invalid values.
+
+    Warn-and-keep so one typo cannot brick the whole vault: the bad record only
+    fails when someone tries to activate it (_build_client validates strictly).
+    """
+    from lm_mcp.config import normalize_portal_host
+
+    out: dict[str, dict] = {}
+    for name, rec in portals_map.items():
+        rec = dict(rec or {})
+        portal = rec.get("portal")
+        if portal:
+            try:
+                rec["portal"] = normalize_portal_host(str(portal))
+            except ValueError:
+                logger.warning(
+                    "portal record '%s' has an invalid hostname %r; keeping as-is", name, portal
+                )
+        out[name] = rec
+    return out
+
+
+def _parse_vault() -> dict[str, dict]:
+    """Load, validate, and normalize the vault without touching module state."""
+    portals_map = _load_vault()
+    if not isinstance(portals_map, dict) or not portals_map:
         raise RuntimeError("Portal vault must be a non-empty JSON object of name -> record.")
-    _state["portals"] = portals
-    _state["clients"] = {}
+    return _normalize_records(portals_map)
+
+
+def load() -> None:
+    """Parse the vault once (idempotent) into the in-memory portal map.
+
+    Never discards live clients; refreshing from disk is reload()'s job, which
+    closes the clients it replaces.
+    """
+    _require_multi_portal()
+    if _state["loaded"]:
+        return
+    _state["portals"] = _parse_vault()
     _state["loaded"] = True
 
 
@@ -93,12 +145,13 @@ def _build_client(rec: dict):
     from lm_mcp.auth.bearer import BearerAuth
     from lm_mcp.auth.lmv1 import LMv1Auth
     from lm_mcp.client import LogicMonitorClient
-    from lm_mcp.config import get_config
+    from lm_mcp.config import get_config, normalize_portal_host
 
     cfg = get_config()
     portal = rec.get("portal")
     if not portal:
         raise ValueError("portal record is missing the 'portal' hostname")
+    portal = normalize_portal_host(str(portal))
     if rec.get("bearer_token"):
         auth = BearerAuth(rec["bearer_token"])
     elif rec.get("access_id") and rec.get("access_key"):
@@ -140,31 +193,49 @@ def activate(customer: str) -> dict:
     }
 
 
-def reload() -> dict:
+async def reload() -> dict:
     """Re-read the vault from disk so added/removed portals take effect without a restart.
 
-    Clears the cached clients and reloads the portal map. The active portal is kept
-    if it still exists (its client is rebuilt so in-flight calls keep working); if it
-    was removed from the vault, the active selection is cleared.
+    Atomic: the new map is parsed and the surviving active portal's replacement
+    client is built before any state is swapped, so a failure at any point leaves
+    the old registry, active portal, and installed client fully intact. Replaced
+    clients are closed after the swap.
     """
-    prev_active = _state["active"]
-    load(force=True)  # resets clients cache + reloads the portal map
-    if prev_active and prev_active in _state["portals"]:
-        rec = _state["portals"][prev_active] or {}
-        client = _build_client(rec)
-        _state["clients"][prev_active] = client
-        from lm_mcp.server import _set_client
+    _require_multi_portal()
+    new_portals = _parse_vault()
 
-        _set_client(client)
+    prev_active = _state["active"]
+    keep_active = prev_active is not None and prev_active in new_portals
+    new_client = None
+    if keep_active:
+        # Build before swapping: a broken record for the active portal aborts
+        # the reload without degrading the running server.
+        new_client = _build_client(new_portals[prev_active] or {})
+
+    old_clients = list(_state["clients"].values())
+    _state["portals"] = new_portals
+    _state["clients"] = {}
+    _state["loaded"] = True
+
+    from lm_mcp.server import _set_client
+
+    if keep_active:
+        _state["clients"][prev_active] = new_client
+        _set_client(new_client)
         _state["active"] = prev_active
-        _state["active_writable"] = bool(rec.get("writable", False))
+        _state["active_writable"] = bool((new_portals[prev_active] or {}).get("writable", False))
     else:
         if prev_active:
-            from lm_mcp.server import _set_client
-
             _set_client(None)
         _state["active"] = None
         _state["active_writable"] = False
+
+    for client in old_clients:
+        try:
+            await client.close()
+        except Exception:
+            logger.debug("error closing a replaced portal client", exc_info=True)
+
     return {
         "reloaded": True,
         "count": len(_state["portals"]),
@@ -196,3 +267,8 @@ async def close_all() -> None:
         except Exception:
             logger.debug("error closing a portal client", exc_info=True)
     _state["clients"] = {}
+
+    # Never leave the process-global client pointing at a closed instance.
+    from lm_mcp.server import _set_client
+
+    _set_client(None)
