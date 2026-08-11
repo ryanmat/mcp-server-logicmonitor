@@ -7,11 +7,18 @@ import pytest
 class TestPackageExports:
     """Tests that verify package exports are accessible."""
 
-    def test_version_exported(self):
-        """Package version is accessible."""
+    def test_version_exported_and_synced(self):
+        """Package version is accessible and matches the installed metadata.
+
+        Guards against release bumps that update pyproject.toml but miss
+        __init__.py: the two must always agree, so a drifted bump fails here
+        instead of shipping a wheel that self-reports the previous version.
+        """
+        from importlib.metadata import version
+
         from lm_mcp import __version__
 
-        assert __version__ == "4.1.0"
+        assert __version__ == version("lm-mcp")
 
     def test_lm_config_exported(self):
         """LMConfig is exported from package root."""
