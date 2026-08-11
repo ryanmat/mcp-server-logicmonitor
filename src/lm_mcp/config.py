@@ -68,7 +68,7 @@ class LMConfig(BaseSettings):
     """
 
     # Core settings
-    portal: str
+    portal: str | None = None
     bearer_token: str | None = None
     access_id: str | None = None
     access_key: str | None = None
@@ -76,6 +76,12 @@ class LMConfig(BaseSettings):
     timeout: int = 30
     enable_write_operations: bool = False
     max_retries: int = 3
+
+    # Multi-portal settings (one server serving many customer portals)
+    multi_portal: bool = False
+    vault_file: str | None = None
+    age_key: str | None = None
+    portals_file: str | None = None
 
     # Transport settings
     transport: Literal["stdio", "http"] = "stdio"
@@ -175,6 +181,17 @@ class LMConfig(BaseSettings):
 
         Either bearer_token OR both (access_id AND access_key) must be provided.
         """
+        if self.multi_portal:
+            return self
+
+        # Single-portal mode keeps upstream's fail-fast guarantee: a fixed portal is
+        # required. (Multi-portal mode selects the portal at runtime via use_portal.)
+        if not self.portal:
+            raise ValueError(
+                "LM_PORTAL is required in single-portal mode "
+                "(or set LM_MULTI_PORTAL=true to select portals at runtime)"
+            )
+
         has_bearer = bool(self.bearer_token)
         has_lmv1 = bool(self.access_id) or bool(self.access_key)
 
@@ -212,6 +229,8 @@ class LMConfig(BaseSettings):
     @property
     def base_url(self) -> str:
         """Return the base URL for LogicMonitor REST API."""
+        if not self.portal:
+            raise ValueError("no portal set (multi-portal mode: select a portal via use_portal)")
         return f"https://{self.portal}/santaba/rest"
 
     @property

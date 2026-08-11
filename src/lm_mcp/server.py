@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes 302 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes 306 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
@@ -47,6 +47,20 @@ def get_client() -> LogicMonitorClient:
         RuntimeError: If called before server initialization.
     """
     if _client is None:
+        # Only surface the multi-portal hint when we can confirm multi-portal mode.
+        # If the config can't be built yet (e.g. no env in a unit test), fall back to
+        # the plain "not initialized" message rather than leaking a config error.
+        multi = False
+        try:
+            from lm_mcp.config import get_config
+
+            multi = get_config().multi_portal
+        except Exception:
+            multi = False
+        if multi:
+            raise RuntimeError(
+                "No portal selected. Call use_portal(<customer>) first (see list_portals)."
+            )
         raise RuntimeError("Client not initialized")
     return _client
 
@@ -212,6 +226,13 @@ SESSION_TOOLS = {
     "list_session_history",
 }
 
+PORTAL_TOOLS = {
+    "list_portals",
+    "use_portal",
+    "current_portal",
+    "reload_portals",
+}
+
 
 async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute a LogicMonitor tool with full middleware chain.
@@ -271,7 +292,11 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                 ]
 
         # Field validation (if enabled and not a session tool)
-        if config.field_validation != "off" and name not in SESSION_TOOLS:
+        if (
+            config.field_validation != "off"
+            and name not in SESSION_TOOLS
+            and name not in PORTAL_TOOLS
+        ):
             resource_type = infer_resource_type(name)
             if resource_type:
                 # Validate 'fields' argument if present
@@ -335,8 +360,8 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                         else:
                             logger.warning(f"Filter validation warning for {name}: {msg}")
 
-        # Session tools don't need any client
-        if name in SESSION_TOOLS:
+        # Session and portal tools don't need an LM client
+        if name in SESSION_TOOLS or name in PORTAL_TOOLS:
             result = await handler(**arguments)
         elif name in AWX_TOOL_NAMES:
             # AWX tools use the AWX client
@@ -381,7 +406,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             log_write_operation(name, arguments, success=True)
 
         # Record result in session if enabled
-        if config.session_enabled and name not in SESSION_TOOLS:
+        if config.session_enabled and name not in SESSION_TOOLS and name not in PORTAL_TOOLS:
             session = get_session()
             # Try to parse the result for session storage
             if result and len(result) > 0:

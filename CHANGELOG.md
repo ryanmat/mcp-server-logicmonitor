@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Optional **multi-portal mode**: a single server can serve many customer portals,
+selecting the active one at runtime, instead of running one server (and pasting one
+token) per portal. With `LM_MULTI_PORTAL=true` the server no longer binds to a fixed
+portal + token at startup — it loads a credential vault and switches portals on
+demand, so the full tool set is registered once rather than per portal. Core LM tools
+273 -> 277 (full surface 306). Single-portal behavior is unchanged.
+
+### Added
+
+- `list_portals` -- list the portals in the vault (name, host, auth type, writable).
+  Returns metadata only; never a token.
+- `use_portal` -- make a portal active for subsequent tool calls (builds and caches a
+  LogicMonitor client per portal on demand).
+- `current_portal` -- show the active portal.
+- `reload_portals` -- re-read the vault so portals added/removed since startup take
+  effect without a client restart (keeps the active portal if it still exists).
+- New `portals` tool category (search_tools and the tool-categories resource).
+
+### Behavior and safety
+
+- Credentials load from an age-encrypted vault (`LM_VAULT_FILE` + `LM_AGE_KEY`) or a
+  plaintext JSON file (`LM_PORTALS_FILE`, testing only) instead of the environment.
+- Read-only by default per portal: a write requires both `LM_ENABLE_WRITE_OPERATIONS=true`
+  and `"writable": true` on that portal's vault record (error code `PORTAL_READ_ONLY`).
+- Data tools return a clear "No portal selected" message until `use_portal` is called.
+- Single-portal mode is preserved: without `LM_MULTI_PORTAL`, a fixed `LM_PORTAL` is
+  still required (fail-fast retained), and behavior matches previous releases.
+
+### Config
+
+- `portal` is now optional (multi-portal selects at runtime); added `multi_portal`,
+  `vault_file`, `age_key`, and `portals_file`. Authentication validation is skipped in
+  multi-portal mode; `base_url` guards a missing portal.
+
 ## [4.1.0] - 2026-06-11
 
 Native OTLP metrics query surface. LogicMonitor's new OTLP Metrics feature

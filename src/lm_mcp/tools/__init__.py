@@ -377,6 +377,20 @@ def require_write_permission(func: F) -> F:
                     "suggestion": "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
                 }
             )
+        if config.multi_portal:
+            from lm_mcp import portals
+
+            if not portals.is_active_writable():
+                return format_response(
+                    {
+                        "error": True,
+                        "code": "PORTAL_READ_ONLY",
+                        "message": "The active portal is read-only",
+                        "suggestion": (
+                            'Set "writable": true on this portal\'s vault record to allow writes'
+                        ),
+                    }
+                )
         return await func(*args, **kwargs)
 
     return wrapper  # type: ignore[return-value]
