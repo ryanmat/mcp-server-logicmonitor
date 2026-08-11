@@ -70,7 +70,21 @@ You should see: `logicmonitor: uvx --from lm-mcp lm-mcp-server - ✓ Connected`
 "Show me all critical alerts in LogicMonitor"
 ```
 
-## What's New in v4.1.0
+## What's New in v4.2.0
+
+Multi-portal mode arrives, hardened. A single server can now serve many customer
+portals, selecting the active one at runtime with `list_portals`, `use_portal`,
+`current_portal`, and `reload_portals` — one entry in your MCP client instead of
+one server (and one pasted token) per portal. Credentials live in an
+age-encrypted vault, every portal is read-only unless its vault record says
+otherwise, and the mode is deliberately stdio-only: the server refuses to start
+it on the shared HTTP transport. The release also carries a full dependency
+refresh clearing 53 dependabot alerts across the lockfile.
+
+<details>
+<summary>v4.1.0</summary>
+
+### What's New in v4.1.0
 
 Native OTLP metrics arrive. LogicMonitor's new OTLP Metrics feature (feature-flag
 gated, Prometheus-backed) ships in its first phase with a single UI surface (the
@@ -82,6 +96,8 @@ All four were validated live against a flag-enabled portal fed by a real OTel
 collector (Kubernetes cAdvisor and application metrics), translate the
 feature-disabled portal responses into a clear availability notice, and cap large
 matrix responses with even-stride downsampling so they stay LLM-friendly.
+
+</details>
 
 ## What's New in v4.0.0
 
