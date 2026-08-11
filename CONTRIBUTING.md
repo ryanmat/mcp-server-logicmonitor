@@ -21,11 +21,18 @@ on `main` rather than merging it back in.
 
 ```bash
 uv sync --extra http          # add --extra ibm / --extra huggingface as needed
+uv run pre-commit install     # once: runs lint and format on every commit
 uv run pytest                 # full suite
 uv run ruff check src tests   # lint
 uv run ruff format src tests  # format (CI checks this)
 uv run mypy src/lm_mcp --ignore-missing-imports
 ```
+
+The pre-commit hooks mirror the blocking CI gates (ruff check, ruff format, plus
+file hygiene and a private-key guard), so formatting drift fails locally instead
+of burning a CI cycle. They deliberately skip pytest, which is too slow for a
+commit hook: run it yourself before pushing. Never bypass a failing hook with
+`--no-verify`; fix the cause.
 
 Run the server locally over stdio with `uv run lm-mcp-server`, which needs
 `LM_PORTAL` and `LM_BEARER_TOKEN` in your environment or a local `.env`.

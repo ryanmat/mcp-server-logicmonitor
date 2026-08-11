@@ -44,6 +44,22 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 
+      # Generated artifacts must be committed alongside tool changes. The suite
+      # already compares them, but this step names the fix instead of surfacing
+      # an opaque assertion failure.
+      - name: Check generated files are up to date
+        run: |
+          uv run python tests/test_tool_contract.py
+          uv run python tests/test_tools_doc.py
+          if ! git diff --quiet -- tests/fixtures/tool_list.json documentation/tools.md; then
+            echo "::error::Generated files are out of date. Run:"
+            echo "  uv run python tests/test_tool_contract.py"
+            echo "  uv run python tests/test_tools_doc.py"
+            echo "and commit the result."
+            git diff --stat -- tests/fixtures/tool_list.json documentation/tools.md
+            exit 1
+          fi
+
   build:
     runs-on: ubuntu-latest
     needs: test

@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (not a config field), corrected the `LM_CORS_ORIGINS` default, and dropped a
   `.gitignore` negation for a file that does not exist.
 
+## [Unreleased]
+
+### Added
+
+- `.pre-commit-config.yaml`: local hooks mirroring the blocking CI gates (ruff
+  check and format on `src/` and `tests/`, file hygiene, private-key guard).
+  Install with `uv run pre-commit install`; `pre-commit` is now a dev dependency.
+- `.github/pull_request_template.md`: prompts contributors for a summary,
+  changes, test plan, and rollback note.
+- CI step that regenerates the tool contract fixture and `documentation/tools.md`
+  and fails with the exact regeneration commands when either is stale.
+
 ## [4.2.0] - 2026-08-11
 
 Optional **multi-portal mode**: a single server can serve many customer portals,
