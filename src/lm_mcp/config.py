@@ -182,6 +182,11 @@ class LMConfig(BaseSettings):
         Either bearer_token OR both (access_id AND access_key) must be provided.
         """
         if self.multi_portal:
+            if self.transport == "http":
+                raise ValueError(
+                    "LM_MULTI_PORTAL is stdio-only; the HTTP transport shares one "
+                    "process across clients. Use LM_TRANSPORT=stdio."
+                )
             return self
 
         # Single-portal mode keeps upstream's fail-fast guarantee: a fixed portal is

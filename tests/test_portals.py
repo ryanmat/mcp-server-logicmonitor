@@ -189,3 +189,50 @@ def test_single_portal_mode_still_requires_a_portal(monkeypatch, reset_portals):
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-1234")
     with pytest.raises(ValidationError):
         LMConfig()
+
+
+def test_load_refuses_when_multi_portal_disabled(tmp_path, monkeypatch, reset_portals):
+    """A vault in the environment must not let portal tools hijack single-portal mode."""
+    vault = _vault(tmp_path, {"acme": {"portal": "acme.example.com", "bearer_token": "t"}})
+    monkeypatch.setenv("LM_PORTAL", "internal.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-1234")
+    monkeypatch.setenv("LM_PORTALS_FILE", vault)
+    monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+
+    with pytest.raises(RuntimeError, match="LM_MULTI_PORTAL"):
+        portals.load()
+    with pytest.raises(RuntimeError, match="LM_MULTI_PORTAL"):
+        portals.activate("acme")
+    # the configured single-portal client was never replaced
+    assert server._client is None
+
+
+@pytest.mark.asyncio
+async def test_use_portal_tool_errors_in_single_portal_mode(tmp_path, monkeypatch, reset_portals):
+    from lm_mcp.tools import portals as portal_tools
+
+    vault = _vault(tmp_path, {"acme": {"portal": "acme.example.com", "bearer_token": "t"}})
+    monkeypatch.setenv("LM_PORTAL", "internal.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-1234")
+    monkeypatch.setenv("LM_PORTALS_FILE", vault)
+    monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+
+    text = (await portal_tools.use_portal("acme"))[0].text
+    assert text.startswith("Error:")
+    assert "LM_MULTI_PORTAL" in text
+
+
+@pytest.mark.asyncio
+async def test_write_gate_reports_no_portal_selected(tmp_path, monkeypatch, reset_portals):
+    """Before use_portal, the write gate must say so instead of claiming read-only."""
+    vault = _vault(tmp_path, {"acme": {"portal": "acme.example.com", "bearer_token": "t"}})
+    _multi(monkeypatch, vault)
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+    @require_write_permission
+    async def _do_write():
+        return format_response({"ok": True})
+
+    text = (await _do_write())[0].text
+    assert "No portal selected" in text
+    assert "use_portal" in text

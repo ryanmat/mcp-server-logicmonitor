@@ -108,13 +108,16 @@ Lists the portals, confirms, drops the record, and re-encrypts (with a timestamp
 backup). It refuses to remove the last portal, since the server needs at least one
 to load. Run `reload_portals` afterwards to apply without a restart.
 
-Doing it by hand instead is the same three steps:
+Doing it by hand instead: decrypt into a variable, edit with jq, back up, re-encrypt.
+Every variable below is defined by the snippet itself, so a typo cannot truncate the
+vault, and the backup keeps a recovery path either way.
 
 ```bash
-age -d -i ~/.config/lm-mcp/age-key.txt ~/.config/lm-mcp/secrets.age   # 1. decrypt & inspect
-# 2. add a record: { "<nickname>": { "portal": "host", "bearer_token": "..." } }
-PUB="$(age-keygen -y ~/.config/lm-mcp/age-key.txt)"                    # 3. re-encrypt
-printf '%s' "$UPDATED_JSON" | age -r "$PUB" -o ~/.config/lm-mcp/secrets.age
+CUR="$(age -d -i ~/.config/lm-mcp/age-key.txt ~/.config/lm-mcp/secrets.age)"
+UPDATED="$(printf '%s' "$CUR" | jq '. + {"<nickname>": {"portal": "host", "bearer_token": "..."}}')"
+cp ~/.config/lm-mcp/secrets.age ~/.config/lm-mcp/secrets.age.bak.$(date +%Y%m%d%H%M%S)
+PUB="$(age-keygen -y ~/.config/lm-mcp/age-key.txt)"
+printf '%s' "$UPDATED" | age -r "$PUB" -o ~/.config/lm-mcp/secrets.age
 ```
 
 ## Publishing later

@@ -178,6 +178,9 @@ def _filter_tools(tools: list, config) -> list:
     Returns:
         Filtered list of Tool objects.
     """
+    if not config.multi_portal:
+        tools = [t for t in tools if t.name not in PORTAL_TOOLS]
+
     if config.enabled_tools:
         patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
         tools = [t for t in tools if any(fnmatch(t.name, pat) for pat in patterns)]
@@ -252,6 +255,16 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
     try:
         handler = get_tool_handler(name)
+
+        # Portal tools exist only in multi-portal mode
+        if name in PORTAL_TOOLS and not config.multi_portal:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Error: Tool '{name}' is only available in multi-portal mode "
+                    "(set LM_MULTI_PORTAL=true).",
+                )
+            ]
 
         # Reject calls to filtered-out tools
         if config.enabled_tools:

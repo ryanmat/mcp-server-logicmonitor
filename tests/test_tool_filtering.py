@@ -4,16 +4,19 @@
 import pytest
 
 from lm_mcp.registry import TOOLS
-from lm_mcp.server import _filter_tools
+from lm_mcp.server import PORTAL_TOOLS, _filter_tools
 
 
 class _MockConfig:
     """Lightweight config mock for tool filtering tests."""
 
-    def __init__(self, enabled_tools=None, disabled_tools=None, mcp_categories=None):
+    def __init__(
+        self, enabled_tools=None, disabled_tools=None, mcp_categories=None, multi_portal=False
+    ):
         self.enabled_tools = enabled_tools
         self.disabled_tools = disabled_tools
         self.mcp_categories = mcp_categories
+        self.multi_portal = multi_portal
 
 
 class TestFilterTools:
@@ -23,7 +26,7 @@ class TestFilterTools:
         """No filters returns all tools."""
         config = _MockConfig()
         result = _filter_tools(TOOLS, config)
-        assert len(result) == len(TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
 
     def test_enabled_exact_names(self):
         """Enabled list with exact names returns only those tools."""
@@ -106,7 +109,7 @@ class TestCategoryFilter:
     def test_categories_unset_returns_all(self):
         config = _MockConfig()
         result = _filter_tools(TOOLS, config)
-        assert len(result) == len(TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
 
     def test_categories_read_only_excludes_destructive(self):
         config = _MockConfig(mcp_categories="read")
@@ -174,7 +177,7 @@ class TestCategoryFilter:
         """Defensive: all-typo input does not silently empty the surface."""
         config = _MockConfig(mcp_categories="bogus,nonsense")
         result = _filter_tools(TOOLS, config)
-        assert len(result) == len(TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
 
     @pytest.mark.asyncio
     async def test_call_tool_rejects_filtered_by_category(self, monkeypatch):
@@ -192,3 +195,17 @@ class TestCategoryFilter:
             assert "LM_MCP_CATEGORIES" in result[0].text
         finally:
             reset_config()
+
+
+class TestPortalToolVisibility:
+    """Portal tools are hidden outside multi-portal mode and present within it."""
+
+    def test_filter_tools_hides_portal_tools_in_single_portal(self):
+        result = _filter_tools(TOOLS, _MockConfig())
+        names = {t.name for t in result}
+        assert names.isdisjoint(PORTAL_TOOLS)
+
+    def test_filter_tools_keeps_portal_tools_in_multi_portal(self):
+        result = _filter_tools(TOOLS, _MockConfig(multi_portal=True))
+        names = {t.name for t in result}
+        assert names >= PORTAL_TOOLS

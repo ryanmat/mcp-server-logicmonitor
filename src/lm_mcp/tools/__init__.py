@@ -380,6 +380,15 @@ def require_write_permission(func: F) -> F:
         if config.multi_portal:
             from lm_mcp import portals
 
+            if not portals.has_active():
+                return format_response(
+                    {
+                        "error": True,
+                        "code": "NO_PORTAL_SELECTED",
+                        "message": "No portal selected",
+                        "suggestion": "Call use_portal(<customer>) first (see list_portals)",
+                    }
+                )
             if not portals.is_active_writable():
                 return format_response(
                     {
