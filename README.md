@@ -102,7 +102,7 @@ own sub-tools' confirm guards). `run_report` executions are pollable via
 `get_report_execution`, `get_alert_details` can fetch the full message body, and NextGen
 reports are visible to the report list tools.
 
-Full release history, including v3.9.x and earlier, is in [CHANGELOG.md](CHANGELOG.md). The v3.8.0 networking intelligence tools have a dedicated reference: [documentation/networking-intelligence.md](documentation/networking-intelligence.md).
+Full release history, including v3.9.x and earlier, is in [CHANGELOG.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/CHANGELOG.md). The v3.8.0 networking intelligence tools have a dedicated reference: [documentation/networking-intelligence.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md).
 
 ## Features
 
@@ -186,7 +186,7 @@ Service discovery and RED metrics for LogicMonitor APM (Application Performance 
 - **Write Protection**: launch_job, launch_workflow, cancel_job, relaunch_job require `LM_ENABLE_WRITE_OPERATIONS=true`
 - **Jinja2 Safety**: All extra_vars inputs are validated to prevent template injection
 
-AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are configured. See [Example Playbooks](examples/playbooks/) for remediation templates.
+AAP tools are optional — they only appear when `AWX_URL` and `AWX_TOKEN` are configured. See [Example Playbooks](https://github.com/ryanmat/mcp-server-logicmonitor/tree/main/examples/playbooks) for remediation templates.
 
 ### IBM watsonx.ai Integration
 
@@ -281,7 +281,7 @@ Skills ship with the repo — clone it and invoke `/lm-triage` in Claude Code to
 - **Session Persistence**: Optional file-backed session variables that survive restarts
 
 ### Multi-Portal Mode (optional)
-Work across many customer portals from a **single** server entry instead of one server (and one token) per portal. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and you switch the active portal at runtime. Four tools manage it: `list_portals`, `use_portal`, `current_portal`, and `reload_portals`. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing) rather than the environment, and each portal is **read-only unless explicitly marked writable** — so an assistant can browse any portal but cannot change one by accident. Multi-portal mode is **stdio-only** (the server refuses to start it on the HTTP transport) and Terraform tools are unavailable in it. Unmodified single-portal behavior is unchanged (no `LM_MULTI_PORTAL`, fixed `LM_PORTAL` + token). See **[MULTIPORTAL.md](MULTIPORTAL.md)**.
+Work across many customer portals from a **single** server entry instead of one server (and one token) per portal. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and you switch the active portal at runtime. Four tools manage it: `list_portals`, `use_portal`, `current_portal`, and `reload_portals`. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing) rather than the environment, and each portal is **read-only unless explicitly marked writable** — so an assistant can browse any portal but cannot change one by accident. Multi-portal mode is **stdio-only** (the server refuses to start it on the HTTP transport) and Terraform tools are unavailable in it. Unmodified single-portal behavior is unchanged (no `LM_MULTI_PORTAL`, fixed `LM_PORTAL` + token). See **[MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md)**.
 
 ## Installation
 
@@ -419,7 +419,7 @@ The [Quick Start](#quick-start) covers Claude Code. Every JSON-based client (Cur
 }
 ```
 
-Add `LM_ENABLE_WRITE_OPERATIONS`, `LM_ACCESS_ID`/`LM_ACCESS_KEY` (ingestion), or the watsonx/Terraform variables to `env` as needed. Per-client config file locations and exact steps (Claude Code, Cursor, Claude Desktop, OpenAI Codex, Cline, GitHub Copilot, Gemini CLI) are in **[documentation/client-setup.md](documentation/client-setup.md)**.
+Add `LM_ENABLE_WRITE_OPERATIONS`, `LM_ACCESS_ID`/`LM_ACCESS_KEY` (ingestion), or the watsonx/Terraform variables to `env` as needed. Per-client config file locations and exact steps (Claude Code, Cursor, Claude Desktop, OpenAI Codex, Cline, GitHub Copilot, Gemini CLI) are in **[documentation/client-setup.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/client-setup.md)**.
 
 ### Cursor's 40-tool cap
 
@@ -433,11 +433,11 @@ Cursor only loads the first 40 MCP tools, so the remaining ~240 are invisible to
 }
 ```
 
-`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 306 tools. In multi-portal mode the four portal tools are exempt from category filtering (they are the mode's control plane) and do not count toward your curated set. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
+`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 306 tools. In multi-portal mode the four portal tools are exempt from category filtering (they are the mode's control plane) and do not count toward your curated set. See [documentation/client-setup.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
 
 ## Available Tools
 
-306 tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](documentation/tools.md)**, generated from the tool registry so it never drifts.
+306 tools cover the full LogicMonitor surface plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations. The complete per-tool reference (every tool, its parameters, and its read/write classification) is in **[documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md)**, generated from the tool registry so it never drifts.
 
 Discover tools at runtime without leaving your client:
 
