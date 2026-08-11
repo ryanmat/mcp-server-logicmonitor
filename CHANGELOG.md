@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `deploy/docker-compose.yml` now publishes the plaintext port on loopback
+  (`127.0.0.1`) instead of every interface. That port is published whether or
+  not the `tls` profile is active, so a TLS deployment was still exposing an
+  unencrypted listener that would carry `LM_HTTP_AUTH_TOKEN` in cleartext.
+  Caddy is unaffected, since it reaches the service over the compose network.
+  Set `LM_HTTP_BIND=0.0.0.0` to serve plaintext to other hosts deliberately.
 - `deploy/docker-compose.yml` no longer defaults `LM_CORS_ORIGINS` to `*`.
   Deployments that relied on the implicit wildcard should set an explicit
   origin list rather than restoring `*`: CORS runs with

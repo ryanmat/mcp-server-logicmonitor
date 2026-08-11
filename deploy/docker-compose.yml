@@ -9,7 +9,13 @@ services:
     image: lm-mcp-server:latest
     container_name: lm-mcp
     ports:
-      - "${LM_HTTP_PORT:-8080}:8080"
+      # Bound to loopback by default: this is the plaintext listener, and it is
+      # published regardless of the tls profile, so binding it to every
+      # interface would send bearer tokens in cleartext to anyone who reaches
+      # the host. Caddy is unaffected -- it reaches this service over the
+      # compose network, not through the published port. To serve plaintext to
+      # other hosts deliberately, set LM_HTTP_BIND=0.0.0.0.
+      - "${LM_HTTP_BIND:-127.0.0.1}:${LM_HTTP_PORT:-8080}:8080"
     environment:
       - LM_PORTAL=${LM_PORTAL}
       - LM_BEARER_TOKEN=${LM_BEARER_TOKEN}
