@@ -150,6 +150,10 @@ class LMConfig(BaseSettings):
 
     model_config = {
         "env_prefix": "LM_",
+        # Validation errors must never echo the rejected value: these fields hold
+        # credentials, and the error text reaches startup tracebacks, container
+        # logs, and the health endpoint's response body.
+        "hide_input_in_errors": True,
     }
 
     @field_validator("portal", mode="before")
@@ -203,7 +207,13 @@ class LMConfig(BaseSettings):
 
         docker-compose passes ${LM_HTTP_AUTH_TOKEN:-}, which arrives as an empty
         string, so empty must mean "no inbound auth" rather than a length error.
+        Surrounding whitespace is stripped: a token read from a Kubernetes secret
+        file or a .env line often carries a trailing newline, and HTTP parsers
+        strip it from header values, so keeping it would 401 every client forever.
         """
+        if v is None:
+            return None
+        v = v.strip()
         if not v:
             return None
         if len(v) < 16:

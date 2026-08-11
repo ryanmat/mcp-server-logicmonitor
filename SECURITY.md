@@ -36,7 +36,13 @@ You can expect:
   `/mcp` and `/api/v1/*` then require `Authorization: Bearer <token>` and
   return 401 otherwise. Starting without it logs a warning.
 - `/`, `/health`, `/healthz`, and `/readyz` stay unauthenticated so container
-  healthchecks and orchestrator probes keep working; they expose no LM data.
+  healthchecks and orchestrator probes keep working. Their responses carry
+  component status, never LogicMonitor data. One caveat: with
+  `LM_HEALTH_CHECK_CONNECTIVITY=true` (off by default), each `/readyz` request
+  calls the LogicMonitor API with your credentials, so an unauthenticated
+  caller can consume your portal's API quota. Leave that flag off, or put the
+  probe endpoints behind your ingress, on deployments reachable from untrusted
+  networks.
 - Pair the token with TLS (the Caddy profile in `deploy/`, or `LM_HTTP_SSL_*`)
   so it is not sent in cleartext.
 - The stdio transport is unaffected: it has no listening socket.

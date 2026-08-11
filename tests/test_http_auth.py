@@ -243,3 +243,102 @@ class TestHttpAuthConfig:
 
         monkeypatch.setenv("LM_HTTP_AUTH_TOKEN", "")
         assert LMConfig().http_auth_token is None
+
+
+class TestHttpAuthHardening:
+    """Regressions from the adversarial review of the auth middleware."""
+
+    @pytest.mark.asyncio
+    async def test_scheme_is_case_insensitive(self, _set_env_with_auth):
+        """RFC 7235 defines auth-scheme as case-insensitive."""
+        async with _client() as client:
+            for scheme in ("Bearer", "bearer", "BEARER", "BeArEr"):
+                resp = await client.post(
+                    "/mcp",
+                    json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+                    headers={"Authorization": f"{scheme} {TOKEN}"},
+                )
+                assert resp.status_code == 200, scheme
+
+    @pytest.mark.asyncio
+    async def test_wrong_scheme_still_rejected(self, _set_env_with_auth):
+        """A non-bearer scheme carrying the token is still refused."""
+        async with _client() as client:
+            resp = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+                headers={"Authorization": f"Basic {TOKEN}"},
+            )
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_open_paths_tolerate_trailing_slash(self, _set_env_with_auth):
+        """Probes written with a trailing slash must not start 401ing.
+
+        Starlette would redirect /healthz/ to /healthz, but the redirect never
+        runs if auth rejects the request first.
+        """
+        async with _client() as client:
+            for path in ("/healthz/", "/readyz/", "/health/"):
+                resp = await client.get(path)
+                assert resp.status_code != 401, path
+
+    @pytest.mark.asyncio
+    async def test_trailing_slash_does_not_open_gated_paths(self, _set_env_with_auth):
+        """Slash tolerance must not become a bypass."""
+        async with _client() as client:
+            for path in ("/mcp/", "/api/v1/analyze/", "/healthz/../mcp"):
+                resp = await client.post(path, json={})
+                assert resp.status_code == 401, path
+
+    def test_token_whitespace_is_stripped(self, _set_env, monkeypatch):
+        """A token from a secret file or .env line often carries a newline.
+
+        Accepting it verbatim would 401 every client forever, since HTTP
+        parsers strip optional whitespace from header values.
+        """
+        from lm_mcp.config import LMConfig
+
+        monkeypatch.setenv("LM_HTTP_AUTH_TOKEN", f"{TOKEN}\n")
+        assert LMConfig().http_auth_token == TOKEN
+
+    def test_whitespace_only_token_is_unset_and_warns(self, _set_env, monkeypatch, caplog):
+        """Spaces must not satisfy the length requirement.
+
+        Blank means no auth, the same rule as an empty value, so the operator
+        gets the startup warning rather than a server that looks protected.
+        """
+        from lm_mcp.config import LMConfig
+        from lm_mcp.transport.http import create_asgi_app
+
+        monkeypatch.setenv("LM_HTTP_AUTH_TOKEN", " " * 20)
+        assert LMConfig().http_auth_token is None
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport.http"):
+            create_asgi_app()
+        assert any("LM_HTTP_AUTH_TOKEN" in r.getMessage() for r in caplog.records)
+
+    def test_rejected_token_not_echoed_in_error(self, _set_env, monkeypatch):
+        """A rejected token must not reach tracebacks, logs, or /health bodies."""
+        from pydantic import ValidationError
+
+        from lm_mcp.config import LMConfig
+
+        secret = "SUPERSECRET-short"[:15]
+        monkeypatch.setenv("LM_HTTP_AUTH_TOKEN", secret)
+        with pytest.raises(ValidationError) as exc:
+            LMConfig()
+        assert secret not in str(exc.value)
+
+    def test_rejected_lm_credential_not_echoed_in_error(self, monkeypatch):
+        """The same protection covers the LogicMonitor bearer token."""
+        from pydantic import ValidationError
+
+        from lm_mcp.config import LMConfig
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "SHORTCRED")
+        monkeypatch.delenv("LM_HTTP_AUTH_TOKEN", raising=False)
+        with pytest.raises(ValidationError) as exc:
+            LMConfig()
+        assert "SHORTCRED" not in str(exc.value)

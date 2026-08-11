@@ -16,9 +16,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Probe and info routes stay reachable without a token: container healthchecks
-# and orchestrator probes cannot carry one, and none of them expose LM data.
+# Probe and info routes stay reachable without a token so orchestration works
+# out of the box: their bodies carry no LM data, only component status. (Probes
+# *can* send headers -- Kubernetes httpGet takes httpHeaders and curl takes -H --
+# so an operator who wants them gated can front them with a proxy.) Note that
+# /readyz reaches the LM API when LM_HEALTH_CHECK_CONNECTIVITY is enabled.
 _OPEN_PATHS = frozenset({"/", "/health", "/healthz", "/readyz"})
+
+
+def _is_open_path(path: str) -> bool:
+    """Match the probe allowlist, tolerating a trailing slash.
+
+    Starlette redirects /healthz/ to /healthz, but that redirect never runs when
+    auth rejects the request first, so a probe written with a trailing slash
+    would start failing the moment a token is configured. Only exact members and
+    their trailing-slash forms match; everything else stays gated.
+    """
+    return path in _OPEN_PATHS or path.rstrip("/") in _OPEN_PATHS
 
 
 class BearerAuthMiddleware:
@@ -32,10 +46,10 @@ class BearerAuthMiddleware:
 
     def __init__(self, app: ASGIApp, token: str) -> None:
         self.app = app
-        self._expected = f"Bearer {token}".encode()
+        self._token = token.encode()
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["path"] in _OPEN_PATHS:
+        if scope["type"] != "http" or _is_open_path(scope["path"]):
             await self.app(scope, receive, send)
             return
 
@@ -45,8 +59,11 @@ class BearerAuthMiddleware:
                 provided = value
                 break
 
-        # One constant-time comparison covers missing, malformed, and wrong.
-        if secrets.compare_digest(provided, self._expected):
+        # RFC 7235 defines auth-scheme as case-insensitive. Only the credentials
+        # are secret, so only they get the constant-time comparison; a missing or
+        # malformed header degrades to comparing against empty bytes.
+        scheme, _, credentials = provided.partition(b" ")
+        if scheme.lower() == b"bearer" and secrets.compare_digest(credentials, self._token):
             await self.app(scope, receive, send)
             return
 
