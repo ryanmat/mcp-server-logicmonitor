@@ -6,13 +6,63 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from starlette.applications import Starlette
+    from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = logging.getLogger(__name__)
+
+# Probe and info routes stay reachable without a token: container healthchecks
+# and orchestrator probes cannot carry one, and none of them expose LM data.
+_OPEN_PATHS = frozenset({"/", "/health", "/healthz", "/readyz"})
+
+
+class BearerAuthMiddleware:
+    """Require a bearer token on every route outside _OPEN_PATHS.
+
+    Installed only when LM_HTTP_AUTH_TOKEN is configured. The allowlist is
+    deliberate: any route added later is authenticated by default rather than
+    silently exposed. Written as raw ASGI so this module keeps its runtime
+    imports free of starlette, matching the rest of the transport.
+    """
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        self.app = app
+        self._expected = f"Bearer {token}".encode()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["path"] in _OPEN_PATHS:
+            await self.app(scope, receive, send)
+            return
+
+        provided = b""
+        for name, value in scope.get("headers", []):
+            if name == b"authorization":
+                provided = value
+                break
+
+        # One constant-time comparison covers missing, malformed, and wrong.
+        if secrets.compare_digest(provided, self._expected):
+            await self.app(scope, receive, send)
+            return
+
+        body = json.dumps({"error": "Unauthorized"}).encode()
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 401,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                    (b"www-authenticate", b"Bearer"),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": body})
 
 
 def create_asgi_app() -> Starlette:
@@ -279,7 +329,9 @@ def create_asgi_app() -> Starlette:
         Route("/api/v1/webhooks/alert", webhook_alert, methods=["POST"]),
     ]
 
-    # Configure CORS middleware
+    # Configure CORS middleware. Order matters: the first entry is outermost,
+    # so CORS answers preflights before auth runs -- browsers cannot attach a
+    # token to a preflight, and 401s still get CORS headers so JS can read them.
     cors_origins = config.cors_origins_list
     middleware = []
     if cors_origins:
@@ -291,6 +343,14 @@ def create_asgi_app() -> Starlette:
                 allow_methods=["*"],
                 allow_headers=["*"],
             )
+        )
+
+    if config.http_auth_token:
+        middleware.append(Middleware(BearerAuthMiddleware, token=config.http_auth_token))
+    else:
+        logger.warning(
+            "Inbound HTTP authentication is disabled; /mcp and /api/v1/* accept "
+            "unauthenticated requests. Set LM_HTTP_AUTH_TOKEN to require a bearer token."
         )
 
     return Starlette(routes=routes, middleware=middleware)
