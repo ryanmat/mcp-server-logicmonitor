@@ -340,6 +340,15 @@ The server exposes health endpoints for container orchestration:
 - `GET /healthz` - Liveness probe (200 OK or 503)
 - `GET /readyz` - Readiness probe (includes connectivity check if enabled)
 
+### Kubernetes
+
+`deploy/k8s/deployment.yaml` is a vendor-neutral Deployment and Service running
+the published `ghcr.io` image. It works on AKS, EKS, GKE, OpenShift, or vanilla
+Kubernetes, reads credentials from a Kubernetes secret you create, and wires the
+liveness and readiness probes to the endpoints above. Apply it with
+`kubectl apply -f deploy/k8s/deployment.yaml` after creating the secret
+documented at the top of the file.
+
 ## Configuration
 
 ### Environment Variables

@@ -103,7 +103,6 @@ parse_har.py
 secrets.age
 secrets.age.bak.*
 secrets*.json
-!secrets.example.json
 age-key.txt
 *.age
 *.agekey

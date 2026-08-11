@@ -12,7 +12,9 @@
 If you discover a security vulnerability in this project, please report it responsibly:
 
 1. **Do not** open a public GitHub issue for security vulnerabilities
-2. Email the maintainer directly or use [GitHub Security Advisories](https://github.com/ryanmat/mcp-server-logicmonitor/security/advisories/new)
+2. Use [private vulnerability reporting](https://github.com/ryanmat/mcp-server-logicmonitor/security/advisories/new),
+   which is enabled on this repository and keeps the report private until a fix
+   ships. The "Report a vulnerability" button on the Security tab does the same.
 3. Include a detailed description of the vulnerability and steps to reproduce
 
 You can expect:
