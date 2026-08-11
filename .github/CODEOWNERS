@@ -1,0 +1,3 @@
+# Description: Route all pull request reviews to the repository owner.
+# Description: Required by the main branch ruleset's code-owner review rule.
+* @ryanmat
