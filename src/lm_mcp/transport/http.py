@@ -66,8 +66,14 @@ def create_asgi_app() -> Starlette:
         ensuring consistent behavior (filtering, validation, audit logging,
         session recording) across stdio and HTTP transports.
         """
-        from lm_mcp.registry import AWX_TOOLS, TOOLS, WATSONX_TOOLS
-        from lm_mcp.server import _awx_client, _filter_tools, _watsonx_client, execute_tool
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+        from lm_mcp.server import (
+            _awx_client,
+            _filter_tools,
+            _tf_runner,
+            _watsonx_client,
+            execute_tool,
+        )
 
         try:
             body = await request.json()
@@ -88,6 +94,8 @@ def create_asgi_app() -> Starlette:
                     all_tools.extend(AWX_TOOLS)
                 if _watsonx_client is not None:
                     all_tools.extend(WATSONX_TOOLS)
+                if _tf_runner is not None:
+                    all_tools.extend(TF_TOOLS)
                 filtered = _filter_tools(all_tools, config)
                 result = [{"name": t.name, "description": t.description} for t in filtered]
                 return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})

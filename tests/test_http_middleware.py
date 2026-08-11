@@ -255,3 +255,65 @@ class TestHttpMultiPortalRefused:
 
         with pytest.raises(ValidationError, match="stdio"):
             create_asgi_app()
+
+
+class TestHttpToolsListWithTerraform:
+    """Tests for HTTP /mcp tools/list including Terraform tools."""
+
+    @pytest.mark.asyncio
+    async def test_tools_list_includes_terraform_when_configured(self, monkeypatch):
+        """HTTP tools/list count includes Terraform tools when the runner is set."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+
+        from unittest.mock import MagicMock
+
+        from lm_mcp.registry import TF_TOOLS, TOOLS
+        from lm_mcp.server import PORTAL_TOOLS, _set_tf_runner
+
+        _set_tf_runner(MagicMock())
+
+        from httpx import ASGITransport, AsyncClient
+
+        from lm_mcp.transport.http import create_asgi_app
+
+        app = create_asgi_app()
+        transport = ASGITransport(app=app)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+            )
+
+        data = resp.json()
+        names = {t["name"] for t in data["result"]}
+        assert len(data["result"]) == len(TOOLS) - len(PORTAL_TOOLS) + len(TF_TOOLS)
+        assert {t.name for t in TF_TOOLS} <= names
+
+    @pytest.mark.asyncio
+    async def test_tools_list_excludes_terraform_when_not_configured(self, monkeypatch):
+        """HTTP tools/list omits Terraform tools when no runner is configured."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+
+        from httpx import ASGITransport, AsyncClient
+
+        from lm_mcp.registry import TF_TOOLS
+        from lm_mcp.transport.http import create_asgi_app
+
+        app = create_asgi_app()
+        transport = ASGITransport(app=app)
+
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+            )
+
+        names = {t["name"] for t in resp.json()["result"]}
+        assert names.isdisjoint({t.name for t in TF_TOOLS})
