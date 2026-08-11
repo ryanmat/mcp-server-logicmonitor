@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.2.0] - 2026-08-11
 
 Optional **multi-portal mode**: a single server can serve many customer portals,
 selecting the active one at runtime, instead of running one server (and pasting one
