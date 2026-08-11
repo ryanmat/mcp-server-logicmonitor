@@ -2,6 +2,10 @@
 # Description: Proxies HTTPS requests to the LM MCP server.
 
 {$DOMAIN:localhost} {
+    # Caddy terminates TLS only. Request authentication is enforced by the
+    # server when LM_HTTP_AUTH_TOKEN is set: clients send
+    # "Authorization: Bearer <token>" on /mcp and /api/v1/*, while / and
+    # /health* stay open for probes.
     reverse_proxy lm-mcp:8080
 
     # Enable compression

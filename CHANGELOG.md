@@ -7,36 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- `lm_mcp.__version__` synced to the release version (the published 4.2.0 wheel
-  self-reports "4.1.0" at the HTTP root endpoint); the foundation test now
-  asserts `__version__` against the installed package metadata so a bump that
-  misses `__init__.py` fails the suite instead of shipping.
-- HTTP transport `tools/list` now includes the Terraform tools when a Terraform
-  runner is configured. They were dispatchable over HTTP but invisible to HTTP
-  clients, unlike stdio which listed them correctly.
-
-## [Unreleased]
-
 ### Added
 
+- `LM_HTTP_AUTH_TOKEN`: opt-in inbound bearer authentication for the HTTP
+  transport. When set, `/mcp` and `/api/v1/*` require
+  `Authorization: Bearer <token>` (constant-time comparison) and return 401
+  with `WWW-Authenticate: Bearer` otherwise; `/`, `/health`, `/healthz`, and
+  `/readyz` stay open for container healthchecks and orchestrator probes.
+  Unset preserves previous behavior and logs a startup warning. Minimum token
+  length 16; a blank value means unset, and surrounding whitespace is stripped
+  so a token read from a secret file still matches. The scheme is matched
+  case-insensitively per RFC 7235, and probe paths match with or without a
+  trailing slash. Stdio is unaffected.
 - `CONTRIBUTING.md`: fork-and-pull-request workflow, development setup, PR
   expectations, and the tool-surface regeneration commands.
 - `deploy/k8s/deployment.yaml`: vendor-neutral Kubernetes Deployment and
   Service for the published container image, with credentials read from a
   user-created secret and probes wired to the health endpoints.
-
-### Fixed
-
-- Documentation: removed the `LM_ANALYSIS_TTL_MINUTES` row from the README
-  (not a config field), corrected the `LM_CORS_ORIGINS` default, and dropped a
-  `.gitignore` negation for a file that does not exist.
-
-## [Unreleased]
-
-### Added
-
 - `.pre-commit-config.yaml`: local hooks mirroring the blocking CI gates (ruff
   check and format on `src/` and `tests/`, file hygiene, private-key guard).
   Install with `uv run pre-commit install`; `pre-commit` is now a dev dependency.
@@ -44,6 +31,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes, test plan, and rollback note.
 - CI step that regenerates the tool contract fixture and `documentation/tools.md`
   and fails with the exact regeneration commands when either is stale.
+
+### Changed
+
+- `deploy/docker-compose.yml` no longer defaults `LM_CORS_ORIGINS` to `*`.
+  Deployments that relied on the implicit wildcard should set an explicit
+  origin list rather than restoring `*`: CORS runs with
+  `allow_credentials=true`, so a wildcard lets any site a browser visits call
+  `/mcp` with the visitor's credentials.
+
+### Fixed
+
+- Configuration validation errors no longer echo the rejected value, which
+  previously put a too-short `LM_HTTP_AUTH_TOKEN` or `LM_BEARER_TOKEN` into the
+  startup traceback, container logs, and the health endpoint's response body.
+- `lm_mcp.__version__` synced to the release version (the published 4.2.0 wheel
+  self-reports "4.1.0" at the HTTP root endpoint); the foundation test now
+  asserts `__version__` against the installed package metadata so a bump that
+  misses `__init__.py` fails the suite instead of shipping.
+- HTTP transport `tools/list` now includes the Terraform tools when a Terraform
+  runner is configured. They were dispatchable over HTTP but invisible to HTTP
+  clients, unlike stdio which listed them correctly.
+- Documentation: removed the `LM_ANALYSIS_TTL_MINUTES` row from the README
+  (not a config field), corrected the `LM_CORS_ORIGINS` default, and dropped a
+  `.gitignore` negation for a file that does not exist.
 
 ## [4.2.0] - 2026-08-11
 

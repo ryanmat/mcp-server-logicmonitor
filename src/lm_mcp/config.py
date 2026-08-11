@@ -80,6 +80,12 @@ class LMConfig(BaseSettings):
         LM_HTTP_HOST: HTTP server bind address (default: 0.0.0.0)
         LM_HTTP_PORT: HTTP server port (default: 8080)
         LM_CORS_ORIGINS: Comma-separated CORS origins (default: empty, no CORS)
+        LM_HTTP_AUTH_TOKEN: Require this bearer token on /mcp and /api/v1/*
+            (default: unset, no inbound auth; minimum 16 characters). The health
+            endpoints and / stay open for probes. HTTP transport only.
+        LM_HTTP_SSL_CERTFILE: TLS certificate path for the HTTP transport
+        LM_HTTP_SSL_KEYFILE: TLS private key path for the HTTP transport
+        LM_HTTP_SSL_KEYFILE_PASSWORD: Password for an encrypted TLS private key
         LM_SESSION_ENABLED: Enable session context tracking (default: true)
         LM_SESSION_HISTORY_SIZE: Number of tool calls to keep in history (default: 50)
         LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
@@ -118,6 +124,7 @@ class LMConfig(BaseSettings):
     http_host: str = "0.0.0.0"
     http_port: int = 8080
     cors_origins: str = ""
+    http_auth_token: str | None = None
     http_ssl_certfile: str | None = None
     http_ssl_keyfile: str | None = None
     http_ssl_keyfile_password: str | None = None
@@ -143,6 +150,10 @@ class LMConfig(BaseSettings):
 
     model_config = {
         "env_prefix": "LM_",
+        # Validation errors must never echo the rejected value: these fields hold
+        # credentials, and the error text reaches startup tracebacks, container
+        # logs, and the health endpoint's response body.
+        "hide_input_in_errors": True,
     }
 
     @field_validator("portal", mode="before")
@@ -187,6 +198,26 @@ class LMConfig(BaseSettings):
         """Validate HTTP port is within acceptable range."""
         if v < 1 or v > 65535:
             raise ValueError("http_port must be between 1 and 65535")
+        return v
+
+    @field_validator("http_auth_token", mode="after")
+    @classmethod
+    def validate_http_auth_token(cls, v: str | None) -> str | None:
+        """Treat an empty value as unset and require real length when set.
+
+        docker-compose passes ${LM_HTTP_AUTH_TOKEN:-}, which arrives as an empty
+        string, so empty must mean "no inbound auth" rather than a length error.
+        Surrounding whitespace is stripped: a token read from a Kubernetes secret
+        file or a .env line often carries a trailing newline, and HTTP parsers
+        strip it from header values, so keeping it would 401 every client forever.
+        """
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            return None
+        if len(v) < 16:
+            raise ValueError("http_auth_token must be at least 16 characters when set")
         return v
 
     @field_validator("session_history_size", mode="after")

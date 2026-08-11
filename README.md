@@ -370,7 +370,8 @@ documented at the top of the file.
 | `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |
 | `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address |
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
-| `LM_CORS_ORIGINS` | No | `*` | Comma-separated CORS origins |
+| `LM_CORS_ORIGINS` | No | - | Comma-separated CORS origins (default: none) |
+| `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on `/mcp` and `/api/v1/*` (min 16 chars). Health endpoints and `/` stay open for probes. HTTP transport only. |
 | `LM_SESSION_ENABLED` | No | `true` | Enable session context tracking |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
 | `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error` |
@@ -380,7 +381,6 @@ documented at the top of the file.
 | `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
-| `LM_ANALYSIS_TTL_MINUTES` | No | `60` | TTL for scheduled analysis results (1-1440 minutes) |
 | `AWX_URL` | No | - | Ansible Automation Platform controller URL (e.g., `https://aap.example.com`) |
 | `AWX_TOKEN` | No | - | AAP personal access token |
 | `AWX_VERIFY_SSL` | No | `true` | Verify SSL certificates for AAP connections |
