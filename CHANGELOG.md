@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   self-reports "4.1.0" at the HTTP root endpoint); the foundation test now
   asserts `__version__` against the installed package metadata so a bump that
   misses `__init__.py` fails the suite instead of shipping.
+- HTTP transport `tools/list` now includes the Terraform tools when a Terraform
+  runner is configured. They were dispatchable over HTTP but invisible to HTTP
+  clients, unlike stdio which listed them correctly.
 
 ## [4.2.0] - 2026-08-11
 
