@@ -373,3 +373,58 @@ class TestMultiPortalTransport:
         config = LMConfig()
         assert config.multi_portal is True
         assert config.transport == "stdio"
+
+
+class TestMultiPortalConfig:
+    """Multi-portal config fail-fast and path expansion."""
+
+    def _clear_vault_env(self, monkeypatch):
+        for var in (
+            "LM_PORTALS_FILE",
+            "LM_VAULT_FILE",
+            "LM_AGE_KEY",
+            "LM_PORTAL",
+            "LM_BEARER_TOKEN",
+            "LM_TRANSPORT",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+    def test_multi_portal_requires_vault_source(self, monkeypatch):
+        self._clear_vault_env(monkeypatch)
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        with pytest.raises(ValidationError, match="LM_VAULT_FILE"):
+            LMConfig()
+
+    def test_multi_portal_accepts_portals_file(self, monkeypatch, tmp_path):
+        self._clear_vault_env(monkeypatch)
+        p = tmp_path / "portals.json"
+        p.write_text("{}")
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(p))
+        assert LMConfig().multi_portal is True
+
+    def test_multi_portal_vault_pair_required_together(self, monkeypatch, tmp_path):
+        self._clear_vault_env(monkeypatch)
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_VAULT_FILE", str(tmp_path / "secrets.age"))
+        with pytest.raises(ValidationError, match="LM_AGE_KEY"):
+            LMConfig()
+
+    def test_multi_portal_paths_expand_tilde(self, monkeypatch):
+        from pathlib import Path
+
+        self._clear_vault_env(monkeypatch)
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", "~/p.json")
+        config = LMConfig()
+        assert config.portals_file == str(Path.home() / "p.json")
+
+    def test_ingest_url_raises_without_portal(self, monkeypatch, tmp_path):
+        self._clear_vault_env(monkeypatch)
+        p = tmp_path / "portals.json"
+        p.write_text("{}")
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(p))
+        config = LMConfig()
+        with pytest.raises(ValueError, match="portal"):
+            _ = config.ingest_url

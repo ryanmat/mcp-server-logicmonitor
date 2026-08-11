@@ -115,11 +115,19 @@ async def run_stdio() -> None:
                     "Install with: uv add 'lm-mcp[huggingface]'"
                 )
 
-    # Initialize Terraform runner if configured
+    # Initialize Terraform runner if configured. Skipped in multi-portal mode:
+    # the LM Terraform provider needs fixed LM_* credentials, which multi-portal
+    # selects at runtime, so the tools would run unauthenticated.
     tf_runner = None
     from lm_mcp.terraform_config import get_terraform_config
 
     tf_config = get_terraform_config()
+    if tf_config is not None and config.multi_portal:
+        logging.getLogger(__name__).warning(
+            "Terraform tools are disabled in multi-portal mode; "
+            "run a single-portal server for Terraform."
+        )
+        tf_config = None
     if tf_config is not None:
         from lm_mcp.client.terraform import TerraformRunner
 

@@ -40,7 +40,7 @@ async def current_portal() -> list[TextContent]:
 async def reload_portals() -> list[TextContent]:
     """Re-read the vault so portals added/removed since startup take effect (no restart)."""
     try:
-        return format_response(portals.reload())
+        return format_response(await portals.reload())
     except (ValueError, RuntimeError) as e:
         return format_response({"error": True, "message": str(e)})
     except Exception as e:

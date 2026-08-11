@@ -199,7 +199,16 @@ def portal_url(resource_type: str, resource_id: int | str) -> str:
     if path is None:
         return ""
 
-    return f"https://{config.portal}/santaba/uiv4/{path}"
+    if config.multi_portal:
+        from lm_mcp import portals
+
+        host = portals.active().get("portal")
+    else:
+        host = config.portal
+    if not host:
+        return ""
+
+    return f"https://{host}/santaba/uiv4/{path}"
 
 
 async def resolve_group_filter(client: Any, group_id: int) -> str:

@@ -479,9 +479,9 @@ Multi-portal switching: one server, many customer portals
 | Tool | Description | Write |
 |------|-------------|-------|
 | `list_portals` | List the customer portals available in this multi-portal server. | No |
-| `use_portal` | Switch the active customer portal for subsequent tool calls. | No |
+| `use_portal` | Switch the active customer portal for subsequent tool calls. | Yes |
 | `current_portal` | Show which customer portal is currently active. | No |
-| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
+| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | Yes |
 
 ## Ansible Automation Platform
 

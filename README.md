@@ -281,7 +281,7 @@ Skills ship with the repo — clone it and invoke `/lm-triage` in Claude Code to
 - **Session Persistence**: Optional file-backed session variables that survive restarts
 
 ### Multi-Portal Mode (optional)
-Work across many customer portals from a **single** server entry instead of one server (and one token) per portal. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and you switch the active portal at runtime. Four tools manage it: `list_portals`, `use_portal`, `current_portal`, and `reload_portals`. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing) rather than the environment, and each portal is **read-only unless explicitly marked writable** — so an assistant can browse any portal but cannot change one by accident. Unmodified single-portal behavior is unchanged (no `LM_MULTI_PORTAL`, fixed `LM_PORTAL` + token). See **[MULTIPORTAL.md](MULTIPORTAL.md)**.
+Work across many customer portals from a **single** server entry instead of one server (and one token) per portal. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and you switch the active portal at runtime. Four tools manage it: `list_portals`, `use_portal`, `current_portal`, and `reload_portals`. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing) rather than the environment, and each portal is **read-only unless explicitly marked writable** — so an assistant can browse any portal but cannot change one by accident. Multi-portal mode is **stdio-only** (the server refuses to start it on the HTTP transport) and Terraform tools are unavailable in it. Unmodified single-portal behavior is unchanged (no `LM_MULTI_PORTAL`, fixed `LM_PORTAL` + token). See **[MULTIPORTAL.md](MULTIPORTAL.md)**.
 
 ## Installation
 
@@ -339,6 +339,10 @@ The server exposes health endpoints for container orchestration:
 | `LM_TIMEOUT` | No | `30` | Request timeout in seconds (range: 5-300) |
 | `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited/server error requests (range: 0-10) |
 | `LM_TRANSPORT` | No | `stdio` | Transport mode: `stdio` (local) or `http` (remote) |
+| `LM_MULTI_PORTAL` | No | `false` | Serve many customer portals from one server, selected at runtime via `use_portal`. Stdio-only. |
+| `LM_VAULT_FILE` | No | - | Path to the age-encrypted portal vault (multi-portal) |
+| `LM_AGE_KEY` | No | - | Path to the age identity that decrypts the vault (multi-portal) |
+| `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |
 | `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address |
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
 | `LM_CORS_ORIGINS` | No | `*` | Comma-separated CORS origins |
@@ -429,7 +433,7 @@ Cursor only loads the first 40 MCP tools, so the remaining ~240 are invisible to
 }
 ```
 
-`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 306 tools. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
+`LM_MCP_CATEGORIES` composes with `LM_ENABLED_TOOLS` by intersection (it only narrows, never expands); unset, the server returns all 306 tools. In multi-portal mode the four portal tools are exempt from category filtering (they are the mode's control plane) and do not count toward your curated set. See [documentation/client-setup.md](documentation/client-setup.md) for a surgical `LM_ENABLED_TOOLS` example.
 
 ## Available Tools
 
