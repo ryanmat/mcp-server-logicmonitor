@@ -1,0 +1,35 @@
+# Description: Local pre-commit hooks mirroring the blocking CI gates.
+# Description: Install once with `uv run pre-commit install`; CI remains the enforcement point.
+#
+# Deliberately excludes pytest: the suite takes several minutes, and a hook that
+# slow teaches people to reach for --no-verify. Run `uv run pytest` yourself.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Keep in sync with the ruff version in the dev dependency group.
+    rev: v0.16.2
+    hooks:
+      # Scoped to src/ and tests/ so these hooks enforce exactly what CI
+      # enforces. contrib/ is community-maintained and outside the CI gates;
+      # linting it here would fail commits over code CI never checks.
+      - id: ruff
+        name: ruff check (lint, autofix)
+        args: [--fix]
+        files: ^(src|tests)/
+      - id: ruff-format
+        name: ruff format
+        files: ^(src|tests)/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^documentation/tools\.md$
+      - id: end-of-file-fixer
+        exclude: ^(documentation/tools\.md|tests/fixtures/.*)$
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: detect-private-key
