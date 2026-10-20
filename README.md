@@ -336,9 +336,9 @@ docker compose --profile tls up -d
 ```
 
 The server exposes health endpoints for container orchestration:
-- `GET /health` - Detailed health check with all component statuses
+- `GET /health` - Detailed health check with all component statuses (adds the LM API connectivity check when enabled, for callers presenting `LM_HTTP_AUTH_TOKEN` or when no token is set)
 - `GET /healthz` - Liveness probe (200 OK or 503)
-- `GET /readyz` - Readiness probe (includes connectivity check if enabled)
+- `GET /readyz` - Readiness probe (local checks only; never calls the LM API)
 
 ### Kubernetes
 
@@ -379,7 +379,7 @@ documented at the top of the file.
 | `LM_ENABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to enable (e.g., `get_*,triage`). Mutually exclusive with `LM_DISABLED_TOOLS`. |
 | `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable (e.g., `delete_*`). Mutually exclusive with `LM_ENABLED_TOOLS`. |
 | `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
-| `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include LM API ping in health checks |
+| `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include an LM API ping in `/health` for authenticated callers (never in `/readyz`) |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
 | `AWX_URL` | No | - | Ansible Automation Platform controller URL (e.g., `https://aap.example.com`) |
 | `AWX_TOKEN` | No | - | AAP personal access token |
