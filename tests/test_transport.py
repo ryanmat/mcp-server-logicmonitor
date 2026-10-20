@@ -214,7 +214,7 @@ def _fake_stdio_server():
 
 
 class TestRunStdioStartup:
-    """run_stdio setup reaches the serve loop in every optional-integration branch.
+    """R1.2: run_stdio setup reaches the serve loop in every optional-integration branch.
 
     The serve loop and the stdio streams are faked; everything before them runs
     for real, including client construction and the optional-integration probes.
@@ -301,7 +301,7 @@ class TestRunStdioStartup:
         assert any("HuggingFace fallback disabled" in r.getMessage() for r in caplog.records)
 
     async def test_single_portal_client_uses_configured_max_retries(self, monkeypatch):
-        """The single-portal client is built with LM_MAX_RETRIES, not the default."""
+        """R1.6: the single-portal client is built with LM_MAX_RETRIES, not the default."""
         from lm_mcp import server as server_module
 
         monkeypatch.setenv("LM_MAX_RETRIES", "7")

@@ -231,7 +231,7 @@ def _asgi_client():
 
 
 class TestReadyzStaysLocal:
-    """/readyz never spends the portal's API quota (issue #56)."""
+    """R1.5: /readyz never spends the portal's API quota (issue #56)."""
 
     async def test_readyz_never_calls_portal(self, connectivity_env, admins_route):
         """Fifty readiness probes with connectivity enabled make zero portal calls."""
@@ -243,7 +243,7 @@ class TestReadyzStaysLocal:
 
 
 class TestHealthConnectivityGate:
-    """/health runs the connectivity check only for callers that could reach /mcp."""
+    """R1.5: /health runs the connectivity check only for callers that could reach /mcp."""
 
     async def test_health_checks_connectivity_when_no_token_configured(
         self, connectivity_env, admins_route
@@ -325,7 +325,7 @@ class TestHttpServerClientConstruction:
     """create_http_server builds the LM client from configuration."""
 
     async def test_http_client_uses_configured_max_retries(self, monkeypatch, reset_portals):
-        """The HTTP transport's client gets LM_MAX_RETRIES, not the default."""
+        """R1.6: the HTTP transport's client gets LM_MAX_RETRIES, not the default."""
         from unittest.mock import AsyncMock
 
         import uvicorn

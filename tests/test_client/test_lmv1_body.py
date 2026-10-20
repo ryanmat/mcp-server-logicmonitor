@@ -52,7 +52,7 @@ def _assert_signed_over_wire_body(request: Request, resource_path: str) -> None:
 
 
 class TestLMv1SignsWireBody:
-    """The signed string and the transmitted body are the same bytes for every verb."""
+    """R1.1: the signed string and the transmitted body are the same bytes for every verb."""
 
     @respx.mock
     async def test_post_signs_wire_body(self, lmv1_client):
