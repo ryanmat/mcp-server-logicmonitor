@@ -24,7 +24,7 @@ For **Claude Code** (CLI):
 ```bash
 claude mcp add logicmonitor \
   -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e LM_BEARER_TOKEN=<your-bearer-token> \
   -- uvx --from lm-mcp lm-mcp-server
 ```
 
@@ -32,8 +32,8 @@ With **IBM watsonx.ai integration** (optional -- adds Granite TTM forecasting an
 ```bash
 claude mcp add logicmonitor \
   -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=your-bearer-token \
-  -e WATSONX_API_KEY=your-ibm-cloud-api-key \
+  -e LM_BEARER_TOKEN=<your-bearer-token> \
+  -e WATSONX_API_KEY=<your-ibm-cloud-api-key> \
   -e WATSONX_URL=https://us-south.ml.cloud.ibm.com \
   -e WATSONX_PROJECT_ID=your-watsonx-project-id \
   -- uvx --from "lm-mcp[ibm]" lm-mcp-server
@@ -43,7 +43,7 @@ With **Terraform IaC** (optional -- adds terraform plan/apply/generate tools):
 ```bash
 claude mcp add logicmonitor \
   -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e LM_BEARER_TOKEN=<your-bearer-token> \
   -e TF_WORKSPACE_DIR=/path/to/terraform/workspaces \
   -- uvx --from lm-mcp lm-mcp-server
 ```
@@ -52,7 +52,7 @@ With **HuggingFace local models** (optional -- local Granite TTM + NL summaries,
 ```bash
 claude mcp add logicmonitor \
   -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e LM_BEARER_TOKEN=<your-bearer-token> \
   -- uvx --from "lm-mcp[huggingface]" lm-mcp-server
 ```
 
@@ -664,7 +664,7 @@ claude mcp remove logicmonitor
 # Re-add with environment variables
 claude mcp add logicmonitor \
   -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=your-bearer-token \
+  -e LM_BEARER_TOKEN=<your-bearer-token> \
   -- uvx --from lm-mcp lm-mcp-server
 ```
 
