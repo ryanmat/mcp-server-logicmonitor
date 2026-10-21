@@ -19,7 +19,8 @@ concurrency:
 
 jobs:
   # Nothing publishes unless the tagged commit is on main, its version metadata
-  # and changelog name the tag, and it passes the checks test.yml runs.
+  # and changelog name the tag, and it passes ruff, the format check, the suite
+  # on 3.11 to 3.13 and the generated-file check.
   gate:
     runs-on: ubuntu-latest
     permissions:
