@@ -17,6 +17,7 @@ from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
+from lm_mcp.tools import ErrorContent
 from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
 
 logger = logging.getLogger(__name__)
@@ -272,7 +273,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         # Portal tools exist only in multi-portal mode
         if name in PORTAL_TOOLS and not config.multi_portal:
             return [
-                TextContent(
+                ErrorContent(
                     type="text",
                     text=f"Error: Tool '{name}' is only available in multi-portal mode "
                     "(set LM_MULTI_PORTAL=true).",
@@ -284,7 +285,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
             if not any(fnmatch(name, pat) for pat in patterns):
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text=f"Error: Tool '{name}' is not enabled. "
                         f"Enabled tools: {config.enabled_tools}",
@@ -294,7 +295,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
             if any(fnmatch(name, pat) for pat in patterns):
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text=f"Error: Tool '{name}' is disabled. "
                         f"Disabled tools: {config.disabled_tools}",
@@ -310,7 +311,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             tools_index.update({t.name: t for t in TF_TOOLS})
             if not tool_in_categories(name, tools_index, config.mcp_categories):
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text=f"Error: Tool '{name}' is excluded by LM_MCP_CATEGORIES "
                         f"(active categories: {config.mcp_categories}).",
@@ -338,7 +339,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
                         if config.field_validation == "error":
                             return [
-                                TextContent(
+                                ErrorContent(
                                     type="text",
                                     text=json.dumps(
                                         {
@@ -369,7 +370,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
                         if config.field_validation == "error":
                             return [
-                                TextContent(
+                                ErrorContent(
                                     type="text",
                                     text=json.dumps(
                                         {
@@ -393,7 +394,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             # AWX tools use the AWX client
             if _awx_client is None:
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text="Error: Ansible Automation Platform not configured. "
                         "Set AWX_URL and AWX_TOKEN environment variables.",
@@ -404,7 +405,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             # WatsonX tools use the watsonx client
             if _watsonx_client is None:
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text="Error: IBM watsonx not configured. "
                         "Set WATSONX_API_KEY, WATSONX_URL, and "
@@ -417,7 +418,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             # credentials are selected at runtime and never reach the subprocess.
             if config.multi_portal:
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text="Error: Terraform tools are not supported in multi-portal mode "
                         "(the Terraform provider needs fixed LM_* credentials). "
@@ -427,7 +428,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             # Terraform tools use the Terraform runner
             if _tf_runner is None:
                 return [
-                    TextContent(
+                    ErrorContent(
                         type="text",
                         text="Error: Terraform not configured. "
                         "Set TF_WORKSPACE_DIR environment variable.",
@@ -464,11 +465,11 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
     except ValueError as e:
         if is_write_tool(name):
             log_write_operation(name, arguments, success=False)
-        return [TextContent(type="text", text=f"Error: {e}")]
+        return [ErrorContent(type="text", text=f"Error: {e}")]
     except Exception as e:
         if is_write_tool(name):
             log_write_operation(name, arguments, success=False)
-        return [TextContent(type="text", text=f"Error executing {name}: {e}")]
+        return [ErrorContent(type="text", text=f"Error executing {name}: {e}")]
 
 
 @server.call_tool()
