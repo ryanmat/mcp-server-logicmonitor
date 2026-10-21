@@ -7,7 +7,7 @@ import logging
 from fnmatch import fnmatch
 
 from mcp.server import Server
-from mcp.types import CompleteResult, GetPromptResult, TextContent
+from mcp.types import CallToolResult, CompleteResult, GetPromptResult, TextContent
 
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.completions import get_completions
@@ -17,7 +17,7 @@ from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
-from lm_mcp.tools import ErrorContent
+from lm_mcp.tools import ErrorContent, is_error_result
 from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
 
 logger = logging.getLogger(__name__)
@@ -443,9 +443,12 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             client = get_client()
             result = await handler(client, **arguments)
 
+        # Handlers return errors rather than raise, so the outcome comes from the result
+        failed = is_error_result(result)
+
         # Audit trail for write operations
         if is_write_tool(name):
-            log_write_operation(name, arguments, success=True)
+            log_write_operation(name, arguments, success=not failed)
 
         # Record result in session if enabled. Portal tools are recorded too:
         # a portal switch is the marker that scopes every entry around it.
@@ -456,10 +459,10 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                 try:
                     text = result[0].text
                     data = json.loads(text)
-                    session.record_result(name, arguments, data, success=True)
+                    session.record_result(name, arguments, data, success=not failed)
                 except (json.JSONDecodeError, AttributeError):
                     # Non-JSON result, just record with minimal info
-                    session.record_result(name, arguments, {}, success=True)
+                    session.record_result(name, arguments, {}, success=not failed)
 
         return result
     except ValueError as e:
@@ -473,7 +476,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict) -> list[TextContent] | CallToolResult:
     """MCP call_tool handler that delegates to execute_tool.
 
     Args:
@@ -481,9 +484,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         arguments: Tool arguments.
 
     Returns:
-        List of TextContent with the tool result.
+        List of TextContent with the tool result, or a CallToolResult with
+        isError=True when the result is an error, which the SDK passes through.
     """
-    return await execute_tool(name, arguments)
+    result = await execute_tool(name, arguments)
+    if is_error_result(result):
+        return CallToolResult(content=list(result), isError=True)
+    return result
 
 
 @server.list_resources()
