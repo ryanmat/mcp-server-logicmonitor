@@ -78,9 +78,9 @@ class TestReleaseMetadata:
         assert server["version"] == _project_version()
         assert [package["version"] for package in server["packages"]] == [_project_version()]
 
-    @pytest.mark.parametrize("doc", ["README.md", "documentation/client-setup.md"])
+    @pytest.mark.parametrize("doc", ["README.md", "documentation/client-setup.md", "server.json"])
     def test_docs_state_the_registry_tool_count(self, doc):
-        """Every total tool count a doc states is the count the registry produces."""
+        """Every total tool count a doc or the registry manifest states is the registry's."""
         from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
 
         total = len(TOOLS) + len(AWX_TOOLS) + len(WATSONX_TOOLS) + len(TF_TOOLS)

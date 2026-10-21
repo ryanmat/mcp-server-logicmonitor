@@ -1217,6 +1217,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pyyaml" },
     { name = "respx" },
     { name = "ruff" },
 ]
@@ -1247,6 +1248,7 @@ dev = [
     { name = "pre-commit", specifier = ">=3.7.0" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "respx", specifier = ">=0.21.0" },
     { name = "ruff", specifier = ">=0.4.0" },
 ]

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ SERVICE_UID = 10001
 # A readable tag plus the digest that actually selects the image.
 _PINNED_IMAGE_RE = re.compile(r"[\w./-]+:[\w.-]+@sha256:[0-9a-f]{64}")
 # release.yml tags images with metadata-action's semver {{version}}, which has no "v".
-_RELEASE_IMAGE_RE = re.compile(r"ghcr\.io/ryanmat/mcp-server-logicmonitor:\d+\.\d+\.\d+")
+IMAGE = "ghcr.io/ryanmat/mcp-server-logicmonitor"
 
 
 def _instructions() -> list[tuple[str, str]]:
@@ -126,9 +127,10 @@ class TestServiceUser:
 class TestKubernetesManifest:
     """R2.3: a release tag the registry carries, and a writable /tmp on a read-only root."""
 
-    def test_image_is_a_published_release_tag(self) -> None:
+    def test_image_is_the_release_this_tree_builds(self) -> None:
+        pyproject = tomllib.loads((DEPLOY_DIR.parent / "pyproject.toml").read_text())
         container = _deployment()["spec"]["template"]["spec"]["containers"][0]
-        assert _RELEASE_IMAGE_RE.fullmatch(container["image"]), container["image"]
+        assert container["image"] == f"{IMAGE}:{pyproject['project']['version']}"
 
     def test_tmp_is_an_empty_dir_on_a_read_only_root(self) -> None:
         pod = _deployment()["spec"]["template"]["spec"]
