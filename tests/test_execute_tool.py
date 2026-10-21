@@ -402,6 +402,32 @@ class TestWriteOutcomeFromResult:
             (logging.INFO, "Write operation: delete_device args={'device_id': 7}")
         ]
 
+    async def test_write_raising_before_handler_audits_failure(self, write_portal, caplog):
+        """No client bound: get_client raises and the except path audits the write as failed."""
+        from lm_mcp.server import _set_client, execute_tool
+
+        _set_client(None)
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await execute_tool("delete_device", {"device_id": 7})
+
+        assert result[0].text == "Error executing delete_device: Client not initialized"
+        assert _audit_lines(caplog) == [
+            (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
+        ]
+
+    async def test_write_value_error_audits_failure(self, write_portal, caplog):
+        """An unknown write-prefixed tool raises ValueError in lookup; it audits as failed."""
+        from lm_mcp.server import execute_tool
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await execute_tool("delete_no_such_resource", {"id": 7})
+
+        assert is_error_result(result)
+        assert result[0].text.startswith("Error: ")
+        assert _audit_lines(caplog) == [
+            (logging.WARNING, "Write operation failed: delete_no_such_resource args={'id': 7}")
+        ]
+
     @respx.mock
     async def test_forbidden_delete_recorded_as_failure_in_session(self, write_portal, monkeypatch):
         monkeypatch.setenv("LM_SESSION_ENABLED", "true")
