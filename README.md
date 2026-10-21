@@ -355,6 +355,8 @@ The server exposes health endpoints for container orchestration:
 - `GET /healthz` - Liveness probe (200 OK or 503)
 - `GET /readyz` - Readiness probe (local checks only; never calls the LM API)
 
+POST requests to `/mcp` and `/api/v1/*` must send `Content-Type: application/json`; any other body type gets `415`.
+
 ### Kubernetes
 
 `deploy/k8s/deployment.yaml` is a vendor-neutral Deployment and Service running
@@ -383,10 +385,11 @@ documented at the top of the file.
 | `LM_VAULT_FILE` | No | - | Path to the age-encrypted portal vault (multi-portal) |
 | `LM_AGE_KEY` | No | - | Path to the age identity that decrypts the vault (multi-portal) |
 | `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |
-| `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address |
+| `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address. With `LM_TRANSPORT=http`, an address other than `127.0.0.1`, `::1` or `localhost` needs `LM_HTTP_AUTH_TOKEN` or `LM_HTTP_ALLOW_UNAUTHENTICATED=true`, or the server refuses to start. |
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
 | `LM_CORS_ORIGINS` | No | - | Comma-separated CORS origins (default: none) |
 | `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on `/mcp` and `/api/v1/*` (min 16 chars). Health endpoints and `/` stay open for probes. HTTP transport only. |
+| `LM_HTTP_ALLOW_UNAUTHENTICATED` | No | `false` | Start on a non-loopback `LM_HTTP_HOST` with no `LM_HTTP_AUTH_TOKEN`, for a listener protected another way (an authenticating proxy, a private network). HTTP transport only. |
 | `LM_SESSION_ENABLED` | No | `true` | Enable session context tracking |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
 | `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error` |

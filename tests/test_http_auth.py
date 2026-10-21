@@ -5,7 +5,10 @@ import logging
 
 import pytest
 
-TOKEN = "test-http-auth-token-0123"
+from tests.live_uvicorn import live_uvicorn
+
+# 16 characters: the configured minimum, and below the length a secret scanner flags.
+TOKEN = "http-auth-tok-16"
 WRONG = "wrong-http-auth-token-999"
 
 
@@ -342,3 +345,173 @@ class TestHttpAuthHardening:
         with pytest.raises(ValidationError) as exc:
             LMConfig()
         assert "SHORTCRED" not in str(exc.value)
+
+
+@pytest.fixture
+def live_server(monkeypatch):
+    """A live uvicorn runner for this module's socket-level tests."""
+    return live_uvicorn(monkeypatch)
+
+
+def _free_port(host: str) -> int:
+    """Ask the OS for a port that is free on ``host`` right now."""
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((host, 0))
+        return sock.getsockname()[1]
+
+
+@pytest.fixture
+def _http_server_env(_set_env, monkeypatch):
+    """Configure create_http_server for a live start with no optional integrations."""
+    for var in (
+        "AWX_URL",
+        "AWX_TOKEN",
+        "WATSONX_API_KEY",
+        "TF_WORKSPACE_DIR",
+        "LM_HTTP_ALLOW_UNAUTHENTICATED",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LM_TRANSPORT", "http")
+    monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: None)
+
+
+class TestUnauthenticatedBindRefusal:
+    """R3.3: create_http_server refuses an unauthenticated non-loopback bind before binding."""
+
+    async def test_non_loopback_without_token_refuses_before_binding(
+        self, _http_server_env, monkeypatch, live_server
+    ):
+        """0.0.0.0 with no token fails with one line naming both variables; no server is built."""
+        from pydantic import ValidationError
+
+        from lm_mcp.transport.http import create_http_server
+
+        monkeypatch.setenv("LM_HTTP_HOST", "0.0.0.0")
+        monkeypatch.setenv("LM_HTTP_PORT", str(_free_port("0.0.0.0")))
+        with pytest.raises(ValidationError) as exc:
+            async with live_server(create_http_server()):
+                pass
+
+        assert live_server.servers == []
+        message = exc.value.errors()[0]["msg"]
+        assert "\n" not in message
+        assert "LM_HTTP_AUTH_TOKEN" in message
+        assert "LM_HTTP_ALLOW_UNAUTHENTICATED" in message
+
+    async def test_override_starts_and_logs_the_warning(
+        self, _http_server_env, monkeypatch, live_server, caplog
+    ):
+        """With LM_HTTP_ALLOW_UNAUTHENTICATED=true the 0.0.0.0 bind starts and warns."""
+        import httpx
+
+        from lm_mcp.transport.http import create_http_server
+
+        monkeypatch.setenv("LM_HTTP_HOST", "0.0.0.0")
+        monkeypatch.setenv("LM_HTTP_PORT", str(_free_port("0.0.0.0")))
+        monkeypatch.setenv("LM_HTTP_ALLOW_UNAUTHENTICATED", "true")
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport.http"):
+            async with (
+                live_server(create_http_server()) as port,
+                httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
+            ):
+                resp = await client.get("/healthz")
+
+        assert resp.status_code == 200
+        assert any(
+            "Inbound HTTP authentication is disabled" in r.getMessage() for r in caplog.records
+        )
+
+    async def test_loopback_without_token_starts(self, _http_server_env, monkeypatch, live_server):
+        """A loopback bind needs no token."""
+        import httpx
+
+        from lm_mcp.transport.http import create_http_server
+
+        monkeypatch.setenv("LM_HTTP_HOST", "127.0.0.1")
+        monkeypatch.setenv("LM_HTTP_PORT", str(_free_port("127.0.0.1")))
+        async with (
+            live_server(create_http_server()) as port,
+            httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
+        ):
+            resp = await client.get("/healthz")
+
+        assert resp.status_code == 200
+
+
+async def _post_variants(live_server, headers):
+    """POST JSON-RPC and API bodies under several Content-Types to a live server."""
+    import json
+
+    import httpx
+    import uvicorn
+
+    from lm_mcp.transport.http import create_asgi_app
+
+    body = json.dumps({"jsonrpc": "2.0", "method": "tools/list", "id": 1})
+    server = uvicorn.Server(
+        uvicorn.Config(create_asgi_app(), host="127.0.0.1", port=0, log_level="warning")
+    )
+    async with (
+        live_server(server.serve()) as port,
+        httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
+    ):
+
+        async def mcp(content_type):
+            extra = {"Content-Type": content_type} if content_type else {}
+            resp = await client.post("/mcp", content=body, headers={**headers, **extra})
+            return resp.status_code
+
+        return {
+            "text/plain": await mcp("text/plain"),
+            "missing": await mcp(None),
+            "json; charset": await mcp("application/json; charset=utf-8"),
+            "JSON upper": await mcp("Application/JSON"),
+            "analyze form": (
+                await client.post("/api/v1/analyze", data={"workflow": "x"}, headers=headers)
+            ).status_code,
+            "webhook text/plain": (
+                await client.post(
+                    "/api/v1/webhooks/alert",
+                    content="{}",
+                    headers={**headers, "Content-Type": "text/plain"},
+                )
+            ).status_code,
+            "analysis GET": (
+                await client.get("/api/v1/analysis/unknown-id", headers=headers)
+            ).status_code,
+        }
+
+
+class TestJsonContentType:
+    """R3.3: POSTs to /mcp and /api/v1/* must carry Content-Type: application/json."""
+
+    async def test_non_json_posts_refused_with_valid_token(self, _set_env_with_auth, live_server):
+        """With a valid token, non-JSON POSTs get 415; JSON with parameters is accepted."""
+        statuses = await _post_variants(live_server, {"Authorization": f"Bearer {TOKEN}"})
+
+        assert statuses == {
+            "text/plain": 415,
+            "missing": 415,
+            "json; charset": 200,
+            "JSON upper": 200,
+            "analyze form": 415,
+            "webhook text/plain": 415,
+            "analysis GET": 404,
+        }
+
+    async def test_non_json_posts_refused_without_auth(self, _set_env, live_server):
+        """The Content-Type check holds when no inbound token is configured."""
+        statuses = await _post_variants(live_server, {})
+
+        assert statuses["text/plain"] == 415
+        assert statuses["analyze form"] == 415
+        assert statuses["json; charset"] == 200
+
+    async def test_unauthenticated_text_plain_gets_401_first(self, _set_env_with_auth, live_server):
+        """Auth runs before the Content-Type check, so an anonymous caller learns nothing more."""
+        statuses = await _post_variants(live_server, {})
+
+        assert statuses["text/plain"] == 401
+        assert statuses["analyze form"] == 401

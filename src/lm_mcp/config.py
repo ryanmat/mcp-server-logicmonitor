@@ -31,6 +31,9 @@ def normalize_portal_host(v: str) -> str:
     return v
 
 
+# HTTP bind addresses only the local host can reach.
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+
 _cached_config: "LMConfig | None" = None
 
 
@@ -77,12 +80,17 @@ class LMConfig(BaseSettings):
         LM_AGE_KEY: Path to the age identity file that decrypts the vault
         LM_PORTALS_FILE: Plaintext JSON portal map (multi-portal, testing only;
             the encrypted vault takes precedence when both are set)
-        LM_HTTP_HOST: HTTP server bind address (default: 0.0.0.0)
+        LM_HTTP_HOST: HTTP server bind address (default: 0.0.0.0). With
+            LM_TRANSPORT=http, a non-loopback bind needs LM_HTTP_AUTH_TOKEN or
+            LM_HTTP_ALLOW_UNAUTHENTICATED=true, or the server refuses to start.
         LM_HTTP_PORT: HTTP server port (default: 8080)
         LM_CORS_ORIGINS: Comma-separated CORS origins (default: empty, no CORS)
         LM_HTTP_AUTH_TOKEN: Require this bearer token on /mcp and /api/v1/*
             (default: unset, no inbound auth; minimum 16 characters). The health
             endpoints and / stay open for probes. HTTP transport only.
+        LM_HTTP_ALLOW_UNAUTHENTICATED: Accept a non-loopback HTTP bind with no
+            LM_HTTP_AUTH_TOKEN, for a listener protected some other way such as
+            an authenticating proxy (default: false). HTTP transport only.
         LM_HTTP_SSL_CERTFILE: TLS certificate path for the HTTP transport
         LM_HTTP_SSL_KEYFILE: TLS private key path for the HTTP transport
         LM_HTTP_SSL_KEYFILE_PASSWORD: Password for an encrypted TLS private key
@@ -125,6 +133,7 @@ class LMConfig(BaseSettings):
     http_port: int = 8080
     cors_origins: str = ""
     http_auth_token: str | None = None
+    http_allow_unauthenticated: bool = False
     http_ssl_certfile: str | None = None
     http_ssl_keyfile: str | None = None
     http_ssl_keyfile_password: str | None = None
@@ -282,6 +291,27 @@ class LMConfig(BaseSettings):
         if self.enabled_tools and self.disabled_tools:
             raise ValueError(
                 "Cannot set both LM_ENABLED_TOOLS and LM_DISABLED_TOOLS. Use one or the other."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_http_exposure(self) -> "LMConfig":
+        """Refuse an HTTP bind that other hosts can reach without authentication.
+
+        stdio never binds, so only the HTTP transport is checked. A bind outside
+        _LOOPBACK_HOSTS needs LM_HTTP_AUTH_TOKEN, or LM_HTTP_ALLOW_UNAUTHENTICATED
+        set on purpose for a listener protected some other way.
+        """
+        if (
+            self.transport == "http"
+            and self.http_host.lower() not in _LOOPBACK_HOSTS
+            and not self.http_auth_token
+            and not self.http_allow_unauthenticated
+        ):
+            raise ValueError(
+                f"Refusing an unauthenticated HTTP bind on {self.http_host}: set "
+                "LM_HTTP_AUTH_TOKEN, bind LM_HTTP_HOST to loopback, or set "
+                "LM_HTTP_ALLOW_UNAUTHENTICATED=true to accept the exposure"
             )
         return self
 
