@@ -9,18 +9,30 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+# A newer push to a pull request supersedes its running checks; pushes to main
+# and build always run to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
+    # Without this, uv follows .python-version and every leg runs 3.11.
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
         with:
           version: "0.9.27"
           enable-cache: true
@@ -29,7 +41,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: uv sync --locked --dev
 
       - name: Run linter
         run: uv run ruff check src tests
@@ -60,15 +72,47 @@ jobs:
             exit 1
           fi
 
+  # The huggingface extra's tests skip in the matrix, which does not install it.
+  # This leg installs it with CPU torch: every version comes from uv.lock through
+  # an exported constraints file, and only torch's build is the CPU wheel, since
+  # uv sync has no torch backend and --locked would pull the CUDA wheels.
+  huggingface:
+    runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.11"
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+        with:
+          version: "0.9.27"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Install the huggingface extra with CPU torch
+        run: |
+          uv export --locked --no-dev --extra huggingface --no-emit-project --no-hashes \
+            --no-header -o "$RUNNER_TEMP/huggingface-constraints.txt"
+          uv pip install --torch-backend cpu -c "$RUNNER_TEMP/huggingface-constraints.txt" \
+            -e ".[huggingface]"
+
+      # --no-sync keeps uv run from syncing the environment back to the lock.
+      - name: Run huggingface tests
+        run: uv run --no-sync pytest tests/test_client/test_huggingface.py -v --tb=short
+
   build:
     runs-on: ubuntu-latest
     needs: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
         with:
           version: "0.9.27"
 
@@ -76,7 +120,7 @@ jobs:
         run: uv build
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: dist
           path: dist/
