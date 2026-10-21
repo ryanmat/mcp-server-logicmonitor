@@ -33,6 +33,8 @@ def normalize_portal_host(v: str) -> str:
 
 # HTTP bind addresses only the local host can reach.
 _LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
+# HTTP bind addresses that mean "every interface" rather than a name to reach.
+_WILDCARD_HOSTS = frozenset({"0.0.0.0", "::", ""})
 
 _cached_config: "LMConfig | None" = None
 
@@ -91,6 +93,9 @@ class LMConfig(BaseSettings):
         LM_HTTP_ALLOW_UNAUTHENTICATED: Accept a non-loopback HTTP bind with no
             LM_HTTP_AUTH_TOKEN, for a listener protected some other way such as
             an authenticating proxy (default: false). HTTP transport only.
+        LM_HTTP_ALLOWED_HOSTS: Comma-separated Host names /mcp and /api/v1/*
+            accept besides the loopback names and a non-wildcard LM_HTTP_HOST
+            (default: empty). HTTP transport only.
         LM_HTTP_SSL_CERTFILE: TLS certificate path for the HTTP transport
         LM_HTTP_SSL_KEYFILE: TLS private key path for the HTTP transport
         LM_HTTP_SSL_KEYFILE_PASSWORD: Password for an encrypted TLS private key
@@ -134,6 +139,7 @@ class LMConfig(BaseSettings):
     cors_origins: str = ""
     http_auth_token: str | None = None
     http_allow_unauthenticated: bool = False
+    http_allowed_hosts: str = ""
     http_ssl_certfile: str | None = None
     http_ssl_keyfile: str | None = None
     http_ssl_keyfile_password: str | None = None
@@ -348,3 +354,17 @@ class LMConfig(BaseSettings):
         if self.cors_origins == "*":
             return ["*"]
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def http_host_allowlist(self) -> frozenset[str]:
+        """Host names the HTTP transport answers on /mcp and /api/v1/*, lowercased.
+
+        The loopback names, LM_HTTP_HOST unless it is a wildcard address (no client
+        addresses a server as 0.0.0.0, and some browsers route that name to the
+        local host), and each LM_HTTP_ALLOWED_HOSTS entry.
+        """
+        hosts = set(_LOOPBACK_HOSTS)
+        if self.http_host not in _WILDCARD_HOSTS:
+            hosts.add(self.http_host.lower())
+        hosts.update(h.strip().lower() for h in self.http_allowed_hosts.split(",") if h.strip())
+        return frozenset(hosts)

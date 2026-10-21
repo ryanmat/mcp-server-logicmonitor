@@ -33,7 +33,7 @@ def _client():
 
     from lm_mcp.transport.http import create_asgi_app
 
-    return AsyncClient(transport=ASGITransport(app=create_asgi_app()), base_url="http://test")
+    return AsyncClient(transport=ASGITransport(app=create_asgi_app()), base_url="http://localhost")
 
 
 class TestHttpAuthRejection:
@@ -515,3 +515,131 @@ class TestJsonContentType:
 
         assert statuses["text/plain"] == 401
         assert statuses["analyze form"] == 401
+
+
+async def _statuses_by_host(live_server, requests):
+    """Send (method, path, Host) requests to a live server; return their status codes.
+
+    ``{port}`` in a Host value is replaced with the server's bound port.
+    """
+    import httpx
+    import uvicorn
+
+    from lm_mcp.transport.http import create_asgi_app
+
+    rpc = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+    server = uvicorn.Server(
+        uvicorn.Config(create_asgi_app(), host="127.0.0.1", port=0, log_level="warning")
+    )
+    async with (
+        live_server(server.serve()) as port,
+        httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
+    ):
+        statuses = []
+        for method, path, host in requests:
+            headers = {"Host": host.format(port=port)}
+            if method == "POST":
+                resp = await client.post(path, json=rpc, headers=headers)
+            else:
+                resp = await client.get(path, headers=headers)
+            statuses.append(resp.status_code)
+        return statuses
+
+
+class TestHostAllowlist:
+    """R3.3: /mcp and /api/v1/* answer only Host names the operator expects."""
+
+    async def test_unknown_host_is_refused_before_the_handler(self, _set_env, live_server):
+        """Host: evil.example gets 400 and execute_tool never runs."""
+        from unittest.mock import AsyncMock, patch
+
+        with patch("lm_mcp.server.execute_tool", new_callable=AsyncMock) as mock_exec:
+            import httpx
+            import uvicorn
+
+            from lm_mcp.transport.http import create_asgi_app
+
+            server = uvicorn.Server(
+                uvicorn.Config(create_asgi_app(), host="127.0.0.1", port=0, log_level="warning")
+            )
+            call = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {"name": "get_devices", "arguments": {}},
+                "id": 1,
+            }
+            async with (
+                live_server(server.serve()) as port,
+                httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
+            ):
+                bare = await client.post("/mcp", json=call, headers={"Host": "evil.example"})
+                with_port = await client.post(
+                    "/mcp", json=call, headers={"Host": f"evil.example:{port}"}
+                )
+
+        mock_exec.assert_not_called()
+        assert bare.status_code == 400
+        assert with_port.status_code == 400
+        assert bare.json() == {"error": "Invalid Host header"}
+
+    async def test_loopback_hosts_are_accepted(self, _set_env, live_server):
+        """127.0.0.1, localhost (any case) and a bracketed [::1] pass, with or without a port."""
+        statuses = await _statuses_by_host(
+            live_server,
+            [
+                ("POST", "/mcp", "127.0.0.1:{port}"),
+                ("POST", "/mcp", "localhost:{port}"),
+                ("POST", "/mcp", "LOCALHOST"),
+                ("POST", "/mcp", "[::1]:{port}"),
+            ],
+        )
+
+        assert statuses == [200, 200, 200, 200]
+
+    async def test_configured_hosts_are_accepted(self, _set_env, live_server, monkeypatch):
+        """LM_HTTP_ALLOWED_HOSTS adds names; loopback still passes and others still fail."""
+        monkeypatch.setenv("LM_HTTP_ALLOWED_HOSTS", "mcp.internal, Other.Internal")
+        statuses = await _statuses_by_host(
+            live_server,
+            [
+                ("POST", "/mcp", "mcp.internal"),
+                ("POST", "/mcp", "other.internal:443"),
+                ("POST", "/mcp", "localhost:{port}"),
+                ("POST", "/mcp", "evil.example"),
+                ("POST", "/api/v1/analyze", "evil.example"),
+            ],
+        )
+
+        assert statuses == [200, 200, 200, 400, 400]
+
+    async def test_probe_paths_are_exempt(self, _set_env, live_server):
+        """/healthz and /readyz answer any Host, so probes by pod IP keep working; others do not."""
+        statuses = await _statuses_by_host(
+            live_server,
+            [
+                ("GET", "/healthz", "10.244.1.7:8080"),
+                ("GET", "/readyz", "10.244.1.7:8080"),
+                ("GET", "/healthz/", "10.244.1.7:8080"),
+                ("GET", "/health", "10.244.1.7:8080"),
+                ("GET", "/", "10.244.1.7:8080"),
+            ],
+        )
+
+        # The probes reach their handlers (200, or 503 with no LM client bound; the
+        # trailing-slash form gets Starlette's redirect); only the Host check sends 400.
+        assert [status != 400 for status in statuses[:3]] == [True, True, True]
+        assert statuses[3:] == [400, 400]
+
+    async def test_specific_bind_host_is_accepted(self, _set_env, live_server, monkeypatch):
+        """A configured non-wildcard LM_HTTP_HOST is an allowed Host name."""
+        monkeypatch.setenv("LM_HTTP_HOST", "10.9.8.7")
+        statuses = await _statuses_by_host(live_server, [("POST", "/mcp", "10.9.8.7:{port}")])
+
+        assert statuses == [200]
+
+    async def test_wildcard_bind_host_is_not_a_host_name(self, _set_env, live_server, monkeypatch):
+        """No client addresses a server as 0.0.0.0, so the wildcard bind adds nothing."""
+        monkeypatch.setenv("LM_HTTP_HOST", "0.0.0.0")
+        statuses = await _statuses_by_host(live_server, [("POST", "/mcp", "0.0.0.0:{port}")])
+
+        assert statuses == [400]

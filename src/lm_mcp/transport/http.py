@@ -146,6 +146,52 @@ class JsonContentTypeMiddleware:
         await _send_json_error(send, 415, "Content-Type must be application/json")
 
 
+# Orchestrators probe by pod or container IP, which no Host allowlist names.
+_HOST_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
+
+
+def _request_host(headers: Iterable[tuple[bytes, bytes]]) -> str:
+    """Return the Host header's name without its port, lowercased; "" if absent.
+
+    A bracketed IPv6 literal such as ``[::1]:8080`` yields the address inside the
+    brackets.
+    """
+    for name, value in headers:
+        if name == b"host":
+            host = value.decode("latin-1").strip().lower()
+            if host.startswith("["):
+                end = host.find("]")
+                return host[1:end] if end != -1 else ""
+            return host.split(":", 1)[0]
+    return ""
+
+
+class HostAllowlistMiddleware:
+    """Answer only requests whose Host header names this server, with 400 otherwise.
+
+    A DNS-rebinding page points its own name at the server's address, so its
+    requests arrive carrying that foreign name in Host. /healthz and /readyz stay
+    exempt for probes. Raw ASGI, like BearerAuthMiddleware: Starlette's
+    TrustedHostMiddleware has no path exemption and cuts an IPv6 literal at its
+    first colon.
+    """
+
+    def __init__(self, app: ASGIApp, allowed_hosts: frozenset[str]) -> None:
+        self.app = app
+        self._allowed = allowed_hosts
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] != "http"
+            or scope["path"].rstrip("/") in _HOST_EXEMPT_PATHS
+            or _request_host(scope.get("headers", [])) in self._allowed
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        await _send_json_error(send, 400, "Invalid Host header")
+
+
 def create_asgi_app() -> Starlette:
     """Create the ASGI application with MCP and health endpoints.
 
@@ -435,13 +481,14 @@ def create_asgi_app() -> Starlette:
         Route("/api/v1/webhooks/alert", webhook_alert, methods=["POST"]),
     ]
 
-    # Configure CORS middleware. Order matters: the first entry is outermost,
-    # so CORS answers preflights before auth runs -- browsers cannot attach a
-    # token to a preflight, and 401s still get CORS headers so JS can read them.
-    # The Content-Type check is innermost, so an anonymous caller gets the 401
+    # Order matters: the first entry is outermost. The Host check runs first, so
+    # a request addressed to a foreign name is refused before anything else. CORS
+    # answers preflights before auth runs -- browsers cannot attach a token to a
+    # preflight, and 401s still get CORS headers so JS can read them. The
+    # Content-Type check is innermost, so an anonymous caller gets the 401
     # whatever it sends.
     cors_origins = config.cors_origins_list
-    middleware = []
+    middleware = [Middleware(HostAllowlistMiddleware, allowed_hosts=config.http_host_allowlist)]
     if cors_origins:
         middleware.append(
             Middleware(

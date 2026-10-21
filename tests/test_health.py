@@ -227,7 +227,7 @@ def _asgi_client():
 
     from lm_mcp.transport.http import create_asgi_app
 
-    return AsyncClient(transport=ASGITransport(app=create_asgi_app()), base_url="http://test")
+    return AsyncClient(transport=ASGITransport(app=create_asgi_app()), base_url="http://localhost")
 
 
 class TestReadyzStaysLocal:

@@ -341,7 +341,7 @@ For remote/shared deployments using HTTP transport:
 ```bash
 cd deploy
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env with your credentials, including LM_HTTP_AUTH_TOKEN (required)
 
 # Run with docker-compose
 docker compose up -d
@@ -355,7 +355,7 @@ The server exposes health endpoints for container orchestration:
 - `GET /healthz` - Liveness probe (200 OK or 503)
 - `GET /readyz` - Readiness probe (local checks only; never calls the LM API)
 
-POST requests to `/mcp` and `/api/v1/*` must send `Content-Type: application/json`; any other body type gets `415`.
+POST requests to `/mcp` and `/api/v1/*` must send `Content-Type: application/json`; any other body type gets `415`. Those routes also answer only the `Host` names the server expects (the loopback names, a non-wildcard `LM_HTTP_HOST`, and `LM_HTTP_ALLOWED_HOSTS`) and refuse others with `400`; `/healthz` and `/readyz` accept any `Host` so probes by pod IP keep working. The compose file requires `LM_HTTP_AUTH_TOKEN` for every profile and passes `DOMAIN` through as an allowed host for the Caddy `tls` profile.
 
 ### Kubernetes
 
@@ -389,6 +389,7 @@ documented at the top of the file.
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
 | `LM_CORS_ORIGINS` | No | - | Comma-separated CORS origins (default: none) |
 | `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on `/mcp` and `/api/v1/*` (min 16 chars). Health endpoints and `/` stay open for probes. HTTP transport only. |
+| `LM_HTTP_ALLOWED_HOSTS` | No | - | Comma-separated `Host` names `/mcp` and `/api/v1/*` accept besides `127.0.0.1`, `::1`, `localhost` and a non-wildcard `LM_HTTP_HOST` (for example the public name a reverse proxy forwards). HTTP transport only. |
 | `LM_HTTP_ALLOW_UNAUTHENTICATED` | No | `false` | Start on a non-loopback `LM_HTTP_HOST` with no `LM_HTTP_AUTH_TOKEN`, for a listener protected another way (an authenticating proxy, a private network). HTTP transport only. |
 | `LM_SESSION_ENABLED` | No | `true` | Enable session context tracking |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
