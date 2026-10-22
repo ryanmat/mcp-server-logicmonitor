@@ -7199,8 +7199,15 @@ TF_TOOLS: list[Tool] = [
                     "description": "Workspace name (subdirectory of TF_WORKSPACE_DIR)",
                 },
                 "backend_config": {
-                    "type": "string",
-                    "description": "Optional backend config (key=value)",
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                    "description": (
+                        "Optional partial backend configuration as key/value pairs, "
+                        'e.g. {"bucket": "state", "key": "prod.tfstate", '
+                        '"region": "us-east-1"}. Keys of the local, s3 and azurerm '
+                        "backends only; endpoint and proxy overrides are refused, and a "
+                        "local path must stay inside the workspace."
+                    ),
                 },
             },
             "required": ["workspace"],
@@ -7246,7 +7253,7 @@ TF_TOOLS: list[Tool] = [
                 },
                 "var_file": {
                     "type": "string",
-                    "description": "Path to a .tfvars file relative to workspace",
+                    "description": "Path to a .tfvars file inside the workspace (relative to it)",
                 },
                 "target": {
                     "type": "string",
@@ -7330,7 +7337,7 @@ TF_TOOLS: list[Tool] = [
                 },
                 "var_file": {
                     "type": "string",
-                    "description": "Path to a .tfvars file relative to workspace",
+                    "description": "Path to a .tfvars file inside the workspace (relative to it)",
                 },
                 "target": {
                     "type": "string",

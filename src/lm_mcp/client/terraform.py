@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import signal
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,14 @@ logger = logging.getLogger(__name__)
 # Everything else, server credentials included, stays out of terraform's reach;
 # provider credentials arrive explicitly through env_extra.
 _INHERITED_ENV = frozenset({"PATH", "HOME", "TMPDIR"})
+
+# Seconds a timed-out terraform gets after SIGINT to finish in-flight provider
+# calls, write state and release its lock before it is killed.
+_INTERRUPT_GRACE_SECONDS = 30
+
+# Commands that change state, where an interrupted run can leave a held lock and
+# resources the state does not record.
+_STATE_CHANGING_COMMANDS = frozenset({"apply", "destroy"})
 
 
 @dataclass
@@ -142,14 +151,23 @@ class TerraformRunner:
                 suggestion=("Install Terraform: https://developer.hashicorp.com/terraform/install"),
             ) from exc
         except TimeoutError:
-            proc.kill()
-            await proc.wait()
+            await self._interrupt(proc)
+            message = f"Terraform command timed out after {self.timeout}s: {' '.join(args)}"
+            suggestion = (
+                f"Increase TF_TIMEOUT (current: {self.timeout}s) or simplify the configuration."
+            )
+            if args and args[0] in _STATE_CHANGING_COMMANDS:
+                message += (
+                    ". It was interrupted mid-run: the state lock may still be held, and "
+                    "resources changed before the interrupt may be missing from state."
+                )
+                suggestion = (
+                    "Run terraform_plan to see what state is missing. If the state is still "
+                    "locked, release it with terraform force-unlock <LOCK_ID> once no other "
+                    f"run holds it. {suggestion}"
+                )
             raise LMError(
-                message=(f"Terraform command timed out after {self.timeout}s: {' '.join(args)}"),
-                code="TERRAFORM_TIMEOUT",
-                suggestion=(
-                    f"Increase TF_TIMEOUT (current: {self.timeout}s) or simplify the configuration."
-                ),
+                message=message, code="TERRAFORM_TIMEOUT", suggestion=suggestion
             ) from None
 
         stdout = stdout_bytes.decode("utf-8", errors="replace")
@@ -167,6 +185,32 @@ class TerraformRunner:
             stdout=stdout,
             stderr=stderr,
         )
+
+    @staticmethod
+    async def _interrupt(proc: asyncio.subprocess.Process) -> None:
+        """Stop a timed-out terraform: SIGINT, a grace period, then SIGKILL.
+
+        SIGINT is terraform's signal to finish in-flight operations, persist state
+        and release its lock; killing it outright skips all three.
+        """
+        try:
+            proc.send_signal(signal.SIGINT)
+        except ProcessLookupError:
+            logger.debug("terraform exited before it could be interrupted")
+            return
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=_INTERRUPT_GRACE_SECONDS)
+            return
+        except TimeoutError:
+            logger.warning(
+                "terraform did not stop within %ss of SIGINT; killing it",
+                _INTERRUPT_GRACE_SECONDS,
+            )
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            logger.debug("terraform exited before it could be killed")
+        await proc.wait()
 
     async def close(self) -> None:
         """Clean up resources. No-op for subprocess runner, matches client interface."""

@@ -2,11 +2,14 @@
 # Description: Runs a real child process that reports the environment it received.
 
 import json
+import os
 import sys
+import time
 
 import pytest
 
 from lm_mcp.client.terraform import TerraformRunner
+from lm_mcp.exceptions import LMError
 
 # Stands in for the terraform binary: prints the environment the runner passed.
 _PRINT_ENV = ["-c", "import json, os; print(json.dumps(dict(os.environ)))"]
@@ -75,3 +78,92 @@ class TestRunnerEnvironment:
         for name, value in extra.items():
             assert env[name] == value
         assert "LM_BEARER_TOKEN" not in env
+
+
+# Stand-ins for a terraform that outlives the timeout. Each writes its pid to the
+# workspace (its cwd); the first stops on SIGINT, the second ignores it.
+_STOPS_ON_SIGINT = """
+import os, pathlib, signal, sys, time
+pathlib.Path("pid").write_text(str(os.getpid()))
+def stop(*_):
+    pathlib.Path("interrupted").write_text("yes")
+    sys.exit(130)
+signal.signal(signal.SIGINT, stop)
+time.sleep(20)
+"""
+
+_IGNORES_SIGINT = """
+import os, pathlib, signal, time
+pathlib.Path("pid").write_text(str(os.getpid()))
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+time.sleep(20)
+"""
+
+
+def _fake_terraform(tmp_path, body: str) -> str:
+    script = tmp_path / "terraform"
+    script.write_text(f"#!{sys.executable}\n{body}")
+    script.chmod(0o755)
+    return str(script)
+
+
+def _slow_runner(tmp_path, body: str) -> TerraformRunner:
+    return TerraformRunner(
+        workspace_dir=str(tmp_path / "root"),
+        terraform_binary=_fake_terraform(tmp_path, body),
+        timeout=1,
+    )
+
+
+class TestRunnerTimeout:
+    """R3.4: a timed-out command is interrupted, given a grace period, then killed."""
+
+    @pytest.mark.asyncio
+    async def test_timeout_sends_sigint_first(self, tmp_path):
+        """terraform gets SIGINT, its signal to release locks and stop cleanly."""
+        runner = _slow_runner(tmp_path, _STOPS_ON_SIGINT)
+
+        with pytest.raises(LMError) as exc_info:
+            await runner.run(["plan"], "ws")
+
+        assert exc_info.value.code == "TERRAFORM_TIMEOUT"
+        assert (runner.workspace_path("ws") / "interrupted").exists()
+
+    @pytest.mark.asyncio
+    async def test_process_ignoring_sigint_is_killed_after_the_grace_period(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setattr("lm_mcp.client.terraform._INTERRUPT_GRACE_SECONDS", 0.5)
+        runner = _slow_runner(tmp_path, _IGNORES_SIGINT)
+
+        started = time.monotonic()
+        with pytest.raises(LMError):
+            await runner.run(["plan"], "ws")
+        elapsed = time.monotonic() - started
+
+        assert elapsed < 10
+        pid = int((runner.workspace_path("ws") / "pid").read_text())
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("command", ["apply", "destroy"])
+    async def test_state_changing_timeout_names_lock_and_orphan_risk(self, tmp_path, command):
+        runner = _slow_runner(tmp_path, _STOPS_ON_SIGINT)
+
+        with pytest.raises(LMError) as exc_info:
+            await runner.run([command, "-auto-approve"], "ws")
+
+        text = f"{exc_info.value.message} {exc_info.value.suggestion}"
+        assert "force-unlock" in text
+        assert "missing from state" in text
+
+    @pytest.mark.asyncio
+    async def test_read_only_timeout_has_no_state_warning(self, tmp_path):
+        runner = _slow_runner(tmp_path, _STOPS_ON_SIGINT)
+
+        with pytest.raises(LMError) as exc_info:
+            await runner.run(["plan"], "ws")
+
+        text = f"{exc_info.value.message} {exc_info.value.suggestion}"
+        assert "force-unlock" not in text

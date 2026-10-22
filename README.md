@@ -255,6 +255,8 @@ Terraform tools are optional -- they only appear when `TF_WORKSPACE_DIR` is conf
 
 The `terraform` subprocess inherits only `PATH`, `HOME`, `TMPDIR` and `TF_*` from the server's environment, so server credentials such as `LM_BEARER_TOKEN` never reach provider or data-source code. The `logicmonitor` provider gets `LM_API_ID`, `LM_API_KEY` and `LM_COMPANY` (and their `TF_VAR_lm_*` forms) from the server's LMv1 configuration. Credentials for other providers must arrive as `TF_VAR_*` variables or through files under `HOME`.
 
+`var_file` and a local backend `path` must resolve inside the workspace, symlinks included. `terraform_init`'s `backend_config` takes an object of local, s3 or azurerm backend keys and refuses endpoint and proxy overrides by name. A command that exceeds `TF_TIMEOUT` gets SIGINT and 30 seconds to persist state and release its lock before it is killed; a timed-out `apply` or `destroy` reports that the lock may still be held and state may be incomplete.
+
 **Three entry points:**
 1. **Agent-authored**: AI generates HCL from natural language, writes to workspace, plans, applies
 2. **Pre-made scripts**: Point `TF_WORKSPACE_DIR` at existing `.tf` files, agent operates on them
