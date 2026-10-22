@@ -7187,9 +7187,10 @@ TF_TOOLS: list[Tool] = [
         name="terraform_init",
         description=(
             "Initialize a Terraform workspace and download required providers. "
-            "Run this before plan, apply, or any other terraform operation."
+            "Run this before plan, apply, or any other terraform operation. "
+            "Requires LM_ENABLE_WRITE_OPERATIONS=true."
         ),
-        annotations=_READ_ONLY,
+        annotations=_WRITE,
         inputSchema={
             "type": "object",
             "properties": {
@@ -7227,9 +7228,11 @@ TF_TOOLS: list[Tool] = [
         name="terraform_plan",
         description=(
             "Preview Terraform changes without applying. Shows what resources "
-            "will be created, modified, or destroyed. Returns structured JSON plan."
+            "will be created, modified, or destroyed. Returns structured JSON plan. "
+            "Requires LM_ENABLE_WRITE_OPERATIONS=true, since providers and data "
+            "sources run against live APIs."
         ),
-        annotations=_READ_ONLY,
+        annotations=_WRITE,
         inputSchema={
             "type": "object",
             "properties": {

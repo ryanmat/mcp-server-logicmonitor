@@ -82,16 +82,20 @@ def _safe_name(raw: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Read-only tools (receive TerraformRunner)
+# Runner tools (receive TerraformRunner); init and plan are write-gated
 # ---------------------------------------------------------------------------
 
 
+@require_write_permission
 async def terraform_init(
     runner: TerraformRunner,
     workspace: str,
     backend_config: str | None = None,
 ) -> list[TextContent]:
     """Initialize a Terraform workspace and download providers.
+
+    Write-gated: init downloads and runs provider plugins and configures the
+    state backend.
 
     Args:
         runner: TerraformRunner instance.
@@ -146,6 +150,7 @@ async def terraform_validate(
         return handle_error(e)
 
 
+@require_write_permission
 async def terraform_plan(
     runner: TerraformRunner,
     workspace: str,
@@ -156,6 +161,8 @@ async def terraform_plan(
     """Preview Terraform changes without applying.
 
     Uses -detailed-exitcode: 0=no changes, 1=error, 2=changes pending.
+    Write-gated: plan runs provider plugins and evaluates data sources against
+    live APIs.
 
     Args:
         runner: TerraformRunner instance.

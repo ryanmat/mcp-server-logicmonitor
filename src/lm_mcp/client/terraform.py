@@ -13,6 +13,11 @@ from lm_mcp.exceptions import LMError
 
 logger = logging.getLogger(__name__)
 
+# Variables the subprocess inherits from the server environment, besides TF_*.
+# Everything else, server credentials included, stays out of terraform's reach;
+# provider credentials arrive explicitly through env_extra.
+_INHERITED_ENV = frozenset({"PATH", "HOME", "TMPDIR"})
+
 
 @dataclass
 class TerraformResult:
@@ -33,8 +38,8 @@ class TerraformRunner:
     """Async subprocess wrapper for the Terraform CLI.
 
     Manages workspace directories under a root directory, executes terraform
-    commands with configurable timeouts, and passes credentials via environment
-    variables (never written to disk).
+    commands with configurable timeouts, and passes credentials via an
+    allowlisted subprocess environment (never written to disk).
     """
 
     def __init__(
@@ -84,9 +89,9 @@ class TerraformRunner:
     ) -> TerraformResult:
         """Execute a terraform command in a workspace directory.
 
-        Creates the workspace subdirectory if it does not exist. Passes
-        env_extra variables (typically LM credentials as TF_VAR_*) into the
-        subprocess environment without writing them to disk.
+        Creates the workspace subdirectory if it does not exist. The subprocess
+        inherits only PATH, HOME, TMPDIR and TF_* from the server environment,
+        plus env_extra (typically LM provider credentials), never written to disk.
 
         Args:
             args: Terraform subcommand and flags (e.g., ["plan", "-json"]).
@@ -103,8 +108,11 @@ class TerraformRunner:
         ws_path = self.workspace_path(workspace)
         ws_path.mkdir(parents=True, exist_ok=True)
 
-        # Build subprocess environment from current env plus extras
-        env = dict(os.environ)
+        env = {
+            name: value
+            for name, value in os.environ.items()
+            if name in _INHERITED_ENV or name.startswith("TF_")
+        }
         if env_extra:
             env.update(env_extra)
 

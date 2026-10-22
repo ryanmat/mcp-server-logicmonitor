@@ -46,7 +46,8 @@ def _reload_config(monkeypatch, *, writes_enabled: bool = False):
 
 class TestTerraformInit:
     @pytest.mark.asyncio
-    async def test_init_success(self, mock_runner):
+    async def test_init_success(self, mock_runner, monkeypatch):
+        _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.terraform import terraform_init
 
         mock_runner.run = AsyncMock(
@@ -58,7 +59,8 @@ class TestTerraformInit:
         assert data["workspace"] == "prod"
 
     @pytest.mark.asyncio
-    async def test_init_failure(self, mock_runner):
+    async def test_init_failure(self, mock_runner, monkeypatch):
+        _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.terraform import terraform_init
 
         mock_runner.run = AsyncMock(
@@ -67,6 +69,17 @@ class TestTerraformInit:
         result = await terraform_init(mock_runner, workspace="bad")
         data = json.loads(result[0].text)
         assert data["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_write_disabled(self, mock_runner, monkeypatch):
+        """R3.4: init downloads providers and runs backend code, so writes must be on."""
+        _reload_config(monkeypatch, writes_enabled=False)
+        from lm_mcp.tools.terraform import terraform_init
+
+        mock_runner.run = AsyncMock()
+        result = await terraform_init(mock_runner, workspace="prod")
+        assert "write operations are disabled" in result[0].text.lower()
+        mock_runner.run.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +126,8 @@ class TestTerraformValidate:
 
 class TestTerraformPlan:
     @pytest.mark.asyncio
-    async def test_no_changes(self, mock_runner):
+    async def test_no_changes(self, mock_runner, monkeypatch):
+        _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.terraform import terraform_plan
 
         mock_runner.run = AsyncMock(return_value=TerraformResult(exit_code=0, stdout="", stderr=""))
@@ -123,7 +137,44 @@ class TestTerraformPlan:
         assert data["has_changes"] is False
 
     @pytest.mark.asyncio
-    async def test_changes_pending(self, mock_runner):
+    async def test_write_disabled(self, mock_runner, monkeypatch):
+        """R3.4: plan evaluates data sources against live APIs, so writes must be on."""
+        _reload_config(monkeypatch, writes_enabled=False)
+        from lm_mcp.tools.terraform import terraform_plan
+
+        mock_runner.run = AsyncMock()
+        result = await terraform_plan(mock_runner, workspace="prod")
+        assert "write operations are disabled" in result[0].text.lower()
+        mock_runner.run.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_provider_credentials_passed_explicitly(self, mock_runner, monkeypatch):
+        """The LM provider's variables go through env_extra; the bearer token never does."""
+        monkeypatch.setenv("LM_PORTAL", "acme.logicmonitor.com")
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+        monkeypatch.setenv("LM_ACCESS_ID", "lmv1-id")
+        monkeypatch.setenv("LM_ACCESS_KEY", "lmv1-key")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        from lm_mcp.config import reset_config
+
+        reset_config()
+        from lm_mcp.tools.terraform import terraform_plan
+
+        mock_runner.run = AsyncMock(return_value=TerraformResult(exit_code=0, stdout="", stderr=""))
+        await terraform_plan(mock_runner, workspace="prod")
+
+        assert mock_runner.run.call_args.kwargs["env_extra"] == {
+            "LM_COMPANY": "acme",
+            "TF_VAR_lm_company": "acme",
+            "LM_API_ID": "lmv1-id",
+            "TF_VAR_lm_api_id": "lmv1-id",
+            "LM_API_KEY": "lmv1-key",
+            "TF_VAR_lm_api_key": "lmv1-key",
+        }
+
+    @pytest.mark.asyncio
+    async def test_changes_pending(self, mock_runner, monkeypatch):
+        _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.terraform import terraform_plan
 
         plan_line = json.dumps({"type": "planned_change", "change": {"action": "create"}})
@@ -136,7 +187,8 @@ class TestTerraformPlan:
         assert data["has_changes"] is True
 
     @pytest.mark.asyncio
-    async def test_plan_error(self, mock_runner):
+    async def test_plan_error(self, mock_runner, monkeypatch):
+        _reload_config(monkeypatch, writes_enabled=True)
         from lm_mcp.tools.terraform import terraform_plan
 
         mock_runner.run = AsyncMock(

@@ -8246,12 +8246,12 @@
   "terraform_init": {
     "annotations": {
       "destructiveHint": false,
-      "idempotentHint": true,
+      "idempotentHint": false,
       "openWorldHint": true,
-      "readOnlyHint": true,
+      "readOnlyHint": false,
       "title": null
     },
-    "description": "Initialize a Terraform workspace and download required providers. Run this before plan, apply, or any other terraform operation.",
+    "description": "Initialize a Terraform workspace and download required providers. Run this before plan, apply, or any other terraform operation. Requires LM_ENABLE_WRITE_OPERATIONS=true.",
     "inputSchema": {
       "properties": {
         "backend_config": {
@@ -8294,12 +8294,12 @@
   "terraform_plan": {
     "annotations": {
       "destructiveHint": false,
-      "idempotentHint": true,
+      "idempotentHint": false,
       "openWorldHint": true,
-      "readOnlyHint": true,
+      "readOnlyHint": false,
       "title": null
     },
-    "description": "Preview Terraform changes without applying. Shows what resources will be created, modified, or destroyed. Returns structured JSON plan.",
+    "description": "Preview Terraform changes without applying. Shows what resources will be created, modified, or destroyed. Returns structured JSON plan. Requires LM_ENABLE_WRITE_OPERATIONS=true, since providers and data sources run against live APIs.",
     "inputSchema": {
       "properties": {
         "target": {
