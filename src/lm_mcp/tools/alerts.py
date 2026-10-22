@@ -32,6 +32,7 @@ async def paginate_alerts(
     client: LogicMonitorClient,
     filter_str: str,
     cap: int = MAX_ALERTS_PER_WINDOW,
+    path: str = "/alert/alerts",
 ) -> tuple[list[dict], bool, int | None]:
     """Pull the alerts matching a filter across pages, up to a cap.
 
@@ -41,8 +42,10 @@ async def paginate_alerts(
 
     Args:
         client: LogicMonitor API client.
-        filter_str: Filter string for /alert/alerts.
+        filter_str: Filter string for the alert list.
         cap: Most alerts to collect.
+        path: Alert list to read; /device/devices/{id}/alerts scopes it to
+            one device, which the /alert/alerts filters cannot do by id.
 
     Returns:
         The alerts, whether the cap stopped collection while more matched,
@@ -59,7 +62,7 @@ async def paginate_alerts(
             "offset": offset,
             "filter": filter_str,
         }
-        result = await client.get("/alert/alerts", params=params)
+        result = await client.get(path, params=params)
         items = result.get("items", [])
         raw_total = result.get("total", 0)
         api_total = raw_total if raw_total >= 0 else None
