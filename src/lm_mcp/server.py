@@ -466,10 +466,12 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
         return result
     except ValueError as e:
+        logger.exception("Tool %s rejected its arguments", name)
         if is_write_tool(name):
             log_write_operation(name, arguments, success=False)
         return [ErrorContent(type="text", text=f"Error: {e}")]
     except Exception as e:
+        logger.exception("Tool %s raised", name)
         if is_write_tool(name):
             log_write_operation(name, arguments, success=False)
         return [ErrorContent(type="text", text=f"Error executing {name}: {e}")]

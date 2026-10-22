@@ -296,6 +296,14 @@ def handle_error(error: Exception) -> list[TextContent]:
         List containing a single ErrorContent with the error details.
     """
     if isinstance(error, LMError):
+        # An API refusal is a WARNING with the server's own words attached, so a
+        # 4xx or 5xx leaves a trace on stderr and not only in the tool result.
+        logger.warning(
+            "%s: %s%s",
+            error.code,
+            error.message,
+            f" (details: {error.details})" if error.details else "",
+        )
         return format_response(error.to_dict())
 
     # Log unexpected exceptions with stack trace before returning sanitized response.
