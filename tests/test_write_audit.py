@@ -4,6 +4,8 @@
 import logging
 from typing import ClassVar
 
+import pytest
+
 
 class TestWriteToolPrefixDetection:
     """Tests for identifying write tools by prefix."""
@@ -157,3 +159,110 @@ class TestPortalAuditVisibility:
         with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
             log_write_operation("create_device", {}, success=True)
         assert not any("portal=" in r.getMessage() for r in caplog.records)
+
+
+class TestAuditRedaction:
+    """Write audit lines redact argument values under credential-shaped keys (R3.7)."""
+
+    def test_password_is_redacted_and_other_values_kept(self, caplog):
+        """The audit line keeps the username and shows *** in place of the password."""
+        from lm_mcp.logging import log_write_operation
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            log_write_operation("create_user", {"password": "hunter2", "username": "a"}, True)
+
+        assert "username" in caplog.text
+        assert "'a'" in caplog.text
+        assert "***" in caplog.text
+        assert "hunter2" not in caplog.text
+
+    def test_failed_write_line_is_redacted_too(self, caplog):
+        """The WARNING line for a failed write goes through the same redaction."""
+        from lm_mcp.logging import log_write_operation
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.audit"):
+            log_write_operation("create_user", {"password": "hunter2", "username": "a"}, False)
+
+        assert "hunter2" not in caplog.text
+        assert "***" in caplog.text
+
+    def test_nested_keys_are_redacted(self):
+        """A credential key inside a nested object is redacted; its siblings are kept."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments({"vars": {"token": "x", "host": "h"}, "name": "n"})
+
+        assert redacted == {"vars": {"token": "***", "host": "h"}, "name": "n"}
+
+    def test_extra_vars_is_redacted_whole(self):
+        """extra_vars carries playbook input of any shape, so the whole value is hidden."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments({"extra_vars": {"token": "x", "plain": "p"}, "limit": "web"})
+
+        assert redacted == {"extra_vars": "***", "limit": "web"}
+
+    def test_lists_of_objects_are_walked(self):
+        """Objects inside lists are redacted like top-level objects."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments({"users": [{"password": "p", "name": "n"}, "plain"]})
+
+        assert redacted == {"users": [{"password": "***", "name": "n"}, "plain"]}
+
+    def test_arguments_are_not_mutated(self):
+        """Redaction returns a new structure; the tool still receives its arguments."""
+        from lm_mcp.logging import redact_arguments
+
+        arguments = {"password": "hunter2", "nested": {"api_key": "k"}}
+        redact_arguments(arguments)
+
+        assert arguments == {"password": "hunter2", "nested": {"api_key": "k"}}
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "password",
+            "PASSWORD",
+            "passwd",
+            "token",
+            "bearer_token",
+            "LM_BEARER_TOKEN",
+            "secret",
+            "client_secret",
+            "clientSecret",
+            "key",
+            "api_key",
+            "apiKey",
+            "APIKey",
+            "private-key",
+            "credential",
+            "credentials",
+            "extra_vars",
+            "extraVars",
+        ],
+    )
+    def test_credential_shaped_keys_are_redacted(self, key):
+        """Keys match a whole credential word, case-insensitive, across snake and camel case."""
+        from lm_mcp.logging import redact_arguments
+
+        assert redact_arguments({key: "value"}) == {key: "***"}
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "keyword",
+            "monkey",
+            "tokenizer",
+            "secretary",
+            "name",
+            "token_id",
+            "api_key_id",
+            "device_ids",
+        ],
+    )
+    def test_other_keys_are_kept(self, key):
+        """A credential word inside another word, and an identifier, are not redacted."""
+        from lm_mcp.logging import redact_arguments
+
+        assert redact_arguments({key: "value"}) == {key: "value"}
