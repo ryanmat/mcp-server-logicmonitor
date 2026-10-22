@@ -412,7 +412,7 @@ async def _forecast_cpu(client, values, method, threshold=1000.0):
 
 
 class TestForecastMethodLabels:
-    """method_used names the method that produced the numbers; fallbacks say why."""
+    """R4.1: method_used names the method that produced the numbers; fallbacks say why."""
 
     @respx.mock
     async def test_ttm_without_watsonx_falls_back_with_reason(self, client, monkeypatch):

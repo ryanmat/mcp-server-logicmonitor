@@ -1,5 +1,6 @@
 # Description: Alert management tools for LogicMonitor MCP server.
-# Description: Provides get_alerts, get_alert_details, acknowledge_alert, add_alert_note.
+# Description: Provides get_alerts, get_alert_details, acknowledge_alert, add_alert_note,
+# and paginate_alerts, the capped alert-window read the analytics tools share.
 
 from __future__ import annotations
 
@@ -60,7 +61,7 @@ async def paginate_alerts(
     cap = min(cap, MAX_ALERTS_PER_WINDOW)
     collected: list[dict] = []
     more = False
-    api_total: int | None = 0
+    api_total: int | None = None
     while len(collected) < cap:
         offset = len(collected)
         params: dict = {

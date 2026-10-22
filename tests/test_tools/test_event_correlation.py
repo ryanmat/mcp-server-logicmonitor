@@ -266,7 +266,7 @@ class TestCorrelateChanges:
 
 
 class TestCorrelateChangesPaging:
-    """correlate_changes reads the whole alert window or says the cap cut it short."""
+    """R4.2: correlate_changes reads the whole alert window or says the cap cut it short."""
 
     @staticmethod
     def _alerts(n):

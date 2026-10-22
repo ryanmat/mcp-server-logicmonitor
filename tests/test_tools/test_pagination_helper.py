@@ -25,7 +25,7 @@ def client():
 
 
 class TestPaginatedResponse:
-    """paginated_response builds total, count, offset and has_more."""
+    """R4.2: paginated_response builds total, count, offset and has_more."""
 
     def test_positive_total_with_more_pages(self):
         from lm_mcp.tools import paginated_response
@@ -109,7 +109,7 @@ LIST_TOOLS = [
 )
 @respx.mock
 async def test_list_tool_reports_more_on_negative_total(client, module, function, path, kwargs):
-    """A full page with total -1001 reads as more results, not as the end of the list."""
+    """R4.2: a full page with total -1001 reads as more results, not as the list's end."""
     import importlib
 
     tool = getattr(importlib.import_module(f"lm_mcp.tools.{module}"), function)

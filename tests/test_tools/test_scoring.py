@@ -621,10 +621,13 @@ class TestCalculateAvailability:
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await calculate_availability(client, device_id=42)
+        result = await calculate_availability(client, device_id=42)
 
-        params = dict(route.calls[0].request.url.params)
-        assert "startEpoch>:" in params.get("filter", "")
+        assert json.loads(result[0].text)["device_id"] == 42
+        assert route.call_count == 1
+        clauses = route.calls[0].request.url.params["filter"].split(",")
+        assert clauses[0].startswith("startEpoch>:")
+        assert clauses[1:] == ["severity>:3"]
 
     @respx.mock
     async def test_availability_filters_by_device_id(self, client):
@@ -651,9 +654,8 @@ class TestCalculateAvailability:
         result = await calculate_availability(client, device_id=100, hours_back=24)
         data = json.loads(result[0].text)
 
-        # Should only include target-server, not other-server
-        assert "target-server" in data.get("by_device", {})
-        assert "other-server" not in data.get("by_device", {})
+        # The device's own alert list is the scope, counted under its name
+        assert list(data["by_device"]) == ["target-server"]
 
 
 # Base epoch for metric data
@@ -1273,7 +1275,7 @@ def _device_alert(alert_id, device_id, name, start_epoch, end_epoch, severity=3)
 
 
 class TestScoreAlertNoisePaging:
-    """score_alert_noise scores the whole window or says the cap cut it short."""
+    """R4.2: score_alert_noise scores the whole window or says the cap cut it short."""
 
     @respx.mock
     async def test_scores_every_page(self, client):
@@ -1311,7 +1313,7 @@ class TestScoreAlertNoisePaging:
 
 
 class TestAvailabilityResolvesDevice:
-    """calculate_availability resolves the device first and reads its alerts by id."""
+    """R4.3: calculate_availability resolves the device first and reads its alerts by id."""
 
     @respx.mock
     async def test_unknown_device_name_is_an_error_not_full_availability(self, client):
@@ -1432,7 +1434,7 @@ class TestAvailabilityResolvesDevice:
 
 
 class TestResolveDevice:
-    """_resolve_device separates a missing device from a failed lookup by code."""
+    """R4.3: _resolve_device separates a missing device from a failed lookup by code."""
 
     @respx.mock
     async def test_missing_device_id_is_device_not_found(self, client):

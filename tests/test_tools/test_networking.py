@@ -275,7 +275,7 @@ class TestDetectAlertBurst:
 
 
 class TestDetectAlertBurstTruncation:
-    """detect_alert_burst warns only when the cap cut the window short."""
+    """R4.2: detect_alert_burst warns only when the cap cut the window short."""
 
     @staticmethod
     def _alerts(n):
@@ -487,7 +487,7 @@ class TestNetworkingErrorHandling:
 
 
 class TestTopTalkersTruncation:
-    """The flow list is read as one page, so get_top_talkers declares when it is partial."""
+    """R4.2: the flow list is read as one page, so get_top_talkers says when it is partial."""
 
     @staticmethod
     def _flows(n):
@@ -573,7 +573,7 @@ def _interface_power_alerts(n):
 
 
 class TestCappedAlertToolsWarn:
-    """get_link_flaps and get_power_events carry detect_alert_burst's truncation warning."""
+    """R4.2: get_link_flaps and get_power_events carry detect_alert_burst's cap warning."""
 
     @pytest.mark.parametrize("tool_name", ["get_link_flaps", "get_power_events"])
     @respx.mock

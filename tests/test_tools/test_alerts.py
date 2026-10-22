@@ -650,7 +650,7 @@ def _window_alerts(n):
 
 
 class TestPaginateAlerts:
-    """paginate_alerts pages to the API total and reports when the cap binds."""
+    """R4.2: paginate_alerts pages to the API total and reports when the cap binds."""
 
     ALERTS_URL = "https://test.logicmonitor.com/santaba/rest/alert/alerts"
 
@@ -728,6 +728,20 @@ class TestPaginateAlerts:
         assert truncated is True
         assert api_total is None
         assert [call.request.url.params["size"] for call in route.calls] == ["100"]
+
+    @respx.mock
+    async def test_a_cap_of_zero_reads_nothing_and_knows_no_total(self, client):
+        """No page was read, so the API's count is unknown, not zero."""
+        from lm_mcp.tools.alerts import paginate_alerts
+
+        route = respx.get(self.ALERTS_URL).mock(side_effect=alert_pages(_window_alerts(10)))
+
+        alerts, truncated, api_total = await paginate_alerts(client, "cleared:false", cap=0)
+
+        assert alerts == []
+        assert truncated is False
+        assert api_total is None
+        assert route.call_count == 0
 
     @respx.mock
     async def test_a_larger_cap_is_clamped_to_the_hard_cap(self, client):

@@ -445,7 +445,7 @@ def _paged_alerts(n):
 
 
 class TestAlertWindowPaging:
-    """Alert statistics and correlation page through the window or say they stopped."""
+    """R4.2: alert statistics and correlation page through the window or say they stopped."""
 
     @respx.mock
     async def test_statistics_counts_every_page(self, client):
