@@ -5,12 +5,18 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
 import time
 
 import httpx
 
-from lm_mcp.client._retry import TRANSPORT_ERRORS, should_retry, transport_error
+from lm_mcp.client._retry import (
+    DEFAULT_RETRY_AFTER_CAP,
+    TRANSPORT_ERRORS,
+    backoff,
+    retry_after_seconds,
+    should_retry,
+    transport_error,
+)
 from lm_mcp.exceptions import (
     AuthenticationError,
     LMError,
@@ -198,10 +204,8 @@ class AwxClient:
             if should_retry(method, response.status_code):
                 last_message = self._parse_error_response(response)
                 if attempt < self.max_retries:
-                    base_backoff = 2**attempt
-                    jitter = random.uniform(0, 0.5 * base_backoff)
-                    wait_time = base_backoff + jitter
-                    await asyncio.sleep(wait_time)
+                    wait = backoff(attempt, retry_after_seconds(response), DEFAULT_RETRY_AFTER_CAP)
+                    await asyncio.sleep(wait)
                     continue
 
             # Handle error responses

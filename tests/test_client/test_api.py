@@ -1091,7 +1091,17 @@ class TestTransportErrorTranslation:
 
     @pytest.mark.asyncio
     @respx.mock
-    @pytest.mark.parametrize("exc", [httpx.RemoteProtocolError(""), httpx.ReadError("")])
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            httpx.RemoteProtocolError(""),
+            httpx.ReadError(""),
+            httpx.WriteError(""),
+            httpx.CloseError(""),
+            httpx.ProxyError(""),
+            httpx.UnsupportedProtocol(""),
+        ],
+    )
     async def test_dropped_connection_gets_a_message(self, exc, waits):
         """httpx raises these with an empty message; the translation still says what failed."""
         from lm_mcp.exceptions import LMConnectionError

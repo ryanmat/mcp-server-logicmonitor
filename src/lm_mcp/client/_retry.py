@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import random
 
 import httpx
@@ -12,14 +13,13 @@ from lm_mcp.exceptions import LMConnectionError
 # Methods safe to resend after a 5xx: repeating them cannot apply a change twice.
 IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "PUT", "DELETE"})
 
-# Failures before any response arrives. Each is translated to LMConnectionError
-# and not resent: past the connect phase the server may already have acted.
-TRANSPORT_ERRORS = (
-    httpx.ConnectError,
-    httpx.TimeoutException,
-    httpx.ReadError,
-    httpx.RemoteProtocolError,
-)
+# Default ceiling in seconds on a wait a server's Retry-After can impose.
+DEFAULT_RETRY_AFTER_CAP = 120
+
+# Failures before any response arrives: timeouts, connect, read and write errors,
+# protocol and proxy errors. Each is translated to LMConnectionError and not
+# resent: past the connect phase the server may already have acted.
+TRANSPORT_ERRORS = (httpx.TransportError,)
 
 
 def should_retry(method: str, status: int) -> bool:
@@ -32,6 +32,15 @@ def should_retry(method: str, status: int) -> bool:
     if status == 429:
         return True
     return status >= 500 and method.upper() in IDEMPOTENT_METHODS
+
+
+def retry_after_seconds(response: httpx.Response) -> int | None:
+    """Return a response's Retry-After in whole seconds, or None if absent or not a number."""
+    if "Retry-After" not in response.headers:
+        return None
+    with contextlib.suppress(ValueError):
+        return int(response.headers["Retry-After"])
+    return None
 
 
 def backoff(attempt: int, retry_after: int | None, cap: int) -> float:
@@ -58,8 +67,10 @@ def transport_error(exc: Exception, service: str, method: str, url: str) -> LMCo
         what = "timed out"
     elif isinstance(exc, httpx.ConnectError):
         what = "could not connect"
-    else:
+    elif isinstance(exc, (httpx.NetworkError, httpx.ProtocolError)):
         what = "lost its connection"
+    else:
+        what = "failed"
     detail = str(exc) or "no detail from the HTTP library"
     return LMConnectionError(
         f"{service} request {method} {url} {what} ({type(exc).__name__}: {detail})"

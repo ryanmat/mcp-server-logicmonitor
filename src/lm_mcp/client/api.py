@@ -2,7 +2,6 @@
 # Description: Handles HTTP communication, error mapping, and response parsing.
 
 import asyncio
-import contextlib
 import json
 import re
 import time
@@ -10,7 +9,14 @@ import time
 import httpx
 
 from lm_mcp.auth import AuthProvider
-from lm_mcp.client._retry import TRANSPORT_ERRORS, backoff, should_retry, transport_error
+from lm_mcp.client._retry import (
+    DEFAULT_RETRY_AFTER_CAP,
+    TRANSPORT_ERRORS,
+    backoff,
+    retry_after_seconds,
+    should_retry,
+    transport_error,
+)
 from lm_mcp.exceptions import (
     AuthenticationError,
     LMError,
@@ -167,7 +173,7 @@ class LogicMonitorClient:
         api_version: int = 3,
         max_retries: int = 3,
         ingest_url: str | None = None,
-        retry_after_cap: int = 120,
+        retry_after_cap: int = DEFAULT_RETRY_AFTER_CAP,
     ):
         """Initialize the client.
 
@@ -234,12 +240,7 @@ class LogicMonitorClient:
         except (json.JSONDecodeError, ValueError):
             message = response.text
 
-        retry_after = None
-        if "Retry-After" in response.headers:
-            with contextlib.suppress(ValueError):
-                retry_after = int(response.headers["Retry-After"])
-
-        return message, retry_after
+        return message, retry_after_seconds(response)
 
     def _check_response_body_errors(self, data: dict) -> None:
         """Check for API errors returned inside HTTP 200 response bodies.

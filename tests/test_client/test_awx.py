@@ -340,6 +340,21 @@ class TestAwxRetryPolicy:
 
     @pytest.mark.asyncio
     @respx.mock
+    @pytest.mark.parametrize(("retry_after", "expected"), [("60", 60), ("600", 120)])
+    async def test_retry_after_is_honored_and_capped(self, waits, retry_after, expected):
+        """AWX waits as the LM client does: Retry-After lengthens the backoff, up to 120 s."""
+        client = AwxClient(base_url=AWX_BASE, token="test-token", max_retries=2)
+        respx.get(f"{AWX_API}/job_templates/").mock(
+            side_effect=[
+                Response(429, headers={"Retry-After": retry_after}, json={"detail": "Throttled"}),
+                Response(200, json={"count": 0, "results": []}),
+            ]
+        )
+        await client.get("/job_templates/")
+        assert waits == [expected]
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_read_timeout_is_translated_with_a_message(self, waits):
         """httpx raises ReadTimeout with an empty message; the translation names it."""
         import httpx
