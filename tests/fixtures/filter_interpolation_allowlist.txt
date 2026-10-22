@@ -1,9 +1,10 @@
 # Description: Filter value interpolations in src/lm_mcp/tools that bypass quote_filter_value on purpose.
-# Description: One "module.py: expression" per line; each is an integer, boolean or constant-map value that cannot carry a quote.
+# Description: One "module.py: expression" per line; each is an integer, boolean or constant-map value, or a value already built from quote_filter_value output.
 #
 # tests/test_filter_invariant.py fails on any interpolation not listed here and on any
-# entry that no longer matches a hit. A string value never belongs here: route it
-# through quote_filter_value instead. Print the current hits with
+# entry that no longer matches a hit. A raw string value never belongs here: route it
+# through quote_filter_value instead (cost.py: or_values is a |-join of values that
+# already went through it). Print the current hits with
 # `uv run python tests/test_filter_invariant.py`.
 alert_rules.py: priority_filter
 alerts.py: device_id
