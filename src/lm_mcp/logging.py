@@ -74,9 +74,11 @@ def _normalize_key(key: str) -> str:
 def is_sensitive_key(key: str) -> bool:
     """Whether an argument key names a credential whose value must not be logged.
 
-    Matches a whole word (password, passwd, token, secret, key, credential,
-    extra_vars, singular or plural) at a snake_case, kebab-case, dotted or
-    camelCase boundary, case-insensitively, so ``api_key``, ``apiKey`` and
+    Matches a whole word from ``_CREDENTIAL_WORD`` (the generic words such as
+    password, token, secret and key, the LogicMonitor property words pass,
+    community, auth and priv, and the one-word compounds such as secretkey,
+    singular or plural) at a snake_case, kebab-case, dotted or camelCase
+    boundary, case-insensitively, so ``api_key``, ``apiKey``, ``ssh.pass`` and
     ``LM_BEARER_TOKEN`` match while ``keyword`` and ``tokenizer`` do not. A key
     ending in ``id`` or ``ids`` names an identifier, not a credential.
 
