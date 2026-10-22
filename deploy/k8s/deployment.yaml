@@ -57,8 +57,8 @@ spec:
               value: 0.0.0.0
             - name: LM_HTTP_PORT
               value: "8080"
-            # Host names /mcp and /api/v1/* answer besides loopback (probes are
-            # exempt). Add mcp-server-logicmonitor.<namespace>.svc.cluster.local for
+            # Host names every route except /healthz and /readyz answers besides
+            # loopback. Add mcp-server-logicmonitor.<namespace>.svc.cluster.local for
             # callers in other namespaces, and the Ingress or Route host if exposed.
             - name: LM_HTTP_ALLOWED_HOSTS
               value: mcp-server-logicmonitor

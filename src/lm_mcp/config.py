@@ -93,9 +93,9 @@ class LMConfig(BaseSettings):
         LM_HTTP_ALLOW_UNAUTHENTICATED: Accept a non-loopback HTTP bind with no
             LM_HTTP_AUTH_TOKEN, for a listener protected some other way such as
             an authenticating proxy (default: false). HTTP transport only.
-        LM_HTTP_ALLOWED_HOSTS: Comma-separated Host names /mcp and /api/v1/*
-            accept besides the loopback names and a non-wildcard LM_HTTP_HOST
-            (default: empty). HTTP transport only.
+        LM_HTTP_ALLOWED_HOSTS: Comma-separated Host names the server accepts on
+            every route except /healthz and /readyz, besides the loopback names
+            and a non-wildcard LM_HTTP_HOST (default: empty). HTTP transport only.
         LM_HTTP_SSL_CERTFILE: TLS certificate path for the HTTP transport
         LM_HTTP_SSL_KEYFILE: TLS private key path for the HTTP transport
         LM_HTTP_SSL_KEYFILE_PASSWORD: Password for an encrypted TLS private key
@@ -357,7 +357,7 @@ class LMConfig(BaseSettings):
 
     @property
     def http_host_allowlist(self) -> frozenset[str]:
-        """Host names the HTTP transport answers on /mcp and /api/v1/*, lowercased.
+        """Lowercased Host names answered on every route except /healthz and /readyz.
 
         The loopback names, LM_HTTP_HOST unless it is a wildcard address (no client
         addresses a server as 0.0.0.0, and some browsers route that name to the

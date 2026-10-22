@@ -547,7 +547,7 @@ async def _statuses_by_host(live_server, requests):
 
 
 class TestHostAllowlist:
-    """R3.3: /mcp and /api/v1/* answer only Host names the operator expects."""
+    """R3.3: every route except /healthz and /readyz answers only expected Host names."""
 
     async def test_unknown_host_is_refused_before_the_handler(self, _set_env, live_server):
         """Host: evil.example gets 400 and execute_tool never runs."""
