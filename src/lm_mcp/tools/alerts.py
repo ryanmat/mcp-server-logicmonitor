@@ -23,6 +23,52 @@ from lm_mcp.tools import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
+# Hard cap on alerts pulled for one windowed analysis.
+MAX_ALERTS_PER_WINDOW = 5000
+ALERTS_PAGE_SIZE = 1000
+
+
+async def paginate_alerts(
+    client: LogicMonitorClient,
+    filter_str: str,
+    cap: int = MAX_ALERTS_PER_WINDOW,
+) -> tuple[list[dict], bool, int | None]:
+    """Pull the alerts matching a filter across pages, up to a cap.
+
+    The cap is clamped to MAX_ALERTS_PER_WINDOW. While rows remain past a
+    page the API reports a negative total, a lower bound, so the API total is
+    known only when the last page read reported an exact one.
+
+    Args:
+        client: LogicMonitor API client.
+        filter_str: Filter string for /alert/alerts.
+        cap: Most alerts to collect.
+
+    Returns:
+        The alerts, whether the cap stopped collection while more matched,
+        and the API's exact total, or None when it reported only a lower bound.
+    """
+    cap = min(cap, MAX_ALERTS_PER_WINDOW)
+    collected: list[dict] = []
+    more = False
+    api_total: int | None = 0
+    while len(collected) < cap:
+        offset = len(collected)
+        params: dict = {
+            "size": min(ALERTS_PAGE_SIZE, cap - offset),
+            "offset": offset,
+            "filter": filter_str,
+        }
+        result = await client.get("/alert/alerts", params=params)
+        items = result.get("items", [])
+        raw_total = result.get("total", 0)
+        api_total = raw_total if raw_total >= 0 else None
+        collected.extend(items)
+        more = bool(items) and (raw_total < 0 or offset + len(items) < raw_total)
+        if not more:
+            break
+    return collected[:cap], more or len(collected) > cap, api_total
+
 
 def _normalize_alert_id(alert_id: str) -> str:
     """Strip LMA prefix from alert ID if present.

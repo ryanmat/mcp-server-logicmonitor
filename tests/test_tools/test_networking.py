@@ -10,6 +10,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.alert_pages import alert_pages
 
 
 @pytest.fixture
@@ -271,6 +272,49 @@ class TestDetectAlertBurst:
         data = json.loads(result[0].text)
         # Only interface alerts should qualify.
         assert data["total_alerts_in_window"] == 12
+
+
+class TestDetectAlertBurstTruncation:
+    """detect_alert_burst warns only when the cap cut the window short."""
+
+    @staticmethod
+    def _alerts(n):
+        now = int(time.time())
+        return [
+            {
+                "id": i,
+                "startEpoch": now - 3000 + (i % 3000),
+                "dataSourceName": "CPU",
+                "monitorObjectName": f"host-{i % 50}",
+            }
+            for i in range(n)
+        ]
+
+    @respx.mock
+    async def test_warns_when_the_cap_binds(self, client):
+        from lm_mcp.tools.networking import detect_alert_burst
+
+        respx.get(f"{BASE}/alert/alerts").mock(
+            side_effect=alert_pages(self._alerts(6000), lower_bound=True)
+        )
+
+        result = await detect_alert_burst(client)
+        data = json.loads(result[0].text)
+        assert data["total_alerts_in_window"] == 5000
+        assert "Truncated at 5000 alerts" in data["warning"]
+
+    @respx.mock
+    async def test_no_warning_for_a_window_of_exactly_the_cap(self, client):
+        from lm_mcp.tools.networking import detect_alert_burst
+
+        respx.get(f"{BASE}/alert/alerts").mock(
+            side_effect=alert_pages(self._alerts(5000), lower_bound=True)
+        )
+
+        result = await detect_alert_burst(client)
+        data = json.loads(result[0].text)
+        assert data["total_alerts_in_window"] == 5000
+        assert "warning" not in data
 
 
 class TestGetLinkFlaps:
