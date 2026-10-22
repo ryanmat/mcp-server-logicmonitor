@@ -27,6 +27,12 @@ if TYPE_CHECKING:
 MAX_ALERTS_PER_WINDOW = 5000
 ALERTS_PAGE_SIZE = 1000
 
+# Warning a windowed analysis carries when the cap cut its window short.
+ALERT_WINDOW_TRUNCATED_WARNING = (
+    f"Truncated at {MAX_ALERTS_PER_WINDOW} alerts. "
+    "Narrow the window or scope for complete analysis."
+)
+
 
 async def paginate_alerts(
     client: LogicMonitorClient,

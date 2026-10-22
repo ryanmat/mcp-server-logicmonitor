@@ -18,7 +18,7 @@ from lm_mcp.tools import (
     resolve_group_filter,
     sanitize_filter_value,
 )
-from lm_mcp.tools.alerts import MAX_ALERTS_PER_WINDOW, paginate_alerts
+from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING, paginate_alerts
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -233,6 +233,16 @@ async def get_top_talkers(
         result = await client.get("/netflow/flows", params=params)
         flows = result.get("items", [])
 
+        # The flow list is read as one page. A negative total (a lower bound),
+        # a total past the page, or a full page with no total means flows were
+        # left unread.
+        raw_total = result.get("total")
+        if raw_total is None:
+            truncated = len(flows) >= _FLOWS_PAGE_SIZE
+        else:
+            truncated = raw_total < 0 or len(flows) < raw_total
+        api_total = raw_total if raw_total is not None and raw_total >= 0 else None
+
         aggregated: dict[str, dict] = defaultdict(
             lambda: {"total_bytes": 0, "total_packets": 0, "flow_count": 0}
         )
@@ -274,6 +284,8 @@ async def get_top_talkers(
             "window_hours": hours_back,
             "group_by": group_by,
             "flows_analyzed": len(flows),
+            "truncated": truncated,
+            "api_total": api_total,
             "total_bytes_in_window": total_bytes,
             "top_talkers": top,
         }
@@ -383,10 +395,7 @@ async def detect_alert_burst(
             "bursts": bursts,
         }
         if truncated:
-            response["warning"] = (
-                f"Truncated at {MAX_ALERTS_PER_WINDOW} alerts. "
-                "Narrow the window or scope for complete analysis."
-            )
+            response["warning"] = ALERT_WINDOW_TRUNCATED_WARNING
         if wildcards_stripped:
             response["note"] = (
                 "Wildcard characters stripped from device filter — the ~ operator "
@@ -495,7 +504,7 @@ async def get_link_flaps(
             wildcards_stripped = wildcards_stripped or was_modified
             filters.append(f"monitorObjectName~{quote_filter_value(clean_device)}")
 
-        alerts, _, _ = await paginate_alerts(client, ",".join(filters))
+        alerts, truncated, _ = await paginate_alerts(client, ",".join(filters))
 
         pattern_re = re.compile(interface_pattern, re.IGNORECASE)
         interface_alerts = [a for a in alerts if pattern_re.search(a.get("dataSourceName") or "")]
@@ -537,6 +546,8 @@ async def get_link_flaps(
             "flapping_interfaces": len(flaps),
             "results": top_flaps,
         }
+        if truncated:
+            response["warning"] = ALERT_WINDOW_TRUNCATED_WARNING
         if wildcards_stripped:
             response["note"] = (
                 "Wildcard characters stripped from device filter — the ~ operator "
@@ -588,7 +599,7 @@ async def get_power_events(
             wildcards_stripped = wildcards_stripped or was_modified
             filters.append(f"monitorObjectName~{quote_filter_value(clean_device)}")
 
-        alerts, _, _ = await paginate_alerts(client, ",".join(filters))
+        alerts, truncated, _ = await paginate_alerts(client, ",".join(filters))
 
         active_patterns = patterns or list(_DEFAULT_POWER_PATTERNS)
         lower_patterns = [p.lower() for p in active_patterns]
@@ -626,6 +637,8 @@ async def get_power_events(
             "patterns_matched_counts": dict(pattern_counts),
             "events": matched,
         }
+        if truncated:
+            response["warning"] = ALERT_WINDOW_TRUNCATED_WARNING
         if wildcards_stripped:
             response["note"] = (
                 "Wildcard characters stripped from device filter — the ~ operator "

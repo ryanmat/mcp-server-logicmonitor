@@ -57,7 +57,7 @@ async def score_alert_noise(
         now_epoch = int(time.time())
         start_epoch = now_epoch - (hours_back * 3600)
 
-        # Fetch all alerts (active + cleared) in the time window
+        # Fetch the window's alerts; with no cleared filter the list holds active alerts only
         filters = [f"startEpoch>:{start_epoch}"]
         if device:
             clean_val, _ = sanitize_filter_value(device)
@@ -211,7 +211,8 @@ async def calculate_availability(
 ) -> list[TextContent]:
     """Calculate availability percentage from alert history.
 
-    Fetches cleared and active alerts at or above the severity threshold,
+    Fetches active alerts at or above the severity threshold (the alert list
+    returns cleared alerts only under a cleared:true filter),
     computes downtime windows, merges overlapping incidents, and calculates
     SLA-style availability metrics.
 
