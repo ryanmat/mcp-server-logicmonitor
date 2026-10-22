@@ -14,10 +14,26 @@ from lm_mcp.exceptions import LMError
 
 logger = logging.getLogger(__name__)
 
-# Variables the subprocess inherits from the server environment, besides TF_*.
-# Everything else, server credentials included, stays out of terraform's reach;
+# Variables the subprocess inherits from the server environment, besides TF_*:
+# the process basics, plus the proxy and CA settings terraform init needs to reach
+# the provider registry from behind an egress proxy or a private CA. Everything
+# else, server and cloud credentials included, stays out of terraform's reach;
 # provider credentials arrive explicitly through env_extra.
-_INHERITED_ENV = frozenset({"PATH", "HOME", "TMPDIR"})
+_INHERITED_ENV = frozenset(
+    {
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+    }
+)
 
 # Seconds a timed-out terraform gets after SIGINT to finish in-flight provider
 # calls, write state and release its lock before it is killed.
@@ -99,8 +115,9 @@ class TerraformRunner:
         """Execute a terraform command in a workspace directory.
 
         Creates the workspace subdirectory if it does not exist. The subprocess
-        inherits only PATH, HOME, TMPDIR and TF_* from the server environment,
-        plus env_extra (typically LM provider credentials), never written to disk.
+        inherits only _INHERITED_ENV (process basics, proxy and CA settings) and
+        TF_* from the server environment, plus env_extra (typically LM provider
+        credentials), never written to disk.
 
         Args:
             args: Terraform subcommand and flags (e.g., ["plan", "-json"]).

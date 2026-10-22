@@ -63,6 +63,38 @@ class TestRunnerEnvironment:
         assert env["TF_IN_AUTOMATION"] == "true"
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "NO_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "no_proxy",
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
+        ],
+    )
+    async def test_proxy_and_ca_settings_pass_through(self, tmp_path, monkeypatch, name):
+        """terraform init reaches the registry through the operator's proxy and CA."""
+        monkeypatch.setenv(name, "proxy-or-ca-value")
+
+        env = await _child_env(tmp_path)
+
+        assert env[name] == "proxy-or-ca-value"
+
+    @pytest.mark.asyncio
+    async def test_cloud_credentials_stay_out(self, tmp_path, monkeypatch):
+        """Cloud credentials in the server env are not inherited; backends get them otherwise."""
+        for name in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "ARM_CLIENT_SECRET"):
+            monkeypatch.setenv(name, "cloud-secret")
+
+        env = await _child_env(tmp_path)
+
+        assert not {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "ARM_CLIENT_SECRET"} & set(env)
+
+    @pytest.mark.asyncio
     async def test_env_extra_reaches_the_subprocess(self, tmp_path, monkeypatch):
         """Provider variables the caller passes in env_extra are set explicitly."""
         monkeypatch.setenv("LM_BEARER_TOKEN", "lm-bearer-secret")
