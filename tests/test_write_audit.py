@@ -240,6 +240,18 @@ class TestAuditRedaction:
             "credentials",
             "extra_vars",
             "extraVars",
+            "ssh.pass",
+            "wmi.pass",
+            "esx.pass",
+            "snmp.community",
+            "snmp.auth",
+            "snmp.priv",
+            "passphrase",
+            "apikey",
+            "aws.secretkey",
+            "aws.accesskey",
+            "azure.clientsecret",
+            "privatekey",
         ],
     )
     def test_credential_shaped_keys_are_redacted(self, key):
@@ -259,6 +271,11 @@ class TestAuditRedaction:
             "token_id",
             "api_key_id",
             "device_ids",
+            "ssh.user",
+            "snmp.version",
+            "passport",
+            "author",
+            "privacy",
         ],
     )
     def test_other_keys_are_kept(self, key):
@@ -266,3 +283,72 @@ class TestAuditRedaction:
         from lm_mcp.logging import redact_arguments
 
         assert redact_arguments({key: "value"}) == {key: "value"}
+
+
+class TestPairedNameValueRedaction:
+    """A value is redacted when the name it is paired with is a credential property (R3.7)."""
+
+    def test_property_value_is_redacted_when_property_name_is_sensitive(self):
+        """update_device_property with ssh.pass hides the value and keeps the name."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments(
+            {"device_id": 7, "property_name": "ssh.pass", "property_value": "hunter2"}
+        )
+
+        assert redacted == {"device_id": 7, "property_name": "ssh.pass", "property_value": "***"}
+
+    def test_property_value_is_kept_when_property_name_is_plain(self):
+        """A plain property keeps its value."""
+        from lm_mcp.logging import redact_arguments
+
+        arguments = {"device_id": 7, "property_name": "location", "property_value": "nyc"}
+
+        assert redact_arguments(arguments) == arguments
+
+    def test_name_value_items_in_a_list_are_paired(self):
+        """{name, value} items, as LM property lists are shaped, are paired item by item."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments(
+            {
+                "properties": [
+                    {"name": "snmp.community", "value": "public"},
+                    {"name": "location", "value": "nyc"},
+                ]
+            }
+        )
+
+        assert redacted == {
+            "properties": [
+                {"name": "snmp.community", "value": "***"},
+                {"name": "location", "value": "nyc"},
+            ]
+        }
+
+    def test_custom_properties_object_keys_are_redacted(self):
+        """create_device custom_properties carrying LM credential properties are hidden."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments(
+            {"name": "web-01", "custom_properties": {"ssh.pass": "s", "ssh.user": "root"}}
+        )
+
+        assert redacted == {
+            "name": "web-01",
+            "custom_properties": {"ssh.pass": "***", "ssh.user": "root"},
+        }
+
+    def test_failed_property_write_audit_line_carries_no_plaintext(self, caplog):
+        """The WARNING for a failed update_device_property never shows the property value."""
+        from lm_mcp.logging import log_write_operation
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.audit"):
+            log_write_operation(
+                "update_device_property",
+                {"device_id": 7, "property_name": "wmi.pass", "property_value": "hunter2"},
+                False,
+            )
+
+        assert "wmi.pass" in caplog.text
+        assert "hunter2" not in caplog.text

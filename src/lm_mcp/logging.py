@@ -24,12 +24,19 @@ LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 REDACTED = "***"
 # Split camelCase and acronym boundaries so apiKey and APIKey read as api_key.
 _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
-# A whole credential word (optionally plural) between key separators or ends.
+# A whole credential word (optionally plural) between key separators or ends: the
+# generic words, the LogicMonitor credential property words (ssh.pass, snmp.community,
+# snmp.auth, snmp.priv) and the cloud compounds written as one word (aws.secretkey).
 _CREDENTIAL_WORD = re.compile(
-    r"(?:^|_)(?:password|passwd|token|secret|key|credential|extra_vars)s?(?:_|$)"
+    r"(?:^|_)(?:password|passwd|passphrase|pass|token|secret|key|credential"
+    r"|community|auth|priv|extra_vars|apikey|secretkey|accesskey|privatekey|clientsecret)"
+    r"s?(?:_|$)"
 )
 # A key naming an identifier (token_id, api_key_id, device_ids) is not a credential.
 _IDENTIFIER_SUFFIX = re.compile(r"(?:^|_)ids?$")
+# Name/value pairs whose value is a credential when the paired name is one:
+# update_device_property's arguments, and the {name, value} items of LM property lists.
+_PAIRED_KEYS = (("property_name", "property_value"), ("name", "value"))
 
 
 def configure_logging(config: LMConfig) -> logging.Handler:
@@ -90,7 +97,10 @@ def redact_arguments(arguments: Any) -> Any:
 
     Walks nested objects and lists. A value under a sensitive key is replaced
     whole, whatever its shape, so an ``extra_vars`` object is hidden entirely.
-    The input is not modified.
+    An object that pairs a name with a value (``property_name`` with
+    ``property_value``, or ``name`` with ``value``) has the value replaced when
+    the name is a credential property such as ``ssh.pass``. The input is not
+    modified.
 
     Args:
         arguments: The arguments passed to a tool, or any value inside them.
@@ -99,12 +109,17 @@ def redact_arguments(arguments: Any) -> Any:
         The same structure with sensitive values replaced by ``***``.
     """
     if isinstance(arguments, Mapping):
-        return {
+        redacted = {
             key: REDACTED
             if isinstance(key, str) and is_sensitive_key(key)
             else redact_arguments(value)
             for key, value in arguments.items()
         }
+        for name_key, value_key in _PAIRED_KEYS:
+            name = arguments.get(name_key)
+            if value_key in redacted and isinstance(name, str) and is_sensitive_key(name):
+                redacted[value_key] = REDACTED
+        return redacted
     if isinstance(arguments, list):
         return [redact_arguments(value) for value in arguments]
     return arguments
