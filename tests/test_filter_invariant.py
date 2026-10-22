@@ -12,7 +12,8 @@ unless the interpolated expression is a ``quote_filter_value(...)`` call or is l
 in ``tests/fixtures/filter_interpolation_allowlist.txt`` as ``module.py: expression``.
 
 The allowlist holds the integer, boolean and constant-map interpolations that cannot
-carry a quote. Run this file directly to print the current hits in allowlist form.
+carry a quote, and a value already built from ``quote_filter_value`` output. Run this
+file directly to print the current hits in allowlist form.
 """
 
 from __future__ import annotations
@@ -107,7 +108,8 @@ def test_every_filter_value_is_quoted_or_allowlisted() -> None:
     offenders = [hit for hit in hits if hit.key not in allowlist]
     assert not offenders, (
         "Filter values interpolated without quote_filter_value "
-        "(route them through the helper, or allowlist an integer-only interpolation "
+        "(route them through the helper, or allowlist an interpolation that cannot carry "
+        "a raw string "
         f"in {ALLOWLIST_PATH.relative_to(REPO_ROOT)}):\n"
         + "\n".join(f"  {hit}" for hit in offenders)
     )
