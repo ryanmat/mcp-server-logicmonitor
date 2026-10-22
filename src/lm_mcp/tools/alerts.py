@@ -12,11 +12,11 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    paginated_response,
     portal_url,
     quote_filter_value,
     require_write_permission,
     resolve_group_filter,
-    safe_total,
     sanitize_filter_value,
 )
 
@@ -152,14 +152,8 @@ async def get_alerts(
                 }
             )
 
-        total = safe_total(result)
-        has_more = (offset + len(alerts)) < total
-
         response = {
-            "total": total,
-            "count": len(alerts),
-            "offset": offset,
-            "has_more": has_more,
+            **paginated_response(alerts, result, offset),
             "alerts": alerts,
         }
 
