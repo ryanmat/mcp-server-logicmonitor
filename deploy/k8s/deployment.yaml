@@ -72,8 +72,9 @@ spec:
                 secretKeyRef:
                   name: lm-mcp-credentials
                   key: bearer-token
-            # Requires a bearer token on /mcp and /api/v1/*. Drop this block only
-            # if the service is unreachable from outside the cluster.
+            # Requires a bearer token on /mcp and /api/v1/*. The pod binds 0.0.0.0,
+            # so the server refuses to start without it unless
+            # LM_HTTP_ALLOW_UNAUTHENTICATED is true (a listener protected another way).
             - name: LM_HTTP_AUTH_TOKEN
               valueFrom:
                 secretKeyRef:
