@@ -796,6 +796,22 @@ class TestPathSegmentGuard:
 
     @pytest.mark.asyncio
     @respx.mock
+    @pytest.mark.parametrize("method", ["put", "patch"])
+    async def test_put_and_patch_traversal_is_refused(self, method):
+        """PUT and PATCH refuse a traversal segment before sending their body."""
+        from lm_mcp.exceptions import ValidationError
+
+        route = respx.route().mock(return_value=Response(200, json={}))
+        async with _guard_client() as client:
+            with pytest.raises(ValidationError, match=r"'\.\.'"):
+                await getattr(client, method)(
+                    "/device/devices/1/../../setting/admins/1", json_body={"roles": []}
+                )
+
+        assert not route.called
+
+    @pytest.mark.asyncio
+    @respx.mock
     @pytest.mark.parametrize(
         "segment",
         ["%2e%2e", "%2E%2E", ".%2e", "a%2fb", "a%2Fb", "x%3fy", "x%3Fy", "x%23y", "x#y", "."],
