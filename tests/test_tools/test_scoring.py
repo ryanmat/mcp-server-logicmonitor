@@ -1477,3 +1477,50 @@ class TestResolveDevice:
         )
 
         assert await _resolve_device(client, None, "web-02") == {"id": 5, "displayName": "web-02"}
+
+
+class TestAvailabilityDeviceWithGroup:
+    """R4.3: a device and a group together have no single scope, so they are refused."""
+
+    @pytest.mark.parametrize(
+        "device_args", [{"device_id": 5}, {"device_name": "web-02"}], ids=["id", "name"]
+    )
+    @respx.mock
+    async def test_device_with_group_is_refused_before_any_read(self, client, device_args):
+        from lm_mcp.tools import ErrorContent
+        from lm_mcp.tools.scoring import calculate_availability
+
+        result = await calculate_availability(client, group_id=7, **device_args)
+
+        assert isinstance(result[0], ErrorContent)
+        assert "group_id" in result[0].text
+        assert "not both" in result[0].text
+        assert len(respx.calls) == 0
+
+    @respx.mock
+    async def test_error_budget_surfaces_the_refusal(self, client):
+        from lm_mcp.tools import ErrorContent
+        from lm_mcp.tools.scoring import calculate_error_budget
+
+        result = await calculate_error_budget(client, device_id=5, group_id=7)
+
+        assert isinstance(result[0], ErrorContent)
+        assert "not both" in result[0].text
+        assert len(respx.calls) == 0
+
+    @respx.mock
+    async def test_group_alone_reads_the_group_alerts(self, client):
+        from lm_mcp.tools.scoring import calculate_availability
+
+        respx.get(f"{DEVICES_URL.rsplit('/', 1)[0]}/groups/7").mock(
+            return_value=httpx.Response(200, json={"id": 7, "fullPath": "Sites/East"})
+        )
+        route = respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        result = await calculate_availability(client, group_id=7)
+
+        data = json.loads(result[0].text)
+        assert data["availability_percent"] == 100.0
+        assert 'monitorObjectGroups~"Sites/East"' in route.calls[0].request.url.params["filter"]

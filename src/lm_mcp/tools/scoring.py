@@ -220,7 +220,7 @@ async def calculate_availability(
         client: LogicMonitor API client.
         device_id: Optional device ID filter.
         device_name: Optional device display name filter.
-        group_id: Optional device group ID filter.
+        group_id: Optional device group ID filter; not with a device.
         hours_back: Hours to look back (default: 720 = 30 days).
         severity_threshold: Minimum severity to count as downtime
             (critical, error, warning, info). Default: error.
@@ -233,6 +233,24 @@ async def calculate_availability(
         now_epoch = int(time.time())
         start_epoch = now_epoch - (hours_back * 3600)
         total_window_minutes = hours_back * 60
+
+        # A device's alert list ignores group filters, so a device and a group
+        # together have no single scope to read.
+        if group_id is not None and (device_id is not None or device_name is not None):
+            return format_response(
+                {
+                    "error": True,
+                    "code": "INVALID_PARAMETER",
+                    "message": (
+                        "Pass a device (device_id or device_name) or group_id, not both: "
+                        "a device's alert list cannot be filtered by group."
+                    ),
+                    "suggestion": (
+                        "Drop group_id for the device's availability, "
+                        "or drop the device for the group's."
+                    ),
+                }
+            )
 
         # Resolve the device before reading any alert. A device that does not
         # exist is an error, not a clean 100 percent, and a failed lookup must
