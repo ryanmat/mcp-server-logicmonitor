@@ -138,13 +138,18 @@ def quote_filter_value(value: str) -> str:
     in double quotes. Numeric and boolean values work without quotes, but
     string values silently return zero results when unquoted.
 
+    Backslashes and double quotes inside the value are escaped, backslash
+    first, so the value cannot close its quotes and append filter clauses
+    (an unescaped ``a"|"b`` would send two clauses joined by OR).
+
     Args:
         value: The string value to quote.
 
     Returns:
-        The value wrapped in double quotes.
+        The escaped value wrapped in double quotes.
     """
-    return f'"{value}"'
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]:
