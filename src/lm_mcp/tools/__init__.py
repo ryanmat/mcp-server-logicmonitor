@@ -7,7 +7,7 @@ import functools
 import json
 import logging
 from collections.abc import Callable
-from typing import Any, ClassVar, TypeVar
+from typing import Any, ClassVar, TypeVar, overload
 
 from mcp.types import TextContent
 
@@ -152,11 +152,27 @@ def quote_filter_value(value: str) -> str:
     return f'"{escaped}"'
 
 
+@overload
+def sanitize_filter_value(value: str) -> tuple[str, bool]: ...
+
+
+@overload
+def sanitize_filter_value(value: None) -> tuple[None, bool]: ...
+
+
+@overload
+def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]: ...
+
+
 def sanitize_filter_value(value: str | None) -> tuple[str | None, bool]:
     """Strip wildcard characters (* and ?) from a filter value.
 
     The LogicMonitor ~ operator already performs substring matching,
     so wildcards are unnecessary and cause issues when URL-encoded.
+
+    The overloads keep a str input typed as a str output, so a call site that
+    has already narrowed its argument can pass the cleaned value straight to
+    quote_filter_value.
 
     Args:
         value: The filter value to sanitize. May be None.
