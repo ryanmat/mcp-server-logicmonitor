@@ -1,6 +1,7 @@
 # Description: Tests for LogicMonitor API client.
 # Description: Uses respx to mock HTTP responses for testing.
 
+import httpx
 import pytest
 import respx
 from httpx import Response
@@ -1062,3 +1063,64 @@ class TestRetryPolicy:
             with pytest.raises(ServerError):
                 await client.ingest_post("/rest/log/ingest", json_body=[{"msg": "x"}])
         assert failing.call_count == 1
+
+
+class TestTransportErrorTranslation:
+    """R3.5: timeouts and dropped connections surface as LMConnectionError, like ConnectError.
+
+    They are not resent: a request that timed out or lost its connection may have
+    reached the server, and ConnectError is not resent either.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        "exc", [httpx.ReadTimeout(""), httpx.ConnectTimeout(""), httpx.PoolTimeout("")]
+    )
+    async def test_timeout_names_the_timeout_and_the_path(self, exc, waits):
+        from lm_mcp.exceptions import LMConnectionError
+
+        route = respx.get(f"{_API}/device/devices").mock(side_effect=exc)
+        async with _retry_client() as client:
+            with pytest.raises(LMConnectionError) as exc_info:
+                await client.get("/device/devices")
+
+        assert "timed out" in exc_info.value.message
+        assert "/device/devices" in exc_info.value.message
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize("exc", [httpx.RemoteProtocolError(""), httpx.ReadError("")])
+    async def test_dropped_connection_gets_a_message(self, exc, waits):
+        """httpx raises these with an empty message; the translation still says what failed."""
+        from lm_mcp.exceptions import LMConnectionError
+
+        route = respx.get(f"{_API}/device/devices").mock(side_effect=exc)
+        async with _retry_client() as client:
+            with pytest.raises(LMConnectionError) as exc_info:
+                await client.get("/device/devices")
+
+        assert type(exc).__name__ in exc_info.value.message
+        assert "/device/devices" in exc_info.value.message
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("call", "args"),
+        [
+            ("post_multipart", ("/setting/datasources/importjson", {"name": "x"})),
+            ("ingest_post", ("/rest/log/ingest", [{"msg": "x"}])),
+        ],
+    )
+    async def test_import_and_ingest_translate_timeouts(self, call, args, waits):
+        from lm_mcp.exceptions import LMConnectionError
+
+        respx.route().mock(side_effect=httpx.ReadTimeout(""))
+        async with _retry_client() as client:
+            with pytest.raises(LMConnectionError) as exc_info:
+                await getattr(client, call)(*args)
+
+        assert "timed out" in exc_info.value.message
+        assert args[0] in exc_info.value.message

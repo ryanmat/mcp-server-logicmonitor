@@ -4,16 +4,15 @@
 import asyncio
 import contextlib
 import json
-import random
 import re
 import time
 
 import httpx
 
 from lm_mcp.auth import AuthProvider
+from lm_mcp.client._retry import TRANSPORT_ERRORS, backoff, should_retry, transport_error
 from lm_mcp.exceptions import (
     AuthenticationError,
-    LMConnectionError,
     LMError,
     LMPermissionError,
     NotFoundError,
@@ -151,36 +150,6 @@ def _check_path(path: str) -> None:
                 f"Path segment {segment!r} is not allowed in {path!r}",
                 suggestion="Pass resource ids as plain values without '/', '?', '#' or '..'.",
             )
-
-
-# Methods safe to resend after a 5xx: repeating them cannot apply a change twice.
-_IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "PUT", "DELETE"})
-
-
-def _should_retry(method: str, status: int) -> bool:
-    """Return whether a response with this status may be retried for this method.
-
-    A 429 means the request was refused unprocessed, so any method is resent.
-    A 5xx may come after the server applied the change, so only idempotent
-    methods are resent; a POST or PATCH could otherwise create or apply twice.
-    """
-    if status == 429:
-        return True
-    return status >= 500 and method.upper() in _IDEMPOTENT_METHODS
-
-
-def _backoff(attempt: int, retry_after: int | None, cap: int) -> float:
-    """Seconds to wait before retry ``attempt + 1``.
-
-    Exponential backoff with jitter spreads out retries from many clients. A
-    server's Retry-After can lengthen the wait but never shorten it, and the
-    result never exceeds ``cap``.
-    """
-    base_backoff = 2.0**attempt
-    wait = base_backoff + random.uniform(0, 0.5 * base_backoff)
-    if retry_after is not None:
-        wait = max(retry_after, wait)
-    return min(wait, cap)
 
 
 class LogicMonitorClient:
@@ -399,17 +368,17 @@ class LogicMonitorClient:
                     content=content,
                     headers=headers,
                 )
-            except httpx.ConnectError as e:
-                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}") from e
+            except TRANSPORT_ERRORS as e:
+                raise transport_error(e, "LogicMonitor API", method, url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if _should_retry(method, response.status_code):
+            if should_retry(method, response.status_code):
                 message, retry_after = self._parse_error_response(response)
                 last_message = message
                 last_retry_after = retry_after
 
                 if attempt < self.max_retries:
-                    await asyncio.sleep(_backoff(attempt, retry_after, self.retry_after_cap))
+                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
                     continue
 
             if response.status_code >= 400:
@@ -504,17 +473,17 @@ class LogicMonitorClient:
                     headers=headers,
                     params=params,
                 )
-            except httpx.ConnectError as e:
-                raise LMConnectionError(f"Failed to connect to {self.base_url}: {e}") from e
+            except TRANSPORT_ERRORS as e:
+                raise transport_error(e, "LogicMonitor API", "POST", url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if _should_retry("POST", response.status_code):
+            if should_retry("POST", response.status_code):
                 message, retry_after = self._parse_error_response(response)
                 last_message = message
                 last_retry_after = retry_after
 
                 if attempt < self.max_retries:
-                    await asyncio.sleep(_backoff(attempt, retry_after, self.retry_after_cap))
+                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
                     continue
 
             if response.status_code >= 400:
@@ -621,17 +590,17 @@ class LogicMonitorClient:
                     content=content,
                     headers=headers,
                 )
-            except httpx.ConnectError as e:
-                raise LMConnectionError(f"Failed to connect to {self.ingest_url}: {e}") from e
+            except TRANSPORT_ERRORS as e:
+                raise transport_error(e, "LogicMonitor ingest", "POST", url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if _should_retry("POST", response.status_code):
+            if should_retry("POST", response.status_code):
                 message, retry_after = self._parse_error_response(response)
                 last_message = message
                 last_retry_after = retry_after
 
                 if attempt < self.max_retries:
-                    await asyncio.sleep(_backoff(attempt, retry_after, self.retry_after_cap))
+                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
                     continue
 
             # Handle 202 Accepted (success for ingestion)
