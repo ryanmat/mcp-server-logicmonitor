@@ -1467,6 +1467,31 @@ class TestClearedAlerts:
         assert data["flapping_alerts"][0]["gap_seconds"] == 600
 
     @pytest.mark.parametrize(
+        ("second_start", "flaps"),
+        [(BASE_EPOCH + 600, 0), (BASE_EPOCH + 1200, 1)],
+        ids=["opens-before-the-clear", "re-fires-as-it-clears"],
+    )
+    @respx.mock
+    async def test_a_flap_needs_the_clear_before_the_refire(self, client, second_start, flaps):
+        from lm_mcp.tools.scoring import score_alert_noise
+
+        # An alert that opens while the previous one is still open overlaps it, so
+        # nothing cleared and re-fired; a live portal day held 660 such pairs among
+        # 4210 counted flaps. A re-fire in the second it cleared is a flap.
+        cleared = [
+            _make_alert(1, "s1", "CPU", start_epoch=BASE_EPOCH, end_epoch=BASE_EPOCH + 1200),
+            _make_alert(2, "s1", "CPU", start_epoch=second_start, end_epoch=BASE_EPOCH + 2400),
+        ]
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([], cleared))
+
+        result = await score_alert_noise(client)
+
+        data = json.loads(result[0].text)
+        assert data["total_alerts"] == 2
+        assert data["flap_count"] == flaps
+        assert len(data["flapping_alerts"]) == flaps
+
+    @pytest.mark.parametrize(
         ("call", "url"),
         [
             ("availability_portal", ALERT_URL),

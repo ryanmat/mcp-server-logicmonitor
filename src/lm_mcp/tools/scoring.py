@@ -126,8 +126,9 @@ async def score_alert_noise(
                 curr = sorted_events[i]
                 prev_end = prev.get("endEpoch", 0)
                 curr_start = curr.get("startEpoch", 0)
-                # endEpoch=0 means still active, skip for flap detection
-                if prev_end > 0 and curr_start - prev_end < 1800:
+                # endEpoch=0 means still active, skip for flap detection; an alert
+                # that starts before the previous one cleared overlaps it, no re-fire
+                if prev_end > 0 and 0 <= curr_start - prev_end < 1800:
                     flap_count += 1
                     if len(flapping_alerts) < 10:
                         flapping_alerts.append(
