@@ -122,8 +122,9 @@ async def _maybe_summarize(
 ) -> None:
     """Optionally append NL summary to a workflow report via watsonx.
 
-    Does nothing if summarize is False or watsonx is not configured.
-    On failure, appends a warning rather than raising.
+    Does nothing if summarize is False. When no summary model is configured, or
+    the summary call fails, appends a warning and attaches the warnings list to
+    the report, so the warning is returned even if it is the only one.
     """
     if not summarize:
         return
@@ -134,12 +135,19 @@ async def _maybe_summarize(
 
         wx = get_watsonx_client()
         if wx is None:
+            warnings.append(
+                "NL summary requested but not configured: set WATSONX_API_KEY or "
+                "install the HuggingFace fallback"
+            )
+            report["warnings"] = warnings
             return
 
         summary = await nl_summarize_helper(wx, report, workflow_name)
         report["nl_summary"] = summary
     except Exception as exc:
+        _AUDIT.warning("%s: NL summary failed: %s", workflow_name, exc, exc_info=True)
         warnings.append(f"NL summary failed: {exc}")
+        report["warnings"] = warnings
 
 
 # ---------------------------------------------------------------------------
@@ -696,6 +704,12 @@ async def capacity_plan(
 
         report["datasources"] = ds_reports
 
+        # The summary level trims the raw datasources block, so it keeps each
+        # forecast's headline and every per-instance error in its place.
+        if detail_level == "summary":
+            report["forecast_summary"] = _forecast_summary(ds_reports)
+            warnings.extend(_instance_errors(ds_reports))
+
         if warnings:
             report["warnings"] = warnings
 
@@ -706,6 +720,51 @@ async def capacity_plan(
         return format_response(report)
     except Exception as e:
         return handle_error(e)
+
+
+# Per-instance error keys capacity_plan records, one per analysis.
+_INSTANCE_ERROR_KEYS = ("forecast_error", "trend_error", "seasonality_error", "change_points_error")
+
+
+def _forecast_summary(ds_reports: list[dict]) -> list[dict]:
+    """One headline row per forecast datapoint: method, days to breach, trend.
+
+    A datapoint the forecast could not run on carries its status instead.
+    """
+    rows: list[dict] = []
+    for ds in ds_reports:
+        for inst in ds["instances"]:
+            forecasts = (inst.get("forecast") or {}).get("forecasts") or {}
+            for datapoint, fc in forecasts.items():
+                row = {
+                    "datasource": ds["datasource"],
+                    "instance": inst["instance"],
+                    "datapoint": datapoint,
+                }
+                if "status" in fc:
+                    row["status"] = fc["status"]
+                else:
+                    row["method"] = fc.get("method_used")
+                    row["days_until_breach"] = fc.get("days_until_breach")
+                    row["trend"] = fc.get("trend")
+                    if fc.get("fallback_reason"):
+                        row["fallback_reason"] = fc["fallback_reason"]
+                rows.append(row)
+    return rows
+
+
+def _instance_errors(ds_reports: list[dict]) -> list[str]:
+    """Every per-instance analysis error, as warning lines naming datasource and instance."""
+    errors: list[str] = []
+    for ds in ds_reports:
+        for inst in ds["instances"]:
+            for key in _INSTANCE_ERROR_KEYS:
+                if key in inst:
+                    analysis = key.removesuffix("_error")
+                    errors.append(
+                        f"{analysis} for {ds['datasource']}/{inst['instance']} failed: {inst[key]}"
+                    )
+    return errors
 
 
 # ---------------------------------------------------------------------------

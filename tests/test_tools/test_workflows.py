@@ -133,6 +133,58 @@ def _site_devices(count: int, status: str) -> list[dict]:
     ]
 
 
+@pytest.fixture
+def lm_env(monkeypatch):
+    """LM credentials and no tool filters, so composite tools pass check_required_tools."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
+    monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
+    monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
+    monkeypatch.delenv("LM_MCP_CATEGORIES", raising=False)
+
+
+_DS_URL = f"{_BASE}/device/devices/1/devicedatasources"
+
+
+def _mock_capacity_portal(instance_data: dict[int, httpx.Response]) -> None:
+    """Route capacity_plan for device 1, datasource CPU (10), one data read per instance."""
+    respx.get(f"{_BASE}/device/devices/1").mock(
+        return_value=_ok({"id": 1, "displayName": "server-01"})
+    )
+    respx.get(_DS_URL).mock(
+        return_value=_ok({"items": [{"id": 10, "dataSourceName": "CPU"}], "total": 1})
+    )
+    respx.get(f"{_DS_URL}/10/instances").mock(
+        return_value=_ok(
+            {
+                "items": [{"id": iid, "displayName": f"cpu{iid}"} for iid in instance_data],
+                "total": len(instance_data),
+            }
+        )
+    )
+    for iid, response in instance_data.items():
+        respx.get(f"{_DS_URL}/10/instances/{iid}/data").mock(return_value=response)
+
+
+def _rising_cpu_and_sparse_mem() -> httpx.Response:
+    """cpu climbs 10 per 5 minutes toward the 90 threshold; mem has one sample."""
+    rows = [
+        [10.0, "No Data"],
+        [20.0, "No Data"],
+        [30.0, 55.0],
+        [40.0, "No Data"],
+        [50.0, "No Data"],
+    ]
+    start = int(time.time()) - 3600
+    return _ok(
+        {
+            "dataPoints": ["cpu", "mem"],
+            "values": rows,
+            "time": [(start + i * 300) * 1000 for i in range(len(rows))],
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
 # TestCheckRequiredTools
 # ---------------------------------------------------------------------------
@@ -563,6 +615,110 @@ class TestCapacityPlan:
         assert "datasources" in data
         assert len(data["datasources"]) == 1
         reset_config()
+
+    @respx.mock
+    async def test_summary_carries_forecast_headlines_and_instance_errors(self, auth, lm_env):
+        """R4.4: the summary keeps each forecast's headline and every per-instance error.
+
+        cpu100 forecasts; cpu101's data read fails, so its forecast, trend and
+        seasonality each fail. The raw datasources block is still trimmed.
+        """
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _rising_cpu_and_sparse_mem(), 101: _portal_error()})
+
+        result = await capacity_plan(client, device_id=1)
+
+        data = json.loads(result[0].text)
+        assert "datasources" not in data
+        cpu, mem = data["forecast_summary"]
+        assert cpu["datasource"] == "CPU"
+        assert cpu["instance"] == "cpu100"
+        assert cpu["datapoint"] == "cpu"
+        assert cpu["method"] == "linear"
+        assert cpu["trend"] == "increasing"
+        assert cpu["days_until_breach"] > 0
+        assert mem == {
+            "datasource": "CPU",
+            "instance": "cpu100",
+            "datapoint": "mem",
+            "status": "insufficient_data",
+        }
+        failed = [w for w in data["warnings"] if "CPU/cpu101" in w]
+        assert [w.split(" for ")[0] for w in failed] == ["forecast", "trend", "seasonality"]
+        assert all("portal unavailable" in w for w in failed)
+
+    @respx.mock
+    async def test_full_detail_is_unchanged(self, auth, lm_env):
+        """R4.4: detail_level=full keeps the raw block and adds no summary or copied errors."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _rising_cpu_and_sparse_mem(), 101: _portal_error()})
+
+        result = await capacity_plan(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert "forecast_summary" not in data
+        assert "warnings" not in data
+        failed = data["datasources"][0]["instances"][1]
+        assert failed["instance"] == "cpu101"
+        assert "portal unavailable" in failed["forecast_error"]
+        assert "portal unavailable" in failed["trend_error"]
+
+
+def _real_watsonx_client():
+    """A WatsonxClient built through its constructor with the SDK's client classes patched."""
+    from unittest.mock import MagicMock
+
+    from lm_mcp.client.watsonx import WatsonxClient
+
+    with (
+        patch("ibm_watsonx_ai.Credentials", return_value=MagicMock()),
+        patch("ibm_watsonx_ai.APIClient", return_value=MagicMock()),
+    ):
+        return WatsonxClient(
+            api_key="test-key",
+            url="https://us-south.ml.cloud.ibm.com",
+            project_id="proj-123",
+        )
+
+
+class TestSummaryFailureWarnings:
+    """R4.4: a requested NL summary that does not arrive is reported in warnings."""
+
+    @respx.mock
+    async def test_summary_without_a_model_is_warned(self, auth, lm_env):
+        """R4.4: triage(summarize=True) with no summary model returns a warning saying so."""
+        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+
+        result = await triage(client, summarize=True)
+
+        data = json.loads(result[0].text)
+        assert "nl_summary" not in data
+        (warning,) = data["warnings"]
+        assert warning.startswith("NL summary requested but")
+        assert "not configured" in warning
+
+    @respx.mock
+    async def test_failing_summary_names_the_error(self, auth, lm_env):
+        """R4.4: triage(summarize=True) with watsonx failing returns the error in warnings."""
+        from lm_mcp.server import _set_watsonx_client
+
+        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _set_watsonx_client(_real_watsonx_client())
+
+        with patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls:
+            model_cls.return_value.generate_text.side_effect = RuntimeError(
+                "503 Service Unavailable"
+            )
+            result = await triage(client, summarize=True)
+
+        data = json.loads(result[0].text)
+        assert "nl_summary" not in data
+        (warning,) = data["warnings"]
+        assert warning.startswith("NL summary failed")
+        assert "503 Service Unavailable" in warning
+        model_cls.return_value.generate_text.assert_called_once()
 
     async def test_surfaces_forecast_failure(self, client, monkeypatch):
         """A failing forecast sub-tool is surfaced as forecast_error, not a silent None."""
