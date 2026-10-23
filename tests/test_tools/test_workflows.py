@@ -25,6 +25,7 @@ from lm_mcp.tools.workflows import (
     search_tools,
     triage,
 )
+from tests.watsonx_sdk import real_watsonx_client
 
 
 @pytest.fixture
@@ -664,23 +665,6 @@ class TestCapacityPlan:
         assert "portal unavailable" in failed["trend_error"]
 
 
-def _real_watsonx_client():
-    """A WatsonxClient built through its constructor with the SDK's client classes patched."""
-    from unittest.mock import MagicMock
-
-    from lm_mcp.client.watsonx import WatsonxClient
-
-    with (
-        patch("ibm_watsonx_ai.Credentials", return_value=MagicMock()),
-        patch("ibm_watsonx_ai.APIClient", return_value=MagicMock()),
-    ):
-        return WatsonxClient(
-            api_key="test-key",
-            url="https://us-south.ml.cloud.ibm.com",
-            project_id="proj-123",
-        )
-
-
 class TestSummaryFailureWarnings:
     """R4.4: a requested NL summary that does not arrive is reported in warnings."""
 
@@ -705,7 +689,7 @@ class TestSummaryFailureWarnings:
 
         respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        _set_watsonx_client(_real_watsonx_client())
+        _set_watsonx_client(real_watsonx_client())
 
         with patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls:
             model_cls.return_value.generate_text.side_effect = RuntimeError(

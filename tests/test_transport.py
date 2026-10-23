@@ -302,6 +302,40 @@ class TestRunStdioStartup:
         self.serve.assert_awaited_once()
         assert any("HuggingFace fallback disabled" in r.getMessage() for r in caplog.records)
 
+    async def test_watsonx_construction_failure_logs_and_reaches_serve_loop(
+        self, monkeypatch, caplog
+    ):
+        """R4.5: a watsonx SDK constructor failure is logged, leaves watsonx unset, and serves.
+
+        The SDK's APIClient fetches an IAM token on construction, so a bad key or
+        an unreachable IAM endpoint fails there with WMLClientError.
+        """
+        from unittest.mock import MagicMock
+
+        from ibm_watsonx_ai.wml_client_error import WMLClientError
+
+        from lm_mcp import server as server_module
+
+        monkeypatch.setenv("WATSONX_API_KEY", "test-key")
+        monkeypatch.setenv("WATSONX_PROJECT_ID", "test-project")
+        monkeypatch.setattr("ibm_watsonx_ai.Credentials", MagicMock())
+        monkeypatch.setattr(
+            "ibm_watsonx_ai.APIClient",
+            MagicMock(side_effect=WMLClientError("Error getting IAM Token.")),
+        )
+        serving_watsonx = []
+        self.serve.side_effect = lambda *args: serving_watsonx.append(server_module._watsonx_client)
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport"):
+            await run_stdio()
+
+        self.serve.assert_awaited_once()
+        assert serving_watsonx == [None]
+        (record,) = [r for r in caplog.records if "watsonx" in r.getMessage()]
+        assert record.levelno == logging.ERROR
+        assert record.exc_info is not None
+        assert "Error getting IAM Token." in str(record.exc_info[1])
+
     async def test_single_portal_client_uses_configured_max_retries(self, monkeypatch):
         """R1.6, R3.5: the client gets LM_MAX_RETRIES and LM_RETRY_AFTER_CAP_SECONDS."""
         from lm_mcp import server as server_module

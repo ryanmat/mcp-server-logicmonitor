@@ -87,6 +87,13 @@ def bootstrap_backends(config: LMConfig) -> Backends:
                 "ibm-watsonx-ai not installed; watsonx tools disabled. "
                 "Install with: uv add 'lm-mcp[ibm]'"
             )
+        except Exception:
+            # The SDK's APIClient fetches an IAM token on construction, so a bad key
+            # or an unreachable IAM endpoint fails here; the LM server serves without it.
+            logger.exception(
+                "watsonx client construction failed; watsonx tools disabled. "
+                "Check WATSONX_API_KEY, WATSONX_URL and WATSONX_PROJECT_ID."
+            )
 
     # HuggingFace local fallback when watsonx API is not configured
     if backends.watsonx is None:
