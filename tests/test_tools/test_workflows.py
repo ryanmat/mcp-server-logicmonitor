@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import json
+import time
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
+import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
@@ -56,6 +59,78 @@ def _mock_text(data: dict) -> list:
 def _patch_sub(module_path: str, data: dict) -> patch:
     """Return an AsyncMock patch that returns TextContent wrapping *data*."""
     return patch(module_path, new_callable=AsyncMock, return_value=_mock_text(data))
+
+
+# ---------------------------------------------------------------------------
+# Helpers for driving detect_site_outage through respx
+# ---------------------------------------------------------------------------
+
+_BASE = "https://test.logicmonitor.com/santaba/rest"
+
+
+def _ok(payload: dict) -> httpx.Response:
+    return httpx.Response(200, json=payload)
+
+
+def _portal_error() -> httpx.Response:
+    return httpx.Response(500, json={"errorMessage": "portal unavailable"})
+
+
+def _alert_window(*alerts: dict) -> httpx.Response:
+    return _ok({"items": list(alerts), "total": len(alerts)})
+
+
+def _power_alert() -> dict:
+    return {
+        "id": 7,
+        "dataSourceName": "APC_UPS_Battery",
+        "alertName": "OnBattery",
+        "monitorObjectName": "ups-1",
+        "startEpoch": int(time.time()) - 60,
+        "severity": 4,
+    }
+
+
+def _mock_site_portal(
+    devices: list[dict],
+    collector_down: httpx.Response,
+    burst: httpx.Response,
+    power: httpx.Response,
+) -> None:
+    """Route one detect_site_outage run on group 42, served by collector 1.
+
+    Burst detection and power events read the same alert window with the same
+    filter, burst first, so the window reads are served in that order. The
+    CollectorDown read is told apart by its filter.
+    """
+
+    def device_route(request: httpx.Request) -> httpx.Response:
+        if request.url.params.get("filter", "").startswith("currentCollectorId"):
+            return _ok({"items": [], "total": len(devices)})
+        return _ok({"items": devices, "total": len(devices)})
+
+    window_reads = iter([burst, power])
+
+    def alert_route(request: httpx.Request) -> httpx.Response:
+        if "CollectorDown" in request.url.params.get("filter", ""):
+            return collector_down
+        return next(window_reads)
+
+    respx.get(f"{_BASE}/device/devices").mock(side_effect=device_route)
+    respx.get(f"{_BASE}/setting/collector/collectors/1").mock(
+        return_value=_ok({"id": 1, "hostname": "col-01", "status": 1, "numberOfHosts": 5})
+    )
+    respx.get(f"{_BASE}/device/groups/42").mock(
+        return_value=_ok({"id": 42, "fullPath": "Sites/HQ"})
+    )
+    respx.get(f"{_BASE}/alert/alerts").mock(side_effect=alert_route)
+
+
+def _site_devices(count: int, status: str) -> list[dict]:
+    return [
+        {"id": i, "displayName": f"sw-{i}", "hostStatus": status, "currentCollectorId": 1}
+        for i in range(1, count + 1)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -1151,8 +1226,10 @@ class TestDetectSiteOutage:
         assert len(data["warnings"]) >= 1
         assert any("collector health probes failed" in w for w in data["warnings"])
         assert any("collector_id=1" in w for w in data["warnings"])
-        # No CollectorDown signal → collector_down triggered is False
-        assert data["signals"]["collector_down"]["triggered"] is False
+        # A failed probe leaves the CollectorDown signal unknown, not untriggered.
+        assert data["signals"]["collector_down"]["triggered"] is None
+        assert data["signals"]["collector_down"]["status"] == "unavailable"
+        assert data["unavailable_signals"] == ["collector_down"]
 
     async def test_partial_collector_failures_do_not_abort_loop(self, client):
         """One bad collector probe no longer aborts the rest (v3.8.2 fix).
@@ -1227,6 +1304,135 @@ class TestDetectSiteOutage:
         # Warning mentions the failed collector specifically.
         assert any("collector_id=20" in w for w in data["warnings"])
         assert any("1/3" in w for w in data["warnings"])
+
+    @respx.mock
+    async def test_failed_burst_read_is_unavailable_not_negative(self, auth):
+        """R4.4: a failed burst read is unknown; power alone cannot settle the verdict.
+
+        Power (25) is the only known trigger. Read as untriggered, the lost burst
+        signal would have scored 25 and said no_outage_signature; known, it could
+        have reached 50, so the verdict cannot be named.
+        """
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(1, "normal"),
+            collector_down=_alert_window(),
+            burst=_portal_error(),
+            power=_alert_window(_power_alert()),
+        )
+
+        result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        burst = data["signals"]["interface_burst"]
+        assert burst["triggered"] is None
+        assert burst["status"] == "unavailable"
+        assert "portal unavailable" in burst["error"]
+        assert data["signals"]["power_events"] == {"triggered": True, "count": 1, "weight": 25}
+        assert data["confidence"] == 25
+        assert data["confidence_level"] == "reduced"
+        assert data["unavailable_signals"] == ["interface_burst"]
+        assert data["verdict"] == "indeterminate"
+        assert any("Burst detection failed" in w for w in data["warnings"])
+
+    @respx.mock
+    async def test_unavailable_signal_that_cannot_change_the_verdict_keeps_it(self, auth):
+        """R4.4: the verdict comes from the signals that read when the lost one cannot move it.
+
+        CollectorDown (40), power (25) and silence (10) score 75; the lost burst
+        signal could only raise that, and site_outage_detected starts at 70.
+        """
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(5, "dead"),
+            collector_down=_alert_window(
+                {"id": 9, "alertType": "CollectorDown", "monitorObjectName": "col-01"}
+            ),
+            burst=_portal_error(),
+            power=_alert_window(_power_alert()),
+        )
+
+        result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["verdict"] == "site_outage_detected"
+        assert data["confidence"] == 75
+        assert data["confidence_level"] == "reduced"
+        assert data["unavailable_signals"] == ["interface_burst"]
+        assert data["signals"]["collector_down"]["triggered"] is True
+
+    @respx.mock
+    async def test_every_alert_read_failing_is_indeterminate(self, auth):
+        """R4.4: with the CollectorDown, burst and power reads all failing, no verdict is named.
+
+        Throttling during an outage fails exactly these reads; before R4.4 the run
+        said no_outage_signature.
+        """
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(1, "normal"),
+            collector_down=_portal_error(),
+            burst=_portal_error(),
+            power=_portal_error(),
+        )
+
+        result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["verdict"] == "indeterminate"
+        assert data["confidence"] == 0
+        assert data["confidence_level"] == "reduced"
+        assert data["unavailable_signals"] == [
+            "collector_down",
+            "interface_burst",
+            "power_events",
+        ]
+        for name in ("collector_down", "interface_burst", "power_events"):
+            assert data["signals"][name]["triggered"] is None
+            assert data["signals"][name]["status"] == "unavailable"
+        assert data["signals"]["device_silence"]["triggered"] is False
+        assert not any("No outage signature" in r for r in data["recommendations"])
+
+    @respx.mock
+    async def test_all_signals_healthy_output_is_unchanged(self, auth):
+        """R4.4: with every read answering, the report carries no unavailable-signal fields."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(1, "normal"),
+            collector_down=_alert_window(),
+            burst=_alert_window(),
+            power=_alert_window(),
+        )
+
+        result = await detect_site_outage(client, group_id=42)
+
+        assert json.loads(result[0].text) == {
+            "verdict": "no_outage_signature",
+            "confidence": 0,
+            "group_id": 42,
+            "window_seconds": 300,
+            "hours_back": 1,
+            "scope": {"devices_in_group": 1, "dead_devices": 0, "collectors_serving_group": 1},
+            "signals": {
+                "collector_down": {"triggered": False, "count": 0},
+                "interface_burst": {"triggered": False, "burst_count": 0},
+                "power_events": {"triggered": False, "count": 0},
+                "device_silence": {"triggered": False, "dead_devices": 0, "threshold": 3},
+            },
+            "recommendations": [
+                "No outage signature detected. If symptoms persist, widen the group scope "
+                "or lengthen the hours_back window."
+            ],
+            "warnings": [],
+        }
 
     async def test_required_tools_disabled_blocks_composite(self, client, monkeypatch):
         """LM_DISABLED_TOOLS matching a required sub-tool blocks execution."""
