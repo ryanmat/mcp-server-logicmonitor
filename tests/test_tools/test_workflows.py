@@ -664,46 +664,6 @@ class TestCapacityPlan:
         assert "portal unavailable" in failed["forecast_error"]
         assert "portal unavailable" in failed["trend_error"]
 
-
-class TestSummaryFailureWarnings:
-    """R4.4: a requested NL summary that does not arrive is reported in warnings."""
-
-    @respx.mock
-    async def test_summary_without_a_model_is_warned(self, auth, lm_env):
-        """R4.4: triage(summarize=True) with no summary model returns a warning saying so."""
-        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-
-        result = await triage(client, summarize=True)
-
-        data = json.loads(result[0].text)
-        assert "nl_summary" not in data
-        (warning,) = data["warnings"]
-        assert warning.startswith("NL summary requested but")
-        assert "not configured" in warning
-
-    @respx.mock
-    async def test_failing_summary_names_the_error(self, auth, lm_env):
-        """R4.4: triage(summarize=True) with watsonx failing returns the error in warnings."""
-        from lm_mcp.server import _set_watsonx_client
-
-        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        _set_watsonx_client(real_watsonx_client())
-
-        with patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls:
-            model_cls.return_value.generate_text.side_effect = RuntimeError(
-                "503 Service Unavailable"
-            )
-            result = await triage(client, summarize=True)
-
-        data = json.loads(result[0].text)
-        assert "nl_summary" not in data
-        (warning,) = data["warnings"]
-        assert warning.startswith("NL summary failed")
-        assert "503 Service Unavailable" in warning
-        model_cls.return_value.generate_text.assert_called_once()
-
     async def test_surfaces_forecast_failure(self, client, monkeypatch):
         """A failing forecast sub-tool is surfaced as forecast_error, not a silent None."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -781,6 +741,46 @@ class TestSummaryFailureWarnings:
         data = json.loads(result[0].text)
         assert data["datasources"] == []
         reset_config()
+
+
+class TestSummaryFailureWarnings:
+    """R4.4: a requested NL summary that does not arrive is reported in warnings."""
+
+    @respx.mock
+    async def test_summary_without_a_model_is_warned(self, auth, lm_env):
+        """R4.4: triage(summarize=True) with no summary model returns a warning saying so."""
+        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+
+        result = await triage(client, summarize=True)
+
+        data = json.loads(result[0].text)
+        assert "nl_summary" not in data
+        (warning,) = data["warnings"]
+        assert warning.startswith("NL summary requested but")
+        assert "not configured" in warning
+
+    @respx.mock
+    async def test_failing_summary_names_the_error(self, auth, lm_env):
+        """R4.4: triage(summarize=True) with watsonx failing returns the error in warnings."""
+        from lm_mcp.server import _set_watsonx_client
+
+        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _set_watsonx_client(real_watsonx_client())
+
+        with patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls:
+            model_cls.return_value.generate_text.side_effect = RuntimeError(
+                "503 Service Unavailable"
+            )
+            result = await triage(client, summarize=True)
+
+        data = json.loads(result[0].text)
+        assert "nl_summary" not in data
+        (warning,) = data["warnings"]
+        assert warning.startswith("NL summary failed")
+        assert "503 Service Unavailable" in warning
+        model_cls.return_value.generate_text.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
