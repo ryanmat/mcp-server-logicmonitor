@@ -580,7 +580,7 @@ Once configured, ask your assistant in natural language. A representative sample
 - "What's the blast radius if device 789 goes down?"
 - "What diagnostics ran on device 123 today, and what did the scripts output?"
 
-For power users, the server accepts LogicMonitor filter syntax directly, for example "Get devices where filter is 'displayName~prod,hostStatus:alive'".
+For power users, the server accepts LogicMonitor filter syntax directly, for example "Get devices where filter is 'displayName~"prod",hostStatus:"normal"'". String values, `hostStatus` words included, are quoted.
 
 ## Development
 
