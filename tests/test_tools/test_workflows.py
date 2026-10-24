@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from unittest.mock import AsyncMock, patch
 
@@ -147,8 +148,14 @@ def lm_env(monkeypatch):
 _DS_URL = f"{_BASE}/device/devices/1/devicedatasources"
 
 
-def _mock_capacity_portal(instance_data: dict[int, httpx.Response]) -> None:
-    """Route capacity_plan for device 1, datasource CPU (10), one data read per instance."""
+def _mock_capacity_portal(
+    instance_data: dict[int, httpx.Response | list[httpx.Response]],
+) -> None:
+    """Route capacity_plan for device 1, datasource CPU (10).
+
+    An instance given one response serves it to every data read; one given a list
+    serves the reads in order (forecast, trend, seasonality, then change points).
+    """
     respx.get(f"{_BASE}/device/devices/1").mock(
         return_value=_ok({"id": 1, "displayName": "server-01"})
     )
@@ -164,7 +171,11 @@ def _mock_capacity_portal(instance_data: dict[int, httpx.Response]) -> None:
         )
     )
     for iid, response in instance_data.items():
-        respx.get(f"{_DS_URL}/10/instances/{iid}/data").mock(return_value=response)
+        route = respx.get(f"{_DS_URL}/10/instances/{iid}/data")
+        if isinstance(response, list):
+            route.mock(side_effect=response)
+        else:
+            route.mock(return_value=response)
 
 
 def _rising_cpu_and_sparse_mem() -> httpx.Response:
@@ -180,6 +191,19 @@ def _rising_cpu_and_sparse_mem() -> httpx.Response:
     return _ok(
         {
             "dataPoints": ["cpu", "mem"],
+            "values": rows,
+            "time": [(start + i * 300) * 1000 for i in range(len(rows))],
+        }
+    )
+
+
+def _swinging_cpu() -> httpx.Response:
+    """cpu swings between 5 and 95 every 5 minutes, which classify_trend calls volatile."""
+    rows = [[5.0], [95.0], [5.0], [95.0], [5.0], [95.0]]
+    start = int(time.time()) - 3600
+    return _ok(
+        {
+            "dataPoints": ["cpu"],
             "values": rows,
             "time": [(start + i * 300) * 1000 for i in range(len(rows))],
         }
@@ -649,6 +673,24 @@ class TestCapacityPlan:
         assert all("portal unavailable" in w for w in failed)
 
     @respx.mock
+    async def test_summary_carries_a_change_point_failure(self, auth, lm_env):
+        """R4.4: a failed change-point read on a volatile instance reaches the summary warnings.
+
+        cpu102's trend is volatile, so capacity_plan reads its series a fourth time
+        for change points, and that read fails.
+        """
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        reads = [_swinging_cpu(), _swinging_cpu(), _swinging_cpu(), _portal_error()]
+        _mock_capacity_portal({102: reads})
+
+        result = await capacity_plan(client, device_id=1)
+
+        data = json.loads(result[0].text)
+        (warning,) = data["warnings"]
+        assert warning.startswith("change_points for CPU/cpu102 failed:")
+        assert "portal unavailable" in warning
+
+    @respx.mock
     async def test_full_detail_is_unchanged(self, auth, lm_env):
         """R4.4: detail_level=full keeps the raw block and adds no summary or copied errors."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
@@ -761,15 +803,21 @@ class TestSummaryFailureWarnings:
         assert "not configured" in warning
 
     @respx.mock
-    async def test_failing_summary_names_the_error(self, auth, lm_env):
-        """R4.4: triage(summarize=True) with watsonx failing returns the error in warnings."""
+    async def test_failing_summary_names_the_error(self, auth, lm_env, caplog):
+        """R4.4: triage(summarize=True) with watsonx failing returns the error in warnings.
+
+        The failure is also logged at WARNING on lm_mcp.audit with its traceback.
+        """
         from lm_mcp.server import _set_watsonx_client
 
         respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         _set_watsonx_client(real_watsonx_client())
 
-        with patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls:
+        with (
+            patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls,
+            caplog.at_level(logging.WARNING, logger="lm_mcp.audit"),
+        ):
             model_cls.return_value.generate_text.side_effect = RuntimeError(
                 "503 Service Unavailable"
             )
@@ -781,6 +829,11 @@ class TestSummaryFailureWarnings:
         assert warning.startswith("NL summary failed")
         assert "503 Service Unavailable" in warning
         model_cls.return_value.generate_text.assert_called_once()
+        (record,) = [r for r in caplog.records if "NL summary failed" in r.getMessage()]
+        assert record.name == "lm_mcp.audit"
+        assert record.levelno == logging.WARNING
+        assert record.exc_info is not None
+        assert "503 Service Unavailable" in record.getMessage()
 
 
 # ---------------------------------------------------------------------------
