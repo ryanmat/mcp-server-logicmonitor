@@ -10,8 +10,8 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 
-# The files main owns at this step. PR 66 widens the guard to all of src/lm_mcp
-# when its resource, prompt and device-filter changes land.
+# The dead-device counter and the operator docs. The resources, prompts and device
+# filter elsewhere under src/lm_mcp are not in this list.
 GUARDED = sorted(
     [
         REPO / "src" / "lm_mcp" / "tools" / "workflows.py",
