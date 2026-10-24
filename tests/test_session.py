@@ -258,7 +258,7 @@ class TestGlobalSession:
 
 
 class TestToolResourceMap:
-    """The resource map names only tools the server registers."""
+    """R4.6: the resource map names only tools the server registers."""
 
     def test_every_mapped_tool_is_registered(self):
         """A mapped name no tool carries can never record a result."""

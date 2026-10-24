@@ -95,7 +95,7 @@ class TestPostAnalyze:
 
 
 class TestAnalysisConcurrency:
-    """LM_ANALYSIS_MAX_CONCURRENCY bounds how many workflows run at once; the rest queue."""
+    """R4.6: LM_ANALYSIS_MAX_CONCURRENCY bounds the workflows running at once; the rest queue."""
 
     @pytest.fixture
     def gated_tools(self, monkeypatch):

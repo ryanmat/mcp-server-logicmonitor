@@ -236,7 +236,7 @@ class TestPersistenceIntegration:
 
     @pytest.mark.usefixtures("_no_backends")
     async def test_transport_bootstrap_wires_the_configured_path(self, monkeypatch, tmp_path):
-        """Startup with LM_SESSION_PERSIST_PATH set writes a variable set through the server."""
+        """R4.6: startup with LM_SESSION_PERSIST_PATH set persists a variable set via the server."""
         from lm_mcp.config import get_config
         from lm_mcp.server import execute_tool
         from lm_mcp.session import get_persistence_path
@@ -261,7 +261,7 @@ class TestPersistenceIntegration:
     async def test_transport_bootstrap_loads_variables_from_a_previous_run(
         self, monkeypatch, tmp_path
     ):
-        """A restarted server reads back the variables the last run persisted."""
+        """R4.6: a restarted server reads back the variables the last run persisted."""
         from lm_mcp.config import get_config
         from lm_mcp.transport.bootstrap import bootstrap_backends
 

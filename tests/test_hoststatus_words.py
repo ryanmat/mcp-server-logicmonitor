@@ -37,7 +37,7 @@ def _violations(text: str) -> list[str]:
 
 
 class TestPatterns:
-    """The guard's patterns catch the forms the API rejects and pass the ones it takes."""
+    """R6.1: the guard's patterns catch the forms the API rejects and pass the ones it takes."""
 
     @pytest.mark.parametrize(
         "text",
@@ -72,12 +72,12 @@ class TestPatterns:
 
 @pytest.mark.parametrize("path", GUARDED, ids=lambda p: str(p.relative_to(REPO)))
 def test_guarded_file_uses_host_status_words(path):
-    """No guarded file filters or compares hostStatus on a number or an unquoted word."""
+    """R6.1: no guarded file filters or compares hostStatus on a number or an unquoted word."""
     assert _violations(path.read_text(encoding="utf-8")) == []
 
 
 def test_guard_covers_the_files_it_names():
-    """An empty glob would pass every check vacuously."""
+    """R6.1: an empty glob would pass every check vacuously."""
     names = {p.relative_to(REPO).as_posix() for p in GUARDED}
     assert "src/lm_mcp/tools/workflows.py" in names
     assert "README.md" in names

@@ -139,7 +139,7 @@ class TestAnalysisStore:
         assert recent[0].id == r2.id  # Most recent first
 
     def test_create_evicts_expired_entries(self):
-        """A create after the TTL elapses drops the expired entries, so the store stays bounded."""
+        """R4.6: a create after the TTL drops the expired entries, so the store stays bounded."""
         from lm_mcp.analysis import AnalysisStore
 
         store = AnalysisStore(ttl_minutes=60)
@@ -154,7 +154,7 @@ class TestAnalysisStore:
         assert len(store.list_recent(limit=100)) == 1
 
     def test_update_evicts_expired_entries(self):
-        """An update after the TTL elapses drops the expired entries and still applies."""
+        """R4.6: an update after the TTL drops the expired entries and still applies."""
         from lm_mcp.analysis import AnalysisStore
 
         store = AnalysisStore(ttl_minutes=60)

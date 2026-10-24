@@ -1241,7 +1241,7 @@ class TestSiteOutageHelpers:
         assert _collector_ids_from_devices([{"id": 1}]) == []
 
     def test_dead_devices_counts_dead_and_dead_collector(self):
-        """Both hostStatus "dead" and "dead-collector" count."""
+        """R6.1: both hostStatus "dead" and "dead-collector" count."""
         from lm_mcp.tools.workflows import _count_dead_devices
 
         devices = [
@@ -1253,7 +1253,7 @@ class TestSiteOutageHelpers:
         assert _count_dead_devices(devices) == 2
 
     def test_dead_devices_accepts_raw_host_status_field(self):
-        """Raw LM API shape uses `hostStatus` not `status`."""
+        """R6.1: raw LM API shape uses `hostStatus` not `status`."""
         from lm_mcp.tools.workflows import _count_dead_devices
 
         devices = [
@@ -1264,7 +1264,7 @@ class TestSiteOutageHelpers:
         assert _count_dead_devices(devices) == 2
 
     def test_dead_devices_ignores_numeric_host_status(self):
-        """The v3 API reports hostStatus as a word, so a number is not a dead device."""
+        """R6.1: the v3 API reports hostStatus as a word, so a number is not a dead device."""
         from lm_mcp.tools.workflows import _count_dead_devices
 
         devices = [

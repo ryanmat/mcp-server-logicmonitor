@@ -189,7 +189,7 @@ class TestLMConfigSession:
             LMConfig()
 
     def test_analysis_max_concurrency_default(self, monkeypatch):
-        """Four analysis workflows run at once unless configured otherwise."""
+        """R4.6: four analysis workflows run at once unless configured otherwise."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
         monkeypatch.delenv("LM_ANALYSIS_MAX_CONCURRENCY", raising=False)
@@ -199,7 +199,7 @@ class TestLMConfigSession:
         assert LMConfig().analysis_max_concurrency == 4
 
     def test_analysis_max_concurrency_from_env(self, monkeypatch):
-        """LM_ANALYSIS_MAX_CONCURRENCY parses into analysis_max_concurrency."""
+        """R4.6: LM_ANALYSIS_MAX_CONCURRENCY parses into analysis_max_concurrency."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
         monkeypatch.setenv("LM_ANALYSIS_MAX_CONCURRENCY", "2")
@@ -209,7 +209,7 @@ class TestLMConfigSession:
         assert LMConfig().analysis_max_concurrency == 2
 
     def test_analysis_max_concurrency_below_one_raises(self, monkeypatch):
-        """A limit of zero would queue every analysis forever, so it is refused."""
+        """R4.6: a limit of zero would queue every analysis forever, so it is refused."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
         monkeypatch.setenv("LM_ANALYSIS_MAX_CONCURRENCY", "0")
@@ -220,7 +220,7 @@ class TestLMConfigSession:
             LMConfig()
 
     def test_session_persist_path_default_is_none(self, monkeypatch):
-        """Session variables are in-memory only unless a path is configured."""
+        """R4.6: session variables are in-memory only unless a path is configured."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
         monkeypatch.delenv("LM_SESSION_PERSIST_PATH", raising=False)
@@ -230,7 +230,7 @@ class TestLMConfigSession:
         assert LMConfig().session_persist_path is None
 
     def test_session_persist_path_from_env(self, monkeypatch, tmp_path):
-        """LM_SESSION_PERSIST_PATH parses into session_persist_path."""
+        """R4.6: LM_SESSION_PERSIST_PATH parses into session_persist_path."""
         path = str(tmp_path / "session.json")
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
