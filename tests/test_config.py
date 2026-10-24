@@ -188,6 +188,27 @@ class TestLMConfigSession:
         with pytest.raises(ValueError):
             LMConfig()
 
+    def test_session_persist_path_default_is_none(self, monkeypatch):
+        """Session variables are in-memory only unless a path is configured."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.delenv("LM_SESSION_PERSIST_PATH", raising=False)
+
+        from lm_mcp.config import LMConfig
+
+        assert LMConfig().session_persist_path is None
+
+    def test_session_persist_path_from_env(self, monkeypatch, tmp_path):
+        """LM_SESSION_PERSIST_PATH parses into session_persist_path."""
+        path = str(tmp_path / "session.json")
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
+        monkeypatch.setenv("LM_SESSION_PERSIST_PATH", path)
+
+        from lm_mcp.config import LMConfig
+
+        assert LMConfig().session_persist_path == path
+
 
 class TestLMConfigValidation:
     """Tests for field validation configuration options."""

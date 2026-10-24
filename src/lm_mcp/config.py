@@ -150,6 +150,7 @@ class LMConfig(BaseSettings):
     # Session settings
     session_enabled: bool = True
     session_history_size: int = 50
+    session_persist_path: str | None = None
 
     # Validation settings
     field_validation: Literal["off", "warn", "error"] = "warn"
