@@ -68,7 +68,8 @@ class AnalysisRequest:
 class AnalysisStore:
     """In-memory store for analysis requests with TTL expiration.
 
-    Every create and update evicts the entries older than the TTL, and at most
+    Every create and update evicts the finished entries that completed more than
+    the TTL ago; pending and running entries stay until they finish. At most
     max_concurrency workflows run at once; later ones wait as pending.
     """
 
@@ -138,14 +139,16 @@ class AnalysisStore:
             req.completed_at = time.time()
 
     def cleanup_expired(self) -> int:
-        """Remove expired entries past TTL.
+        """Remove finished entries whose completion is past the TTL.
 
         Returns:
             Number of entries removed.
         """
         now = time.time()
         expired = [
-            aid for aid, req in self._store.items() if (now - req.created_at) > self._ttl_seconds
+            aid
+            for aid, req in self._store.items()
+            if req.completed_at is not None and (now - req.completed_at) > self._ttl_seconds
         ]
         for aid in expired:
             del self._store[aid]
