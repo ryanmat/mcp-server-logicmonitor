@@ -1545,6 +1545,28 @@ class TestDetectSiteOutage:
         assert any("Burst detection failed" in w for w in data["warnings"])
 
     @respx.mock
+    async def test_device_scope_reads_the_group_by_exact_membership(self, auth):
+        """R5: the site's device read sends hostGroupIds:42, so groups 142 or 420 stay out."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(1, "normal"),
+            collector_down=_alert_window(),
+            burst=_alert_window(),
+            power=_alert_window(),
+        )
+
+        await detect_site_outage(client, group_id=42)
+
+        device_filters = [
+            call.request.url.params.get("filter", "")
+            for call in respx.calls
+            if call.request.url.path.endswith("/device/devices")
+        ]
+        assert "hostGroupIds:42" in device_filters
+
+    @respx.mock
     async def test_unavailable_signal_that_cannot_change_the_verdict_keeps_it(self, auth):
         """R4.4: the verdict comes from the signals that read when the lost one cannot move it.
 

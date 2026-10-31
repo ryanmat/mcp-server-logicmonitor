@@ -509,6 +509,193 @@ class TestFetchMetricSeries:
         assert params.get("datapoints") == "cpu,memory"
 
 
+SERIES_URL = (
+    "https://test.logicmonitor.com/santaba/rest"
+    "/device/devices/1/devicedatasources/10/instances/100/data"
+)
+
+
+def _data_page(times_sec, rows, next_page=""):
+    """Build one data page in the live shape: rows newest first, ms timestamps."""
+    return {
+        "dataSourceName": "Ping",
+        "dataPoints": ["cpu", "memory"],
+        "values": rows,
+        "time": [t * 1000 for t in times_sec],
+        "nextPageParams": next_page,
+    }
+
+
+class TestFetchMetricSeriesOrderAndPaging:
+    """R5: series come out oldest first and every page of the window is read.
+
+    The live data endpoint returns rows newest first, 500 a page, with a
+    nextPageParams query string while rows remain (probe 2026-10-30).
+    """
+
+    @respx.mock
+    async def test_descending_rows_come_out_ascending_and_paired(self, client):
+        """A newest-first page is returned oldest first with values kept on their times."""
+        from lm_mcp.tools.stats_helpers import fetch_metric_series
+
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json=_data_page(
+                    [BASE_EPOCH + 600, BASE_EPOCH + 300, BASE_EPOCH],
+                    [[60.0, 80.0], [55.0, 75.0], [50.0, 70.0]],
+                ),
+            )
+        )
+
+        series = await fetch_metric_series(
+            client, device_id=1, device_datasource_id=10, instance_id=100
+        )
+
+        assert series["cpu"]["timestamps"] == [BASE_EPOCH, BASE_EPOCH + 300, BASE_EPOCH + 600]
+        assert series["cpu"]["values"] == [50.0, 55.0, 60.0]
+        assert series["memory"]["values"] == [70.0, 75.0, 80.0]
+        assert series["cpu"]["truncated"] is False
+
+    @respx.mock
+    async def test_forecast_current_value_is_newest_sample(self, client):
+        """forecast_metric reports the newest sample as current_value on a newest-first page."""
+        import json
+
+        from lm_mcp.tools.forecasting import forecast_metric
+
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json=_data_page(
+                    [BASE_EPOCH + 900, BASE_EPOCH + 600, BASE_EPOCH + 300, BASE_EPOCH],
+                    [[90.0, 1.0], [70.0, 1.0], [50.0, 1.0], [30.0, 1.0]],
+                ),
+            )
+        )
+
+        result = await forecast_metric(
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            threshold=200.0,
+            datapoints="cpu",
+            hours_back=24,
+            method="linear",
+        )
+
+        cpu = json.loads(result[0].text)["forecasts"]["cpu"]
+        assert cpu["current_value"] == 90.0
+        assert cpu["trend"] == "increasing"
+
+    @respx.mock
+    async def test_next_page_marker_is_followed_until_empty(self, client):
+        """Each nextPageParams page is read with its start and end and the datapoints kept."""
+        from lm_mcp.tools.stats_helpers import fetch_metric_series
+
+        marker = f"start={BASE_EPOCH - 3600}&end={BASE_EPOCH + 599}"
+        route = respx.get(SERIES_URL).mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json=_data_page(
+                        [BASE_EPOCH + 900, BASE_EPOCH + 600],
+                        [[4.0, 40.0], [3.0, 30.0]],
+                        next_page=marker,
+                    ),
+                ),
+                httpx.Response(
+                    200,
+                    json=_data_page(
+                        [BASE_EPOCH + 300, BASE_EPOCH],
+                        [[2.0, 20.0], [1.0, 10.0]],
+                    ),
+                ),
+            ]
+        )
+
+        series = await fetch_metric_series(
+            client,
+            device_id=1,
+            device_datasource_id=10,
+            instance_id=100,
+            datapoints="cpu,memory",
+        )
+
+        assert route.call_count == 2
+        second = dict(route.calls[1].request.url.params)
+        assert second["start"] == str(BASE_EPOCH - 3600)
+        assert second["end"] == str(BASE_EPOCH + 599)
+        assert second["datapoints"] == "cpu,memory"
+        assert series["cpu"]["values"] == [1.0, 2.0, 3.0, 4.0]
+        assert series["memory"]["values"] == [10.0, 20.0, 30.0, 40.0]
+        assert series["cpu"]["timestamps"] == [
+            BASE_EPOCH,
+            BASE_EPOCH + 300,
+            BASE_EPOCH + 600,
+            BASE_EPOCH + 900,
+        ]
+        assert series["cpu"]["truncated"] is False
+
+    @respx.mock
+    async def test_page_cap_binds_and_reports_truncated(self, client):
+        """A window that never runs out stops at the page cap and says it was truncated."""
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES, fetch_metric_series
+
+        pages = []
+        for i in range(MAX_SERIES_PAGES + 5):
+            t = BASE_EPOCH - i * 600
+            pages.append(
+                httpx.Response(
+                    200,
+                    json=_data_page(
+                        [t, t - 300],
+                        [[float(i), 0.0], [float(i), 0.0]],
+                        next_page=f"start={BASE_EPOCH - 86400}&end={t - 301}",
+                    ),
+                )
+            )
+        route = respx.get(SERIES_URL).mock(side_effect=pages)
+
+        series = await fetch_metric_series(
+            client, device_id=1, device_datasource_id=10, instance_id=100
+        )
+
+        assert route.call_count == MAX_SERIES_PAGES
+        assert series["cpu"]["truncated"] is True
+        assert len(series["cpu"]["values"]) == 2 * MAX_SERIES_PAGES
+        assert series["cpu"]["timestamps"] == sorted(series["cpu"]["timestamps"])
+
+    @respx.mock
+    async def test_page_cap_not_reported_when_last_page_is_final(self, client):
+        """Reading exactly the cap's worth of pages, the last with no marker, is not truncated."""
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES, fetch_metric_series
+
+        pages = []
+        for i in range(MAX_SERIES_PAGES):
+            t = BASE_EPOCH - i * 600
+            last = i == MAX_SERIES_PAGES - 1
+            pages.append(
+                httpx.Response(
+                    200,
+                    json=_data_page(
+                        [t],
+                        [[float(i), 0.0]],
+                        next_page="" if last else f"start={BASE_EPOCH - 86400}&end={t - 1}",
+                    ),
+                )
+            )
+        route = respx.get(SERIES_URL).mock(side_effect=pages)
+
+        series = await fetch_metric_series(
+            client, device_id=1, device_datasource_id=10, instance_id=100
+        )
+
+        assert route.call_count == MAX_SERIES_PAGES
+        assert series["cpu"]["truncated"] is False
+
+
 class TestHoltWinters:
     """Tests for holt_winters triple exponential smoothing."""
 

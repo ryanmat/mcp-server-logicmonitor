@@ -6,9 +6,15 @@ from __future__ import annotations
 import math
 import time
 from typing import TYPE_CHECKING, Any
+from urllib.parse import parse_qsl
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+# The instance data endpoint returns at most 500 samples a page, newest first.
+# A week of one-minute samples is 21 pages; longer windows keep the newest
+# 25 pages (12,500 samples) and report truncated.
+MAX_SERIES_PAGES = 25
 
 
 def linear_regression(x: list[float], y: list[float]) -> tuple[float, float, float]:
@@ -466,7 +472,9 @@ async def fetch_metric_series(
 
     Consolidates the common pattern of fetching from the device data endpoint,
     transposing the list-of-lists response to per-datapoint columns, filtering
-    "No Data" sentinels, and converting millisecond timestamps.
+    "No Data" sentinels, and converting millisecond timestamps. The endpoint
+    pages newest first, so every page named by nextPageParams is read, up to
+    MAX_SERIES_PAGES, and the samples are returned oldest first.
 
     Args:
         client: LogicMonitor API client.
@@ -478,8 +486,9 @@ async def fetch_metric_series(
 
     Returns:
         Dict keyed by datapoint name, each containing:
-        - values: list[float] of numeric values
-        - timestamps: list[int] of epoch seconds
+        - values: list[float] of numeric values, oldest first
+        - timestamps: list[int] of epoch seconds, ascending
+        - truncated: True when the page cap stopped the read with samples left
     """
     now_epoch = int(time.time())
     start_epoch = now_epoch - (hours_back * 3600)
@@ -493,28 +502,43 @@ async def fetch_metric_series(
         f"/devicedatasources/{device_datasource_id}"
         f"/instances/{instance_id}/data"
     )
-    result = await client.get(path, params=params)
 
-    dp_names = result.get("datapoints", result.get("dataPoints", []))
-    value_rows = result.get("values", [])
-    raw_timestamps = result.get("time", [])
-    timestamps = [int(t / 1000) if t > 1e12 else int(t) for t in raw_timestamps]
+    dp_names: list[str] = []
+    rows: list[tuple[int, list[Any]]] = []
+    truncated = False
+    for page in range(MAX_SERIES_PAGES):
+        result = await client.get(path, params=params)
+        if page == 0:
+            dp_names = result.get("datapoints", result.get("dataPoints", []))
+        for t, row in zip(result.get("time", []), result.get("values", []), strict=False):
+            rows.append((int(t / 1000) if t > 1e12 else int(t), row))
+
+        next_page = result.get("nextPageParams") or ""
+        if not next_page:
+            break
+        params = dict(parse_qsl(next_page))
+        if datapoints:
+            params["datapoints"] = datapoints
+    else:
+        truncated = True
+
+    rows.sort(key=lambda r: r[0])
 
     series: dict[str, dict[str, Any]] = {}
     for dp_idx, dp_name in enumerate(dp_names):
         dp_values = []
         dp_timestamps = []
-        for i, row in enumerate(value_rows):
+        for ts, row in rows:
             if dp_idx < len(row) and row[dp_idx] != "No Data":
                 val = row[dp_idx]
                 if val is not None and not (isinstance(val, float) and math.isnan(val)):
                     dp_values.append(float(val))
-                    if i < len(timestamps):
-                        dp_timestamps.append(timestamps[i])
+                    dp_timestamps.append(ts)
 
         series[dp_name] = {
             "values": dp_values,
             "timestamps": dp_timestamps,
+            "truncated": truncated,
         }
 
     return series

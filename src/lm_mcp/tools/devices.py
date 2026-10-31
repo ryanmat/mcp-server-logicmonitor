@@ -77,7 +77,9 @@ async def get_devices(
             # Build filter from named parameters
             filters = []
             if group_id:
-                filters.append(f"hostGroupIds~{group_id}")
+                # hostGroupIds:N matches membership in the id list; ~N is a
+                # substring match that also returns groups 16, 60 and 160 for 6.
+                filters.append(f"hostGroupIds:{group_id}")
             if name_filter:
                 clean_name, was_modified = sanitize_filter_value(name_filter)
                 wildcards_stripped = wildcards_stripped or was_modified
