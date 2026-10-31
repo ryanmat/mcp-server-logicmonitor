@@ -1,5 +1,5 @@
 # Description: Guards the CI workflow settings that fail silently when an edit drops them.
-# Description: Interpreter selection, locked installs, SHA-pinned actions, permissions, concurrency.
+# Description: Interpreter, locked installs, pinned actions, permissions, concurrency, Dependabot.
 
 from __future__ import annotations
 
@@ -72,3 +72,17 @@ class TestWorkflowHygiene:
         group = _load(name)["concurrency"]["group"]
         assert "${{ github.workflow }}" in group
         assert "${{ github.ref }}" in group
+
+
+class TestDependabotBaseImage:
+    """The base image's Python minor moves with the CI matrix; Dependabot proposes patches only."""
+
+    def test_docker_updates_ignore_python_minor_bumps(self) -> None:
+        config = yaml.safe_load((WORKFLOWS_DIR.parent / "dependabot.yml").read_text())
+        docker = [u for u in config["updates"] if u["package-ecosystem"] == "docker"]
+        assert len(docker) == 1
+        ignored = {
+            rule["dependency-name"]: rule.get("update-types", [])
+            for rule in docker[0].get("ignore", [])
+        }
+        assert ignored.get("python") == ["version-update:semver-minor"]
