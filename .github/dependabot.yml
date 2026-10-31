@@ -25,6 +25,10 @@ updates:
     directory: "/deploy"
     schedule:
       interval: "weekly"
+    # The base image's Python minor moves with the CI test matrix, by hand.
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-minor"]
     groups:
       docker-minor-and-patch:
         patterns: ["*"]
