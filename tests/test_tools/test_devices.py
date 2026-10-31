@@ -2,6 +2,7 @@
 # Description: Validates device and device group CRUD functions, including bulk operations.
 
 import json
+import re
 
 import httpx
 import pytest
@@ -26,6 +27,30 @@ def client(auth):
         timeout=30,
         api_version=3,
     )
+
+
+_GROUP_DEVICES = [
+    {"id": 1, "displayName": "in-16-60", "hostStatus": "normal", "hostGroupIds": "16,60"},
+    {"id": 2, "displayName": "in-6-16", "hostStatus": "normal", "hostGroupIds": "6,16"},
+    {"id": 3, "displayName": "in-6", "hostStatus": "normal", "hostGroupIds": "6"},
+    {"id": 4, "displayName": "in-26", "hostStatus": "normal", "hostGroupIds": "26"},
+]
+
+
+def _portal_group_filter(request: httpx.Request) -> httpx.Response:
+    """Answer a hostGroupIds filter the way the live portal does (probe 2026-10-30).
+
+    hostGroupIds:N, quoted or not, matches devices whose id list holds N;
+    hostGroupIds~N, quoted or not, matches N anywhere in the joined list.
+    """
+    match = re.fullmatch(r'hostGroupIds([:~])"?(\d+)"?', request.url.params["filter"])
+    assert match is not None, request.url.params["filter"]
+    op, value = match.groups()
+    if op == ":":
+        items = [d for d in _GROUP_DEVICES if value in d["hostGroupIds"].split(",")]
+    else:
+        items = [d for d in _GROUP_DEVICES if value in d["hostGroupIds"]]
+    return httpx.Response(200, json={"items": items, "total": len(items)})
 
 
 class TestGetDevices:
@@ -85,6 +110,48 @@ class TestGetDevices:
         await get_devices(client, group_id=10)
 
         assert "filter" in route.calls[0].request.url.params
+
+    @respx.mock
+    async def test_group_filter_sends_exact_membership_form(self, client):
+        """R5: group_id sends hostGroupIds:N, the exact form, not the substring ~N."""
+        from lm_mcp.tools.devices import get_devices
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_devices(client, group_id=6)
+
+        assert route.calls[0].request.url.params["filter"] == "hostGroupIds:6"
+
+    @respx.mock
+    async def test_group_filter_excludes_devices_in_groups_containing_the_digits(self, client):
+        """R5: a device in groups 16 and 60 is not returned for group 6."""
+        from lm_mcp.tools.devices import get_devices
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            side_effect=_portal_group_filter
+        )
+
+        result = await get_devices(client, group_id=6)
+
+        ids = {d["id"] for d in json.loads(result[0].text)["devices"]}
+        assert 1 not in ids
+        assert 4 not in ids
+
+    @respx.mock
+    async def test_group_filter_includes_multi_group_members(self, client):
+        """R5: a device in groups 6 and 16 is returned for group 6, as is one in 6 alone."""
+        from lm_mcp.tools.devices import get_devices
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            side_effect=_portal_group_filter
+        )
+
+        result = await get_devices(client, group_id=6)
+
+        ids = {d["id"] for d in json.loads(result[0].text)["devices"]}
+        assert ids == {2, 3}
 
     @respx.mock
     async def test_get_devices_with_raw_filter(self, client):
