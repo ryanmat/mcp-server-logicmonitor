@@ -279,6 +279,136 @@ class TestLaunchJob:
         assert "job_type" not in body
 
 
+def _launch_response(job_id: int, ignored_fields: dict | None, job_type: str = "run") -> dict:
+    """A job template launch response, synthetic: the AWX controller was unreachable.
+
+    Shape from the AWX source, JobTemplateLaunch.post in
+    https://github.com/ansible/awx/blob/devel/awx/api/views/__init__.py: `job`, then
+    `ignored_fields` (each prompt the template rejected, mapped to the value sent),
+    then the JobSerializer fields. ignored_fields=None leaves the key out, as an
+    older controller does.
+    """
+    data: dict = {"job": job_id}
+    if ignored_fields is not None:
+        data["ignored_fields"] = ignored_fields
+    data.update({"id": job_id, "type": "job", "status": "pending", "job_type": job_type})
+    return data
+
+
+class TestLaunchJobIgnoredFields:
+    """R5: a prompt the template ignores on launch is reported, never hidden."""
+
+    @respx.mock
+    async def test_ignored_check_mode_cancels_the_job_and_errors(self, awx_client, monkeypatch):
+        """job_type ignored under check_mode: the job is cancelled; the error names the setting."""
+        _reload_config(monkeypatch, writes_enabled=True)
+        from lm_mcp.tools import is_error_result
+        from lm_mcp.tools.ansible import launch_job
+
+        respx.post(f"{API}/job_templates/10/launch/").mock(
+            return_value=httpx.Response(
+                201, json=_launch_response(71, {"job_type": "check", "diff_mode": True})
+            )
+        )
+        cancel = respx.post(f"{API}/jobs/71/cancel/").mock(return_value=httpx.Response(202))
+
+        result = await launch_job(awx_client, template_id=10, check_mode=True)
+
+        assert cancel.call_count == 1
+        assert is_error_result(result)
+        text = result[0].text
+        assert "ask_job_type_on_launch" in text
+        assert "71" in text
+        assert "cancelled" in text
+
+    @respx.mock
+    async def test_ignored_check_mode_with_failed_cancel_says_the_job_may_run(
+        self, awx_client, monkeypatch, caplog
+    ):
+        """A cancel that fails still errors, says the job may be running, and logs the failure."""
+        _reload_config(monkeypatch, writes_enabled=True)
+        from lm_mcp.tools import is_error_result
+        from lm_mcp.tools.ansible import launch_job
+
+        respx.post(f"{API}/job_templates/10/launch/").mock(
+            return_value=httpx.Response(201, json=_launch_response(72, {"job_type": "check"}))
+        )
+        respx.post(f"{API}/jobs/72/cancel/").mock(
+            return_value=httpx.Response(405, json={"error": "not allowed"})
+        )
+
+        with caplog.at_level("WARNING", logger="lm_mcp.tools.ansible"):
+            result = await launch_job(awx_client, template_id=10, check_mode=True)
+
+        assert is_error_result(result)
+        text = result[0].text
+        assert "72" in text
+        assert "could not be cancelled" in text
+        records = [r for r in caplog.records if r.name == "lm_mcp.tools.ansible"]
+        assert len(records) == 1
+        assert records[0].levelname == "WARNING"
+        assert "72" in records[0].getMessage()
+        assert records[0].exc_info is not None
+
+    @respx.mock
+    async def test_empty_ignored_fields_returns_the_job(self, awx_client, monkeypatch):
+        """ignored_fields {} under check_mode returns the job with no warnings and no cancel."""
+        _reload_config(monkeypatch, writes_enabled=True)
+        from lm_mcp.tools.ansible import launch_job
+
+        respx.post(f"{API}/job_templates/10/launch/").mock(
+            return_value=httpx.Response(201, json=_launch_response(73, {}, job_type="check"))
+        )
+        cancel = respx.post(f"{API}/jobs/73/cancel/").mock(return_value=httpx.Response(202))
+
+        result = await launch_job(awx_client, template_id=10, check_mode=True)
+
+        data = json.loads(result[0].text)
+        assert data == {"job_id": 73, "status": "pending"}
+        assert cancel.call_count == 0
+
+    @pytest.mark.parametrize("field", ["limit", "extra_vars"])
+    @respx.mock
+    async def test_other_ignored_field_warns_and_returns_the_job(
+        self, awx_client, monkeypatch, field
+    ):
+        """An ignored limit or extra_vars returns the job with a warning naming the field."""
+        _reload_config(monkeypatch, writes_enabled=True)
+        from lm_mcp.tools.ansible import launch_job
+
+        sent = {"limit": "web01"} if field == "limit" else {"extra_vars": {"host": "web01"}}
+        ignored = {"limit": "web01"} if field == "limit" else {"extra_vars": {"host": "web01"}}
+        respx.post(f"{API}/job_templates/10/launch/").mock(
+            return_value=httpx.Response(201, json=_launch_response(74, ignored))
+        )
+        cancel = respx.post(f"{API}/jobs/74/cancel/").mock(return_value=httpx.Response(202))
+
+        result = await launch_job(awx_client, template_id=10, **sent)
+
+        data = json.loads(result[0].text)
+        assert data["job_id"] == 74
+        assert len(data["warnings"]) == 1
+        assert field in data["warnings"][0]
+        assert cancel.call_count == 0
+
+    @respx.mock
+    async def test_missing_ignored_fields_key_is_not_ignored(self, awx_client, monkeypatch):
+        """An older controller with no ignored_fields key: the job returns with no warnings."""
+        _reload_config(monkeypatch, writes_enabled=True)
+        from lm_mcp.tools.ansible import launch_job
+
+        respx.post(f"{API}/job_templates/10/launch/").mock(
+            return_value=httpx.Response(201, json=_launch_response(75, None, job_type="check"))
+        )
+        cancel = respx.post(f"{API}/jobs/75/cancel/").mock(return_value=httpx.Response(202))
+
+        result = await launch_job(awx_client, template_id=10, check_mode=True)
+
+        data = json.loads(result[0].text)
+        assert data == {"job_id": 75, "status": "pending"}
+        assert cancel.call_count == 0
+
+
 class TestGetJobStatus:
     """Tests for get_job_status tool."""
 

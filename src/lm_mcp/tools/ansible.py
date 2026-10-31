@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,8 @@ from lm_mcp.tools import format_response, handle_error, require_write_permission
 
 if TYPE_CHECKING:
     from lm_mcp.client.awx import AwxClient
+
+logger = logging.getLogger(__name__)
 
 _JINJA2_PATTERN = re.compile(r"\{\{|\{%|\{#")
 
@@ -163,12 +166,27 @@ async def launch_job(
             f"/job_templates/{template_id}/launch/",
             json_body=body if body else None,
         )
-        return format_response(
-            {
-                "job_id": data.get("job"),
-                "status": data.get("status", "pending"),
-            }
-        )
+        job_id = data.get("job")
+        # ignored_fields maps each prompt the template does not accept on launch
+        # to the value sent; an older controller omits the key. Shape from
+        # JobTemplateLaunch.post in
+        # https://github.com/ansible/awx/blob/devel/awx/api/views/__init__.py
+        ignored = data.get("ignored_fields") or {}
+        if check_mode and "job_type" in ignored:
+            return await _cancel_ignored_check_mode(client, template_id, job_id)
+
+        response: dict = {
+            "job_id": job_id,
+            "status": data.get("status", "pending"),
+        }
+        warnings = [
+            f"AWX ignored {field}: job template {template_id} does not prompt for it "
+            "on launch, so the template's own value applies"
+            for field in ignored
+        ]
+        if warnings:
+            response["warnings"] = warnings
+        return format_response(response)
     except ValueError as e:
         # Jinja2 validation error
         return format_response(
@@ -180,6 +198,59 @@ async def launch_job(
         )
     except Exception as e:
         return handle_error(e)
+
+
+async def _cancel_ignored_check_mode(
+    client: AwxClient,
+    template_id: int,
+    job_id: int | None,
+) -> list[TextContent]:
+    """Cancel a job AWX started as a run after ignoring the check-mode job type.
+
+    Args:
+        client: Automation Controller API client.
+        template_id: The job template that ignored job_type.
+        job_id: The job the launch started.
+
+    Returns:
+        An error response naming the template setting and whether the cancel landed.
+    """
+    reason = (
+        f"Job template {template_id} does not prompt for job type on launch "
+        "(ask_job_type_on_launch is false), so AWX ignored check mode and started "
+        f"job {job_id} as a run."
+    )
+    suggestion = (
+        "Set ask_job_type_on_launch to true on the job template, then launch again with check_mode."
+    )
+    try:
+        await client.post(f"/jobs/{job_id}/cancel/")
+    except Exception as e:
+        logger.warning(
+            "Cancel of job %s failed after AWX ignored check mode on template %s",
+            job_id,
+            template_id,
+            exc_info=True,
+        )
+        return format_response(
+            {
+                "error": True,
+                "code": "CHECK_MODE_IGNORED",
+                "message": (
+                    f"{reason} Job {job_id} could not be cancelled ({e}) and may be "
+                    "applying changes; check it with get_job_status."
+                ),
+                "suggestion": suggestion,
+            }
+        )
+    return format_response(
+        {
+            "error": True,
+            "code": "CHECK_MODE_IGNORED",
+            "message": f"{reason} Job {job_id} was cancelled.",
+            "suggestion": suggestion,
+        }
+    )
 
 
 async def get_job_status(
