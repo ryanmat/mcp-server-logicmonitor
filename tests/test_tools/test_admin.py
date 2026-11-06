@@ -2,6 +2,7 @@
 # Description: Covers CRUD operations and error handling for administrative resources.
 
 import json
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -9,6 +10,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -80,7 +82,96 @@ class TestDashboardGroups:
         assert data["name"] == "Production"
 
 
+# One token as a live portal returns it: roles are role names with no id, accessKey is masked,
+# createdOn is in epoch seconds, and a token never used has lastUsedOn 0.
+LIVE_API_TOKEN = {
+    "id": 100,
+    "accessId": "a1b2c3d4e5f6g7h8i9j0",
+    "accessKey": "*****",
+    "adminId": 1,
+    "adminName": "admin",
+    "createdBy": "admin",
+    "createdOn": 1700000000,
+    "lastAuthIp": "",
+    "lastUsedOn": 0,
+    "note": "CI/CD token",
+    "roles": ["manager", "lm_logs_administrator"],
+    "status": 2,
+    "userPermission": "write",
+}
+
+LIVE_API_TOKEN_OUTPUT = {
+    "id": 100,
+    "admin_id": 1,
+    "admin_name": "admin",
+    "note": "CI/CD token",
+    "status": 2,
+    "created_on": 1700000000,
+    "last_used_on": 0,
+    "roles": ["manager", "lm_logs_administrator"],
+}
+
+API_TOKENS_URL = "https://test.logicmonitor.com/santaba/rest/setting/admins/apitokens"
+
+
 class TestApiTokens:
+    @respx.mock
+    async def test_get_api_tokens_returns_live_shape(self, client):
+        """R5: a token's roles are returned as the role names the API sends."""
+        from lm_mcp.tools.api_tokens import get_api_tokens
+
+        respx.get(API_TOKENS_URL).mock(
+            return_value=httpx.Response(200, json={"items": [LIVE_API_TOKEN], "total": 1})
+        )
+
+        result = await get_api_tokens(client)
+        data = json.loads(result[0].text)
+        assert data["api_tokens"] == [LIVE_API_TOKEN_OUTPUT]
+
+    @respx.mock
+    async def test_get_api_token_returns_live_shape_for_admin(self, client):
+        """R5: the per-admin read returns the same role names as the list."""
+        from lm_mcp.tools.api_tokens import get_api_token
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/admins/1/apitokens/100").mock(
+            return_value=httpx.Response(200, json=LIVE_API_TOKEN)
+        )
+
+        result = await get_api_token(client, admin_id=1, token_id=100)
+        assert json.loads(result[0].text) == LIVE_API_TOKEN_OUTPUT
+
+    @respx.mock
+    async def test_get_api_token_returns_live_shape_by_id(self, client):
+        """R5: the portal-wide read by id returns the same role names as the list."""
+        from lm_mcp.tools.api_tokens import get_api_token
+
+        respx.get(API_TOKENS_URL).mock(
+            return_value=httpx.Response(200, json={"items": [LIVE_API_TOKEN], "total": 1})
+        )
+
+        result = await get_api_token(client, token_id=100)
+        assert json.loads(result[0].text) == LIVE_API_TOKEN_OUTPUT
+
+    @respx.mock
+    async def test_tools_return_live_shape_through_execute_tool(self, monkeypatch, client):
+        """R5: both registered tools return token data, not an error, through the dispatcher."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        respx.get(API_TOKENS_URL).mock(
+            return_value=httpx.Response(200, json={"items": [LIVE_API_TOKEN], "total": 1})
+        )
+
+        with patch("lm_mcp.server.get_client", return_value=client):
+            from lm_mcp.server import execute_tool
+
+            listed = await execute_tool("get_api_tokens", {"limit": 25})
+            fetched = await execute_tool("get_api_token", {"token_id": 100})
+
+        assert not is_error_result(listed)
+        assert not is_error_result(fetched)
+        assert json.loads(listed[0].text)["api_tokens"] == [LIVE_API_TOKEN_OUTPUT]
+        assert json.loads(fetched[0].text) == LIVE_API_TOKEN_OUTPUT
+
     @respx.mock
     async def test_get_api_tokens_returns_list(self, client):
         from lm_mcp.tools.api_tokens import get_api_tokens
@@ -98,7 +189,7 @@ class TestApiTokens:
                             "status": 2,
                             "createdOn": 1700000000,
                             "lastUsedOn": 1700100000,
-                            "roles": [{"name": "administrator"}],
+                            "roles": ["administrator"],
                         }
                     ],
                     "total": 1,
@@ -109,6 +200,7 @@ class TestApiTokens:
         result = await get_api_tokens(client, admin_id=1)
         data = json.loads(result[0].text)
         assert data["api_tokens"][0]["note"] == "CI/CD token"
+        assert data["api_tokens"][0]["roles"] == ["administrator"]
 
     @respx.mock
     async def test_get_api_token_returns_details(self, client):
@@ -123,7 +215,7 @@ class TestApiTokens:
                     "adminName": "admin",
                     "note": "CI/CD token",
                     "status": 2,
-                    "roles": [{"id": 1, "name": "administrator"}],
+                    "roles": ["administrator"],
                 },
             )
         )
@@ -131,6 +223,7 @@ class TestApiTokens:
         result = await get_api_token(client, admin_id=1, token_id=100)
         data = json.loads(result[0].text)
         assert data["note"] == "CI/CD token"
+        assert data["roles"] == ["administrator"]
 
     @respx.mock
     async def test_get_api_tokens_without_admin_lists_portal_wide(self, client):
@@ -150,7 +243,7 @@ class TestApiTokens:
                             "adminName": "admin",
                             "note": "CI/CD token",
                             "status": 2,
-                            "roles": [{"name": "administrator"}],
+                            "roles": ["administrator"],
                         },
                         {
                             "id": 101,
@@ -158,7 +251,7 @@ class TestApiTokens:
                             "adminName": "svc-backup",
                             "note": "backup job",
                             "status": 2,
-                            "roles": [{"name": "readonly"}],
+                            "roles": ["manager"],
                         },
                     ],
                     "total": 2,
@@ -171,6 +264,7 @@ class TestApiTokens:
         assert route.called
         assert route.calls.last.request.url.params["size"] == "25"
         assert [t["admin_id"] for t in data["api_tokens"]] == [1, 7]
+        assert [t["roles"] for t in data["api_tokens"]] == [["administrator"], ["manager"]]
         assert data["total"] == 2
 
     @respx.mock
@@ -191,7 +285,7 @@ class TestApiTokens:
                             "adminName": "admin",
                             "note": "CI/CD token",
                             "status": 2,
-                            "roles": [{"id": 1, "name": "administrator"}],
+                            "roles": ["administrator"],
                         }
                     ],
                     "total": 1,
@@ -204,7 +298,7 @@ class TestApiTokens:
         assert route.calls.last.request.url.params["filter"] == "id:100"
         assert data["id"] == 100
         assert data["admin_id"] == 1
-        assert data["roles"] == [{"id": 1, "name": "administrator"}]
+        assert data["roles"] == ["administrator"]
 
     @respx.mock
     async def test_get_api_token_without_admin_reports_missing_id(self, client):
