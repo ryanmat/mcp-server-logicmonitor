@@ -1667,6 +1667,28 @@ class TestDetectSiteOutage:
         assert "confidence_level" not in data
 
     @respx.mock
+    async def test_record_without_is_down_leaves_the_signal_unknown(self, auth):
+        """R4.4: a collector record with no isDown is unknown, not a healthy collector."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(1, "normal"),
+            collector=_ok({"id": 1, "hostname": "col-01", "status": 1, "numberOfHosts": 5}),
+            burst=_alert_window(),
+            power=_alert_window(),
+        )
+
+        result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["signals"]["collector_down"]["triggered"] is None
+        assert data["signals"]["collector_down"]["status"] == "unavailable"
+        assert data["unavailable_signals"] == ["collector_down"]
+        assert data["confidence_level"] == "reduced"
+        assert not any("collector health probes failed" in w for w in data["warnings"])
+
+    @respx.mock
     async def test_up_collector_leaves_the_signal_untriggered(self, auth):
         """R5: isDown false is a known negative, so the signal stays in the score untriggered."""
         from lm_mcp.tools.workflows import detect_site_outage

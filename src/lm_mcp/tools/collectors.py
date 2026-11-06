@@ -233,7 +233,8 @@ async def get_collector_health(
         collector_id: Single collector ID. If set, other scope args are ignored.
         collector_group_id: Restrict to collectors in this group.
         include_history: Include recent alerts on a device named for the collector's
-            hostname (default: False). The API cannot narrow them to CollectorDown.
+            hostname (default: False). The API cannot narrow them to CollectorDown, so an
+            empty list does not show the collector stayed up.
         history_days: History lookback in days (default: 7).
 
     Returns:

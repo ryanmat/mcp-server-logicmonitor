@@ -508,6 +508,9 @@ class TestGetCollectorHealth:
         data = json.loads(result[0].text)
         assert data["include_history"] is True
         assert alerts.call_count == 1
+        sent_filter = alerts.calls.last.request.url.params["filter"]
+        assert 'monitorObjectName:"col-03"' in sent_filter
+        assert "startEpoch>:" in sent_filter
         history = data["collectors"][0]["collector_down_history"]
         assert len(history) == 1
         assert history[0]["alert_type"] == "dataSourceAlert"
