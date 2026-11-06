@@ -352,3 +352,125 @@ class TestPairedNameValueRedaction:
 
         assert "wmi.pass" in caplog.text
         assert "hunter2" not in caplog.text
+
+
+class TestRedactCredentialsInsideStrings:
+    """rul-5dc39b1355: a credential inside a string argument is masked like a credential key."""
+
+    def test_ruled_example(self):
+        """The case verified on main 2026-10-30: the url kept both secrets in the clear."""
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments(
+            {"url": "https://admin:s3cret@10.0.0.5/?password=s3cret2", "password": "p"}
+        )
+
+        assert redacted == {"url": "https://***@10.0.0.5/?password=***", "password": "***"}
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("https://admin:s3cret@host/?password=x", "https://***@host/?password=***"),
+            ("https://admin@host/path", "https://***@host/path"),
+            ("ssh://git:tok@host:22/repo", "ssh://***@host:22/repo"),
+            ("https://a:b@c@host/", "https://***@host/"),
+            ("https://host/?a=1&token=t&b=2", "https://host/?a=1&token=***&b=2"),
+            ("https://host/?api_key=k", "https://host/?api_key=***"),
+            ("https://host/?apiKey=k", "https://host/?apiKey=***"),
+            ("https://host/?password=a;b&c=1", "https://host/?password=***&c=1"),
+            ("https://host/#access_token=t&state=s", "https://host/#access_token=***&state=s"),
+            ("https://host/?a=1#token=t", "https://host/?a=1#token=***"),
+            ("host.example.com/?password=x", "host.example.com/?password=***"),
+            (
+                "see https://u:p@h/ and https://k:v@g/x?secret=s now",
+                "see https://***@h/ and https://***@g/x?secret=*** now",
+            ),
+            ('curl "https://u:p@h/?token=t" -o out', 'curl "https://***@h/?token=***" -o out'),
+        ],
+    )
+    def test_credentials_are_masked(self, value, expected):
+        from lm_mcp.logging import redact_arguments
+
+        assert redact_arguments(value) == expected
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "",
+            "web-01",
+            "a=b",
+            "ops@example.com",
+            "mailto:ops@example.com",
+            "https://host/path",
+            "https://host/users/ops@example.com",
+            "https://host/?email=ops@example.com",
+            "https://host/?token_id=5",
+            "https://host/?keyword=foo&name=bar",
+            'displayName~"prod",hostStatus:"normal"',
+        ],
+    )
+    def test_strings_without_credentials_are_unchanged(self, value):
+        from lm_mcp.logging import redact_arguments
+
+        assert redact_arguments(value) == value
+
+    def test_nested_strings_are_masked(self):
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments(
+            {
+                "hooks": [{"endpoint": "https://u:p@h/"}, "https://x:y@z/"],
+                "config": {"ack_url": "https://h/?api_key=k&x=1"},
+            }
+        )
+
+        assert redacted == {
+            "hooks": [{"endpoint": "https://***@h/"}, "https://***@z/"],
+            "config": {"ack_url": "https://h/?api_key=***&x=1"},
+        }
+
+    def test_paired_value_is_masked_inside_or_whole_by_its_name(self):
+        from lm_mcp.logging import redact_arguments
+
+        redacted = redact_arguments(
+            [
+                {"name": "site", "value": "https://u:p@h/"},
+                {"name": "ssh.pass", "value": "https://h/"},
+            ]
+        )
+
+        assert redacted == [
+            {"name": "site", "value": "https://***@h/"},
+            {"name": "ssh.pass", "value": "***"},
+        ]
+
+    def test_values_that_are_not_strings_pass_through(self):
+        from lm_mcp.logging import redact_arguments
+
+        arguments = {"port": 443, "enabled": True, "nothing": None, "ratio": 0.5}
+
+        assert redact_arguments(arguments) == arguments
+
+    def test_input_is_not_modified(self):
+        from lm_mcp.logging import redact_arguments
+
+        arguments = {"url": "https://u:p@h/", "hooks": ["https://x:y@z/"]}
+
+        redact_arguments(arguments)
+
+        assert arguments == {"url": "https://u:p@h/", "hooks": ["https://x:y@z/"]}
+
+    @pytest.mark.parametrize(("success", "level"), [(True, logging.INFO), (False, logging.WARNING)])
+    def test_audit_line_carries_no_plaintext(self, caplog, success, level):
+        from lm_mcp.logging import log_write_operation
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            log_write_operation(
+                "create_http_integration",
+                {"url": "https://admin:s3cret@host/?password=s3cret2"},
+                success,
+            )
+
+        assert [record.levelno for record in caplog.records] == [level]
+        assert "s3cret" not in caplog.text
+        assert "https://***@host/?password=***" in caplog.text

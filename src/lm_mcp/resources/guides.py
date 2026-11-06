@@ -563,8 +563,9 @@ COMMON_QUERY_EXAMPLES = {
         {
             "description": "Find devices in a specific group",
             "tool": "get_devices",
-            "filter": "hostGroupIds~5",
-            "notes": "Use ~ for contains since hostGroupIds is a comma-separated list.",
+            "filter": "hostGroupIds:5",
+            "notes": "Use : for list membership; ~ matches a substring of the joined ids "
+            "and returns devices from other groups.",
         },
         {
             "description": "Find active SDTs for a device",

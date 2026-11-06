@@ -40,7 +40,8 @@ async def get_topology_map(
         params: dict = {"size": limit}
 
         if device_group_id:
-            params["filter"] = f"hostGroupIds~{device_group_id}"
+            # hostGroupIds:N matches membership in the id list; ~N is a substring of it.
+            params["filter"] = f"hostGroupIds:{device_group_id}"
 
         result = await client.get("/topology/topologies", params=params)
 

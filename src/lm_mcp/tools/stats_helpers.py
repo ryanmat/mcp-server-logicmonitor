@@ -542,3 +542,21 @@ async def fetch_metric_series(
         }
 
     return series
+
+
+def truncation_warnings(series: dict[str, dict[str, Any]]) -> list[str]:
+    """Warn for each series the page cap cut short; the newest samples are the ones kept.
+
+    Args:
+        series: Series as fetch_metric_series returns them, keyed by the name the
+            warning shows.
+
+    Returns:
+        One warning per truncated series; empty when every read was complete.
+    """
+    return [
+        f"{name}: the read stopped at the {MAX_SERIES_PAGES}-page cap, so the oldest "
+        "samples of the window are missing; shorten hours_back to read all of it."
+        for name, data in series.items()
+        if data["truncated"]
+    ]

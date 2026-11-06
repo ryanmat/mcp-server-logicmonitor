@@ -25,6 +25,7 @@ from lm_mcp.tools.alerts import paginate_alerts
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
     shannon_entropy,
+    truncation_warnings,
 )
 
 if TYPE_CHECKING:
@@ -538,7 +539,8 @@ async def score_device_health(
         weights: Optional dict of datapoint_name -> weight for scoring.
 
     Returns:
-        Health score with status, contributing factors, and anomaly count.
+        Health score with status, contributing factors, and anomaly count;
+        warnings names any datapoint the page cap cut short.
     """
     try:
         series = await fetch_metric_series(
@@ -649,6 +651,9 @@ async def score_device_health(
         }
         if health_score < 50:
             result_data["anti_patterns"] = anti_patterns
+        warnings = truncation_warnings(series)
+        if warnings:
+            result_data["warnings"] = warnings
 
         return format_response(result_data)
     except Exception as e:

@@ -146,13 +146,6 @@ ALERT_FILTERS = {
             "operators": [":", "~"],
             "examples": ["ackedBy~admin"],
         },
-        "hostGroupIds": {
-            "type": "string",
-            "description": "Device group IDs (comma-separated internally). "
-            "Use ~ operator to match devices belonging to a group.",
-            "operators": ["~"],
-            "examples": ["hostGroupIds~1234"],
-        },
         "monitorObjectId": {
             "type": "integer",
             "description": "Device/resource ID",
@@ -162,7 +155,8 @@ ALERT_FILTERS = {
         "monitorObjectGroups": {
             "type": "string",
             "description": "Device group full path. Use | for multiple groups, "
-            "append * for subgroups.",
+            "append * for subgroups. The group filter to use on alerts: this "
+            "endpoint ignores hostGroupIds.",
             "operators": [":", "~"],
             "examples": [
                 'monitorObjectGroups:"Kubernetes Cluster: rm-aks-cluster/*"',
@@ -189,7 +183,7 @@ ALERT_FILTERS = {
         },
         {
             "description": "Alerts for devices in a group (e.g., K8s cluster)",
-            "filter": "hostGroupIds~1977,cleared:false",
+            "filter": 'monitorObjectGroups~"Kubernetes Cluster: rm-aks-cluster",cleared:false',
         },
     ],
 }
@@ -229,9 +223,10 @@ DEVICE_FILTERS = {
         },
         "hostGroupIds": {
             "type": "string",
-            "description": "Device group membership",
-            "operators": ["~"],
-            "examples": ["hostGroupIds~5"],
+            "description": "Device group membership. : matches a group in the device's id "
+            "list; ~ matches a substring of the joined ids and returns other groups.",
+            "operators": [":"],
+            "examples": ["hostGroupIds:5"],
         },
         "preferredCollectorId": {
             "type": "integer",
@@ -267,7 +262,7 @@ DEVICE_FILTERS = {
         },
         {
             "description": "Devices in specific group",
-            "filter": "hostGroupIds~5",
+            "filter": "hostGroupIds:5",
         },
     ],
 }

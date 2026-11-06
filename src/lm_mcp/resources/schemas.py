@@ -188,7 +188,7 @@ DEVICE_SCHEMA = {
             "type": "string",
             "description": "Comma-separated list of device group IDs",
             "filterable": True,
-            "operators": ["~"],
+            "operators": [":"],
             "example": "1,5,12",
         },
         "preferredCollectorId": {

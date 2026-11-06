@@ -387,6 +387,75 @@ def _audit_lines(caplog) -> list[tuple[int, str]]:
     return [(r.levelno, r.getMessage()) for r in caplog.records if r.name == "lm_mcp.audit"]
 
 
+INTEGRATIONS_URL = "https://test.logicmonitor.com/santaba/rest/setting/integrations"
+CREDENTIAL_URL = "https://admin:s3cret@10.0.0.5/hook?password=s3cret2"
+MASKED_URL = "https://***@10.0.0.5/hook?password=***"
+
+
+class TestCredentialsInUrlArguments:
+    """rul-5dc39b1355: the API receives the URL whole; audit and session see it masked."""
+
+    @respx.mock
+    async def test_real_write_keeps_the_url_for_the_api_and_masks_the_records(
+        self, write_portal, monkeypatch, caplog
+    ):
+        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
+        from lm_mcp.config import reset_config
+        from lm_mcp.server import execute_tool
+        from lm_mcp.session import get_session, reset_session
+
+        reset_config()
+        reset_session()
+        route = respx.post(INTEGRATIONS_URL).mock(
+            return_value=httpx.Response(200, json={"id": 9, "name": "hook"})
+        )
+        try:
+            with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+                await execute_tool(
+                    "create_http_integration", {"name": "hook", "url": CREDENTIAL_URL}
+                )
+            recorded = get_session().history[-1].arguments
+        finally:
+            reset_session()
+
+        assert json.loads(route.calls[0].request.content)["url"] == CREDENTIAL_URL
+        assert recorded == {"name": "hook", "url": MASKED_URL}
+        audit = _audit_lines(caplog)
+        assert len(audit) == 1
+        assert MASKED_URL in audit[0][1]
+        assert "s3cret" not in caplog.text
+
+    @pytest.mark.parametrize(
+        ("text", "recorded_result"),
+        [(json.dumps({"id": 1}), {"id": 1}), ("not json", {})],
+        ids=["json_result", "plain_text_result"],
+    )
+    async def test_session_records_masked_arguments_for_every_result_shape(
+        self, monkeypatch, text, recorded_result
+    ):
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
+
+        client = MagicMock()
+        handler = AsyncMock(return_value=[TextContent(type="text", text=text)])
+        session = MagicMock()
+
+        with (
+            patch("lm_mcp.server.get_tool_handler", return_value=handler),
+            patch("lm_mcp.server.get_client", return_value=client),
+            patch("lm_mcp.server.get_session", return_value=session),
+        ):
+            from lm_mcp.server import execute_tool
+
+            await execute_tool("get_devices", {"url": CREDENTIAL_URL})
+
+        handler.assert_called_once_with(client, url=CREDENTIAL_URL)
+        session.record_result.assert_called_once_with(
+            "get_devices", {"url": MASKED_URL}, recorded_result, success=True
+        )
+
+
 class TestWriteOutcomeFromResult:
     """Audit, session and isError derive from the real handler's result (R1.4)."""
 

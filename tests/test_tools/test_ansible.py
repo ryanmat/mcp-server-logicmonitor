@@ -319,7 +319,8 @@ class TestLaunchJobIgnoredFields:
         text = result[0].text
         assert "ask_job_type_on_launch" in text
         assert "71" in text
-        assert "cancelled" in text
+        assert "was cancelled" in text
+        assert "could not be cancelled" not in text
 
     @respx.mock
     async def test_ignored_check_mode_with_failed_cancel_says_the_job_may_run(
