@@ -465,8 +465,8 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
         # Record result in session if enabled. Portal tools are recorded too:
         # a portal switch is the marker that scopes every entry around it. History
-        # is shown back to clients and can persist to disk, so it holds the same
-        # redacted arguments the audit line shows.
+        # is shown back to clients, so it holds the same redacted arguments the
+        # audit line shows.
         if config.session_enabled and name not in SESSION_TOOLS:
             session = get_session()
             recorded_arguments = redact_arguments(arguments)
