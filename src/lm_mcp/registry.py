@@ -6681,9 +6681,9 @@ TOOLS.extend(
                         "default": False,
                         "description": (
                             "Include recent alerts on a device named for the collector's "
-                            "hostname. The API cannot narrow them to CollectorDown, so an "
-                            "empty list does not show the collector stayed up; each row's "
-                            "alert_type names what it is."
+                            "hostname. A collector with no such device returns an empty "
+                            "list, which does not show it stayed up. The API cannot narrow "
+                            "rows to CollectorDown; each row's alert_type names what it is."
                         ),
                     },
                     "history_days": {

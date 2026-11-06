@@ -93,7 +93,7 @@ Enriched collector status. Leading indicator for site-level events. Preferred ov
 **Parameters:**
 - `collector_id` (int, optional) -- single collector; other scope args ignored if set
 - `collector_group_id` (int, optional) -- restrict to a collector group
-- `include_history` (bool, optional, default `false`) -- include recent alerts on a device named for the collector's hostname. The API ignores `alertType` filters, so these are not limited to CollectorDown and an empty list does not show the collector stayed up; each row's `alert_type` names what it is
+- `include_history` (bool, optional, default `false`) -- include recent alerts on a device named for the collector's hostname. A collector with no such device returns an empty list, which does not show it stayed up. The API ignores `alertType` filters, so rows are not limited to CollectorDown; each row's `alert_type` names what it is
 - `history_days` (int, optional, default `7`)
 
 **Enrichments over `get_collectors`:**
