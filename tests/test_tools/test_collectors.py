@@ -328,6 +328,7 @@ class TestGetCollectorHealth:
 
     @respx.mock
     async def test_reports_healthy_collector(self, client):
+        """R5: isDown false is an up collector; status is 1 whether the collector is up or down."""
         from lm_mcp.tools.collectors import get_collector_health
 
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/1").mock(
@@ -336,7 +337,8 @@ class TestGetCollectorHealth:
                 json={
                     "id": 1,
                     "hostname": "col-01",
-                    "status": "normal",
+                    "status": 1,
+                    "isDown": False,
                     "numberOfHosts": 42,
                     "collectorGroupId": 5,
                     "collectorGroupName": "prod",
@@ -348,22 +350,23 @@ class TestGetCollectorHealth:
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 42})
         )
-        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
-            return_value=httpx.Response(200, json={"items": []})
-        )
 
         result = await get_collector_health(client, collector_id=1)
         data = json.loads(result[0].text)
 
         assert data["total_collectors"] == 1
+        assert data["collectors_down"] == 0
+        assert "collectors_down_signal_unavailable" not in data
+        assert "warning" not in data
         col = data["collectors"][0]
         assert col["hostname"] == "col-01"
         assert col["is_down"] is False
         assert col["downstream_device_count"] == 42
-        assert col["active_collector_down_alerts"] == 0
+        assert "down_signal_unavailable" not in col
 
     @respx.mock
-    async def test_flags_collector_with_active_collector_down_alert(self, client):
+    async def test_flags_collector_the_record_marks_down(self, client):
+        """R5: isDown true is a down collector, with status 1 as a live portal returns it."""
         from lm_mcp.tools.collectors import get_collector_health
 
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/2").mock(
@@ -372,7 +375,8 @@ class TestGetCollectorHealth:
                 json={
                     "id": 2,
                     "hostname": "col-02",
-                    "status": "normal",
+                    "status": 1,
+                    "isDown": True,
                     "numberOfHosts": 30,
                 },
             )
@@ -380,88 +384,55 @@ class TestGetCollectorHealth:
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 30})
         )
-        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "id": 999,
-                            "alertType": "CollectorDown",
-                            "monitorObjectName": "col-02",
-                            "cleared": False,
-                        }
-                    ]
-                },
-            )
-        )
 
         result = await get_collector_health(client, collector_id=2)
         data = json.loads(result[0].text)
 
         assert data["collectors_down"] == 1
         assert data["collectors"][0]["is_down"] is True
-        assert data["collectors"][0]["active_collector_down_alerts"] == 1
+        assert "collectors_down_signal_unavailable" not in data
 
     @respx.mock
-    async def test_alert_query_failure_surfaces_unknown_down_signal(self, client):
-        """A failed CollectorDown query is surfaced, not reported as zero collectors down."""
+    async def test_sends_no_alert_read_for_the_down_signal(self, client):
+        """R5: the API rejects type:alert and ignores alertType, so the state reads no alerts."""
         from lm_mcp.tools.collectors import get_collector_health
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/3").mock(
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/1").mock(
             return_value=httpx.Response(
-                200,
-                json={"id": 3, "hostname": "col-03", "status": "normal", "numberOfHosts": 10},
+                200, json={"id": 1, "hostname": "col-01", "status": 1, "isDown": False}
             )
         )
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 10})
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
-        # The CollectorDown alert query fails (e.g. 500/429/403).
-        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
-            return_value=httpx.Response(500, json={"errorMessage": "boom"})
+        alerts = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(200, json={"items": []})
         )
 
-        result = await get_collector_health(client, collector_id=3)
+        result = await get_collector_health(client, collector_id=1)
         data = json.loads(result[0].text)
 
-        # The down signal is unknown, surfaced as such -- not a confident zero.
-        assert data["collectors_down_signal_unavailable"] == 1
-        assert "undercounted" in data["warning"]
-        col = data["collectors"][0]
-        assert col["down_signal_unavailable"] is True
-        assert col["active_collector_down_alerts"] is None
+        assert not alerts.called
+        assert "active_collector_down_alerts" not in data["collectors"][0]
 
     @respx.mock
-    async def test_alert_query_failure_makes_is_down_unknown(self, auth):
-        """R4.4: a failed CollectorDown read leaves is_down null, whatever the status says.
-
-        The status word is not consulted once the alert read failed, so the
-        "dead" collector is unknown too, and neither counts as down.
-        """
+    async def test_record_without_is_down_leaves_the_state_unknown(self, client):
+        """R4.4: no isDown is unknown, whatever status says, and neither counts as down."""
         from lm_mcp.tools.collectors import get_collector_health
 
-        client = LogicMonitorClient(
-            base_url="https://test.logicmonitor.com/santaba/rest",
-            auth=auth,
-            max_retries=0,
-        )
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "items": [
                         {"id": 1, "hostname": "col-a", "status": "dead", "numberOfHosts": 4},
-                        {"id": 2, "hostname": "col-b", "status": "normal", "numberOfHosts": 6},
+                        {"id": 2, "hostname": "col-b", "status": 1, "numberOfHosts": 6},
                     ]
                 },
             )
         )
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 5})
-        )
-        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
-            return_value=httpx.Response(500, json={"errorMessage": "boom"})
         )
 
         result = await get_collector_health(client)
@@ -470,9 +441,9 @@ class TestGetCollectorHealth:
         for col in data["collectors"]:
             assert col["is_down"] is None
             assert col["down_signal_unavailable"] is True
-            assert col["active_collector_down_alerts"] is None
         assert data["collectors_down"] == 0
         assert data["collectors_down_signal_unavailable"] == 2
+        assert "undercounted" in data["warning"]
 
     @respx.mock
     async def test_lists_all_collectors_when_no_scope(self, client):
@@ -483,8 +454,8 @@ class TestGetCollectorHealth:
                 200,
                 json={
                     "items": [
-                        {"id": 1, "hostname": "col-a", "status": "normal", "numberOfHosts": 10},
-                        {"id": 2, "hostname": "col-b", "status": "normal", "numberOfHosts": 20},
+                        {"id": 1, "hostname": "col-a", "status": 1, "isDown": False},
+                        {"id": 2, "hostname": "col-b", "status": 1, "isDown": True},
                     ]
                 },
             )
@@ -492,35 +463,35 @@ class TestGetCollectorHealth:
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
-        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
-            return_value=httpx.Response(200, json={"items": []})
-        )
 
         result = await get_collector_health(client)
         data = json.loads(result[0].text)
         assert data["total_collectors"] == 2
+        assert data["collectors_down"] == 1
+        assert [c["is_down"] for c in data["collectors"]] == [False, True]
 
     @respx.mock
     async def test_includes_history_when_requested(self, client):
+        """R5: history rows name the alert's own type, the field a live alert carries."""
         from lm_mcp.tools.collectors import get_collector_health
 
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/3").mock(
             return_value=httpx.Response(
                 200,
-                json={"id": 3, "hostname": "col-03", "status": "normal"},
+                json={"id": 3, "hostname": "col-03", "status": 1, "isDown": False},
             )
         )
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
-        respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+        alerts = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(
                 200,
                 json={
                     "items": [
                         {
                             "id": 500,
-                            "alertType": "CollectorDown",
+                            "type": "dataSourceAlert",
                             "monitorObjectName": "col-03",
                             "startEpoch": 1700000000,
                             "severity": 4,
@@ -536,6 +507,7 @@ class TestGetCollectorHealth:
         )
         data = json.loads(result[0].text)
         assert data["include_history"] is True
+        assert alerts.call_count == 1
         history = data["collectors"][0]["collector_down_history"]
         assert len(history) == 1
-        assert history[0]["alert_type"] == "CollectorDown"
+        assert history[0]["alert_type"] == "dataSourceAlert"

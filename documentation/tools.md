@@ -116,7 +116,7 @@ Collector status and management
 | `create_collector_group` | Create a collector group (requires write permission) | Yes |
 | `update_collector_group` | Update a collector group (requires write permission) | Yes |
 | `delete_collector_group` | Delete a collector group (requires write permission). Blocks if collectors are still assigned. | Yes |
-| `get_collector_health` | Enriched collector status with time-since-last-contact, downstream device count, dependent alert count, and optional CollectorDown history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages. | No |
+| `get_collector_health` | Enriched collector status: whether each collector is down, downstream device count, uptime, and optional alert history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages. | No |
 
 ## Networking
 

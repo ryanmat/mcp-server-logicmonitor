@@ -382,7 +382,7 @@ Parameters:
 
 Steps to follow:
 1. Use get_collectors to list all collectors and their status
-2. Check for down collectors (isDown=true)
+2. Use get_collector_health to find down collectors (is_down=true)
 3. Compare collector build versions to identify outdated collectors
 4. Review collector group assignments for load balancing
 5. Check for collectors with high device counts

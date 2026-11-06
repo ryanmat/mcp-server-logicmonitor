@@ -93,14 +93,13 @@ Enriched collector status. Leading indicator for site-level events. Preferred ov
 **Parameters:**
 - `collector_id` (int, optional) -- single collector; other scope args ignored if set
 - `collector_group_id` (int, optional) -- restrict to a collector group
-- `include_history` (bool, optional, default `false`) -- include recent CollectorDown alerts
+- `include_history` (bool, optional, default `false`) -- include recent alerts on a device named for the collector's hostname. The API ignores `alertType` filters, so these are not limited to CollectorDown; each row's `alert_type` names what it is
 - `history_days` (int, optional, default `7`)
 
 **Enrichments over `get_collectors`:**
-- `is_down` -- computed from status field and active CollectorDown alerts; `null` when the CollectorDown alert read fails, with `down_signal_unavailable: true`
+- `is_down` -- the `isDown` field on the collector record, since `status` is `1` whether the collector is up or down; `null` when the record carries no `isDown`, with `down_signal_unavailable: true`
 - `downstream_device_count` -- from `/device/devices?filter=currentCollectorId:{id}` (more reliable than stale `numberOfHosts`)
-- `active_collector_down_alerts` -- count of current open CollectorDown alerts for this collector hostname; `null` when that read fails
-- `collector_down_history` -- recent history when requested
+- `collector_down_history` -- the `include_history` rows when requested
 
 ### get_power_events
 
