@@ -393,7 +393,7 @@ MASKED_URL = "https://***@10.0.0.5/hook?password=***"
 
 
 class TestCredentialsInUrlArguments:
-    """rul-5dc39b1355: the API receives the URL whole; audit and session see it masked."""
+    """R5: the API receives the URL whole; audit and session see it masked."""
 
     @respx.mock
     async def test_real_write_keeps_the_url_for_the_api_and_masks_the_records(

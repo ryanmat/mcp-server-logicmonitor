@@ -355,10 +355,10 @@ class TestPairedNameValueRedaction:
 
 
 class TestRedactCredentialsInsideStrings:
-    """rul-5dc39b1355: a credential inside a string argument is masked like a credential key."""
+    """R5: a credential inside a string argument is masked like a credential key."""
 
-    def test_ruled_example(self):
-        """The case verified on main 2026-10-30: the url kept both secrets in the clear."""
+    def test_url_credentials_are_masked_beside_a_credential_key(self):
+        """Both secrets in the url are masked, as the password key's value is."""
         from lm_mcp.logging import redact_arguments
 
         redacted = redact_arguments(
