@@ -40,7 +40,6 @@ sdts.py: device_id
 sdts.py: future
 sdts.py: now
 topology_analysis.py: dev['device_id']
-topology.py: device_group_id
 topology.py: device_id
 traces.py: SEVERITY_MAP[severity.lower()]
 websites.py: group_id

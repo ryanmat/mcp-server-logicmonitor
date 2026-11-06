@@ -3305,10 +3305,6 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "device_group_id": {
-                        "type": "integer",
-                        "description": "Filter by device group ID",
-                    },
                     "include_connections": {
                         "type": "boolean",
                         "default": True,

@@ -21,7 +21,6 @@ if TYPE_CHECKING:
 
 async def get_topology_map(
     client: LogicMonitorClient,
-    device_group_id: int | None = None,
     include_connections: bool = True,
     limit: int = 100,
 ) -> list[TextContent]:
@@ -29,7 +28,6 @@ async def get_topology_map(
 
     Args:
         client: LogicMonitor API client.
-        device_group_id: Filter to specific device group.
         include_connections: Include connection/relationship data.
         limit: Maximum number of nodes to return.
 
@@ -38,11 +36,6 @@ async def get_topology_map(
     """
     try:
         params: dict = {"size": limit}
-
-        if device_group_id:
-            # The exact form on /device/devices. This endpoint answers an id that matches
-            # nothing with the same maps as no filter, so this does not narrow the list.
-            params["filter"] = f"hostGroupIds:{device_group_id}"
 
         result = await client.get("/topology/topologies", params=params)
 

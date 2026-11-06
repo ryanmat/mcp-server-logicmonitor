@@ -996,3 +996,75 @@ class TestTruncatedSeriesWarnings:
         data = json.loads(result[0].text)
         assert data["sample_count"] == 3
         assert "warnings" not in data
+
+
+# Identical at every shared time, so correctly paired series correlate at exactly 1.0.
+SHARED_CPU = [10.0, 80.0, 20.0, 90.0, 30.0, 70.0, 15.0, 85.0]
+SHARED_TIMES = [BASE_EPOCH + 300 * i for i in range(1, len(SHARED_CPU) + 1)]
+
+
+def _cpu_page(times_sec, values):
+    """One final page in the live shape, newest first, from oldest-first times and values."""
+    pairs = list(zip(times_sec, values, strict=True))[::-1]
+    return httpx.Response(
+        200,
+        json=_data_page([t for t, _ in pairs], [[v, 0.0] for _, v in pairs]),
+    )
+
+
+class TestCorrelateMetricsAlignment:
+    """R5 follow-up: series of different lengths are trimmed to their newest samples.
+
+    fetch_metric_series returns samples oldest first, so the newest are at the tail.
+    """
+
+    @staticmethod
+    async def _correlate(client):
+        from lm_mcp.tools.correlation import correlate_metrics
+
+        result = await correlate_metrics(
+            client,
+            sources=[
+                {**SERIES_ARGS, "datapoint": "cpu"},
+                {**SECOND_SERIES_ARGS, "datapoint": "cpu"},
+            ],
+        )
+        return json.loads(result[0].text)
+
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("longer_url", "shorter_url"),
+        [(SERIES_URL, SECOND_SERIES_URL), (SECOND_SERIES_URL, SERIES_URL)],
+        ids=["first_source_longer", "second_source_longer"],
+    )
+    async def test_extra_older_sample_does_not_shift_the_pairs(
+        self, client, longer_url, shorter_url
+    ):
+        """One source with an older sample still pairs every shared time with itself."""
+        respx.get(longer_url).mock(
+            return_value=_cpu_page([BASE_EPOCH, *SHARED_TIMES], [55.0, *SHARED_CPU])
+        )
+        respx.get(shorter_url).mock(return_value=_cpu_page(SHARED_TIMES, SHARED_CPU))
+
+        data = await self._correlate(client)
+
+        assert data["correlation_matrix"][0][1] == 1.0
+        assert data["sample_count"] == len(SHARED_CPU)
+
+    @respx.mock
+    async def test_the_longer_source_keeps_its_newest_samples(self, client):
+        """A source with a newer sample keeps it and drops its oldest; pairing is by position."""
+        from lm_mcp.tools.stats_helpers import pearson_correlation
+
+        newest = SHARED_TIMES[-1] + 300
+        respx.get(SERIES_URL).mock(
+            return_value=_cpu_page([*SHARED_TIMES, newest], [*SHARED_CPU, 40.0])
+        )
+        respx.get(SECOND_SERIES_URL).mock(return_value=_cpu_page(SHARED_TIMES, SHARED_CPU))
+
+        data = await self._correlate(client)
+
+        kept = [*SHARED_CPU[1:], 40.0]
+        expected = round(pearson_correlation(kept, SHARED_CPU), 4)
+        assert expected != 1.0
+        assert data["correlation_matrix"][0][1] == expected
