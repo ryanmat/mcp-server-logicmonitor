@@ -92,7 +92,7 @@ RESOURCES: list[Resource] = [
     Resource(
         uri=AnyUrl("lm://enums/device-status"),
         name="Device Status Values",
-        description="Valid device status values: normal(0), dead(1), etc.",
+        description="Valid device status words: normal, dead, dead-collector, etc.",
         mimeType="application/json",
     ),
     Resource(

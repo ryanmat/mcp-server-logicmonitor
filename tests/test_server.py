@@ -19,6 +19,13 @@ class TestServerCreation:
 
         assert server.name == "logicmonitor-platform"
 
+    def test_server_reports_the_package_version(self):
+        """The version clients read at initialize is this package's, not the MCP SDK's."""
+        from lm_mcp import __version__
+        from lm_mcp.server import server
+
+        assert server.create_initialization_options().server_version == __version__
+
     def test_main_function_exists(self):
         """Entry point main function exists."""
         from lm_mcp.server import main

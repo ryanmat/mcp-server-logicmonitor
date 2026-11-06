@@ -7,8 +7,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-06
+
+A hardening release. The first five entries under Changed and the entry under Removed can stop
+a setup that worked on 4.2.1, so read them before you upgrade. Availability and noise figures
+also move, because those tools read cleared alerts.
+
+### Changed
+
+- `LM_TRANSPORT=http` with no token refuses to start on the default bind. `LM_HTTP_HOST`
+  defaults to `0.0.0.0`, and any address other than `127.0.0.1`, `::1` or `localhost` needs
+  `LM_HTTP_AUTH_TOKEN`, or `LM_HTTP_ALLOW_UNAUTHENTICATED=true` for a listener protected another
+  way. The compose file requires the token in every profile.
+- HTTP requests are checked before they reach a route. A body on `/mcp` or `/api/v1/*` that is
+  not `application/json` gets 415. Every route except `/healthz` and `/readyz` answers 400 unless
+  `Host` is a loopback name, a non-wildcard `LM_HTTP_HOST` or an `LM_HTTP_ALLOWED_HOSTS` entry, so
+  add the public name a reverse proxy forwards. Compose allows `DOMAIN`, and the k8s manifest
+  allows its Service name.
+- `terraform_init` and `terraform_plan` need `LM_ENABLE_WRITE_OPERATIONS=true` and join the write
+  audit trail, since providers and data sources call live APIs during them.
+- The `terraform` subprocess inherits only `PATH`, `HOME`, `TMPDIR`, `TF_*`, the proxy settings
+  and the CA settings. Server and cloud credentials such as `LM_BEARER_TOKEN`, `AWS_*`, `ARM_*` and
+  `GOOGLE_*` stay out, so move provider credentials to `TF_VAR_*` variables or files under `HOME`.
+- `terraform_init`'s `backend_config` is an object of allowlisted local, s3 and azurerm keys, not
+  a `key=value` string, and endpoint, proxy and TLS-weakening keys are refused by name. `var_file`,
+  a local backend `path` and `workspace_dir` must resolve inside the workspace, symlinks included.
+  A timed-out command gets SIGINT and 30 seconds to release its lock before it is killed.
+- A POST, PATCH or AWX job launch that gets a 5xx is not resent, since the server may already
+  have applied it. A 429 is resent for any method, and a 5xx for GET, HEAD, PUT and DELETE. Timeouts
+  and dropped connections return a connection error naming the failure, method and URL, and are
+  not resent. `Retry-After` can lengthen the backoff, never shorten it, up to
+  `LM_RETRY_AFTER_CAP_SECONDS` (120 seconds for AWX).
+- `LM_LOG_LEVEL` is honored. Records go to stderr with timestamp, level and logger name, every 4xx
+  and 5xx a tool returns is logged at the default level with its details, and `debug` adds httpx
+  and MCP SDK lines.
+- Filter values are escaped, so a value holding a quote is matched literally as one clause.
+- `forecast_metric` names the method that ran. `fallback_reason` replaces `ttm_fallback` and
+  `ttm_fallback_reason` and covers every fallback to linear, and Holt-Winters omits `r_squared`
+  instead of returning 0.0.
+- `calculate_availability` and `score_alert_noise` read cleared alerts as well as active ones, so
+  availability falls and flap counts rise wherever cleared incidents exist. Both counted open
+  alerts only before. On one test portal, a device over 30 days at `severity_threshold=warning`
+  moved from 84.18 percent to 0.07 percent, because its warning alerts cover almost the whole
+  window, and stayed at 100 percent at the default error threshold. Noise over 24 hours moved from
+  55 with 0 flaps to 70 with 3550. An alert that opens while the previous one is open overlaps it
+  and is not a flap.
+- `calculate_availability` resolves the device first and returns `DEVICE_NOT_FOUND` or
+  `DEVICE_LOOKUP_FAILED` before any alert read, reads that device's alerts from
+  `/device/devices/{id}/alerts`, and refuses a device together with `group_id`.
+- Windowed alert analytics return `truncated` and `api_total`. Statistics, correlation, noise,
+  availability and change correlation read up to 5000 alerts a window, and `correlate_alerts` and
+  `get_alert_statistics` page past 1000 up to `limit`. Burst detection, link flaps and power events
+  warn when truncated, and `get_top_talkers` says when its single page is partial.
+- A negative API total, which means at least that many rows, reads as `has_more` with a positive
+  `total` and a `total_note` on the list tools. `get_alerts`, `get_devices`,
+  `get_diagnosticsources` and `get_remediationsources` gain the paging fields.
+- A failed read is reported as unknown, not as a negative. `detect_site_outage` marks a failed
+  signal `unavailable` with `triggered` null, adds `confidence_level` `reduced` and
+  `unavailable_signals`, and can answer `indeterminate`. `get_collector_health` reports `is_down`
+  and `active_collector_down_alerts` as null, with `down_signal_unavailable`, when the CollectorDown
+  read fails.
+- `capacity_plan` summaries add `forecast_summary` rows and carry each instance's forecast, trend,
+  seasonality and change-point errors and truncation warnings into `warnings`.
+- A requested NL summary that does not arrive always leaves a warning, and `watsonx_summarize`
+  names the model that wrote the summary.
+- Finished analyses expire an hour after they complete. Pending and running ones stay.
+- `get_api_token`'s signature has been `(token_id, admin_id=None)` since 4.2.1, which the 4.2.1
+  notes left out. MCP callers pass arguments by name and are unaffected; direct Python callers
+  are affected.
+- The docs describe the HTTP transport as it is: the `/api/v1` analysis API plus a minimal JSON-RPC
+  `/mcp` route with no `initialize`, which standard MCP clients cannot connect to.
+
+### Removed
+
+- `get_topology_map` no longer takes `device_group_id`, and a caller passing it gets an error.
+  Drop the argument: `/topology/topologies` ignored it in both filter forms, so the call returns
+  the same maps.
+
+### Added
+
+- `LM_HTTP_ALLOW_UNAUTHENTICATED`, `LM_HTTP_ALLOWED_HOSTS` and `LM_RETRY_AFTER_CAP_SECONDS`,
+  described under Changed.
+- `LM_ANALYSIS_MAX_CONCURRENCY` (default 4, at least 1) bounds the workflows `/api/v1/analyze` and
+  the alert webhook run at once. Later submissions are accepted and wait as `pending`.
+- Metric tools add a warning naming the datapoint and the page cap when a read stops at the cap:
+  `forecast_metric`, `detect_change_points`, `classify_trend`, `detect_seasonality`,
+  `score_device_health` and `correlate_metrics`.
+- Startup logs a WARNING for an unusable AWX, watsonx, HuggingFace or Terraform configuration, by
+  variable name and without values.
+
+### Security
+
+- Write audit lines redact values under credential-shaped keys, LogicMonitor credential properties
+  such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one. URL
+  userinfo and credential-named query values inside string arguments are masked in the audit line
+  and the session history; the API still receives the URL whole.
+- The client refuses an API path with a `.` or `..` segment, or one holding `?`, `#` or a
+  percent-encoded dot, slash, `?` or `#`, before any request goes out.
+- HTTP `tools/call` validates arguments against the tool's schema (-32602 on failure), answers a
+  malformed body with a JSON-RPC error and 400 instead of 500, and returns fixed error text with
+  the traceback logged.
+- Dependency updates: certifi 2026.10.19, mcp 1.30.0, aiohttp 3.14.4, multidict 6.9.1, virtualenv
+  21.14.13, filelock 4.2.1 and setuptools 84.1.0. `accelerate`, which only the `huggingface` extra
+  installs, has an open medium-severity advisory with no patched release.
+
 ### Fixed
 
+- `get_api_tokens` and `get_api_token` failed with `'str' object has no attribute 'get'` on any
+  token that has a role, because the API returns a token's roles as name strings. Both return that
+  list, so `get_api_token`'s `roles` are role names, not `{id, name}` objects.
+- `LM_SESSION_PERSIST_PATH` was documented but never read. Session variables are written to that
+  file and read back at the next start.
+- Metric reads kept one newest-first page, about the newest 8.3 hours of a 24-hour one-minute
+  series. They follow the API's paging up to 25 pages and return samples oldest first, with
+  `truncated` per datapoint when the cap stops the read.
+- `get_devices(group_id=N)` sent `hostGroupIds~N`, a substring match on the joined id list, so
+  group 5 also matched groups such as 495 and 501, and `detect_site_outage`'s device scope with it.
+  It sends `hostGroupIds:N`, which is list membership.
+- The device filter, schema and guide resources teach `hostGroupIds:N`. The alerts filter resource
+  teaches `monitorObjectGroups`, since `/alert/alerts` ignores `hostGroupIds` in both forms.
+- `launch_job` with `check_mode` cancels a job whose template ignored `job_type` and returns an
+  error naming `ask_job_type_on_launch`, so a check cannot run as a real job. Any other ignored
+  prompt returns the job with a warning naming it.
+- `detect_site_outage` counts dead devices from the `hostStatus` words `dead` and `dead-collector`.
+- A watsonx constructor failure is logged and leaves the watsonx tools off instead of stopping the
+  server.
+- The `lm://enums/device-status` listing named numeric status codes. It names the words.
+- The server reported the MCP SDK's version to clients at initialize. It reports its own.
 - `get_devices` (`status=`) returned nothing for every status: it filtered on the numeric
   codes `hostStatus:0` to `hostStatus:4`, but the v3 API filters `hostStatus` on the word,
   and on a live portal `hostStatus:0` and `hostStatus:1` match nothing. It now sends the

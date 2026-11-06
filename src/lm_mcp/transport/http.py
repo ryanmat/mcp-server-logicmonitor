@@ -1,5 +1,5 @@
 # Description: HTTP transport implementation for MCP server.
-# Description: Uses Starlette and Uvicorn for streamable HTTP mode.
+# Description: Serves the /api/v1 analysis API and a minimal JSON-RPC /mcp route over Starlette.
 
 from __future__ import annotations
 
