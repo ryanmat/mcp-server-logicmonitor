@@ -50,7 +50,7 @@ async def get_api_tokens(
                     "status": item.get("status"),
                     "created_on": item.get("createdOn"),
                     "last_used_on": item.get("lastUsedOn"),
-                    "roles": [r.get("name") for r in item.get("roles", [])],
+                    "roles": item.get("roles", []),
                 }
             )
 
@@ -100,7 +100,7 @@ async def get_api_token(
             "status": result.get("status"),
             "created_on": result.get("createdOn"),
             "last_used_on": result.get("lastUsedOn"),
-            "roles": [{"id": r.get("id"), "name": r.get("name")} for r in result.get("roles", [])],
+            "roles": result.get("roles", []),
         }
 
         return format_response(token)
