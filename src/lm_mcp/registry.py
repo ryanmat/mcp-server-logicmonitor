@@ -6659,10 +6659,10 @@ TOOLS.extend(
         Tool(
             name="get_collector_health",
             description=(
-                "Enriched collector status with time-since-last-contact, downstream device "
-                "count, dependent alert count, and optional CollectorDown history. Leading "
-                "indicator for site-level events. Prefer this over `get_collectors` when "
-                "investigating potential outages."
+                "Enriched collector status: whether each collector is down, downstream "
+                "device count, uptime, and optional alert history. Leading indicator for "
+                "site-level events. Prefer this over `get_collectors` when investigating "
+                "potential outages."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6679,12 +6679,17 @@ TOOLS.extend(
                     "include_history": {
                         "type": "boolean",
                         "default": False,
-                        "description": "Include CollectorDown alert history",
+                        "description": (
+                            "Include recent alerts on a device named for the collector's "
+                            "hostname. A collector with no such device returns an empty "
+                            "list, which does not show it stayed up. The API cannot narrow "
+                            "rows to CollectorDown; each row's alert_type names what it is."
+                        ),
                     },
                     "history_days": {
                         "type": "integer",
                         "default": 7,
-                        "description": "CollectorDown history lookback in days",
+                        "description": "History lookback in days",
                     },
                 },
             },

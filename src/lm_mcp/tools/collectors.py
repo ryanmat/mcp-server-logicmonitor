@@ -221,19 +221,22 @@ async def get_collector_health(
     include_history: bool = False,
     history_days: int = 7,
 ) -> list[TextContent]:
-    """Enriched collector status with downstream device count and CollectorDown history.
+    """Enriched collector status with down state, device count and optional alert history.
 
     Reports collector health signals critical for detecting site-level events
     (power outages, network partitions). Status is enriched with whether the
-    collector is currently down, how many devices it monitors, and optionally
-    the history of CollectorDown alerts over a lookback window.
+    collector is currently down, from the isDown field on its record, how many
+    devices it monitors, and optionally alerts on a device named for its hostname.
 
     Args:
         client: LogicMonitor API client.
         collector_id: Single collector ID. If set, other scope args are ignored.
         collector_group_id: Restrict to collectors in this group.
-        include_history: Include recent CollectorDown alert history (default: False).
-        history_days: CollectorDown history lookback in days (default: 7).
+        include_history: Include recent alerts on a device named for the collector's
+            hostname (default: False). A collector with no such device returns an empty
+            list, which does not show it stayed up. The API cannot narrow rows to
+            CollectorDown.
+        history_days: History lookback in days (default: 7).
 
     Returns:
         List of TextContent with enriched collector records.
@@ -265,8 +268,8 @@ async def get_collector_health(
         if unknown_signal:
             response["collectors_down_signal_unavailable"] = unknown_signal
             response["warning"] = (
-                f"{unknown_signal} of {len(enriched)} collector(s) could not be checked "
-                "for active CollectorDown alerts; collectors_down may be undercounted."
+                f"{unknown_signal} of {len(enriched)} collector record(s) carry no isDown "
+                "field; collectors_down may be undercounted."
             )
         return format_response(response)
     except Exception as e:
@@ -279,10 +282,9 @@ async def _enrich_collector(
     include_history: bool,
     history_days: int,
 ) -> dict:
-    """Attach downstream device count and CollectorDown signals to a collector."""
+    """Attach the down state and downstream device count to a collector."""
     cid = col.get("id")
     hostname = col.get("hostname") or ""
-    status = col.get("status")
     num_hosts_reported = col.get("numberOfHosts") or 0
 
     downstream_count = num_hosts_reported
@@ -306,18 +308,13 @@ async def _enrich_collector(
         )
         downstream_count = num_hosts_reported
 
-    active_collector_down = await _active_collector_down_count(client, hostname)
-    down_signal_unavailable = active_collector_down is None
-
     history: list[dict] = []
     if include_history and hostname:
         history = await _collector_down_history(client, hostname, history_days)
 
-    # A failed CollectorDown read leaves the collector's state unknown; the status
-    # field is not consulted on its own.
-    is_down: bool | None = None
-    if not down_signal_unavailable:
-        is_down = bool(active_collector_down) or _status_indicates_down(status)
+    # isDown is the down signal. status is 1 whether the collector is up or down, so a
+    # record with no isDown leaves the state unknown.
+    is_down: bool | None = col.get("isDown")
 
     record: dict = {
         "id": cid,
@@ -325,69 +322,17 @@ async def _enrich_collector(
         "collector_group_id": col.get("collectorGroupId"),
         "collector_group_name": col.get("collectorGroupName"),
         "platform": col.get("platform"),
-        "status": status,
+        "status": col.get("status"),
         "is_down": is_down,
         "downstream_device_count": downstream_count,
         "reported_numberOfHosts": num_hosts_reported,
-        "active_collector_down_alerts": active_collector_down,
         "up_time_seconds": col.get("upTime"),
     }
-    if down_signal_unavailable:
+    if is_down is None:
         record["down_signal_unavailable"] = True
     if include_history:
         record["collector_down_history"] = history
     return record
-
-
-def _status_indicates_down(status: int | str | None) -> bool:
-    """Conservative interpretation of the LM collector status field.
-
-    The LM API returns status as either an integer code or a short string
-    depending on the portal generation. We treat anything that is not
-    clearly a "normal"/"up" signal as not-down to avoid false positives;
-    the authoritative signal is the presence of an active CollectorDown
-    alert, which is checked separately.
-    """
-    if status is None:
-        return False
-    if isinstance(status, str):
-        lowered = status.lower()
-        return lowered in {"dead", "down", "critical"}
-    return False
-
-
-async def _active_collector_down_count(
-    client: LogicMonitorClient,
-    hostname: str,
-) -> int | None:
-    """Count active CollectorDown alerts for a collector hostname.
-
-    Returns None (not 0) when the alert query fails, so the caller can distinguish "no
-    active CollectorDown alerts" from "could not determine" and avoid reporting a real
-    outage as zero collectors down.
-    """
-    if not hostname:
-        return 0
-    try:
-        result = await client.get(
-            "/alert/alerts",
-            params={
-                "size": 10,
-                "filter": (
-                    "type:alert,"
-                    f"monitorObjectName:{quote_filter_value(hostname)},"
-                    "cleared:false,"
-                    'alertType~"CollectorDown"'
-                ),
-            },
-        )
-    except Exception:
-        logger.exception(
-            "collector-down alert query failed for hostname=%s; down signal unavailable",
-            hostname,
-        )
-        return None
-    return len(result.get("items", []))
 
 
 async def _collector_down_history(
@@ -395,7 +340,11 @@ async def _collector_down_history(
     hostname: str,
     history_days: int,
 ) -> list[dict]:
-    """Fetch recent CollectorDown alerts for a collector hostname."""
+    """Fetch recent alerts on a device named for a collector hostname.
+
+    The API ignores the alertType clause, so rows are not limited to CollectorDown; each
+    row's alert_type names what it is.
+    """
     start_epoch = int(time.time()) - (history_days * 86400)
     try:
         result = await client.get(
@@ -426,7 +375,7 @@ async def _collector_down_history(
                 "start_epoch": item.get("startEpoch"),
                 "end_epoch": item.get("endEpoch"),
                 "cleared": item.get("cleared", False),
-                "alert_type": item.get("alertType"),
+                "alert_type": item.get("type"),
             }
         )
     return history
