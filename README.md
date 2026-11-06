@@ -25,6 +25,7 @@ Check these before you upgrade:
 - `LM_TRANSPORT=http` with no `LM_HTTP_AUTH_TOKEN` refuses to start on the default bind, and HTTP routes check `Host` and `Content-Type`.
 - `terraform_init` and `terraform_plan` need writes enabled, the `terraform` subprocess no longer inherits cloud credentials, and `backend_config` is an object.
 - `get_topology_map` no longer takes `device_group_id`.
+- `get_collector_health` reads each collector's `isDown` field and no longer returns `active_collector_down_alerts`, so `detect_site_outage` verdicts change where a collector is down.
 - `calculate_availability` and `score_alert_noise` read cleared alerts, so availability falls and flap counts rise where cleared incidents exist.
 
 The [CHANGELOG](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/CHANGELOG.md) has every change and what to do about it.

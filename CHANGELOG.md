@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.3.0] - 2026-11-06
 
-A hardening release. The first five entries under Changed and the entry under Removed can stop
+A hardening release. The first five entries under Changed and the entries under Removed can stop
 a setup that worked on 4.2.1, so read them before you upgrade. Availability and noise figures
-also move, because those tools read cleared alerts.
+also move, because those tools read cleared alerts, and `detect_site_outage` verdicts change
+where a collector is down, because `get_collector_health` can now report one.
 
 ### Changed
 
@@ -64,9 +65,7 @@ also move, because those tools read cleared alerts.
   `get_diagnosticsources` and `get_remediationsources` gain the paging fields.
 - A failed read is reported as unknown, not as a negative. `detect_site_outage` marks a failed
   signal `unavailable` with `triggered` null, adds `confidence_level` `reduced` and
-  `unavailable_signals`, and can answer `indeterminate`. `get_collector_health` reports `is_down`
-  and `active_collector_down_alerts` as null, with `down_signal_unavailable`, when the CollectorDown
-  read fails.
+  `unavailable_signals`, and can answer `indeterminate`.
 - `capacity_plan` summaries add `forecast_summary` rows and carry each instance's forecast, trend,
   seasonality and change-point errors and truncation warnings into `warnings`.
 - A requested NL summary that does not arrive always leaves a warning, and `watsonx_summarize`
@@ -83,6 +82,8 @@ also move, because those tools read cleared alerts.
 - `get_topology_map` no longer takes `device_group_id`, and a caller passing it gets an error.
   Drop the argument: `/topology/topologies` ignored it in both filter forms, so the call returns
   the same maps.
+- `get_collector_health` no longer returns `active_collector_down_alerts`. Read `is_down`, which
+  reports the collector's state. The alert query behind the count could not succeed.
 
 ### Added
 
@@ -111,8 +112,30 @@ also move, because those tools read cleared alerts.
   21.14.13, filelock 4.2.1 and setuptools 84.1.0. `accelerate`, which only the `huggingface` extra
   installs, has an open medium-severity advisory with no patched release.
 
+### Known limits
+
+- `get_collector_health`'s `include_history` returns alerts on a device named for the collector's
+  hostname, not only CollectorDown alerts, because the API ignores `alertType` filters. A collector
+  with no such device returns an empty list, which does not show it stayed up.
+- `get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only
+  portal tested, one with no NetFlow-enabled device.
+- `get_metric_anomalies`, `save_baseline`, `compare_to_baseline` and `get_interface_metrics` read
+  one page of at most 500 samples, the newest, and do not say so when the window holds more.
+- `correlate_metrics` pairs samples by position, not by timestamp, so sources with different sample
+  intervals are approximate.
+- `health_check`'s summary drops a truncated-read warning, which its 4-hour default window cannot
+  reach, and `correlate_metrics`' insufficient-data error omits one.
+- The diagnostic and remediation execution guard refuses `dead` devices but not `dead-collector`
+  ones.
+- Signature parameters such as `X-Amz-Signature` stay visible in a logged URL.
+
 ### Fixed
 
+- `get_collector_health` could not report a down collector where `status` is an integer, as it is
+  on a live portal. The API rejected its alert query on every call, so every collector read
+  `is_down: false` with a warning that the check failed. `is_down` reads the collector's `isDown`
+  field, and a record without it reads null with `down_signal_unavailable`. `detect_site_outage`'s
+  collector signal fires where a collector is down.
 - `get_api_tokens` and `get_api_token` failed with `'str' object has no attribute 'get'` on any
   token that has a role, because the API returns a token's roles as name strings. Both return that
   list, so `get_api_token`'s `roles` are role names, not `{id, name}` objects.
