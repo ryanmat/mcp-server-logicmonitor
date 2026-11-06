@@ -1,6 +1,8 @@
 # Description: Tests for shared statistical utility functions.
 # Description: Validates linear_regression, pearson_correlation, autocorrelation, cusum, entropy.
 
+import importlib
+import json
 import math
 
 import httpx
@@ -858,3 +860,139 @@ class TestMADAnomalies:
         values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
         result = mad_anomalies(values)
         assert len(result["modified_z_scores"]) == len(values)
+
+
+SERIES_ARGS = {"device_id": 1, "device_datasource_id": 10, "instance_id": 100}
+SECOND_SERIES_ARGS = {"device_id": 2, "device_datasource_id": 10, "instance_id": 100}
+SECOND_SERIES_URL = SERIES_URL.replace("/devices/1/", "/devices/2/")
+
+# The fetch_metric_series consumers that analyze every datapoint of one instance;
+# correlate_metrics reads one datapoint per source and has its own tests.
+INSTANCE_CONSUMERS = [
+    pytest.param(
+        "forecasting",
+        "forecast_metric",
+        {"threshold": 90.0, "method": "linear"},
+        id="forecast_metric",
+    ),
+    pytest.param("forecasting", "detect_change_points", {}, id="detect_change_points"),
+    pytest.param("forecasting", "classify_trend", {}, id="classify_trend"),
+    pytest.param("forecasting", "detect_seasonality", {}, id="detect_seasonality"),
+    pytest.param("scoring", "score_device_health", {}, id="score_device_health"),
+]
+
+
+def _capped_pages():
+    """MAX_SERIES_PAGES newest-first pages, the last still naming a next page."""
+    from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+
+    pages = []
+    for i in range(MAX_SERIES_PAGES):
+        t = BASE_EPOCH - i * 600
+        pages.append(
+            httpx.Response(
+                200,
+                json=_data_page(
+                    [t, t - 300],
+                    [[50.0 + i, 70.0 - i], [51.0 + i, 71.0 - i]],
+                    next_page=f"start={BASE_EPOCH - 86400}&end={t - 301}",
+                ),
+            )
+        )
+    return pages
+
+
+def _complete_page():
+    """One final page: the read saw the whole window."""
+    return httpx.Response(
+        200,
+        json=_data_page(
+            [BASE_EPOCH + 600, BASE_EPOCH + 300, BASE_EPOCH],
+            [[60.0, 80.0], [55.0, 75.0], [50.0, 70.0]],
+        ),
+    )
+
+
+class TestTruncatedSeriesWarnings:
+    """R5 follow-up: every consumer reports a series the page cap cut short."""
+
+    @respx.mock
+    @pytest.mark.parametrize(("module", "tool", "extra"), INSTANCE_CONSUMERS)
+    async def test_capped_series_warns_naming_datapoint_and_cap(self, client, module, tool, extra):
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+
+        route = respx.get(SERIES_URL).mock(side_effect=_capped_pages())
+        handler = getattr(importlib.import_module(f"lm_mcp.tools.{module}"), tool)
+
+        result = await handler(client, **SERIES_ARGS, **extra)
+
+        assert route.call_count == MAX_SERIES_PAGES
+        data = json.loads(result[0].text)
+        assert data["device_id"] == 1
+        warnings = data["warnings"]
+        assert len(warnings) == 2
+        for datapoint, warning in zip(("cpu", "memory"), warnings, strict=True):
+            assert warning.startswith(f"{datapoint}: ")
+            assert f"{MAX_SERIES_PAGES}-page cap" in warning
+
+    @respx.mock
+    @pytest.mark.parametrize(("module", "tool", "extra"), INSTANCE_CONSUMERS)
+    async def test_complete_series_carries_no_warnings(self, client, module, tool, extra):
+        respx.get(SERIES_URL).mock(return_value=_complete_page())
+        handler = getattr(importlib.import_module(f"lm_mcp.tools.{module}"), tool)
+
+        result = await handler(client, **SERIES_ARGS, **extra)
+
+        data = json.loads(result[0].text)
+        assert data["device_id"] == 1
+        assert "warnings" not in data
+
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("capped_device", "complete_url"),
+        [(1, SECOND_SERIES_URL), (2, SERIES_URL)],
+        ids=["first_source_capped", "second_source_capped"],
+    )
+    @pytest.mark.parametrize(
+        "datapoint", [{"datapoint": "cpu"}, {}], ids=["named_datapoint", "first_available"]
+    )
+    async def test_correlate_metrics_warns_only_for_the_capped_source(
+        self, client, capped_device, complete_url, datapoint
+    ):
+        from lm_mcp.tools.correlation import correlate_metrics
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+
+        capped_url = SERIES_URL if capped_device == 1 else SECOND_SERIES_URL
+        respx.get(capped_url).mock(side_effect=_capped_pages())
+        respx.get(complete_url).mock(return_value=_complete_page())
+
+        result = await correlate_metrics(
+            client,
+            sources=[{**SERIES_ARGS, **datapoint}, {**SECOND_SERIES_ARGS, **datapoint}],
+        )
+
+        data = json.loads(result[0].text)
+        assert data["labels"] == ["d1:cpu", "d2:cpu"]
+        warnings = data["warnings"]
+        assert len(warnings) == 1
+        assert warnings[0].startswith(f"d{capped_device}:cpu: ")
+        assert f"{MAX_SERIES_PAGES}-page cap" in warnings[0]
+
+    @respx.mock
+    async def test_correlate_metrics_complete_sources_carry_no_warnings(self, client):
+        from lm_mcp.tools.correlation import correlate_metrics
+
+        respx.get(SERIES_URL).mock(return_value=_complete_page())
+        respx.get(SECOND_SERIES_URL).mock(return_value=_complete_page())
+
+        result = await correlate_metrics(
+            client,
+            sources=[
+                {**SERIES_ARGS, "datapoint": "cpu"},
+                {**SECOND_SERIES_ARGS, "datapoint": "cpu"},
+            ],
+        )
+
+        data = json.loads(result[0].text)
+        assert data["sample_count"] == 3
+        assert "warnings" not in data

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
@@ -17,6 +17,7 @@ from lm_mcp.tools.stats_helpers import (
     holt_winters,
     linear_regression,
     prediction_interval,
+    truncation_warnings,
 )
 
 if TYPE_CHECKING:
@@ -54,7 +55,8 @@ async def forecast_metric(
     Returns:
         Per-datapoint forecast with slope, breach time, trend direction,
         method_used, and confidence_interval; fallback_reason says why linear
-        ran when the selected method could not.
+        ran when the selected method could not; warnings names any datapoint the
+        page cap cut short.
     """
     try:
         series = await fetch_metric_series(
@@ -123,15 +125,17 @@ async def forecast_metric(
 
             forecasts[dp_name] = forecast_result
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "device_datasource_id": device_datasource_id,
-                "instance_id": instance_id,
-                "hours_back": hours_back,
-                "forecasts": forecasts,
-            }
-        )
+        response: dict[str, Any] = {
+            "device_id": device_id,
+            "device_datasource_id": device_datasource_id,
+            "instance_id": instance_id,
+            "hours_back": hours_back,
+            "forecasts": forecasts,
+        }
+        warnings = truncation_warnings(series)
+        if warnings:
+            response["warnings"] = warnings
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -456,7 +460,8 @@ async def detect_change_points(
         sensitivity: Detection sensitivity (lower = more sensitive, default: 1.0).
 
     Returns:
-        Per-datapoint list of change points with timestamps and direction.
+        Per-datapoint list of change points with timestamps and direction;
+        warnings names any datapoint the page cap cut short.
     """
     try:
         series = await fetch_metric_series(
@@ -497,17 +502,19 @@ async def detect_change_points(
                 "sample_count": len(values),
             }
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "device_datasource_id": device_datasource_id,
-                "instance_id": instance_id,
-                "hours_back": hours_back,
-                "sensitivity": sensitivity,
-                "total_change_points": total_change_points,
-                "datapoints": results,
-            }
-        )
+        response: dict[str, Any] = {
+            "device_id": device_id,
+            "device_datasource_id": device_datasource_id,
+            "instance_id": instance_id,
+            "hours_back": hours_back,
+            "sensitivity": sensitivity,
+            "total_change_points": total_change_points,
+            "datapoints": results,
+        }
+        warnings = truncation_warnings(series)
+        if warnings:
+            response["warnings"] = warnings
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -534,7 +541,8 @@ async def classify_trend(
         hours_back: Hours of data to analyze (default: 24).
 
     Returns:
-        Per-datapoint classification with confidence and supporting metrics.
+        Per-datapoint classification with confidence and supporting metrics;
+        warnings names any datapoint the page cap cut short.
     """
     try:
         series = await fetch_metric_series(
@@ -602,15 +610,17 @@ async def classify_trend(
                 "sample_count": len(values),
             }
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "device_datasource_id": device_datasource_id,
-                "instance_id": instance_id,
-                "hours_back": hours_back,
-                "classifications": classifications,
-            }
-        )
+        response: dict[str, Any] = {
+            "device_id": device_id,
+            "device_datasource_id": device_datasource_id,
+            "instance_id": instance_id,
+            "hours_back": hours_back,
+            "classifications": classifications,
+        }
+        warnings = truncation_warnings(series)
+        if warnings:
+            response["warnings"] = warnings
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 
@@ -638,7 +648,8 @@ async def detect_seasonality(
         hours_back: Hours of data to analyze (default: 168 = 1 week).
 
     Returns:
-        Per-datapoint seasonality analysis with dominant period and peak hours.
+        Per-datapoint seasonality analysis with dominant period and peak hours;
+        warnings names any datapoint the page cap cut short.
     """
     try:
         series = await fetch_metric_series(
@@ -712,14 +723,16 @@ async def detect_seasonality(
                 "sample_count": len(values),
             }
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "device_datasource_id": device_datasource_id,
-                "instance_id": instance_id,
-                "hours_back": hours_back,
-                "seasonality": results,
-            }
-        )
+        response: dict[str, Any] = {
+            "device_id": device_id,
+            "device_datasource_id": device_datasource_id,
+            "instance_id": instance_id,
+            "hours_back": hours_back,
+            "seasonality": results,
+        }
+        warnings = truncation_warnings(series)
+        if warnings:
+            response["warnings"] = warnings
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

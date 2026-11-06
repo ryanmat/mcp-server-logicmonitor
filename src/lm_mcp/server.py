@@ -12,7 +12,12 @@ from mcp.types import CallToolResult, CompleteResult, GetPromptResult, TextConte
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
-from lm_mcp.logging import configure_logging, is_write_tool, log_write_operation
+from lm_mcp.logging import (
+    configure_logging,
+    is_write_tool,
+    log_write_operation,
+    redact_arguments,
+)
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
@@ -459,18 +464,21 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             log_write_operation(name, arguments, success=not failed)
 
         # Record result in session if enabled. Portal tools are recorded too:
-        # a portal switch is the marker that scopes every entry around it.
+        # a portal switch is the marker that scopes every entry around it. History
+        # is shown back to clients, so it holds the same redacted arguments the
+        # audit line shows.
         if config.session_enabled and name not in SESSION_TOOLS:
             session = get_session()
+            recorded_arguments = redact_arguments(arguments)
             # Try to parse the result for session storage
             if result and len(result) > 0:
                 try:
                     text = result[0].text
                     data = json.loads(text)
-                    session.record_result(name, arguments, data, success=not failed)
+                    session.record_result(name, recorded_arguments, data, success=not failed)
                 except (json.JSONDecodeError, AttributeError):
                     # Non-JSON result, just record with minimal info
-                    session.record_result(name, arguments, {}, success=not failed)
+                    session.record_result(name, recorded_arguments, {}, success=not failed)
 
         return result
     except ValueError as e:

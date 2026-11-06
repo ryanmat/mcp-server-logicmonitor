@@ -26,6 +26,7 @@ from lm_mcp.tools.stats_helpers import (
     iqr_anomalies,
     mad_anomalies,
     pearson_correlation,
+    truncation_warnings,
 )
 
 if TYPE_CHECKING:
@@ -657,7 +658,8 @@ async def correlate_metrics(
         hours_back: Hours of data to analyze (default: 24).
 
     Returns:
-        Correlation matrix and list of strong correlations.
+        Correlation matrix and list of strong correlations; warnings names any
+        source the page cap cut short.
     """
     try:
         if len(sources) > 10:
@@ -681,6 +683,7 @@ async def correlate_metrics(
         labels = []
         all_values = []
         sample_counts = []
+        warnings: list[str] = []
 
         for src in sources:
             dp_name = src.get("datapoint", "")
@@ -707,6 +710,8 @@ async def correlate_metrics(
             labels.append(label)
             all_values.append(vals)
             sample_counts.append(len(vals))
+            if dp_name in series:
+                warnings.extend(truncation_warnings({label: series[dp_name]}))
 
         # Align series to the shortest length
         min_len = min(len(v) for v in all_values) if all_values else 0
@@ -746,14 +751,15 @@ async def correlate_metrics(
                         )
             matrix.append(row)
 
-        return format_response(
-            {
-                "labels": labels,
-                "correlation_matrix": matrix,
-                "strong_correlations": strong_correlations,
-                "sample_count": min_len,
-                "hours_back": hours_back,
-            }
-        )
+        response: dict[str, Any] = {
+            "labels": labels,
+            "correlation_matrix": matrix,
+            "strong_correlations": strong_correlations,
+            "sample_count": min_len,
+            "hours_back": hours_back,
+        }
+        if warnings:
+            response["warnings"] = warnings
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

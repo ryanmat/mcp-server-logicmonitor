@@ -40,7 +40,9 @@ async def get_topology_map(
         params: dict = {"size": limit}
 
         if device_group_id:
-            params["filter"] = f"hostGroupIds~{device_group_id}"
+            # The exact form on /device/devices. This endpoint answers an id that matches
+            # nothing with the same maps as no filter, so this does not narrow the list.
+            params["filter"] = f"hostGroupIds:{device_group_id}"
 
         result = await client.get("/topology/topologies", params=params)
 

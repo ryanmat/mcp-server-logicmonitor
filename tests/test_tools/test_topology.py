@@ -32,6 +32,21 @@ class TestGetTopologyMap:
     """Tests for get_topology_map tool."""
 
     @respx.mock
+    async def test_group_filter_sends_the_membership_form(self, client):
+        """R5: device_group_id sends hostGroupIds:N; no group sends no filter."""
+        from lm_mcp.tools.topology import get_topology_map
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/topology/topologies").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        await get_topology_map(client, device_group_id=6)
+        await get_topology_map(client)
+
+        assert route.calls[0].request.url.params["filter"] == "hostGroupIds:6"
+        assert "filter" not in route.calls[1].request.url.params
+
+    @respx.mock
     async def test_get_topology_map_returns_list(self, client):
         """get_topology_map returns topology data."""
         from lm_mcp.tools.topology import get_topology_map

@@ -37,6 +37,12 @@ _IDENTIFIER_SUFFIX = re.compile(r"(?:^|_)ids?$")
 # Name/value pairs whose value is a credential when the paired name is one:
 # update_device_property's arguments, and the {name, value} items of LM property lists.
 _PAIRED_KEYS = (("property_name", "property_value"), ("name", "value"))
+# URL userinfo: what follows :// up to the last @ of the authority, which RFC 3986 ends
+# at the first /, ? or #. A string with no :// holds none, so an email address is left alone.
+_URL_USERINFO = re.compile(r'(?<=://)[^/?#\s"]*@')
+# A query parameter inside a string, after ?, & or # (an OAuth fragment carries the same
+# pairs). The value runs to the next &, #, whitespace or double quote.
+_QUERY_PARAMETER = re.compile(r'([?&#])([^=?&#\s"]+)=([^&#\s"]*)')
 
 
 def configure_logging(config: LMConfig) -> logging.Handler:
@@ -94,6 +100,18 @@ def is_sensitive_key(key: str) -> bool:
     return _CREDENTIAL_WORD.search(normalized) is not None
 
 
+def _mask_query_parameter(match: re.Match[str]) -> str:
+    """Replace a query parameter's value when its name is a credential word."""
+    separator, name, _value = match.groups()
+    return f"{separator}{name}={REDACTED}" if is_sensitive_key(name) else match.group(0)
+
+
+def _redact_string(value: str) -> str:
+    """Mask URL userinfo and credential-named query values inside a string."""
+    without_userinfo = _URL_USERINFO.sub(f"{REDACTED}@", value)
+    return _QUERY_PARAMETER.sub(_mask_query_parameter, without_userinfo)
+
+
 def redact_arguments(arguments: Any) -> Any:
     """Return a copy of tool arguments with credential-shaped values replaced.
 
@@ -101,8 +119,10 @@ def redact_arguments(arguments: Any) -> Any:
     whole, whatever its shape, so an ``extra_vars`` object is hidden entirely.
     An object that pairs a name with a value (``property_name`` with
     ``property_value``, or ``name`` with ``value``) has the value replaced when
-    the name is a credential property such as ``ssh.pass``. The input is not
-    modified.
+    the name is a credential property such as ``ssh.pass``. Any other string
+    keeps its text with URL userinfo and the values of credential-named query
+    parameters masked, so ``https://admin:pw@host/?password=x`` becomes
+    ``https://***@host/?password=***``. The input is not modified.
 
     Args:
         arguments: The arguments passed to a tool, or any value inside them.
@@ -124,6 +144,8 @@ def redact_arguments(arguments: Any) -> Any:
         return redacted
     if isinstance(arguments, list):
         return [redact_arguments(value) for value in arguments]
+    if isinstance(arguments, str):
+        return _redact_string(arguments)
     return arguments
 
 
