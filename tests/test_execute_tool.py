@@ -393,8 +393,8 @@ MASKED_URL = "https://***@10.0.0.5/hook?password=***"
 TOPOLOGIES_URL = "https://test.logicmonitor.com/santaba/rest/topology/topologies"
 
 
-class TestRemovedTopologyGroupParameter:
-    """R5: get_topology_map no longer takes device_group_id; passing it is an error."""
+class TestTopologyMapRejectsGroupParameter:
+    """R5: passing device_group_id to get_topology_map is an error."""
 
     @respx.mock
     async def test_passing_it_errors_instead_of_listing_every_map(self, write_portal, caplog):

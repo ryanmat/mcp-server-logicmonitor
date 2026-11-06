@@ -45,7 +45,7 @@ class TestGetTopologyMap:
         assert "filter" not in route.calls[0].request.url.params
 
     def test_schema_offers_no_group_parameter(self):
-        """R5: the tool's schema stops promising a group filter."""
+        """R5: the tool's schema offers no group filter, since the endpoint applies none."""
         from lm_mcp.registry import TOOLS
 
         tool = next(item for item in TOOLS if item.name == "get_topology_map")

@@ -198,14 +198,15 @@ def _rising_cpu_and_sparse_mem() -> httpx.Response:
 
 
 def _steady_cpu_and_mem() -> httpx.Response:
-    """cpu and mem hold nearly level on one final page, so no analysis reads them twice."""
-    rows = [[50.0, 60.0], [50.5, 60.5], [51.0, 61.0]]
-    start = int(time.time()) - 3600
+    """cpu and mem hold nearly level on one final page, newest first, in the live shape."""
+    newest = int(time.time()) - 60
     return _ok(
         {
+            "dataSourceName": "CPU",
             "dataPoints": ["cpu", "mem"],
-            "values": rows,
-            "time": [(start + i * 300) * 1000 for i in range(len(rows))],
+            "values": [[51.0, 61.0], [50.5, 60.5], [50.0, 60.0]],
+            "time": [(newest - i * 300) * 1000 for i in range(3)],
+            "nextPageParams": "",
         }
     )
 
@@ -221,6 +222,7 @@ def _capped_read() -> list[httpx.Response]:
         pages.append(
             _ok(
                 {
+                    "dataSourceName": "CPU",
                     "dataPoints": ["cpu", "mem"],
                     "values": [[50.0, 60.0], [50.5, 60.5]],
                     "time": [newest * 1000, (newest - 300) * 1000],
