@@ -32,19 +32,25 @@ class TestGetTopologyMap:
     """Tests for get_topology_map tool."""
 
     @respx.mock
-    async def test_group_filter_sends_the_membership_form(self, client):
-        """R5: device_group_id sends hostGroupIds:N; no group sends no filter."""
+    async def test_sends_no_filter(self, client):
+        """R5: the endpoint filters nothing on a group, so the tool sends no filter."""
         from lm_mcp.tools.topology import get_topology_map
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/topology/topologies").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await get_topology_map(client, device_group_id=6)
         await get_topology_map(client)
 
-        assert route.calls[0].request.url.params["filter"] == "hostGroupIds:6"
-        assert "filter" not in route.calls[1].request.url.params
+        assert "filter" not in route.calls[0].request.url.params
+
+    def test_schema_offers_no_group_parameter(self):
+        """R5: the tool's schema offers no group filter, since the endpoint applies none."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(item for item in TOOLS if item.name == "get_topology_map")
+
+        assert set(tool.inputSchema["properties"]) == {"include_connections", "limit"}
 
     @respx.mock
     async def test_get_topology_map_returns_list(self, client):

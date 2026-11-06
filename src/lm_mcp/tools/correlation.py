@@ -724,7 +724,9 @@ async def correlate_metrics(
                 }
             )
 
-        aligned = [v[:min_len] for v in all_values]
+        # Series run oldest first, so the tail is the newest samples. Pairing is by
+        # position, not timestamp, so sources with different intervals stay approximate.
+        aligned = [v[-min_len:] for v in all_values]
 
         # Build NxN correlation matrix
         n = len(aligned)

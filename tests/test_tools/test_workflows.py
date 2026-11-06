@@ -197,6 +197,42 @@ def _rising_cpu_and_sparse_mem() -> httpx.Response:
     )
 
 
+def _steady_cpu_and_mem() -> httpx.Response:
+    """cpu and mem hold nearly level on one final page, newest first, in the live shape."""
+    newest = int(time.time()) - 60
+    return _ok(
+        {
+            "dataSourceName": "CPU",
+            "dataPoints": ["cpu", "mem"],
+            "values": [[51.0, 61.0], [50.5, 60.5], [50.0, 60.0]],
+            "time": [(newest - i * 300) * 1000 for i in range(3)],
+            "nextPageParams": "",
+        }
+    )
+
+
+def _capped_read() -> list[httpx.Response]:
+    """One read's pages, newest first, the last still naming a next page: the cap binds."""
+    from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+
+    now = int(time.time())
+    pages = []
+    for page in range(MAX_SERIES_PAGES):
+        newest = now - page * 600
+        pages.append(
+            _ok(
+                {
+                    "dataSourceName": "CPU",
+                    "dataPoints": ["cpu", "mem"],
+                    "values": [[50.0, 60.0], [50.5, 60.5]],
+                    "time": [newest * 1000, (newest - 300) * 1000],
+                    "nextPageParams": f"start={now - 86400}&end={newest - 301}",
+                }
+            )
+        )
+    return pages
+
+
 def _swinging_cpu() -> httpx.Response:
     """cpu swings between 5 and 95 every 5 minutes, which classify_trend calls volatile."""
     rows = [[5.0], [95.0], [5.0], [95.0], [5.0], [95.0]]
@@ -689,6 +725,76 @@ class TestCapacityPlan:
         (warning,) = data["warnings"]
         assert warning.startswith("change_points for CPU/cpu102 failed:")
         assert "portal unavailable" in warning
+
+    @respx.mock
+    async def test_summary_carries_truncation_warnings_once_per_datapoint(self, auth, lm_env):
+        """R5: a capped series reaches the summary, once though three analyses read it."""
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _capped_read() * 3, 101: _steady_cpu_and_mem()})
+
+        result = await capacity_plan(client, device_id=1)
+
+        data = json.loads(result[0].text)
+        assert "datasources" not in data
+        cpu, mem = data["warnings"]
+        assert cpu.startswith("CPU/cpu100: cpu: ")
+        assert mem.startswith("CPU/cpu100: mem: ")
+        assert f"{MAX_SERIES_PAGES}-page cap" in cpu
+
+    @respx.mock
+    @pytest.mark.parametrize("capped_read", [0, 1, 2], ids=["forecast", "trend", "seasonality"])
+    async def test_summary_carries_a_warning_only_one_analysis_saw(self, auth, lm_env, capped_read):
+        """R5: a read capped for one analysis alone still reaches the summary."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        reads = [[_steady_cpu_and_mem()], [_steady_cpu_and_mem()], [_steady_cpu_and_mem()]]
+        reads[capped_read] = _capped_read()
+        _mock_capacity_portal({100: [page for read in reads for page in read]})
+
+        result = await capacity_plan(client, device_id=1)
+
+        cpu, mem = json.loads(result[0].text)["warnings"]
+        assert cpu.startswith("CPU/cpu100: cpu: ")
+        assert mem.startswith("CPU/cpu100: mem: ")
+
+    @respx.mock
+    async def test_summary_carries_a_warning_from_change_points(self, auth, lm_env):
+        """R5: the change-point read on a volatile instance carries its warning up too."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        reads = [_swinging_cpu(), _swinging_cpu(), _swinging_cpu(), *_capped_read()]
+        _mock_capacity_portal({102: reads})
+
+        result = await capacity_plan(client, device_id=1)
+
+        cpu, mem = json.loads(result[0].text)["warnings"]
+        assert cpu.startswith("CPU/cpu102: cpu: ")
+        assert mem.startswith("CPU/cpu102: mem: ")
+
+    @respx.mock
+    async def test_summary_of_complete_reads_has_no_warnings(self, auth, lm_env):
+        """R5: a complete read adds nothing to the summary."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _steady_cpu_and_mem()})
+
+        result = await capacity_plan(client, device_id=1)
+
+        data = json.loads(result[0].text)
+        assert data["forecast_summary"]
+        assert "warnings" not in data
+
+    @respx.mock
+    async def test_full_detail_keeps_truncation_warnings_on_the_instance(self, auth, lm_env):
+        """R5: detail_level=full leaves the warning under datasources and copies nothing up."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _capped_read() * 3})
+
+        result = await capacity_plan(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert "warnings" not in data
+        instance = data["datasources"][0]["instances"][0]
+        assert len(instance["forecast"]["warnings"]) == 2
 
     @respx.mock
     async def test_full_detail_is_unchanged(self, auth, lm_env):

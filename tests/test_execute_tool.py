@@ -390,6 +390,26 @@ def _audit_lines(caplog) -> list[tuple[int, str]]:
 INTEGRATIONS_URL = "https://test.logicmonitor.com/santaba/rest/setting/integrations"
 CREDENTIAL_URL = "https://admin:s3cret@10.0.0.5/hook?password=s3cret2"
 MASKED_URL = "https://***@10.0.0.5/hook?password=***"
+TOPOLOGIES_URL = "https://test.logicmonitor.com/santaba/rest/topology/topologies"
+
+
+class TestTopologyMapRejectsGroupParameter:
+    """R5: passing device_group_id to get_topology_map is an error."""
+
+    @respx.mock
+    async def test_passing_it_errors_instead_of_listing_every_map(self, write_portal, caplog):
+        route = respx.get(TOPOLOGIES_URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        from lm_mcp.server import execute_tool
+
+        with caplog.at_level(logging.ERROR, logger="lm_mcp.server"):
+            result = await execute_tool("get_topology_map", {"device_group_id": 6})
+
+        assert isinstance(result[0], ErrorContent)
+        assert "device_group_id" in result[0].text
+        assert not route.called
+        assert "Tool get_topology_map raised" in caplog.text
 
 
 class TestCredentialsInUrlArguments:

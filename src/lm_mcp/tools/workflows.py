@@ -705,10 +705,11 @@ async def capacity_plan(
         report["datasources"] = ds_reports
 
         # The summary level trims the raw datasources block, so it keeps each
-        # forecast's headline and every per-instance error in its place.
+        # forecast's headline and every per-instance error and warning in its place.
         if detail_level == "summary":
             report["forecast_summary"] = _forecast_summary(ds_reports)
             warnings.extend(_instance_errors(ds_reports))
+            warnings.extend(_instance_warnings(ds_reports))
 
         if warnings:
             report["warnings"] = warnings
@@ -765,6 +766,21 @@ def _instance_errors(ds_reports: list[dict]) -> list[str]:
                         f"{analysis} for {ds['datasource']}/{inst['instance']} failed: {inst[key]}"
                     )
     return errors
+
+
+def _instance_warnings(ds_reports: list[dict]) -> list[str]:
+    """Every sub-tool warning, naming datasource and instance, once per instance.
+
+    The analyses read the same window, so a capped series warns from each of them.
+    """
+    lines: dict[str, None] = {}
+    for ds in ds_reports:
+        for inst in ds["instances"]:
+            for key in _INSTANCE_ERROR_KEYS:
+                analysis = inst.get(key.removesuffix("_error")) or {}
+                for warning in analysis.get("warnings", []):
+                    lines[f"{ds['datasource']}/{inst['instance']}: {warning}"] = None
+    return list(lines)
 
 
 # ---------------------------------------------------------------------------

@@ -6514,10 +6514,6 @@
     "description": "Get network topology map data",
     "inputSchema": {
       "properties": {
-        "device_group_id": {
-          "description": "Filter by device group ID",
-          "type": "integer"
-        },
         "include_connections": {
           "default": true,
           "description": "Include connection data",
