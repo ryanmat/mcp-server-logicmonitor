@@ -136,7 +136,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Network | Neighbors, interfaces, flows, connections, top talkers, link flaps, and outage detection. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |
 | Cost | Cost recommendations, recommendation categories, and idle resources (LM Envision) |
 | Ingestion | Push logs and metrics through LMv1 authentication |
-| Batch jobs | List batch jobs and each device's batch job results |
+| Batch jobs | List batch jobs and the BatchJob datasources on a device; per-run output comes from `get_device_data` |
 
 `get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only portal tested, one with no NetFlow-enabled device. Treat both as unverified until you have tried them on a portal with NetFlow data.
 
@@ -214,9 +214,9 @@ The TTM model is `ibm-granite/granite-timeseries-ttm-r2` (512 context, 96 foreca
 
 11 tools for Infrastructure as Code with any Terraform provider. `terraform_generate` exports existing LM portal resources as HCL using the `logicmonitor/logicmonitor` provider. The other ten appear when `TF_WORKSPACE_DIR` is set, and they need the `terraform` CLI installed separately.
 
-- `terraform_init` and `terraform_plan` require write permission, since providers and data sources call live APIs
+- `terraform_init` and `terraform_plan` require write permission, since providers and data sources call live APIs, and `terraform_import` and `terraform_write_config` require it too
 - `terraform_apply` and `terraform_destroy` are triple-gated: write permission, `TF_AUTO_APPROVE_ENABLED`, and a confirm parameter
-- `terraform_validate`, `terraform_import`, `terraform_state_list`, `terraform_state_show`, `terraform_output`, and `terraform_write_config` cover the rest of the workflow
+- `terraform_validate`, `terraform_state_list`, `terraform_state_show`, and `terraform_output` need no write permission
 
 An agent can author HCL from natural language, operate on existing `.tf` files under `TF_WORKSPACE_DIR`, or export LM resources with `terraform_generate` and import them into state.
 

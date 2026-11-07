@@ -36,7 +36,7 @@ SERVER_INSTRUCTIONS = (
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
     "`detect_site_outage` -- answer common multi-step investigations in a single call. "
     "Write operations (create/update/delete/run) are gated behind "
-    "`LM_ENABLE_WRITE_OPERATIONS` and are absent unless the operator enabled them."
+    "`LM_ENABLE_WRITE_OPERATIONS` and are refused unless the operator enabled them."
 )
 server = Server("logicmonitor-platform", version=__version__, instructions=SERVER_INSTRUCTIONS)
 
