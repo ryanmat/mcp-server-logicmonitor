@@ -1119,10 +1119,7 @@ class TestSearchTools:
         assert "forecast_metric" in tool_names
 
     async def test_configured_integration_tools_are_searchable(self, client):
-        """Terraform tools (conditional) are searchable only when their runner is set.
-
-        search_tools mirrors the server's advertised surface, not just the core TOOLS list.
-        """
+        """search_tools adds the Terraform tools to its corpus only when their runner is set."""
         from unittest.mock import patch
 
         # Not configured -> Terraform tools are absent from the search corpus.
