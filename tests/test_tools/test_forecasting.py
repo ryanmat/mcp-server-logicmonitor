@@ -400,9 +400,8 @@ class TestForecastMethodLabels:
     """R4.1: method_used names the method that produced the numbers; fallbacks say why."""
 
     @respx.mock
-    async def test_ttm_without_watsonx_falls_back_with_reason(self, client, monkeypatch):
+    async def test_ttm_without_watsonx_falls_back_with_reason(self, client):
         """method=ttm with no watsonx client reports linear and names watsonx."""
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", None)
         values = [[float(10 + i)] for i in range(600)]
 
         cpu = await _forecast_cpu(client, values, method="ttm")
@@ -441,9 +440,8 @@ class TestForecastMethodLabels:
 
     @pytest.mark.parametrize("method", ["linear", "auto"])
     @respx.mock
-    async def test_selected_linear_carries_no_fallback_reason(self, client, monkeypatch, method):
+    async def test_selected_linear_carries_no_fallback_reason(self, client, method):
         """Linear that was asked for, or chosen by auto, is not a fallback."""
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", None)
         values = [[float(10 + i)] for i in range(10)]
 
         cpu = await _forecast_cpu(client, values, method=method)

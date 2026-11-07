@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).parent.parent
 # A stated total ("306 tools", "306 structured tools", "**306 Tools**"); smaller numbers
 # before "tools" describe subsets, such as a category or a client's cap.
 _TOOL_TOTAL_RE = re.compile(r"\b(\d{3})\s+(?:structured\s+)?tools\b", re.IGNORECASE)
-_TOOL_BREAKDOWN_RE = re.compile(r"\((\d+) LM \+ (\d+) AAP \+ (\d+) Terraform \+ (\d+) watsonx\)")
+_TOOL_BREAKDOWN_RE = re.compile(r"\((\d+) LM \+ (\d+) AAP \+ (\d+) Terraform\)")
 
 
 def _project_version() -> str:
@@ -81,9 +81,9 @@ class TestReleaseMetadata:
     @pytest.mark.parametrize("doc", ["README.md", "documentation/client-setup.md", "server.json"])
     def test_docs_state_the_registry_tool_count(self, doc):
         """Every total tool count a doc or the registry manifest states is the registry's."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
 
-        total = len(TOOLS) + len(AWX_TOOLS) + len(WATSONX_TOOLS) + len(TF_TOOLS)
+        total = len(TOOLS) + len(AWX_TOOLS) + len(TF_TOOLS)
         stated = [int(n) for n in _TOOL_TOTAL_RE.findall((REPO_ROOT / doc).read_text())]
 
         assert stated, f"{doc} states no tool count"
@@ -91,12 +91,12 @@ class TestReleaseMetadata:
 
     def test_readme_tool_breakdown_matches_the_registry(self):
         """The README's per-integration breakdown matches each registry list."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
 
         match = _TOOL_BREAKDOWN_RE.search((REPO_ROOT / "README.md").read_text())
 
-        assert match, "README.md has no (LM + AAP + Terraform + watsonx) tool breakdown"
-        counts = (len(TOOLS), len(AWX_TOOLS), len(TF_TOOLS), len(WATSONX_TOOLS))
+        assert match, "README.md has no (LM + AAP + Terraform) tool breakdown"
+        counts = (len(TOOLS), len(AWX_TOOLS), len(TF_TOOLS))
         assert tuple(int(n) for n in match.groups()) == counts
 
 

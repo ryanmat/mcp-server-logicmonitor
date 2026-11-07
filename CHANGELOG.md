@@ -8,6 +8,12 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
+### Removed
+
+| Tool | Replacement |
+|---|---|
+| `watsonx_summarize` | None. The calling model summarizes tool results itself. |
+
 ### Changed
 
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,

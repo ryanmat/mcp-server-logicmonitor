@@ -887,20 +887,6 @@ class TestCapacityPlan:
 class TestSummaryFailureWarnings:
     """R4.4: a requested NL summary that does not arrive is reported in warnings."""
 
-    @respx.mock
-    async def test_summary_without_a_model_is_warned(self, auth, lm_env):
-        """R4.4: triage(summarize=True) with no summary model returns a warning saying so."""
-        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-
-        result = await triage(client, summarize=True)
-
-        data = json.loads(result[0].text)
-        assert "nl_summary" not in data
-        (warning,) = data["warnings"]
-        assert warning.startswith("NL summary requested but")
-        assert "not configured" in warning
-
 
 # ---------------------------------------------------------------------------
 # TestPortalOverview
@@ -1140,7 +1126,7 @@ class TestSearchTools:
         """AWX/Terraform tools (conditional) become searchable when their client is set.
 
         Regression for the drift where search_tools iterated only the core TOOLS list,
-        leaving the AWX/watsonx/Terraform tools unsearchable even when configured.
+        leaving the AWX and Terraform tools unsearchable even when configured.
         """
         from unittest.mock import patch
 

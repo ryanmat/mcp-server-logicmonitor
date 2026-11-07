@@ -1567,14 +1567,6 @@ class TestServerCallToolFlow:
         assert "test_awx_connection" in awx_names
         assert "launch_job" in awx_names
 
-    def test_watsonx_tools_registered(self):
-        """WATSONX_TOOLS contains IBM watsonx tools."""
-        from lm_mcp.registry import WATSONX_TOOLS
-
-        assert len(WATSONX_TOOLS) == 1
-        wx_names = {t.name for t in WATSONX_TOOLS}
-        assert "watsonx_summarize" in wx_names
-
     def test_tf_tools_registered(self):
         """TF_TOOLS contains all Terraform IaC tools."""
         from lm_mcp.registry import TF_TOOLS

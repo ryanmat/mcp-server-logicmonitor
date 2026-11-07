@@ -506,12 +506,6 @@ TOOL_CATEGORIES = {
                 "set_action_rule_status",
             ],
         },
-        "watsonx": {
-            "description": "IBM watsonx.ai summarization and forecasting",
-            "tools": [
-                "watsonx_summarize",
-            ],
-        },
     },
 }
 

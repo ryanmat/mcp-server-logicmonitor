@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 306 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform, Terraform, and IBM watsonx.ai integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 305 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform and Terraform integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -564,14 +564,6 @@ ADR automation: action chains (ordered diagnostic/remediation stages) and the ru
 | `update_action_rule` | Update an action rule via PATCH; only provided fields are sent (requires write permission) | Yes |
 | `delete_action_rule` | Delete an action rule (requires write permission) | Yes |
 | `set_action_rule_status` | Enable or disable an action rule without touching its matchers (requires write permission) | Yes |
-
-## IBM watsonx.ai
-
-IBM watsonx.ai summarization and forecasting
-
-| Tool | Description | Write |
-|------|-------------|-------|
-| `watsonx_summarize` | Generate a plain-English summary of structured data using IBM Granite LLM via watsonx.ai. Takes JSON output from any tool and produces a concise, shift-handoff-ready analysis summary. | No |
 
 ## Usage examples for the ML and statistical tools
 

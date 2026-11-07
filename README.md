@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 306 tools, 15 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 305 tools, 15 workflow prompts, and 26 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Tools are read-only until you set `LM_ENABLE_WRITE_OPERATIONS=true`. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 306 counts every tool the server can advertise (277 LM + 18 AAP + 10 Terraform + 1 watsonx). The AAP, Terraform, and watsonx tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
+The 305 counts every tool the server can advertise (277 LM + 18 AAP + 10 Terraform). The AAP and Terraform tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
-- the `lm://guide/tool-categories` resource: all 306 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 305 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -367,7 +367,7 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 306 tools organized by domain category |
+| `lm://guide/tool-categories` | All 305 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

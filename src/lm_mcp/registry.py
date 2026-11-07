@@ -7154,40 +7154,6 @@ AWX_TOOLS: list[Tool] = [
 ]
 
 
-# IBM watsonx.ai tools — only registered when WATSONX_API_KEY is configured
-WATSONX_TOOLS: list[Tool] = [
-    Tool(
-        name="watsonx_summarize",
-        description=(
-            "Generate a plain-English summary of structured data using IBM "
-            "Granite LLM via watsonx.ai. Takes JSON output from any tool and "
-            "produces a concise, shift-handoff-ready analysis summary."
-        ),
-        annotations=_READ_ONLY,
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "string",
-                    "description": "JSON string of structured data to summarize",
-                },
-                "context": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Context hint (e.g., 'triage report', 'capacity plan')",
-                },
-                "max_tokens": {
-                    "type": "integer",
-                    "default": 500,
-                    "description": "Maximum tokens in the generated summary",
-                },
-            },
-            "required": ["data"],
-        },
-    ),
-]
-
-
 # Terraform IaC tools (visible only when TF_WORKSPACE_DIR is set)
 TF_TOOLS: list[Tool] = [
     Tool(
@@ -7544,7 +7510,6 @@ def get_tool_handler(tool_name: str) -> Any:
         topologysources,
         traces,
         users,
-        watsonx,
         websites,
         workflows,
     )
@@ -7896,8 +7861,6 @@ def get_tool_handler(tool_name: str) -> Any:
         # Universal reference layer (Resource/Prompt mirrors for non-Claude clients)
         "get_reference": reference.get_reference,
         "get_workflow": reference.get_workflow,
-        # IBM watsonx.ai
-        "watsonx_summarize": watsonx.watsonx_summarize,
         # Terraform IaC
         "terraform_init": terraform.terraform_init,
         "terraform_validate": terraform.terraform_validate,

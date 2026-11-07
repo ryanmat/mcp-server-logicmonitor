@@ -9869,37 +9869,5 @@
       ],
       "type": "object"
     }
-  },
-  "watsonx_summarize": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Generate a plain-English summary of structured data using IBM Granite LLM via watsonx.ai. Takes JSON output from any tool and produces a concise, shift-handoff-ready analysis summary.",
-    "inputSchema": {
-      "properties": {
-        "context": {
-          "default": "",
-          "description": "Context hint (e.g., 'triage report', 'capacity plan')",
-          "type": "string"
-        },
-        "data": {
-          "description": "JSON string of structured data to summarize",
-          "type": "string"
-        },
-        "max_tokens": {
-          "default": 500,
-          "description": "Maximum tokens in the generated summary",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "data"
-      ],
-      "type": "object"
-    }
   }
 }

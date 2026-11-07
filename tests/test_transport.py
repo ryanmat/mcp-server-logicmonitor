@@ -2,7 +2,6 @@
 # Description: Validates transport runner selection and configuration.
 
 import logging
-import sys
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock
 
@@ -276,66 +275,6 @@ class TestRunStdioStartup:
             for r in caplog.records
         )
 
-    async def test_watsonx_import_error_logs_and_reaches_serve_loop(self, monkeypatch, caplog):
-        """A configured watsonx without its extra logs a warning and still serves."""
-        monkeypatch.setenv("WATSONX_API_KEY", "test-key")
-        monkeypatch.setenv("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
-        monkeypatch.setenv("WATSONX_PROJECT_ID", "test-project")
-        monkeypatch.setitem(sys.modules, "lm_mcp.client.watsonx", None)
-
-        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport"):
-            await run_stdio()
-
-        self.serve.assert_awaited_once()
-        assert any("ibm-watsonx-ai not installed" in r.getMessage() for r in caplog.records)
-
-    async def test_huggingface_import_error_logs_and_reaches_serve_loop(self, monkeypatch, caplog):
-        """A HuggingFace config without torch/transformers logs a warning and still serves."""
-        from lm_mcp.hf_config import HuggingFaceConfig
-
-        monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: HuggingFaceConfig())
-        monkeypatch.setitem(sys.modules, "lm_mcp.client.huggingface", None)
-
-        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport"):
-            await run_stdio()
-
-        self.serve.assert_awaited_once()
-        assert any("HuggingFace fallback disabled" in r.getMessage() for r in caplog.records)
-
-    async def test_watsonx_construction_failure_logs_and_reaches_serve_loop(
-        self, monkeypatch, caplog
-    ):
-        """R4.5: a watsonx SDK constructor failure is logged, leaves watsonx unset, and serves.
-
-        The SDK's APIClient fetches an IAM token on construction, so a bad key or
-        an unreachable IAM endpoint fails there with WMLClientError.
-        """
-        from unittest.mock import MagicMock
-
-        from ibm_watsonx_ai.wml_client_error import WMLClientError
-
-        from lm_mcp import server as server_module
-
-        monkeypatch.setenv("WATSONX_API_KEY", "test-key")
-        monkeypatch.setenv("WATSONX_PROJECT_ID", "test-project")
-        monkeypatch.setattr("ibm_watsonx_ai.Credentials", MagicMock())
-        monkeypatch.setattr(
-            "ibm_watsonx_ai.APIClient",
-            MagicMock(side_effect=WMLClientError("Error getting IAM Token.")),
-        )
-        serving_watsonx = []
-        self.serve.side_effect = lambda *args: serving_watsonx.append(server_module._watsonx_client)
-
-        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport"):
-            await run_stdio()
-
-        self.serve.assert_awaited_once()
-        assert serving_watsonx == [None]
-        (record,) = [r for r in caplog.records if "watsonx" in r.getMessage()]
-        assert record.levelno == logging.ERROR
-        assert record.exc_info is not None
-        assert "Error getting IAM Token." in str(record.exc_info[1])
-
     async def test_single_portal_client_uses_configured_max_retries(self, monkeypatch):
         """R1.6, R3.5: the client gets LM_MAX_RETRIES and LM_RETRY_AFTER_CAP_SECONDS."""
         from lm_mcp import server as server_module
@@ -384,10 +323,9 @@ async def _http_tool_names(monkeypatch) -> list[str]:
 
 
 def _clear_backend_globals() -> None:
-    from lm_mcp.server import _set_awx_client, _set_tf_runner, _set_watsonx_client
+    from lm_mcp.server import _set_awx_client, _set_tf_runner
 
     _set_awx_client(None)
-    _set_watsonx_client(None)
     _set_tf_runner(None)
 
 
@@ -395,8 +333,7 @@ class TestOneBootstrapForBothTransports:
     """R4.7: both transports build backends through one function and list the same tools.
 
     The stdio serve loop and streams are faked; the HTTP server runs on a real
-    loopback socket. Backend construction runs for real, with the watsonx SDK's
-    client classes patched.
+    loopback socket. Backend construction runs for real.
     """
 
     @pytest.fixture(autouse=True)
@@ -437,19 +374,13 @@ class TestOneBootstrapForBothTransports:
         reset_terraform_config()
 
     def _configure_every_backend(self, monkeypatch, tmp_path) -> None:
-        from unittest.mock import MagicMock
-
         monkeypatch.setenv("AWX_URL", "https://awx.example.com")
         monkeypatch.setenv("AWX_TOKEN", "awx-token")
-        monkeypatch.setenv("WATSONX_API_KEY", "test-key")
-        monkeypatch.setenv("WATSONX_PROJECT_ID", "test-project")
         monkeypatch.setenv("TF_WORKSPACE_DIR", str(tmp_path))
-        monkeypatch.setattr("ibm_watsonx_ai.Credentials", MagicMock())
-        monkeypatch.setattr("ibm_watsonx_ai.APIClient", MagicMock())
 
     async def test_configured_backends_list_the_same_tools(self, monkeypatch, tmp_path):
-        """AWX, watsonx and Terraform configured: stdio and HTTP name the same tools."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, WATSONX_TOOLS
+        """AWX and Terraform configured: stdio and HTTP name the same tools."""
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS
 
         self._configure_every_backend(monkeypatch, tmp_path)
 
@@ -458,7 +389,7 @@ class TestOneBootstrapForBothTransports:
         http_names = await _http_tool_names(monkeypatch)
 
         assert stdio_names == http_names
-        backend_names = {t.name for t in (*AWX_TOOLS, *WATSONX_TOOLS, *TF_TOOLS)}
+        backend_names = {t.name for t in (*AWX_TOOLS, *TF_TOOLS)}
         assert backend_names <= set(stdio_names)
 
     async def test_no_backends_list_the_filtered_core_tools(self, monkeypatch):
