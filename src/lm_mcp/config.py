@@ -71,7 +71,6 @@ class LMConfig(BaseSettings):
         LM_BEARER_TOKEN: API Bearer token for authentication (preferred)
         LM_ACCESS_ID: LMv1 access ID for HMAC authentication
         LM_ACCESS_KEY: LMv1 access key for HMAC authentication
-        LM_API_VERSION: API version (default: 3)
         LM_TIMEOUT: Request timeout in seconds (default: 30, range: 5-300)
         LM_ENABLE_WRITE_OPERATIONS: Enable write operations (default: false)
         LM_MAX_RETRIES: Max retry attempts for rate limits (default: 3, range: 0-10)
@@ -88,7 +87,6 @@ class LMConfig(BaseSettings):
             LM_TRANSPORT=http, a non-loopback bind needs LM_HTTP_AUTH_TOKEN or
             LM_HTTP_ALLOW_UNAUTHENTICATED=true, or the server refuses to start.
         LM_HTTP_PORT: HTTP server port (default: 8080)
-        LM_CORS_ORIGINS: Comma-separated CORS origins (default: empty, no CORS)
         LM_HTTP_AUTH_TOKEN: Require this bearer token on every HTTP path outside
             the health endpoints and / (default: unset, no inbound auth; minimum
             16 characters). The health endpoints and / stay open for probes. HTTP
@@ -103,7 +101,6 @@ class LMConfig(BaseSettings):
         LM_HTTP_SSL_KEYFILE: TLS private key path for the HTTP transport
         LM_HTTP_SSL_KEYFILE_PASSWORD: Password for an encrypted TLS private key
         LM_SESSION_HISTORY_SIZE: Number of tool calls to keep in history (default: 50)
-        LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
         LM_ENABLED_TOOLS: Comma-separated tool names or glob patterns to enable (default: all)
         LM_DISABLED_TOOLS: Comma-separated tool names or glob patterns to disable (default: none)
         LM_MCP_CATEGORIES: Comma-separated categories to include (default: all).
@@ -123,7 +120,6 @@ class LMConfig(BaseSettings):
     bearer_token: str | None = None
     access_id: str | None = None
     access_key: str | None = None
-    api_version: int = 3
     timeout: int = 30
     enable_write_operations: bool = False
     max_retries: int = 3
@@ -139,7 +135,6 @@ class LMConfig(BaseSettings):
     transport: Literal["stdio", "http"] = "stdio"
     http_host: str = "0.0.0.0"
     http_port: int = 8080
-    cors_origins: str = ""
     http_auth_token: str | None = None
     http_allow_unauthenticated: bool = False
     http_allowed_hosts: str = ""
@@ -149,9 +144,6 @@ class LMConfig(BaseSettings):
 
     # Session settings
     session_history_size: int = 50
-
-    # Validation settings
-    field_validation: Literal["off", "warn", "error"] = "warn"
 
     # Tool filtering
     enabled_tools: str | None = None
@@ -348,17 +340,6 @@ class LMConfig(BaseSettings):
         if not self.portal:
             raise ValueError("no portal set (multi-portal mode: select a portal via use_portal)")
         return f"https://{self.portal}"
-
-    @property
-    def cors_origins_list(self) -> list[str]:
-        """Parse CORS origins from comma-separated string to list.
-
-        Returns ["*"] if cors_origins is "*" (allow all).
-        Otherwise splits by comma and strips whitespace.
-        """
-        if self.cors_origins == "*":
-            return ["*"]
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def http_host_allowlist(self) -> frozenset[str]:

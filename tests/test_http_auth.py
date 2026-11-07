@@ -1,5 +1,5 @@
 # Description: Tests for opt-in inbound bearer authentication on the HTTP transport.
-# Description: Covers gated paths, open probe paths, CORS preflight, and config validation.
+# Description: Covers gated paths, open probe paths, preflights, and config validation.
 
 import logging
 
@@ -18,7 +18,6 @@ def _set_env(monkeypatch):
     monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
     monkeypatch.delenv("LM_HTTP_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("LM_CORS_ORIGINS", raising=False)
 
 
 @pytest.fixture
@@ -123,12 +122,12 @@ class TestHttpAuthOpenPaths:
         assert resp.status_code in (200, 503)
 
 
-class TestHttpAuthCors:
-    """CORS preflight is answered before auth runs."""
+class TestHttpAuthPreflight:
+    """A preflight meets the bearer check like any other request."""
 
     @pytest.mark.asyncio
-    async def test_cors_preflight_bypasses_auth(self, _set_env_with_auth, monkeypatch):
-        """OPTIONS preflight succeeds without a token; browsers cannot send one."""
+    async def test_unauthenticated_preflight_is_refused(self, _set_env_with_auth, monkeypatch):
+        """R1.6: an OPTIONS preflight without a token gets 401 and no CORS header."""
         monkeypatch.setenv("LM_CORS_ORIGINS", "https://example.com")
         async with _client() as client:
             resp = await client.options(
@@ -138,8 +137,8 @@ class TestHttpAuthCors:
                     "Access-Control-Request-Method": "POST",
                 },
             )
-        assert resp.status_code == 200
-        assert resp.headers["access-control-allow-origin"] == "https://example.com"
+        assert resp.status_code == 401
+        assert "access-control-allow-origin" not in resp.headers
 
 
 class TestHttpAuthDisabled:

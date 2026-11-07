@@ -26,6 +26,15 @@ class TestServerCreation:
 
         assert server.create_initialization_options().server_version == __version__
 
+    def test_capabilities_carry_no_completions(self):
+        """R1.6: the server registers no completion handler, so it offers no completions."""
+        from lm_mcp.server import server
+
+        capabilities = server.create_initialization_options().capabilities
+
+        assert capabilities.resources is not None
+        assert capabilities.completions is None
+
     def test_main_function_exists(self):
         """Entry point main function exists."""
         from lm_mcp.server import main

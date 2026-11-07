@@ -15,7 +15,6 @@ def client():
         base_url="https://test.logicmonitor.com/santaba/rest",
         auth=BearerAuth("test-token"),
         timeout=30,
-        api_version=3,
     )
 
 
@@ -30,7 +29,7 @@ class TestGetReference:
         data = json.loads(result[0].text)
 
         assert data["count"] == len(RESOURCES)
-        assert data["count"] >= 26
+        assert data["count"] >= 25
         for entry in data["available"]:
             assert "category" in entry
             assert "name" in entry

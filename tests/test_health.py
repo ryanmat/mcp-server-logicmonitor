@@ -208,7 +208,6 @@ def connectivity_env(monkeypatch, reset_portals):
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
     monkeypatch.setenv("LM_HEALTH_CHECK_CONNECTIVITY", "true")
     monkeypatch.delenv("LM_HTTP_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("LM_CORS_ORIGINS", raising=False)
     _set_client(LogicMonitorClient(base_url=PORTAL_BASE, auth=BearerAuth("test-token")))
 
 

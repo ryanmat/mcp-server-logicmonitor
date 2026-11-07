@@ -20,12 +20,10 @@ class TestLogicMonitorClientInit:
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
             timeout=60,
-            api_version=3,
         )
 
         assert client.base_url == "https://test.logicmonitor.com/santaba/rest"
         assert client.auth == auth
-        assert client.api_version == 3
 
     def test_client_strips_trailing_slash(self):
         """Client removes trailing slash from base_url."""
@@ -67,7 +65,6 @@ class TestLogicMonitorClientHeaders:
         client = LogicMonitorClient(
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
-            api_version=3,
         )
 
         headers = client._get_headers("GET", "/alert/alerts")

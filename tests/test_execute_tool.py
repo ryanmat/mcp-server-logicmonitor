@@ -358,7 +358,6 @@ def write_portal(monkeypatch, reset_portals):
             base_url=config.base_url,
             auth=create_auth_provider(config),
             timeout=config.timeout,
-            api_version=config.api_version,
             max_retries=config.max_retries,
             ingest_url=config.ingest_url,
         )

@@ -338,7 +338,7 @@ class TestGuideResources:
     def test_all_guide_resources_loadable(self):
         """All guide resources return valid JSON."""
         guide_uris = [str(r.uri) for r in RESOURCES if "/guide/" in str(r.uri)]
-        assert len(guide_uris) == 5
+        assert len(guide_uris) == 4
         for uri in guide_uris:
             content = get_resource_content(uri)
             data = json.loads(content)
@@ -397,9 +397,14 @@ class TestOrchestrationGuide:
         assert "mcpServers" in config
         assert "logicmonitor" in config["mcpServers"]
 
-    def test_orchestration_guide_total_resource_count(self):
-        """Total resource count is 26 after adding example-responses guide."""
-        assert len(RESOURCES) == 26
+    async def test_list_resources_serves_25_without_example_responses(self):
+        """R1.6: list_resources serves 25 URIs, and lm://guide/example-responses is not one."""
+        from lm_mcp.server import list_resources
+
+        uris = [str(resource.uri) for resource in await list_resources()]
+
+        assert len(uris) == 25
+        assert "lm://guide/example-responses" not in uris
 
 
 class TestBestPracticesResource:

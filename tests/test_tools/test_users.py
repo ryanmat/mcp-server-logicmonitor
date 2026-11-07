@@ -22,7 +22,6 @@ def client(auth):
         base_url="https://test.logicmonitor.com/santaba/rest",
         auth=auth,
         timeout=30,
-        api_version=3,
         max_retries=0,
     )
 

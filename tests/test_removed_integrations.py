@@ -139,6 +139,9 @@ def test_server_holds_no_removed_integration_state(attribute):
         "lm_mcp.terraform_config",
         "lm_mcp.config_warnings",
         "lm_mcp.tools.metric_presets",
+        "lm_mcp.completions",
+        "lm_mcp.validation",
+        "lm_mcp.resources.examples",
     ],
 )
 def test_removed_module_does_not_import(module):

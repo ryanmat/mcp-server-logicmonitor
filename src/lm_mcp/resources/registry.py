@@ -172,12 +172,6 @@ RESOURCES: list[Resource] = [
         ),
         mimeType="application/json",
     ),
-    Resource(
-        uri=AnyUrl("lm://guide/example-responses"),
-        name="Example Tool Responses",
-        description=("Realistic example output from key tools to help understand response formats"),
-        mimeType="application/json",
-    ),
 ]
 
 

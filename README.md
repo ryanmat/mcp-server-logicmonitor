@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 277 tools, 14 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 277 tools, 14 workflow prompts, and 25 resources.
 
 ## Overview
 
@@ -239,7 +239,6 @@ To get LMv1 credentials:
 | `LM_ACCESS_ID` | No | - | LMv1 API access ID (for ingestion APIs) |
 | `LM_ACCESS_KEY` | No | - | LMv1 API access key (for ingestion APIs) |
 | `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | Enable write operations (create, update, delete) |
-| `LM_API_VERSION` | No | `3` | API version |
 | `LM_TIMEOUT` | No | `30` | Request timeout in seconds (range: 5-300) |
 | `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited requests, and for server errors on idempotent requests (GET, PUT, DELETE); a POST or PATCH that gets a 5xx is not resent (range: 0-10) |
 | `LM_RETRY_AFTER_CAP_SECONDS` | No | `120` | Longest wait between retries. A server's `Retry-After` can lengthen the backoff up to this cap, never shorten it |
@@ -250,7 +249,6 @@ To get LMv1 credentials:
 | `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |
 | `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address. With `LM_TRANSPORT=http`, an address other than `127.0.0.1`, `::1` or `localhost` needs `LM_HTTP_AUTH_TOKEN` or `LM_HTTP_ALLOW_UNAUTHENTICATED=true`, or the server refuses to start. |
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
-| `LM_CORS_ORIGINS` | No | - | Comma-separated CORS origins (default: none) |
 | `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on every path outside `/` and the health endpoints (min 16 chars). Needed to start on a non-loopback `LM_HTTP_HOST`, the default `0.0.0.0` included, unless `LM_HTTP_ALLOW_UNAUTHENTICATED=true`. Health endpoints and `/` stay open for probes. HTTP transport only. |
 | `LM_HTTP_ALLOWED_HOSTS` | No | - | Comma-separated `Host` names the server accepts on every route except `/healthz` and `/readyz`, besides `127.0.0.1`, `::1`, `localhost` and a non-wildcard `LM_HTTP_HOST` (for example the public name a reverse proxy forwards). HTTP transport only. |
 | `LM_HTTP_ALLOW_UNAUTHENTICATED` | No | `false` | Start on a non-loopback `LM_HTTP_HOST` with no `LM_HTTP_AUTH_TOKEN`, for a listener protected another way (an authenticating proxy, a private network). HTTP transport only. |
@@ -259,7 +257,6 @@ To get LMv1 credentials:
 | `LM_HTTP_SSL_KEYFILE_PASSWORD` | No | - | Password for an encrypted TLS private key. HTTP transport only. |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
 | `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error`. Records go to stderr; write audit lines (`info` for a success, `warning` for a failure) redact argument values under credential-shaped keys such as `password`, `token`, `api_key` and `extra_vars`, LogicMonitor credential properties such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one |
-| `LM_FIELD_VALIDATION` | No | `warn` | Field validation: `off`, `warn`, or `error` |
 | `LM_ENABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to enable (e.g., `get_*,triage`). Mutually exclusive with `LM_DISABLED_TOOLS`. |
 | `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable (e.g., `delete_*`). Mutually exclusive with `LM_ENABLED_TOOLS`. |
 | `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
@@ -269,10 +266,10 @@ To get LMv1 credentials:
 
 ## MCP resources and prompts
 
-Clients read these through the standard MCP resource and prompt calls. Prompt and resource-template arguments also offer auto-complete through MCP completions.
+Clients read these through the standard MCP resource and prompt calls.
 
 <details>
-<summary>26 reference resources</summary>
+<summary>25 reference resources</summary>
 
 | URI | Description |
 |-----|-------------|
@@ -301,7 +298,6 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
-| `lm://guide/example-responses` | Example output for key tools to help understand response formats |
 
 </details>
 
@@ -398,7 +394,7 @@ uv run ruff format src tests
 | `src/lm_mcp/client/` | Async HTTP client for the LogicMonitor API |
 | `src/lm_mcp/auth/` | Bearer and LMv1 authentication |
 | `src/lm_mcp/transport/` | Stdio and HTTP transports |
-| `src/lm_mcp/prompts/`, `resources/`, `completions/` | MCP prompts, reference resources, and argument completions |
+| `src/lm_mcp/prompts/`, `resources/` | MCP prompts and reference resources |
 | `.claude/skills/` | Claude Code skills |
 | `documentation/` | Tool reference (generated), client setup, networking intelligence |
 | `deploy/` | Dockerfile, compose file, Caddyfile, Kubernetes manifest |

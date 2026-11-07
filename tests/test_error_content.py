@@ -91,22 +91,6 @@ class TestExecuteToolInlineErrors:
         assert is_error_result(result)
         assert "excluded by LM_MCP_CATEGORIES" in result[0].text
 
-    async def test_invalid_fields_in_error_mode(self, single_portal, monkeypatch):
-        monkeypatch.setenv("LM_FIELD_VALIDATION", "error")
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("get_devices", {"fields": "notAField"})
-        assert is_error_result(result)
-        assert '"code": "INVALID_FIELDS"' in result[0].text
-
-    async def test_invalid_filter_fields_in_error_mode(self, single_portal, monkeypatch):
-        monkeypatch.setenv("LM_FIELD_VALIDATION", "error")
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("get_devices", {"filter": "notAField:1"})
-        assert is_error_result(result)
-        assert '"code": "INVALID_FILTER_FIELDS"' in result[0].text
-
     async def test_unknown_tool_value_error_path(self, single_portal):
         from lm_mcp.server import execute_tool
 

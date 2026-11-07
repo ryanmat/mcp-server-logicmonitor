@@ -132,6 +132,9 @@ def _serialize_json_body(json_body: list | dict | None) -> str:
 # Percent-encoded dot, slash, ``?`` and ``#``, in either case.
 _ENCODED_ESCAPE_RE = re.compile(r"%(?:2e|2f|3f|23)", re.IGNORECASE)
 
+# X-Version on requests to the santaba REST API; portals refuse version 4 to API credentials.
+_API_VERSION = "3"
+
 
 def _check_path(path: str) -> None:
     """Refuse a resource path with a segment that could escape the resource it names.
@@ -170,7 +173,6 @@ class LogicMonitorClient:
         base_url: str,
         auth: AuthProvider,
         timeout: int = 30,
-        api_version: int = 3,
         max_retries: int = 3,
         ingest_url: str | None = None,
         retry_after_cap: int = DEFAULT_RETRY_AFTER_CAP,
@@ -181,7 +183,6 @@ class LogicMonitorClient:
             base_url: LogicMonitor API base URL (e.g., https://company.logicmonitor.com/santaba/rest)
             auth: Authentication provider for generating auth headers.
             timeout: Request timeout in seconds.
-            api_version: LogicMonitor API version.
             max_retries: Maximum retry attempts for rate-limited requests.
             ingest_url: Base URL for ingestion APIs (e.g., https://company.logicmonitor.com).
             retry_after_cap: Longest wait in seconds between retries, whatever a
@@ -189,7 +190,6 @@ class LogicMonitorClient:
         """
         self.base_url = base_url.rstrip("/")
         self.auth = auth
-        self.api_version = api_version
         self.max_retries = max_retries
         self.retry_after_cap = retry_after_cap
         self._client = httpx.AsyncClient(timeout=timeout)
@@ -220,7 +220,7 @@ class LogicMonitorClient:
         """
         headers = {
             "Content-Type": "application/json",
-            "X-Version": str(self.api_version),
+            "X-Version": _API_VERSION,
         }
         headers.update(self.auth.get_auth_headers(method, path, body))
         return headers
@@ -445,7 +445,7 @@ class LogicMonitorClient:
 
         # Build headers without Content-Type (httpx sets multipart boundary)
         headers = {
-            "X-Version": str(self.api_version),
+            "X-Version": _API_VERSION,
         }
         # Use empty body string for auth signature (multipart bodies aren't signed)
         headers.update(self.auth.get_auth_headers("POST", path, ""))

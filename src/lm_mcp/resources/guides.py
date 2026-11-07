@@ -749,13 +749,11 @@ def get_guide_content(guide_name: str) -> dict | None:
         Guide content dict or None if not found.
     """
     from lm_mcp.resources.best_practices import get_best_practices
-    from lm_mcp.resources.examples import get_example_responses
 
     guides: dict[str, dict] = {
         "tool-categories": TOOL_CATEGORIES,
         "examples": COMMON_QUERY_EXAMPLES,
         "mcp-orchestration": MCP_ORCHESTRATION_GUIDE,
         "best-practices": get_best_practices(),
-        "example-responses": get_example_responses(),
     }
     return guides.get(guide_name)

@@ -126,7 +126,8 @@ class JsonContentTypeMiddleware:
     A browser sends a text/plain or form POST cross-origin without a CORS
     preflight, so a page the operator has open could otherwise drive those
     routes on a server it can reach. Requiring application/json forces the
-    preflight, which CORS then answers. Raw ASGI, like BearerAuthMiddleware.
+    preflight, which gets no CORS headers back, so the browser sends nothing
+    further. Raw ASGI, like BearerAuthMiddleware.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -199,7 +200,6 @@ def create_asgi_app() -> Starlette:
     """
     from starlette.applications import Starlette
     from starlette.middleware import Middleware
-    from starlette.middleware.cors import CORSMiddleware
     from starlette.requests import Request
     from starlette.responses import JSONResponse, Response
     from starlette.routing import Route
@@ -275,23 +275,10 @@ def create_asgi_app() -> Starlette:
     ]
 
     # Order matters: the first entry is outermost. The Host check runs first, so
-    # a request addressed to a foreign name is refused before anything else. CORS
-    # answers preflights before auth runs -- browsers cannot attach a token to a
-    # preflight, and 401s still get CORS headers so JS can read them. The
+    # a request addressed to a foreign name is refused before anything else. The
     # Content-Type check is innermost, so an anonymous caller gets the 401
     # whatever it sends.
-    cors_origins = config.cors_origins_list
     middleware = [Middleware(HostAllowlistMiddleware, allowed_hosts=config.http_host_allowlist)]
-    if cors_origins:
-        middleware.append(
-            Middleware(
-                CORSMiddleware,
-                allow_origins=cors_origins,
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
-            )
-        )
 
     if config.http_auth_token:
         middleware.append(Middleware(BearerAuthMiddleware, token=config.http_auth_token))
@@ -326,7 +313,6 @@ async def create_http_server() -> None:
         base_url=config.base_url,
         auth=auth,
         timeout=config.timeout,
-        api_version=config.api_version,
         max_retries=config.max_retries,
         retry_after_cap=config.retry_after_cap_seconds,
         ingest_url=config.ingest_url,

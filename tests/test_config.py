@@ -21,7 +21,6 @@ class TestLMConfigBearer:
 
         assert config.portal == "test.logicmonitor.com"
         assert config.bearer_token == "test_token_123"
-        assert config.api_version == 3
         assert config.timeout == 30
 
     def test_bearer_missing_token_raises_error(self, monkeypatch):
@@ -161,53 +160,6 @@ class TestLMConfigSession:
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
         monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "1001")
-
-        from lm_mcp.config import LMConfig
-
-        with pytest.raises(ValueError):
-            LMConfig()
-
-
-class TestLMConfigValidation:
-    """Tests for field validation configuration options."""
-
-    def test_field_validation_default(self, monkeypatch):
-        """Field validation defaults to warn."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        assert config.field_validation == "warn"
-
-    def test_field_validation_off(self, monkeypatch):
-        """Field validation can be turned off."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-        monkeypatch.setenv("LM_FIELD_VALIDATION", "off")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        assert config.field_validation == "off"
-
-    def test_field_validation_error(self, monkeypatch):
-        """Field validation can be set to error mode."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-        monkeypatch.setenv("LM_FIELD_VALIDATION", "error")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        assert config.field_validation == "error"
-
-    def test_field_validation_invalid_value(self, monkeypatch):
-        """Invalid field validation value raises error."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-        monkeypatch.setenv("LM_FIELD_VALIDATION", "invalid")
 
         from lm_mcp.config import LMConfig
 
@@ -482,3 +434,25 @@ def test_config_has_no_has_lmv1_auth():
 
     assert hasattr(LMConfig, "base_url")
     assert not hasattr(LMConfig, "has_lmv1_auth")
+
+
+@pytest.mark.parametrize("field", ["api_version", "cors_origins", "field_validation"])
+def test_config_has_no_removed_knob(field):
+    """R1.6: LM_API_VERSION, LM_CORS_ORIGINS and LM_FIELD_VALIDATION are not settings."""
+    from lm_mcp.config import LMConfig
+
+    assert "timeout" in LMConfig.model_fields
+    assert field not in LMConfig.model_fields
+
+
+def test_config_loads_with_removed_knobs_set(monkeypatch):
+    """R1.6: an environment that sets the removed knobs loads, and nothing reads them."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test_token_123")
+    monkeypatch.setenv("LM_API_VERSION", "4")
+    monkeypatch.setenv("LM_CORS_ORIGINS", "*")
+    monkeypatch.setenv("LM_FIELD_VALIDATION", "not-a-mode")
+
+    from lm_mcp.config import LMConfig
+
+    assert LMConfig().portal == "test.logicmonitor.com"

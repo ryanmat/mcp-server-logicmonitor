@@ -20,7 +20,6 @@ def client():
         base_url=BASE_URL,
         auth=BearerAuth("test-token"),
         timeout=30,
-        api_version=3,
     )
 
 
