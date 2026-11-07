@@ -73,6 +73,11 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   bearer check, and no route takes a request body, so no request gets `415`. Use stdio for MCP
   clients.
 - `jsonschema` as a direct dependency; `mcp` still installs it.
+- `python-dotenv` as a direct dependency. Nothing under `src/` imported it, and `pydantic-settings`
+  still installs it.
+- `contrib/eda/`, the Event-Driven Ansible source kept for reference since 1.9.5 and never part of
+  the package; `scripts/add-mcp-to-project.sh`; `scripts/smoke_http_integration.py`, the 3.7.1
+  live smoke for the integration tools; and the unused `tools/metric_presets.py` module.
 
 ### Changed
 
