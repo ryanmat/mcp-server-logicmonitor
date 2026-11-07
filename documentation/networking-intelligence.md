@@ -135,7 +135,7 @@ The headline tool. Chains four signals into a single site-outage verdict with co
 2. Query `get_collector_health` for each -- any `is_down=True` trips **Signal A**.
 3. Query `detect_alert_burst` filtered to Interface-family DataSources -- trips **Signal B**.
 4. Query `get_power_events` scoped to the group -- trips **Signal C**.
-5. Count dead/unreachable devices in the group -- trips **Signal D** when count exceeds `max(3, device_count // 5)`.
+5. Count dead/unreachable devices in the group -- trips **Signal D** when count reaches `max(3, device_count // 5)`.
 6. Compute confidence score (see model below) and derive the verdict. A signal whose read fails is reported with `status: "unavailable"` and its `error`, and is left out of the score; the report then carries `confidence_level: "reduced"` and `unavailable_signals`.
 
 **Verdict thresholds:**
@@ -182,7 +182,7 @@ Additive weights, capped at 100:
 | Power events | +25 | `get_power_events` returns any matched events in the last hour |
 | Device silence | +10 | Dead-device count in the group >= `max(3, group_size / 5)` |
 
-The 70 threshold for `site_outage_detected` requires at least two of the three heavy signals (collector, burst, power). The 40 threshold for `possible_site_outage` catches single-signal cases like "only UPS events" or "only interface burst" where context is needed.
+The 70 threshold for `site_outage_detected` requires at least two of the three heavy signals (collector, burst, power). The 40 threshold for `possible_site_outage` catches a collector down on its own, or an interface burst together with power events, where context is needed. A burst or power events alone score 25 and stay below it.
 
 ---
 

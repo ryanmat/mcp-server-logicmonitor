@@ -103,7 +103,7 @@ def test_server_instructions_point_to_search_tools():
 def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
     """Write tools stay listed with writes off and are refused, so they are not absent."""
     from lm_mcp.config import LMConfig
-    from lm_mcp.registry import TOOLS
+    from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
     from lm_mcp.server import SERVER_INSTRUCTIONS, _filter_tools
 
     monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -119,6 +119,8 @@ def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
     assert "acknowledge_alert" in {tool.name for tool in _filter_tools(TOOLS, LMConfig())}
     assert "refused" in SERVER_INSTRUCTIONS
     assert "absent" not in SERVER_INSTRUCTIONS
+    total = len(TOOLS) + len(AWX_TOOLS) + len(TF_TOOLS) + len(WATSONX_TOOLS)
+    assert f"up to {total} " in SERVER_INSTRUCTIONS
 
 
 if __name__ == "__main__":

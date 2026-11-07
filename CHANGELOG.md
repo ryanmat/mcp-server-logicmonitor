@@ -3,7 +3,8 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html), except
+that 4.3.0 is a minor release with breaking changes, which its section lists first.
 
 ## [Unreleased]
 
@@ -104,7 +105,8 @@ where a collector is down, because `get_collector_health` can now report one.
   userinfo and credential-named query values inside string arguments are masked in the audit line
   and the session history; the API still receives the URL whole.
 - The client refuses an API path with a `.` or `..` segment, or one holding `?`, `#` or a
-  percent-encoded dot, slash, `?` or `#`, before any request goes out.
+  percent-encoded dot, slash, `?` or `#`, before any request goes out. The string id properties
+  `sdt_id` and `note_id` carry the pattern `^[A-Za-z0-9_-]+$`.
 - HTTP `tools/call` validates arguments against the tool's schema (-32602 on failure), answers a
   malformed body with a JSON-RPC error and 400 instead of 500, and returns fixed error text with
   the traceback logged.
@@ -119,8 +121,11 @@ where a collector is down, because `get_collector_health` can now report one.
   with no such device returns an empty list, which does not show it stayed up.
 - `get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only
   portal tested, one with no NetFlow-enabled device.
-- `get_metric_anomalies`, `save_baseline`, `compare_to_baseline` and `get_interface_metrics` read
-  one page of at most 500 samples, the newest, and do not say so when the window holds more.
+- `get_device_data`, `get_metric_anomalies`, `save_baseline`, `compare_to_baseline` and
+  `get_interface_metrics` read one page of at most 500 samples, the newest, and do not say so
+  when the window holds more.
+- `update_logicmodule` fails on `topologysource` with `Unknown tool: export_topologysource`,
+  before any request goes out, since topology sources have no export tool.
 - `correlate_metrics` pairs samples by position, not by timestamp, so sources with different sample
   intervals are approximate.
 - `health_check`'s summary drops a truncated-read warning, which its 4-hour default window cannot
@@ -141,9 +146,10 @@ where a collector is down, because `get_collector_health` can now report one.
   list, so `get_api_token`'s `roles` are role names, not `{id, name}` objects.
 - `LM_SESSION_PERSIST_PATH` was documented but never read. Session variables are written to that
   file and read back at the next start.
-- Metric reads kept one newest-first page, about the newest 8.3 hours of a 24-hour one-minute
-  series. They follow the API's paging up to 25 pages and return samples oldest first, with
-  `truncated` per datapoint when the cap stops the read.
+- `forecast_metric`, `detect_change_points`, `classify_trend`, `detect_seasonality`,
+  `score_device_health` and `correlate_metrics` kept one newest-first page, about the newest 8.3
+  hours of a 24-hour one-minute series. They follow the API's paging up to 25 pages and read
+  samples oldest first, with `truncated` per datapoint when the cap stops the read.
 - `get_devices(group_id=N)` sent `hostGroupIds~N`, a substring match on the joined id list, so
   group 5 also matched groups such as 495 and 501, and `detect_site_outage`'s device scope with it.
   It sends `hostGroupIds:N`, which is list membership.
@@ -157,6 +163,7 @@ where a collector is down, because `get_collector_health` can now report one.
   server.
 - The `lm://enums/device-status` listing named numeric status codes. It names the words.
 - The server reported the MCP SDK's version to clients at initialize. It reports its own.
+- `save_baseline` returns an error for a 200 response whose body carries `errorMessage`.
 - `get_devices` (`status=`) returned nothing for every status: it filtered on the numeric
   codes `hostStatus:0` to `hostStatus:4`, but the v3 API filters `hostStatus` on the word,
   and on a live portal `hostStatus:0` and `hostStatus:1` match nothing. It now sends the

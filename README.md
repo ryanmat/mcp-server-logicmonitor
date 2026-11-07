@@ -112,7 +112,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 
 ### Find a tool
 
-- `search_tools`: keyword search across every tool by name and description
+- `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
 - the `lm://guide/tool-categories` resource: all 306 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
@@ -130,7 +130,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Reports | List, view, run, and schedule reports |
 | Escalations | Full CRUD for escalation chains and recipient groups |
 | Users and audit | Users, roles, access groups, API tokens, audit logs, ops notes, login and change audits |
-| LogicModules | Query, export, import, and update data, config, event, property, topology, log, diagnostic, and remediation sources, plus Config Archive retrieval, diffs, and on-demand collection |
+| LogicModules | Query, create, update, delete, export, and import data, config, event, property, topology, log, diagnostic, and remediation sources (topology sources have no export, and remediation sources have no import), plus Config Archive retrieval, diffs, and on-demand collection |
 | Diagnostics and remediation | Assigned-source resolution, structured execution results with script output, manual execution, action chains and rules |
 | APM traces | Service discovery, per-operation RED metrics, service alerts, and OTel properties |
 | Network | Neighbors, interfaces, flows, connections, top talkers, link flaps, and outage detection. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |
@@ -140,7 +140,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 
 `get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only portal tested, one with no NetFlow-enabled device. Treat both as unverified until you have tried them on a portal with NetFlow data.
 
-`update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it exports the full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff by default, so a partial change cannot blank a script.
+`update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it exports the full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff by default, so a partial change cannot blank a script. It does not work on topology sources, which have no export tool.
 
 ### Analysis tools
 
@@ -226,7 +226,7 @@ The `terraform` subprocess inherits only `PATH`, `HOME`, `TMPDIR`, `TF_*`, the p
 
 ### Multi-portal mode
 
-Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`list_portals`, `use_portal`, `current_portal`, `reload_portals`) switch the active portal at runtime. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only, and Terraform tools are unavailable in it. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
+Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`list_portals`, `use_portal`, `current_portal`, `reload_portals`) switch the active portal at runtime. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only, and the ten Terraform workspace tools are unavailable in it. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
 
 ## Deployment
 
@@ -339,7 +339,7 @@ To get LMv1 credentials:
 
 ## MCP resources and prompts
 
-Clients read these through the standard MCP resource and prompt calls.
+Clients read these through the standard MCP resource and prompt calls. Tool arguments also offer auto-complete through MCP completions.
 
 <details>
 <summary>26 reference resources</summary>
