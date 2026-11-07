@@ -1,5 +1,5 @@
 # Description: Tests that unusable optional-integration configuration is logged, not dropped.
-# Description: Covers the AWX and Terraform loaders and the unconfigured silence.
+# Description: Covers the Terraform loader and the unconfigured silence.
 
 from __future__ import annotations
 
@@ -7,11 +7,9 @@ import logging
 
 import pytest
 
-from lm_mcp.awx_config import get_awx_config, reset_awx_config
 from lm_mcp.terraform_config import get_terraform_config, reset_terraform_config
 
 _LOADERS = {
-    "awx": (get_awx_config, reset_awx_config),
     "terraform": (get_terraform_config, reset_terraform_config),
 }
 
@@ -22,7 +20,7 @@ def _clean_integration_env(monkeypatch):
     import os
 
     for name in list(os.environ):
-        if name.startswith(("AWX_", "TF_")):
+        if name.startswith("TF_"):
             monkeypatch.delenv(name)
     for _get, reset in _LOADERS.values():
         reset()
@@ -58,7 +56,6 @@ def test_unusable_value_is_logged_by_name(loader, env, named, monkeypatch, caplo
 @pytest.mark.parametrize(
     ("loader", "unrelated"),
     [
-        ("awx", {}),
         ("terraform", {"TF_LOG": "DEBUG", "TF_VAR_region": "us-east-1"}),
     ],
 )

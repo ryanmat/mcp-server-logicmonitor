@@ -1,4 +1,4 @@
-# Description: R1.2: the 5.0 server carries neither the watsonx nor the HuggingFace integration.
+# Description: R1.2 and R1.3: the 5.0 server carries no watsonx, HuggingFace or AWX integration.
 # Description: Covers the registry, the server's dispatch state, bootstrap and the stdio start.
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ import yaml
 
 import lm_mcp
 from lm_mcp import registry, server
+from lm_mcp.prompts import PROMPTS
 from lm_mcp.resources import get_resource_content
 from lm_mcp.tools import is_error_result
 from lm_mcp.transport.bootstrap import Backends
@@ -28,36 +29,70 @@ _REPO = Path(__file__).resolve().parent.parent
 
 # Word-bounded where a plain substring overmatches: "TestOrchestrationGuide" holds "torch".
 _REMOVED_WORDS = re.compile(
-    r"watsonx|huggingface|granite|\btorch\b|\bhf_|\bttm\b|nl_summary", re.IGNORECASE
+    r"watsonx|huggingface|granite|\btorch\b|\bhf_|\bttm\b|nl_summary"
+    r"|awx|ansible|\baap\b|remediate_workflow",
+    re.IGNORECASE,
 )
 
 _SUMMARIZING_COMPOSITES = ["triage", "health_check", "portal_overview", "capacity_plan", "diagnose"]
+
+_REMOVED_TOOLS = [
+    "watsonx_summarize",
+    "test_awx_connection",
+    "get_job_templates",
+    "get_job_template",
+    "launch_job",
+    "get_job_status",
+    "get_job_output",
+    "cancel_job",
+    "relaunch_job",
+    "get_inventories",
+    "get_inventory_hosts",
+    "launch_workflow",
+    "get_workflow_status",
+    "get_workflow_templates",
+    "get_projects",
+    "get_credentials",
+    "get_organizations",
+    "get_job_events",
+    "get_hosts",
+]
 
 
 def _tool(name: str):
     return next(tool for tool in registry.TOOLS if tool.name == name)
 
 
-def test_registry_has_no_watsonx_manifest():
-    assert not hasattr(registry, "WATSONX_TOOLS")
+@pytest.mark.parametrize("manifest", ["WATSONX_TOOLS", "AWX_TOOLS"])
+def test_registry_has_no_removed_manifest(manifest):
+    assert not hasattr(registry, manifest)
 
 
-def test_no_registered_tool_is_watsonx_summarize():
-    names = {tool.name for tool in (*registry.TOOLS, *registry.AWX_TOOLS, *registry.TF_TOOLS)}
+@pytest.mark.parametrize("name", _REMOVED_TOOLS)
+def test_removed_tool_is_not_registered(name):
+    assert name not in {tool.name for tool in (*registry.TOOLS, *registry.TF_TOOLS)}
 
-    assert "watsonx_summarize" not in names
 
-
-def test_watsonx_summarize_has_no_handler():
+@pytest.mark.parametrize("name", _REMOVED_TOOLS)
+def test_removed_tool_has_no_handler(name):
     with pytest.raises(ValueError, match="Unknown tool"):
-        registry.get_tool_handler("watsonx_summarize")
+        registry.get_tool_handler(name)
 
 
 @pytest.mark.parametrize(
     "attribute",
-    ["get_watsonx_client", "_set_watsonx_client", "_watsonx_client", "WATSONX_TOOL_NAMES"],
+    [
+        "get_watsonx_client",
+        "_set_watsonx_client",
+        "_watsonx_client",
+        "WATSONX_TOOL_NAMES",
+        "get_awx_client",
+        "_set_awx_client",
+        "_awx_client",
+        "AWX_TOOL_NAMES",
+    ],
 )
-def test_server_holds_no_watsonx_state(attribute):
+def test_server_holds_no_removed_integration_state(attribute):
     assert not hasattr(server, attribute)
 
 
@@ -69,6 +104,9 @@ def test_server_holds_no_watsonx_state(attribute):
         "lm_mcp.ibm_config",
         "lm_mcp.client.huggingface",
         "lm_mcp.hf_config",
+        "lm_mcp.tools.ansible",
+        "lm_mcp.client.awx",
+        "lm_mcp.awx_config",
     ],
 )
 def test_removed_module_does_not_import(module):
@@ -99,36 +137,54 @@ def test_module_names_neither_summarize_nor_ttm(module):
     assert re.findall(r"\bsummarize\b|\bttm\b", text, flags=re.IGNORECASE) == []
 
 
-def test_tool_categories_have_no_watsonx_category():
+@pytest.mark.parametrize("category", ["watsonx", "ansible"])
+def test_tool_categories_have_no_removed_category(category):
     categories = json.loads(get_resource_content("lm://guide/tool-categories"))["categories"]
 
-    assert "watsonx" not in categories
+    assert category not in categories
 
 
-def test_backends_have_no_watsonx_field():
-    assert "watsonx" not in {field.name for field in dataclasses.fields(Backends)}
+@pytest.mark.parametrize("backend", ["watsonx", "awx"])
+def test_backends_have_no_removed_field(backend):
+    assert backend not in {field.name for field in dataclasses.fields(Backends)}
 
 
-async def test_execute_tool_reports_watsonx_summarize_as_unknown(monkeypatch):
+def test_remediate_workflow_prompt_is_not_registered():
+    assert "remediate_workflow" not in {prompt.name for prompt in PROMPTS}
+
+
+def test_example_playbooks_are_gone():
+    assert not (_REPO / "examples" / "playbooks").exists()
+
+
+@pytest.mark.parametrize("name", _REMOVED_TOOLS)
+async def test_execute_tool_reports_removed_tool_as_unknown(name, monkeypatch):
     monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
     monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
 
-    result = await server.execute_tool("watsonx_summarize", {"data": "x"})
+    result = await server.execute_tool(name, {})
 
     assert is_error_result(result)
-    assert "Unknown tool: watsonx_summarize" in result[0].text
+    assert f"Unknown tool: {name}" in result[0].text
 
 
-def test_stdio_start_with_watsonx_settings_logs_nothing_about_watsonx(tmp_path):
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {"WATSONX_API_KEY": "test-key", "WATSONX_PROJECT_ID": "test-project"},
+        {"AWX_URL": "https://aap.example.com", "AWX_TOKEN": "test-token"},
+    ],
+    ids=["watsonx", "awx"],
+)
+def test_stdio_start_with_removed_settings_logs_nothing_about_them(settings, tmp_path):
     """A real server process with stdin at EOF ignores the settings and exits cleanly."""
     env = {
         **os.environ,
         "LM_PORTAL": "test.logicmonitor.com",
         "LM_BEARER_TOKEN": "test-token",
         "LM_MULTI_PORTAL": "false",
-        "WATSONX_API_KEY": "test-key",
-        "WATSONX_PROJECT_ID": "test-project",
+        **settings,
     }
 
     done = subprocess.run(
@@ -143,7 +199,7 @@ def test_stdio_start_with_watsonx_settings_logs_nothing_about_watsonx(tmp_path):
     )
 
     assert done.returncode == 0, done.stderr
-    assert "watsonx" not in (done.stdout + done.stderr).lower()
+    assert _REMOVED_WORDS.findall(done.stdout + done.stderr) == []
 
 
 def test_pyproject_declares_only_the_http_extra():
@@ -218,6 +274,7 @@ def test_tests_name_no_removed_integration():
         "server.json",
         "README.md",
         "CONTRIBUTING.md",
+        "SECURITY.md",
         "documentation/client-setup.md",
         "documentation/tools.md",
         ".github/workflows/test.yml",

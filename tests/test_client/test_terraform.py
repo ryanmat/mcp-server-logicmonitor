@@ -16,7 +16,6 @@ _PRINT_ENV = ["-c", "import json, os; print(json.dumps(dict(os.environ)))"]
 
 _SERVER_SECRETS = {
     "LM_BEARER_TOKEN": "lm-bearer-secret",
-    "AWX_TOKEN": "awx-secret",
     "LM_HTTP_AUTH_TOKEN": "inbound-secret",
     "DATABASE_URL": "postgres://user:pw@db/x",
 }

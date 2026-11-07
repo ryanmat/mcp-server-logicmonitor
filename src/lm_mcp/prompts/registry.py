@@ -22,7 +22,6 @@ from lm_mcp.prompts.templates import (
     health_check_template,
     incident_triage_template,
     rca_workflow_template,
-    remediate_workflow_template,
     remediation_template,
     sdt_planning_template,
     top_talkers_template,
@@ -265,22 +264,6 @@ PROMPTS: list[Prompt] = [
         ],
     ),
     Prompt(
-        name="remediate_workflow",
-        description="Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform",
-        arguments=[
-            PromptArgument(
-                name="alert_id",
-                description="Alert ID to investigate and remediate",
-                required=False,
-            ),
-            PromptArgument(
-                name="device_id",
-                description="Device ID to find alerts for and remediate",
-                required=False,
-            ),
-        ],
-    ),
-    Prompt(
         name="remediation",
         description="RemediationSource execution workflow with pre-execution safety checklist",
         arguments=[
@@ -320,7 +303,6 @@ _TEMPLATES = {
     "top_talkers": top_talkers_template,
     "rca_workflow": rca_workflow_template,
     "capacity_forecast": capacity_forecast_template,
-    "remediate_workflow": remediate_workflow_template,
     "remediation": remediation_template,
 }
 

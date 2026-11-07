@@ -44,10 +44,9 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
 
     if not blocked and config.mcp_categories:
         from lm_mcp.categories import tool_in_categories
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
+        from lm_mcp.registry import TF_TOOLS, TOOLS
 
         tools_index = {t.name: t for t in TOOLS}
-        tools_index.update({t.name: t for t in AWX_TOOLS})
         tools_index.update({t.name: t for t in TF_TOOLS})
         blocked = [
             t for t in required if not tool_in_categories(t, tools_index, config.mcp_categories)
@@ -1106,15 +1105,13 @@ async def search_tools(
         Matching tools with relevance scores.
     """
     try:
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
+        from lm_mcp.registry import TF_TOOLS, TOOLS
         from lm_mcp.resources.guides import TOOL_CATEGORIES
-        from lm_mcp.server import get_awx_client, get_tf_runner
+        from lm_mcp.server import get_tf_runner
 
-        # Mirror the server's advertised tool surface so configured AWX and
-        # Terraform tools are searchable, not just the core TOOLS list.
+        # Mirror the server's advertised tool surface so configured Terraform
+        # tools are searchable, not just the core TOOLS list.
         search_corpus = list(TOOLS)
-        if get_awx_client() is not None:
-            search_corpus.extend(AWX_TOOLS)
         if get_tf_runner() is not None:
             search_corpus.extend(TF_TOOLS)
 

@@ -262,9 +262,9 @@ class TestToolResourceMap:
 
     def test_every_mapped_tool_is_registered(self):
         """A mapped name no tool carries can never record a result."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
+        from lm_mcp.registry import TF_TOOLS, TOOLS
 
-        registered = {t.name for t in (*TOOLS, *AWX_TOOLS, *TF_TOOLS)}
+        registered = {t.name for t in (*TOOLS, *TF_TOOLS)}
 
         unregistered = [n for n in SessionContext()._tool_resource_map if n not in registered]
 
