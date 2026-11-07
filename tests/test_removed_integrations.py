@@ -1,4 +1,4 @@
-# Description: R1.2: guards the removal of the integrations the 5.0 server no longer carries.
+# Description: R1.2: the 5.0 server carries neither the watsonx nor the HuggingFace integration.
 # Description: Covers the registry, the server's dispatch state, bootstrap and the stdio start.
 
 from __future__ import annotations
