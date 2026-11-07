@@ -884,10 +884,6 @@ class TestCapacityPlan:
         reset_config()
 
 
-class TestSummaryFailureWarnings:
-    """R4.4: a requested NL summary that does not arrive is reported in warnings."""
-
-
 # ---------------------------------------------------------------------------
 # TestPortalOverview
 # ---------------------------------------------------------------------------

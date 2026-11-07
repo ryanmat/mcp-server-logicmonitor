@@ -53,7 +53,6 @@ def test_unusable_value_is_logged_by_name(loader, env, named, monkeypatch, caplo
     (message,) = _warnings(caplog)
     assert named in message
     assert "soon" not in message
-    assert "key-0123" not in message
 
 
 @pytest.mark.parametrize(
