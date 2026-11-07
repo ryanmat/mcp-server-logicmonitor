@@ -321,7 +321,7 @@ def _lm_mcp_declared_names() -> set[str]:
 
 
 def test_lock_declares_no_direct_dotenv():
-    """R1.6: lm-mcp declares no python-dotenv; pydantic-settings and uvicorn still pull it in."""
+    """R1.6: lm-mcp declares no python-dotenv; pydantic-settings and uvicorn[standard] need it."""
     declared = _lm_mcp_declared_names()
 
     assert "pydantic-settings" in declared
