@@ -17,8 +17,6 @@ claude mcp add logicmonitor \
 ```
 
 > **Note:** Remove `-e LM_ENABLE_WRITE_OPERATIONS=true` if you want read-only access.
->
-> **IBM watsonx.ai:** To enable Granite TTM forecasting and NL summaries, add `-e WATSONX_API_KEY=... -e WATSONX_URL=... -e WATSONX_PROJECT_ID=...` and change `--from lm-mcp` to `--from "lm-mcp[ibm]"`.
 
 Verify the connection:
 ```bash

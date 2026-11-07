@@ -20,7 +20,7 @@ on `main` rather than merging it back in.
 ## Development setup
 
 ```bash
-uv sync --extra http          # add --extra ibm / --extra huggingface as needed
+uv sync --extra http
 uv run pre-commit install     # once: runs lint and format on every commit
 uv run pytest                 # full suite
 uv run ruff check src tests   # lint

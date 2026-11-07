@@ -224,7 +224,6 @@ class TestRunStdioStartup:
     @pytest.fixture(autouse=True)
     def _isolate(self, monkeypatch, reset_portals):
         from lm_mcp import server as server_module
-        from lm_mcp.hf_config import reset_hf_config
         from lm_mcp.terraform_config import reset_terraform_config
 
         for var in (
@@ -235,23 +234,17 @@ class TestRunStdioStartup:
             "LM_MAX_RETRIES",
             "AWX_URL",
             "AWX_TOKEN",
-            "WATSONX_API_KEY",
-            "WATSONX_URL",
-            "WATSONX_PROJECT_ID",
             "TF_WORKSPACE_DIR",
         ):
             monkeypatch.delenv(var, raising=False)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        reset_hf_config()
         reset_terraform_config()
 
         self.serve = AsyncMock()
         monkeypatch.setattr(server_module.server, "run", self.serve)
         monkeypatch.setattr("mcp.stdio_server", _fake_stdio_server())
-        monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: None)
         yield
-        reset_hf_config()
         reset_terraform_config()
 
     async def test_multi_portal_with_terraform_reaches_serve_loop(
@@ -339,7 +332,6 @@ class TestOneBootstrapForBothTransports:
     @pytest.fixture(autouse=True)
     def _isolate(self, monkeypatch, reset_portals):
         from lm_mcp import server as server_module
-        from lm_mcp.hf_config import reset_hf_config
         from lm_mcp.terraform_config import reset_terraform_config
 
         for var in (
@@ -352,9 +344,6 @@ class TestOneBootstrapForBothTransports:
             "LM_HTTP_ALLOW_UNAUTHENTICATED",
             "AWX_URL",
             "AWX_TOKEN",
-            "WATSONX_API_KEY",
-            "WATSONX_URL",
-            "WATSONX_PROJECT_ID",
             "TF_WORKSPACE_DIR",
         ):
             monkeypatch.delenv(var, raising=False)
@@ -362,15 +351,12 @@ class TestOneBootstrapForBothTransports:
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         monkeypatch.setenv("LM_HTTP_HOST", "127.0.0.1")
         monkeypatch.setenv("LM_HTTP_PORT", str(free_port("127.0.0.1")))
-        reset_hf_config()
         reset_terraform_config()
 
         self.serve = AsyncMock()
         monkeypatch.setattr(server_module.server, "run", self.serve)
         monkeypatch.setattr("mcp.stdio_server", _fake_stdio_server())
-        monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: None)
         yield
-        reset_hf_config()
         reset_terraform_config()
 
     def _configure_every_backend(self, monkeypatch, tmp_path) -> None:

@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).parent.parent
 # A stated total ("306 tools", "306 structured tools", "**306 Tools**"); smaller numbers
 # before "tools" describe subsets, such as a category or a client's cap.
 _TOOL_TOTAL_RE = re.compile(r"\b(\d{3})\s+(?:structured\s+)?tools\b", re.IGNORECASE)
-_TOOL_BREAKDOWN_RE = re.compile(r"\((\d+) LM \+ (\d+) AAP \+ (\d+) Terraform\)")
+_LM_TOOL_COUNT_RE = re.compile(r"\((\d+) LM\b")
 
 
 def _project_version() -> str:
@@ -90,14 +90,13 @@ class TestReleaseMetadata:
         assert set(stated) == {total}, f"{doc} states {sorted(set(stated))}, registry has {total}"
 
     def test_readme_tool_breakdown_matches_the_registry(self):
-        """The README's per-integration breakdown matches each registry list."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
+        """The README's count of LM tools is the registry's."""
+        from lm_mcp.registry import TOOLS
 
-        match = _TOOL_BREAKDOWN_RE.search((REPO_ROOT / "README.md").read_text())
+        match = _LM_TOOL_COUNT_RE.search((REPO_ROOT / "README.md").read_text())
 
-        assert match, "README.md has no (LM + AAP + Terraform) tool breakdown"
-        counts = (len(TOOLS), len(AWX_TOOLS), len(TF_TOOLS))
-        assert tuple(int(n) for n in match.groups()) == counts
+        assert match, "README.md states no LM tool count"
+        assert int(match.group(1)) == len(TOOLS)
 
 
 class TestFoundationIntegration:

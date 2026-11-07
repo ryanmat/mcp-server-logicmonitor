@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ryanmat/logicmonitor",
-  "description": "LogicMonitor API integration with up to 305 tools for alerts, devices, dashboards, traces, OTLP metrics, network intelligence, Ansible Automation Platform, IBM watsonx.ai, and more.",
+  "description": "LogicMonitor API integration with up to 305 tools for alerts, devices, dashboards, traces, OTLP metrics, network intelligence, Ansible Automation Platform, and more.",
   "repository": {
     "url": "https://github.com/ryanmat/mcp-server-logicmonitor",
     "source": "github"
@@ -103,27 +103,6 @@
         {
           "name": "AWX_MAX_RETRIES",
           "description": "Max retries for failed AAP API requests (default: 3)",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": false
-        },
-        {
-          "name": "WATSONX_API_KEY",
-          "description": "IBM Cloud API key for watsonx.ai (optional — watsonx tools excluded if not set)",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": true
-        },
-        {
-          "name": "WATSONX_URL",
-          "description": "IBM watsonx.ai endpoint URL (default: https://us-south.ml.cloud.ibm.com)",
-          "isRequired": false,
-          "format": "string",
-          "isSecret": false
-        },
-        {
-          "name": "WATSONX_PROJECT_ID",
-          "description": "IBM watsonx.ai project ID",
           "isRequired": false,
           "format": "string",
           "isSecret": false

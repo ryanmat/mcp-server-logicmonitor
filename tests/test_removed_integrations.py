@@ -11,9 +11,11 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 import lm_mcp
 from lm_mcp import registry, server
@@ -22,12 +24,12 @@ from lm_mcp.tools import is_error_result
 from lm_mcp.transport.bootstrap import Backends
 
 _SRC = Path(lm_mcp.__file__).parent
+_REPO = Path(__file__).resolve().parent.parent
 
-# The modules that name watsonx: the HuggingFace client and its config.
-_MODULES_NAMING_WATSONX = {
-    "client/huggingface.py",
-    "hf_config.py",
-}
+# Word-bounded where a plain substring would match an ordinary word: "orchestration" holds "torch".
+_REMOVED_WORDS = re.compile(
+    r"watsonx|huggingface|granite|\btorch\b|\bhf_|\bttm\b|nl_summary", re.IGNORECASE
+)
 
 _SUMMARIZING_COMPOSITES = ["triage", "health_check", "portal_overview", "capacity_plan", "diagnose"]
 
@@ -61,7 +63,13 @@ def test_server_holds_no_watsonx_state(attribute):
 
 @pytest.mark.parametrize(
     "module",
-    ["lm_mcp.tools.watsonx", "lm_mcp.client.watsonx", "lm_mcp.ibm_config"],
+    [
+        "lm_mcp.tools.watsonx",
+        "lm_mcp.client.watsonx",
+        "lm_mcp.ibm_config",
+        "lm_mcp.client.huggingface",
+        "lm_mcp.hf_config",
+    ],
 )
 def test_removed_module_does_not_import(module):
     with pytest.raises(ModuleNotFoundError):
@@ -138,12 +146,68 @@ def test_stdio_start_with_watsonx_settings_logs_nothing_about_watsonx(tmp_path):
     assert "watsonx" not in (done.stdout + done.stderr).lower()
 
 
-def test_src_names_watsonx_only_in_the_modules_that_hold_it():
-    """Exact, so a module that drops the word has to leave the list as well."""
+def test_pyproject_declares_only_the_http_extra():
+    project = tomllib.loads((_REPO / "pyproject.toml").read_text())["project"]
+
+    assert set(project["optional-dependencies"]) == {"http"}
+
+
+def test_dev_group_pins_no_model_dependency():
+    groups = tomllib.loads((_REPO / "pyproject.toml").read_text())["dependency-groups"]
+    pinned = {re.split(r"[<>=!~\[ ]", entry)[0] for entry in groups["dev"]}
+
+    assert pinned.isdisjoint({"ibm-watsonx-ai", "pandas", "torch", "transformers"})
+
+
+def test_ci_has_no_huggingface_job():
+    workflow = yaml.safe_load((_REPO / ".github/workflows/test.yml").read_text())
+
+    assert "huggingface" not in workflow["jobs"]
+
+
+def test_dependabot_ignores_nothing_for_uv():
+    config = yaml.safe_load((_REPO / ".github/dependabot.yml").read_text())
+    (uv,) = [update for update in config["updates"] if update["package-ecosystem"] == "uv"]
+
+    assert "ignore" not in uv
+
+
+def test_src_names_no_removed_integration():
     naming = {
         path.relative_to(_SRC).as_posix()
         for path in _SRC.rglob("*.py")
-        if "watsonx" in path.read_text().lower()
+        if _REMOVED_WORDS.search(path.read_text())
     }
 
-    assert naming == _MODULES_NAMING_WATSONX
+    assert naming == set()
+
+
+def test_tests_name_no_removed_integration():
+    """This file names them by necessity, and is the one exception."""
+    tests = _REPO / "tests"
+    naming = {
+        path.relative_to(tests).as_posix()
+        for path in tests.rglob("*")
+        if path.suffix in {".py", ".json", ".md", ".txt"}
+        and path != Path(__file__).resolve()
+        and _REMOVED_WORDS.search(path.read_text())
+    }
+
+    assert naming == set()
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "pyproject.toml",
+        "server.json",
+        "README.md",
+        "CONTRIBUTING.md",
+        "documentation/client-setup.md",
+        "documentation/tools.md",
+        ".github/workflows/test.yml",
+        ".github/dependabot.yml",
+    ],
+)
+def test_public_file_names_no_removed_integration(name):
+    assert _REMOVED_WORDS.findall((_REPO / name).read_text()) == []

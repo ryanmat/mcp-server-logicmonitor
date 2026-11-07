@@ -86,20 +86,3 @@ class TestDependabotBaseImage:
             for rule in docker[0].get("ignore", [])
         }
         assert ignored.get("python") == ["version-update:semver-minor"]
-
-
-class TestDependabotTorch:
-    """granite-tsfm caps torch, so a forced torch bump resolves the model stack downward."""
-
-    def test_uv_updates_ignore_torch_minor_and_major_bumps(self) -> None:
-        config = yaml.safe_load((WORKFLOWS_DIR.parent / "dependabot.yml").read_text())
-        uv = [u for u in config["updates"] if u["package-ecosystem"] == "uv"]
-        assert len(uv) == 1
-        ignored = {
-            rule["dependency-name"]: rule.get("update-types", [])
-            for rule in uv[0].get("ignore", [])
-        }
-        assert ignored.get("torch") == [
-            "version-update:semver-minor",
-            "version-update:semver-major",
-        ]

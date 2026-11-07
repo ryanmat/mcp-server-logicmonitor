@@ -1,21 +1,17 @@
 # Description: Tests that unusable optional-integration configuration is logged, not dropped.
-# Description: Covers the HuggingFace and Terraform loaders and the unconfigured silence.
+# Description: Covers the AWX and Terraform loaders and the unconfigured silence.
 
 from __future__ import annotations
 
 import logging
-import sys
-import types
 
 import pytest
 
 from lm_mcp.awx_config import get_awx_config, reset_awx_config
-from lm_mcp.hf_config import get_hf_config, reset_hf_config
 from lm_mcp.terraform_config import get_terraform_config, reset_terraform_config
 
 _LOADERS = {
     "awx": (get_awx_config, reset_awx_config),
-    "huggingface": (get_hf_config, reset_hf_config),
     "terraform": (get_terraform_config, reset_terraform_config),
 }
 
@@ -26,7 +22,7 @@ def _clean_integration_env(monkeypatch):
     import os
 
     for name in list(os.environ):
-        if name.startswith(("AWX_", "HF_", "TF_")):
+        if name.startswith(("AWX_", "TF_")):
             monkeypatch.delenv(name)
     for _get, reset in _LOADERS.values():
         reset()
@@ -58,30 +54,6 @@ def test_unusable_value_is_logged_by_name(loader, env, named, monkeypatch, caplo
     assert named in message
     assert "soon" not in message
     assert "key-0123" not in message
-
-
-def test_huggingface_settings_failure_is_logged(monkeypatch, caplog):
-    """R4.5: the HuggingFace loader logs a settings failure with its traceback.
-
-    Every HuggingFaceConfig field is a string with a default, so no HF_ value
-    fails validation; the failure here comes from the settings class itself.
-    """
-    import lm_mcp.hf_config as hf_config
-
-    class BrokenSettings(hf_config.HuggingFaceConfig):
-        def __init__(self) -> None:
-            raise RuntimeError("settings source failed")
-
-    monkeypatch.setitem(sys.modules, "torch", types.ModuleType("torch"))
-    monkeypatch.setattr(hf_config, "HuggingFaceConfig", BrokenSettings)
-
-    with caplog.at_level(logging.WARNING, logger="lm_mcp"):
-        assert get_hf_config() is None
-
-    (record,) = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert "HF_" in record.getMessage()
-    assert "settings source failed" in record.getMessage()
-    assert record.exc_info is not None
 
 
 @pytest.mark.parametrize(
