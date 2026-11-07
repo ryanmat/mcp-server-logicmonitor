@@ -1119,23 +1119,19 @@ class TestSearchTools:
         assert "forecast_metric" in tool_names
 
     async def test_configured_integration_tools_are_searchable(self, client):
-        """AWX/Terraform tools (conditional) become searchable when their client is set.
-
-        Regression for the drift where search_tools iterated only the core TOOLS list,
-        leaving the AWX and Terraform tools unsearchable even when configured.
-        """
+        """search_tools adds TF_TOOLS to its corpus only when the Terraform runner is set."""
         from unittest.mock import patch
 
-        # Not configured -> AWX tools are absent from the search corpus.
-        result = await search_tools(client, query="ansible job template")
+        # Not configured -> TF_TOOLS are absent from the search corpus.
+        result = await search_tools(client, query="terraform state list")
         names = [m["name"] for m in json.loads(result[0].text)["matches"]]
-        assert "get_job_templates" not in names
+        assert "terraform_state_list" not in names
 
-        # Configured -> AWX tools are searchable.
-        with patch("lm_mcp.server.get_awx_client", return_value=object()):
-            result = await search_tools(client, query="ansible job template")
+        # Configured -> TF_TOOLS are searchable.
+        with patch("lm_mcp.server.get_tf_runner", return_value=object()):
+            result = await search_tools(client, query="terraform state list")
         names = [m["name"] for m in json.loads(result[0].text)["matches"]]
-        assert "get_job_templates" in names
+        assert "terraform_state_list" in names
 
     async def test_category_filter(self, client):
         """Category filter restricts results to that category's tools."""

@@ -13,6 +13,24 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 | Tool | Replacement |
 |---|---|
 | `watsonx_summarize` | None. The calling model summarizes tool results itself. |
+| `test_awx_connection` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_templates` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_template` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `launch_job` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_status` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_output` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `cancel_job` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `relaunch_job` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_inventories` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_inventory_hosts` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `launch_workflow` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_workflow_status` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_workflow_templates` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_projects` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_credentials` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_organizations` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_events` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_hosts` | None. Use the AAP API or Red Hat's AAP MCP server. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -23,6 +41,13 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 - The `ibm` and `huggingface` extras, and the settings only they read: `WATSONX_API_KEY`,
   `WATSONX_URL`, `WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`,
   `HF_DEVICE` and `HF_CACHE_DIR`.
+- The Ansible Automation Platform integration: the tools above, the `ansible` category in
+  `lm://guide/tool-categories`, the `remediate_workflow` prompt, `examples/playbooks/`, and the
+  settings `AWX_URL`, `AWX_TOKEN`, `AWX_VERIFY_SSL`, `AWX_TIMEOUT` and `AWX_MAX_RETRIES`, which
+  the server ignores if set. LogicMonitor's own remediation stays: `execute_remediation`, the
+  RemediationSource tools and the `remediation` prompt. Red Hat announced its AAP MCP server as a
+  Technology Preview for AAP 2.6.4, which it does not support in production; whether it works with
+  AWX is unconfirmed.
 
 ### Changed
 

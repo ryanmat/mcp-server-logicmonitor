@@ -26,7 +26,7 @@ def log_unusable_config(
     as tokens never reach the log; any other error with its traceback.
 
     Args:
-        integration: Name used in the message, such as "AWX".
+        integration: Name used in the message, such as "Terraform".
         settings_cls: The settings class whose construction failed.
         exc: The exception its construction raised.
         gate: The variable whose absence means "not configured", or None when

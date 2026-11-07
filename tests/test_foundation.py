@@ -81,9 +81,9 @@ class TestReleaseMetadata:
     @pytest.mark.parametrize("doc", ["README.md", "documentation/client-setup.md", "server.json"])
     def test_docs_state_the_registry_tool_count(self, doc):
         """Every total tool count a doc or the registry manifest states is the registry's."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
+        from lm_mcp.registry import TF_TOOLS, TOOLS
 
-        total = len(TOOLS) + len(AWX_TOOLS) + len(TF_TOOLS)
+        total = len(TOOLS) + len(TF_TOOLS)
         stated = [int(n) for n in _TOOL_TOTAL_RE.findall((REPO_ROOT / doc).read_text())]
 
         assert stated, f"{doc} states no tool count"

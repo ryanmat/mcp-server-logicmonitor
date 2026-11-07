@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 305 tools the LogicMonitor MCP server can advertise (core plus the optional Ansible Automation Platform and Terraform integrations). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 287 tools the LogicMonitor MCP server can advertise (core plus the optional Terraform integration). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -30,7 +30,7 @@ Resource/Prompt mirrors exposed as Tools for clients without those primitives
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_reference` | Get LogicMonitor reference content (schemas, enums, filter syntax, guides). Mirrors content from MCP Resources for clients without full Resource support (Copilot cloud agent, OpenAI Codex, Cline). Categories: schema, enums, filters, syntax, guide. Pass list=true (or omit both category and name) to discover all available (category, name) pairs. | No |
-| `get_workflow` | Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, remediate_workflow, etc.). Mirrors MCP Prompt content for clients without Prompt support. Prefer the composite workflow tools (triage, diagnose, health_check, capacity_plan, portal_overview) when they exist -- those execute the procedure. Pass list=true to discover available workflows. | No |
+| `get_workflow` | Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, etc.). Mirrors MCP Prompt content for clients without Prompt support. Prefer the composite workflow tools (triage, diagnose, health_check, capacity_plan, portal_overview) when they exist -- those execute the procedure. Pass list=true to discover available workflows. | No |
 
 ## Discovery
 
@@ -482,31 +482,6 @@ Multi-portal switching: one server, many customer portals
 | `use_portal` | Switch the active customer portal for subsequent tool calls. | Yes |
 | `current_portal` | Show which customer portal is currently active. | No |
 | `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | Yes |
-
-## Ansible Automation Platform
-
-Ansible Automation Platform for observability-driven remediation
-
-| Tool | Description | Write |
-|------|-------------|-------|
-| `test_awx_connection` | Test connectivity to Ansible Automation Platform controller | No |
-| `get_job_templates` | List job templates from Ansible Automation Platform | No |
-| `get_job_template` | Get details of a specific job template | No |
-| `launch_job` | Launch an Ansible job template. Requires write permission. | Yes |
-| `get_job_status` | Get the status of a running or completed job | No |
-| `get_job_output` | Get the stdout output of a job | No |
-| `cancel_job` | Cancel a running job. Requires write permission. | Yes |
-| `relaunch_job` | Relaunch a previously run job. Requires write permission. | Yes |
-| `get_inventories` | List inventories from Ansible Automation Platform | No |
-| `get_inventory_hosts` | List hosts in a specific inventory | No |
-| `launch_workflow` | Launch a workflow job template. Requires write permission. | Yes |
-| `get_workflow_status` | Get the status of a workflow job | No |
-| `get_workflow_templates` | List workflow job templates from Ansible Automation Platform | No |
-| `get_projects` | List projects from Ansible Automation Platform | No |
-| `get_credentials` | List credentials from Ansible Automation Platform (secrets not exposed) | No |
-| `get_organizations` | List organizations from Ansible Automation Platform | No |
-| `get_job_events` | Get events from a specific job run | No |
-| `get_hosts` | List hosts from Ansible Automation Platform | No |
 
 ## Terraform
 

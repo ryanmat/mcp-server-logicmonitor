@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 305 tools, 15 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 287 tools, 14 workflow prompts, and 26 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Tools are read-only until you set `LM_ENABLE_WRITE_OPERATIONS=true`. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 305 counts every tool the server can advertise (277 LM + 18 AAP + 10 Terraform). The AAP and Terraform tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
+The 287 counts every tool the server can advertise (277 LM + 10 Terraform). Those 10 Terraform tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
-- the `lm://guide/tool-categories` resource: all 305 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 287 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -165,21 +165,10 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 | Portal Overview | `/lm-portal` | Portal-wide snapshot for shift handoff: alerts, collectors, SDTs, down devices |
 | Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
 | APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
-| Remediation | `/lm-remediate` | Diagnose alert, find or generate playbook, launch AAP job, verify fix |
 
 ## Integrations
 
 Each integration is optional. Add its variables to the `env` block or `claude mcp add` command from [Setup](#setup).
-
-### Ansible Automation Platform
-
-18 tools that connect LogicMonitor alerts to remediation playbooks. They appear when `AWX_URL` and `AWX_TOKEN` are set.
-
-They list, inspect, and launch job templates with extra variables and host limits, check status, view output, cancel or relaunch a job, launch workflow templates and monitor multi-step sequences, and browse inventories, projects, and credentials for targeted remediation. Secrets are never exposed.
-
-`launch_job`, `launch_workflow`, `cancel_job`, and `relaunch_job` require `LM_ENABLE_WRITE_OPERATIONS=true`. All `extra_vars` inputs are validated to prevent Jinja2 template injection.
-
-See [Example Playbooks](https://github.com/ryanmat/mcp-server-logicmonitor/tree/main/examples/playbooks) for remediation templates.
 
 ### Terraform
 
@@ -288,11 +277,6 @@ To get LMv1 credentials:
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include an LM API ping in `/health` for authenticated callers (never in `/readyz`) |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
 | `LM_ANALYSIS_MAX_CONCURRENCY` | No | `4` | Analysis workflows (`/api/v1/analyze` and the alert webhook) that run at once; later submissions are accepted and wait as `pending`. At least 1. HTTP transport only. |
-| `AWX_URL` | No | - | Ansible Automation Platform controller URL (e.g., `https://aap.example.com`) |
-| `AWX_TOKEN` | No | - | AAP personal access token |
-| `AWX_VERIFY_SSL` | No | `true` | Verify SSL certificates for AAP connections |
-| `AWX_TIMEOUT` | No | `30` | Request timeout in seconds for AAP API calls |
-| `AWX_MAX_RETRIES` | No | `3` | Max retries for rate-limited AAP requests, and for server errors on idempotent ones; a job launch that gets a 5xx is not resent. A `Retry-After` lengthens the backoff up to 120 seconds |
 | `TF_WORKSPACE_DIR` | No | - | Root directory for Terraform workspaces (enables Terraform tools) |
 | `TF_TERRAFORM_BINARY` | No | `terraform` | Path to the terraform binary |
 | `TF_TIMEOUT` | No | `300` | Terraform command timeout in seconds |
@@ -330,7 +314,7 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 305 tools organized by domain category |
+| `lm://guide/tool-categories` | All 287 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
@@ -339,7 +323,7 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 </details>
 
 <details>
-<summary>15 workflow prompts</summary>
+<summary>14 workflow prompts</summary>
 
 | Prompt | Description | Arguments |
 |--------|-------------|-----------|
@@ -356,7 +340,6 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 | `top_talkers` | Identify noisiest devices and datasources generating the most alerts | `hours_back`, `limit`, `group_by` |
 | `rca_workflow` | Guided root cause analysis combining alerts, topology, and change history | `device_id`, `alert_id`, `hours_back` |
 | `capacity_forecast` | Forecast capacity trends and predict threshold breaches | `device_id`, `group_id`, `datasource`, `hours_back`, `threshold` |
-| `remediate_workflow` | Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform | `alert_id`, `device_id` |
 | `remediation` | Execute a LogicMonitor remediation source with pre-execution safety checks | `host_id`, `remediation_source_id` |
 
 </details>
@@ -429,13 +412,12 @@ uv run ruff format src tests
 | `src/lm_mcp/server.py` | MCP server entry point (`lm-mcp-server`) and tool dispatch |
 | `src/lm_mcp/registry.py` | Tool definitions and the handler map |
 | `src/lm_mcp/tools/` | Tool handlers, one module per domain |
-| `src/lm_mcp/client/` | Async HTTP clients for the LogicMonitor and AAP APIs |
+| `src/lm_mcp/client/` | Async HTTP client for the LogicMonitor API |
 | `src/lm_mcp/auth/` | Bearer and LMv1 authentication |
 | `src/lm_mcp/transport/` | HTTP transport and analysis API |
 | `src/lm_mcp/prompts/`, `resources/`, `completions/` | MCP prompts, reference resources, and argument completions |
 | `.claude/skills/` | Claude Code skills |
 | `documentation/` | Tool reference (generated), client setup, networking intelligence |
-| `examples/playbooks/` | Sample AAP remediation playbooks |
 | `deploy/` | Dockerfile, compose file, Caddyfile, Kubernetes manifest |
 | `tests/` | pytest suite and contract fixtures |
 

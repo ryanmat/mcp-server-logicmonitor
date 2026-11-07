@@ -232,8 +232,6 @@ class TestRunStdioStartup:
             "LM_VAULT_FILE",
             "LM_AGE_KEY",
             "LM_MAX_RETRIES",
-            "AWX_URL",
-            "AWX_TOKEN",
             "TF_WORKSPACE_DIR",
         ):
             monkeypatch.delenv(var, raising=False)
@@ -316,9 +314,8 @@ async def _http_tool_names(monkeypatch) -> list[str]:
 
 
 def _clear_backend_globals() -> None:
-    from lm_mcp.server import _set_awx_client, _set_tf_runner
+    from lm_mcp.server import _set_tf_runner
 
-    _set_awx_client(None)
     _set_tf_runner(None)
 
 
@@ -342,8 +339,6 @@ class TestOneBootstrapForBothTransports:
             "LM_MCP_CATEGORIES",
             "LM_HTTP_AUTH_TOKEN",
             "LM_HTTP_ALLOW_UNAUTHENTICATED",
-            "AWX_URL",
-            "AWX_TOKEN",
             "TF_WORKSPACE_DIR",
         ):
             monkeypatch.delenv(var, raising=False)
@@ -360,13 +355,11 @@ class TestOneBootstrapForBothTransports:
         reset_terraform_config()
 
     def _configure_every_backend(self, monkeypatch, tmp_path) -> None:
-        monkeypatch.setenv("AWX_URL", "https://awx.example.com")
-        monkeypatch.setenv("AWX_TOKEN", "awx-token")
         monkeypatch.setenv("TF_WORKSPACE_DIR", str(tmp_path))
 
     async def test_configured_backends_list_the_same_tools(self, monkeypatch, tmp_path):
-        """AWX and Terraform configured: stdio and HTTP name the same tools."""
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS
+        """Terraform configured: stdio and HTTP name the same tools."""
+        from lm_mcp.registry import TF_TOOLS
 
         self._configure_every_backend(monkeypatch, tmp_path)
 
@@ -375,7 +368,7 @@ class TestOneBootstrapForBothTransports:
         http_names = await _http_tool_names(monkeypatch)
 
         assert stdio_names == http_names
-        backend_names = {t.name for t in (*AWX_TOOLS, *TF_TOOLS)}
+        backend_names = {t.name for t in TF_TOOLS}
         assert backend_names <= set(stdio_names)
 
     async def test_no_backends_list_the_filtered_core_tools(self, monkeypatch):

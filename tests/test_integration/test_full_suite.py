@@ -1558,15 +1558,6 @@ class TestServerCallToolFlow:
         assert "audit_network_monitoring_coverage" in tool_names
         assert "create_http_integration" in tool_names
 
-    def test_awx_tools_registered(self):
-        """AWX_TOOLS contains all 18 Ansible Automation Platform tools."""
-        from lm_mcp.registry import AWX_TOOLS
-
-        assert len(AWX_TOOLS) == 18
-        awx_names = {t.name for t in AWX_TOOLS}
-        assert "test_awx_connection" in awx_names
-        assert "launch_job" in awx_names
-
     def test_tf_tools_registered(self):
         """TF_TOOLS contains all Terraform IaC tools."""
         from lm_mcp.registry import TF_TOOLS

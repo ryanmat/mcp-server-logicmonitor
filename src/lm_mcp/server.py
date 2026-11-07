@@ -20,7 +20,7 @@ from lm_mcp.logging import (
     redact_arguments,
 )
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, get_tool_handler
+from lm_mcp.registry import TF_TOOLS, TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.tools import ErrorContent, is_error_result
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes up to 305 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes up to 287 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
@@ -82,35 +82,6 @@ def _set_client(client: LogicMonitorClient) -> None:
     """
     global _client
     _client = client
-
-
-# Global AWX client (initialized when AWX_URL and AWX_TOKEN are set)
-_awx_client = None
-
-# Set of AWX tool names for dispatch routing
-AWX_TOOL_NAMES = {t.name for t in AWX_TOOLS}
-
-
-def get_awx_client():
-    """Get the initialized AWX client.
-
-    Returns:
-        The AWX client instance, or None if not configured.
-    """
-    return _awx_client
-
-
-def _set_awx_client(client) -> None:
-    """Set the global AWX client.
-
-    Called by transport runners during initialization when AWX
-    credentials are available.
-
-    Args:
-        client: The AwxClient instance, or None to clear.
-    """
-    global _awx_client
-    _awx_client = client
 
 
 # Global Terraform runner (initialized when TF_WORKSPACE_DIR is set)
@@ -189,7 +160,7 @@ def _filter_tools(tools: list, config) -> list:
 async def list_tools():
     """Return available tools, filtered by config.
 
-    Includes AWX tools only when the AWX client is configured.
+    Includes TF_TOOLS only when the Terraform runner is configured.
     """
     return _filter_tools(collect_tools(), get_config())
 
@@ -197,12 +168,10 @@ async def list_tools():
 def collect_tools() -> list[Tool]:
     """The tools this server can dispatch with its configured backends, before operator filters.
 
-    The AWX and Terraform tools are included only when their backend is set.
+    TF_TOOLS are included only when their backend is set.
     Both transports build their tool lists from this.
     """
     tools = list(TOOLS)
-    if _awx_client is not None:
-        tools.extend(AWX_TOOLS)
     if _tf_runner is not None:
         tools.extend(TF_TOOLS)
     return tools
@@ -289,7 +258,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             from lm_mcp.categories import tool_in_categories
 
             tools_index = {t.name: t for t in TOOLS}
-            tools_index.update({t.name: t for t in AWX_TOOLS})
             tools_index.update({t.name: t for t in TF_TOOLS})
             if not tool_in_categories(name, tools_index, config.mcp_categories):
                 return [
@@ -372,17 +340,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         # Session and portal tools don't need an LM client
         if name in SESSION_TOOLS or name in PORTAL_TOOLS:
             result = await handler(**arguments)
-        elif name in AWX_TOOL_NAMES:
-            # AWX tools use the AWX client
-            if _awx_client is None:
-                return [
-                    ErrorContent(
-                        type="text",
-                        text="Error: Ansible Automation Platform not configured. "
-                        "Set AWX_URL and AWX_TOKEN environment variables.",
-                    )
-                ]
-            result = await handler(_awx_client, **arguments)
         elif name in TF_TOOL_NAMES:
             # The LM Terraform provider needs fixed LM_* credentials; multi-portal
             # credentials are selected at runtime and never reach the subprocess.

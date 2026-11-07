@@ -74,8 +74,8 @@ You can expect:
 - Enable only when needed: `LM_ENABLE_WRITE_OPERATIONS=true`
 - `terraform_init` and `terraform_plan` count as writes, since providers and data
   sources call live APIs during them
-- A POST, PATCH or AWX job launch that gets a 5xx is not resent, so a retry cannot
-  apply a change twice
+- A POST or PATCH that gets a 5xx is not resent, so a retry cannot apply a change
+  twice
 - Review permissions granted to your LogicMonitor API token
 
 ### Container security

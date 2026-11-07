@@ -108,13 +108,6 @@ class TestExecuteToolInlineErrors:
         assert is_error_result(result)
         assert '"code": "INVALID_FILTER_FIELDS"' in result[0].text
 
-    async def test_awx_not_configured(self, single_portal):
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("get_hosts", {})
-        assert is_error_result(result)
-        assert result[0].text.startswith("Error: Ansible Automation Platform not configured")
-
     async def test_terraform_not_configured(self, single_portal):
         from lm_mcp.server import execute_tool
 

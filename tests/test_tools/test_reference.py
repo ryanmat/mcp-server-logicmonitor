@@ -99,7 +99,7 @@ class TestGetWorkflow:
         data = json.loads(result[0].text)
 
         assert data["count"] == len(PROMPTS)
-        assert data["count"] >= 15
+        assert data["count"] >= 14
         for entry in data["available"]:
             assert "name" in entry
             assert "description" in entry
