@@ -284,7 +284,7 @@ class TestGuideResources:
 
     def test_tool_categories_covers_all_registered_tools(self):
         """Tool categories index accounts for all registered tools."""
-        from lm_mcp.registry import TF_TOOLS, TOOLS
+        from lm_mcp.registry import TOOLS
 
         content = get_resource_content("lm://guide/tool-categories")
         data = json.loads(content)
@@ -294,8 +294,8 @@ class TestGuideResources:
         for category in data["categories"].values():
             categorized_tools.update(category["tools"])
 
-        # Collect all registered tool names (LM + TF)
-        registered_tools = {t.name for t in TOOLS} | {t.name for t in TF_TOOLS}
+        # Collect all registered tool names
+        registered_tools = {t.name for t in TOOLS}
 
         # Every registered tool should be in some category
         missing = registered_tools - categorized_tools

@@ -4,7 +4,7 @@
 import json
 from pathlib import Path
 
-from lm_mcp.registry import TF_TOOLS, TOOLS
+from lm_mcp.registry import TOOLS
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tool_list.json"
 
@@ -22,13 +22,13 @@ def _annotations(annotations) -> dict | None:
 
 
 def canonical_tool_surface() -> dict:
-    """Serialize the full possible tool surface (core plus every conditional integration).
+    """Serialize every tool the registry defines.
 
     Unconditional on purpose: the snapshot is the contract for every tool the server can
-    ever advertise, so drift is caught regardless of which integrations are configured.
+    ever advertise, so drift is caught regardless of which tools a configuration lists.
     """
     surface: dict = {}
-    for tool in [*TOOLS, *TF_TOOLS]:
+    for tool in TOOLS:
         surface[tool.name] = {
             "description": tool.description,
             "inputSchema": tool.inputSchema,
@@ -38,10 +38,10 @@ def canonical_tool_surface() -> dict:
 
 
 def test_no_duplicate_tool_names():
-    """No tool name is registered twice across the core and conditional registries."""
-    names = [t.name for t in [*TOOLS, *TF_TOOLS]]
+    """No tool name is registered twice."""
+    names = [t.name for t in TOOLS]
     dupes = sorted({n for n in names if names.count(n) > 1})
-    assert not dupes, f"duplicate tool names across registries: {dupes}"
+    assert not dupes, f"duplicate tool names: {dupes}"
 
 
 def test_tool_contract_snapshot():
@@ -103,7 +103,7 @@ def test_server_instructions_point_to_search_tools():
 def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
     """Write tools stay listed with writes off and are refused, so they are not absent."""
     from lm_mcp.config import LMConfig
-    from lm_mcp.registry import TF_TOOLS, TOOLS
+    from lm_mcp.registry import TOOLS
     from lm_mcp.server import SERVER_INSTRUCTIONS, _filter_tools
 
     monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -119,8 +119,7 @@ def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
     assert "acknowledge_alert" in {tool.name for tool in _filter_tools(TOOLS, LMConfig())}
     assert "refused" in SERVER_INSTRUCTIONS
     assert "absent" not in SERVER_INSTRUCTIONS
-    total = len(TOOLS) + len(TF_TOOLS)
-    assert f"up to {total} " in SERVER_INSTRUCTIONS
+    assert f"up to {len(TOOLS)} " in SERVER_INSTRUCTIONS
 
 
 if __name__ == "__main__":

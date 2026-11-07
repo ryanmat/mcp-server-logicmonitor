@@ -1118,21 +1118,6 @@ class TestSearchTools:
         tool_names = [m["name"] for m in data["matches"]]
         assert "forecast_metric" in tool_names
 
-    async def test_configured_integration_tools_are_searchable(self, client):
-        """search_tools adds TF_TOOLS to its corpus only when the Terraform runner is set."""
-        from unittest.mock import patch
-
-        # Not configured -> TF_TOOLS are absent from the search corpus.
-        result = await search_tools(client, query="terraform state list")
-        names = [m["name"] for m in json.loads(result[0].text)["matches"]]
-        assert "terraform_state_list" not in names
-
-        # Configured -> TF_TOOLS are searchable.
-        with patch("lm_mcp.server.get_tf_runner", return_value=object()):
-            result = await search_tools(client, query="terraform state list")
-        names = [m["name"] for m in json.loads(result[0].text)["matches"]]
-        assert "terraform_state_list" in names
-
     async def test_category_filter(self, client):
         """Category filter restricts results to that category's tools."""
         result = await search_tools(client, query="alert", category="alerts")

@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 287 tools, 14 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 277 tools, 14 workflow prompts, and 26 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Tools are read-only until you set `LM_ENABLE_WRITE_OPERATIONS=true`. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 287 counts every tool the server can advertise (277 LM + 10 Terraform). Those 10 Terraform tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
+The 277 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
-- the `lm://guide/tool-categories` resource: all 287 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 277 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -172,21 +172,11 @@ Each integration is optional. Add its variables to the `env` block or `claude mc
 
 ### Terraform
 
-11 tools for Infrastructure as Code with any Terraform provider. `terraform_generate` exports existing LM portal resources as HCL using the `logicmonitor/logicmonitor` provider. The other ten appear when `TF_WORKSPACE_DIR` is set, and they need the `terraform` CLI installed separately.
-
-- `terraform_init` and `terraform_plan` require write permission, since providers and data sources call live APIs, and `terraform_import` and `terraform_write_config` require it too
-- `terraform_apply` and `terraform_destroy` are triple-gated: write permission, `TF_AUTO_APPROVE_ENABLED`, and a confirm parameter
-- `terraform_validate`, `terraform_state_list`, `terraform_state_show`, and `terraform_output` need no write permission
-
-An agent can author HCL from natural language, operate on existing `.tf` files under `TF_WORKSPACE_DIR`, or export LM resources with `terraform_generate` and import them into state.
-
-The `terraform` subprocess inherits only `PATH`, `HOME`, `TMPDIR`, `TF_*`, the proxy settings (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` and their lowercase forms) and the CA settings (`SSL_CERT_FILE`, `SSL_CERT_DIR`) from the server's environment, so server and cloud credentials such as `LM_BEARER_TOKEN` or `AWS_SECRET_ACCESS_KEY` never reach provider or data-source code. The `logicmonitor` provider gets `LM_API_ID`, `LM_API_KEY` and `LM_COMPANY` (and their `TF_VAR_lm_*` forms) from the server's LMv1 configuration. Other providers take credentials as `TF_VAR_*` variables that the HCL passes to them, or from files under `HOME` such as `~/.aws/credentials`. A backend block cannot read variables, so backend credentials come from files under `HOME` or from `terraform_init`'s `backend_config` keys (`profile`, `access_key`, `sas_token` and the like).
-
-`var_file` and a local backend `path` must resolve inside the workspace, symlinks included. `terraform_init`'s `backend_config` takes an object of local, s3 or azurerm backend keys and refuses endpoint and proxy overrides by name. A command that exceeds `TF_TIMEOUT` gets SIGINT and 30 seconds to persist state and release its lock before it is killed; a timed-out `apply` or `destroy` reports that the lock may still be held and state may be incomplete.
+`terraform_generate` exports an existing LM portal resource as HCL for the `logicmonitor/logicmonitor` provider. It is part of the core tool set and needs no settings of its own.
 
 ### Multi-portal mode
 
-Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`list_portals`, `use_portal`, `current_portal`, `reload_portals`) switch the active portal at runtime. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only, and the ten Terraform workspace tools are unavailable in it. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
+Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`list_portals`, `use_portal`, `current_portal`, `reload_portals`) switch the active portal at runtime. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
 
 ## Deployment
 
@@ -277,10 +267,6 @@ To get LMv1 credentials:
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include an LM API ping in `/health` for authenticated callers (never in `/readyz`) |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
 | `LM_ANALYSIS_MAX_CONCURRENCY` | No | `4` | Analysis workflows (`/api/v1/analyze` and the alert webhook) that run at once; later submissions are accepted and wait as `pending`. At least 1. HTTP transport only. |
-| `TF_WORKSPACE_DIR` | No | - | Root directory for Terraform workspaces (enables Terraform tools) |
-| `TF_TERRAFORM_BINARY` | No | `terraform` | Path to the terraform binary |
-| `TF_TIMEOUT` | No | `300` | Terraform command timeout in seconds |
-| `TF_AUTO_APPROVE_ENABLED` | No | `false` | Enable terraform apply/destroy operations |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -314,7 +300,7 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 287 tools organized by domain category |
+| `lm://guide/tool-categories` | All 277 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

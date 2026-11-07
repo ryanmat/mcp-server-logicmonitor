@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 287 tools the LogicMonitor MCP server can advertise (core plus the optional Terraform integration). The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 277 tools the LogicMonitor MCP server can advertise. The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -485,20 +485,10 @@ Multi-portal switching: one server, many customer portals
 
 ## Terraform
 
-Terraform Infrastructure as Code management for any provider
+Export LogicMonitor resources as Terraform HCL
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `terraform_init` | Initialize a Terraform workspace and download required providers. Run this before plan, apply, or any other terraform operation. Requires LM_ENABLE_WRITE_OPERATIONS=true. | Yes |
-| `terraform_validate` | Validate Terraform configuration syntax in a workspace. Returns validation diagnostics as structured JSON. | No |
-| `terraform_plan` | Preview Terraform changes without applying. Shows what resources will be created, modified, or destroyed. Returns structured JSON plan. Requires LM_ENABLE_WRITE_OPERATIONS=true, since providers and data sources run against live APIs. | Yes |
-| `terraform_state_list` | List all resources currently tracked in Terraform state for a workspace. | No |
-| `terraform_state_show` | Show detailed Terraform state for a specific resource, including all attributes and metadata. | No |
-| `terraform_output` | Show Terraform output values defined in the configuration. | No |
-| `terraform_apply` | Apply Terraform configuration changes. Creates, updates, or destroys infrastructure as defined in the configuration. Triple-gated: requires LM_ENABLE_WRITE_OPERATIONS=true, TF_AUTO_APPROVE_ENABLED=true, and confirm=true parameter. | Yes |
-| `terraform_destroy` | Destroy all Terraform-managed infrastructure in a workspace. Triple-gated: requires LM_ENABLE_WRITE_OPERATIONS=true, TF_AUTO_APPROVE_ENABLED=true, and confirm=true parameter. | Yes |
-| `terraform_import` | Import an existing resource into Terraform state. Maps a real-world resource (by ID) to a Terraform resource address for state tracking. | Yes |
-| `terraform_write_config` | Write HCL configuration content to a file in a Terraform workspace. Use this to create or update .tf files that define infrastructure. | Yes |
 | `terraform_generate` | Export an existing LogicMonitor resource as Terraform HCL configuration using the logicmonitor/logicmonitor provider. Supports device, device_group, collector, alert_rule, escalation_chain, dashboard, datasource, sdt, website, role, and report_group resource types. | No |
 
 ## Remediation

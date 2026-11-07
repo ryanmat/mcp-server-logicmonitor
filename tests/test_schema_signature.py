@@ -5,10 +5,10 @@ import inspect
 
 import pytest
 
-from lm_mcp.registry import TF_TOOLS, TOOLS, get_tool_handler
+from lm_mcp.registry import TOOLS, get_tool_handler
 from lm_mcp.server import PORTAL_TOOLS, SESSION_TOOLS
 
-ALL_TOOLS = [*TOOLS, *TF_TOOLS]
+ALL_TOOLS = list(TOOLS)
 
 _NAMED = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
 
@@ -16,9 +16,8 @@ _NAMED = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONL
 def _caller_params(tool_name: str) -> list[inspect.Parameter]:
     """Return the handler parameters the caller fills from tool arguments.
 
-    execute_tool passes the LM client or the Terraform runner as the
-    first positional argument, except for session and portal tools, which receive the
-    arguments alone.
+    execute_tool passes the LM client as the first positional argument, except for
+    session and portal tools, which receive the arguments alone.
     """
     params = list(inspect.signature(get_tool_handler(tool_name)).parameters.values())
     if tool_name in SESSION_TOOLS or tool_name in PORTAL_TOOLS:
@@ -30,7 +29,7 @@ def test_invariant_covers_every_registered_tool():
     """The parametrized invariant runs over the full tool surface, one case per tool."""
     names = [t.name for t in ALL_TOOLS]
     assert len(names) == len(set(names))
-    assert len(names) >= 280
+    assert len(names) >= 270
 
 
 @pytest.mark.parametrize("tool", ALL_TOOLS, ids=lambda t: t.name)

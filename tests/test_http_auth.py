@@ -356,11 +356,7 @@ def live_server(monkeypatch):
 @pytest.fixture
 def _http_server_env(_set_env, monkeypatch):
     """Configure create_http_server for a live start with no optional integrations."""
-    for var in (
-        "TF_WORKSPACE_DIR",
-        "LM_HTTP_ALLOW_UNAUTHENTICATED",
-    ):
-        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("LM_HTTP_ALLOW_UNAUTHENTICATED", raising=False)
     monkeypatch.setenv("LM_TRANSPORT", "http")
 
 

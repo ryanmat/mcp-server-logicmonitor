@@ -1558,16 +1558,6 @@ class TestServerCallToolFlow:
         assert "audit_network_monitoring_coverage" in tool_names
         assert "create_http_integration" in tool_names
 
-    def test_tf_tools_registered(self):
-        """TF_TOOLS contains all Terraform IaC tools."""
-        from lm_mcp.registry import TF_TOOLS
-
-        assert len(TF_TOOLS) == 10
-        tf_names = {t.name for t in TF_TOOLS}
-        assert "terraform_init" in tf_names
-        assert "terraform_plan" in tf_names
-        assert "terraform_apply" in tf_names
-
     def test_get_tool_handler_valid_tool(self):
         """get_tool_handler returns a callable for a valid tool name."""
         from lm_mcp.registry import get_tool_handler

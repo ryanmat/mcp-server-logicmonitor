@@ -33,8 +33,6 @@ You can expect:
   LogicMonitor credential properties such as `ssh.pass`, and URL userinfo and
   credential-named query values. Signature parameters such as `X-Amz-Signature`
   stay visible in a logged URL.
-- The `terraform` subprocess does not inherit server or cloud credentials. See
-  the Terraform section of the [README](README.md).
 
 ### Inbound HTTP exposure
 - The HTTP transport drives the full tool surface with the server's LogicMonitor
@@ -72,8 +70,6 @@ You can expect:
 ### Write operations
 - Write operations are disabled by default
 - Enable only when needed: `LM_ENABLE_WRITE_OPERATIONS=true`
-- `terraform_init` and `terraform_plan` count as writes, since providers and data
-  sources call live APIs during them
 - A POST or PATCH that gets a 5xx is not resent, so a retry cannot apply a change
   twice
 - Review permissions granted to your LogicMonitor API token

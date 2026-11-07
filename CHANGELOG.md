@@ -31,6 +31,16 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 | `get_organizations` | None. Use the AAP API or Red Hat's AAP MCP server. |
 | `get_job_events` | None. Use the AAP API or Red Hat's AAP MCP server. |
 | `get_hosts` | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `terraform_init` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_validate` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_plan` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_apply` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_destroy` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_import` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_output` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_state_list` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_state_show` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_write_config` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -48,6 +58,11 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   RemediationSource tools and the `remediation` prompt. Red Hat announced its AAP MCP server as a
   Technology Preview for AAP 2.6.4, which it does not support in production; whether it works with
   AWX is unconfirmed.
+- The Terraform runner: the ten `terraform_*` tools above, which ran the `terraform` CLI in
+  workspaces under `TF_WORKSPACE_DIR`, and the settings `TF_WORKSPACE_DIR`, `TF_TERRAFORM_BINARY`,
+  `TF_TIMEOUT` and `TF_AUTO_APPROVE_ENABLED`, which the server ignores if set. The only process the
+  server still starts is `age`, to decrypt a multi-portal vault. `terraform_generate` stays, and the
+  `terraform` category in `lm://guide/tool-categories` now lists only it.
 
 ### Changed
 

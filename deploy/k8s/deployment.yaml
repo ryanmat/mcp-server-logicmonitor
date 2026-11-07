@@ -86,8 +86,7 @@ spec:
             - name: LM_LOG_LEVEL
               value: warning
             # The root filesystem is read-only; /tmp is the writable emptyDir below.
-            # Point TF_WORKSPACE_DIR or a session persistence file under it, or
-            # mount a volume of their own.
+            # Point a session persistence file under it, or mount a volume of its own.
             - name: TMPDIR
               value: /tmp
           # Probe paths are exempt from inbound auth by design.

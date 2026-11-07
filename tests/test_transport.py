@@ -1,7 +1,6 @@
 # Description: Tests for the transport abstraction module.
 # Description: Validates transport runner selection and configuration.
 
-import logging
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock
 
@@ -215,16 +214,15 @@ def _fake_stdio_server():
 
 
 class TestRunStdioStartup:
-    """R1.2: run_stdio setup reaches the serve loop in every optional-integration branch.
+    """R1.2: run_stdio setup reaches the serve loop in single- and multi-portal mode.
 
     The serve loop and the stdio streams are faked; everything before them runs
-    for real, including client construction and the optional-integration probes.
+    for real, including client construction and the backend bootstrap.
     """
 
     @pytest.fixture(autouse=True)
     def _isolate(self, monkeypatch, reset_portals):
         from lm_mcp import server as server_module
-        from lm_mcp.terraform_config import reset_terraform_config
 
         for var in (
             "LM_MULTI_PORTAL",
@@ -232,39 +230,27 @@ class TestRunStdioStartup:
             "LM_VAULT_FILE",
             "LM_AGE_KEY",
             "LM_MAX_RETRIES",
-            "TF_WORKSPACE_DIR",
         ):
             monkeypatch.delenv(var, raising=False)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        reset_terraform_config()
 
         self.serve = AsyncMock()
         monkeypatch.setattr(server_module.server, "run", self.serve)
         monkeypatch.setattr("mcp.stdio_server", _fake_stdio_server())
-        yield
-        reset_terraform_config()
 
-    async def test_multi_portal_with_terraform_reaches_serve_loop(
-        self, monkeypatch, tmp_path, caplog
-    ):
-        """Multi-portal plus TF_WORKSPACE_DIR logs the Terraform-disabled warning and serves."""
+    async def test_multi_portal_reaches_serve_loop(self, monkeypatch, tmp_path):
+        """Multi-portal mode with a plaintext portals file reaches the serve loop."""
         portals_file = tmp_path / "portals.json"
         portals_file.write_text('{"acme": {"portal": "acme.example.com", "bearer_token": "t"}}')
         monkeypatch.setenv("LM_MULTI_PORTAL", "true")
         monkeypatch.setenv("LM_PORTALS_FILE", str(portals_file))
         monkeypatch.delenv("LM_PORTAL")
         monkeypatch.delenv("LM_BEARER_TOKEN")
-        monkeypatch.setenv("TF_WORKSPACE_DIR", str(tmp_path))
 
-        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport"):
-            await run_stdio()
+        await run_stdio()
 
         self.serve.assert_awaited_once()
-        assert any(
-            "Terraform tools are disabled in multi-portal mode" in r.getMessage()
-            for r in caplog.records
-        )
 
     async def test_single_portal_client_uses_configured_max_retries(self, monkeypatch):
         """R1.6, R3.5: the client gets LM_MAX_RETRIES and LM_RETRY_AFTER_CAP_SECONDS."""
@@ -313,12 +299,6 @@ async def _http_tool_names(monkeypatch) -> list[str]:
     return [tool["name"] for tool in resp.json()["result"]]
 
 
-def _clear_backend_globals() -> None:
-    from lm_mcp.server import _set_tf_runner
-
-    _set_tf_runner(None)
-
-
 class TestOneBootstrapForBothTransports:
     """R4.7: both transports build backends through one function and list the same tools.
 
@@ -329,7 +309,6 @@ class TestOneBootstrapForBothTransports:
     @pytest.fixture(autouse=True)
     def _isolate(self, monkeypatch, reset_portals):
         from lm_mcp import server as server_module
-        from lm_mcp.terraform_config import reset_terraform_config
 
         for var in (
             "LM_MULTI_PORTAL",
@@ -339,37 +318,16 @@ class TestOneBootstrapForBothTransports:
             "LM_MCP_CATEGORIES",
             "LM_HTTP_AUTH_TOKEN",
             "LM_HTTP_ALLOW_UNAUTHENTICATED",
-            "TF_WORKSPACE_DIR",
         ):
             monkeypatch.delenv(var, raising=False)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         monkeypatch.setenv("LM_HTTP_HOST", "127.0.0.1")
         monkeypatch.setenv("LM_HTTP_PORT", str(free_port("127.0.0.1")))
-        reset_terraform_config()
 
         self.serve = AsyncMock()
         monkeypatch.setattr(server_module.server, "run", self.serve)
         monkeypatch.setattr("mcp.stdio_server", _fake_stdio_server())
-        yield
-        reset_terraform_config()
-
-    def _configure_every_backend(self, monkeypatch, tmp_path) -> None:
-        monkeypatch.setenv("TF_WORKSPACE_DIR", str(tmp_path))
-
-    async def test_configured_backends_list_the_same_tools(self, monkeypatch, tmp_path):
-        """Terraform configured: stdio and HTTP name the same tools."""
-        from lm_mcp.registry import TF_TOOLS
-
-        self._configure_every_backend(monkeypatch, tmp_path)
-
-        stdio_names = await _stdio_tool_names(self.serve)
-        _clear_backend_globals()
-        http_names = await _http_tool_names(monkeypatch)
-
-        assert stdio_names == http_names
-        backend_names = {t.name for t in TF_TOOLS}
-        assert backend_names <= set(stdio_names)
 
     async def test_no_backends_list_the_filtered_core_tools(self, monkeypatch):
         """With no backend configured both transports list exactly the filtered TOOLS."""
@@ -380,22 +338,18 @@ class TestOneBootstrapForBothTransports:
         expected = [t.name for t in _filter_tools(list(TOOLS), get_config())]
 
         assert await _stdio_tool_names(self.serve) == expected
-        _clear_backend_globals()
         assert await _http_tool_names(monkeypatch) == expected
 
-    async def test_each_transport_calls_bootstrap_backends_once(self, monkeypatch, tmp_path):
+    async def test_each_transport_calls_bootstrap_backends_once(self, monkeypatch):
         """bootstrap_backends is the one function both transports build backends with."""
         from unittest.mock import patch
 
         from lm_mcp.transport import bootstrap
-
-        self._configure_every_backend(monkeypatch, tmp_path)
 
         with patch.object(
             bootstrap, "bootstrap_backends", wraps=bootstrap.bootstrap_backends
         ) as spy:
             await _stdio_tool_names(self.serve)
             assert spy.call_count == 1
-            _clear_backend_globals()
             await _http_tool_names(monkeypatch)
             assert spy.call_count == 2

@@ -5,22 +5,20 @@ import pytest
 
 from lm_mcp import portals
 from lm_mcp.config import reset_config
-from lm_mcp.server import _set_client, _set_tf_runner
+from lm_mcp.server import _set_client
 
 
 @pytest.fixture(autouse=True)
 def _reset_config_cache():
-    """Reset the cached config and the global Terraform runner between tests.
+    """Reset the cached LM config between tests.
 
     Tests that use monkeypatch to set environment variables need
-    fresh config instances. This fixture clears LM config and the
-    Terraform runner before and after each test.
+    fresh config instances. This fixture clears LM config before and
+    after each test.
     """
     reset_config()
-    _set_tf_runner(None)
     yield
     reset_config()
-    _set_tf_runner(None)
 
 
 @pytest.fixture

@@ -328,7 +328,6 @@ class TestHttpServerClientConstruction:
         from lm_mcp import server as server_module
         from lm_mcp.transport.http import create_http_server
 
-        monkeypatch.delenv("TF_WORKSPACE_DIR", raising=False)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         monkeypatch.setenv("LM_TRANSPORT", "http")
