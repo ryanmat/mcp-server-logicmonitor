@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import dataclasses
 import importlib
+import inspect
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -21,16 +23,17 @@ from lm_mcp.transport.bootstrap import Backends
 
 _SRC = Path(lm_mcp.__file__).parent
 
-# The modules that name watsonx: the ttm method, the summarize argument and the HuggingFace client.
+# The modules that name watsonx: the HuggingFace client and its config.
 _MODULES_NAMING_WATSONX = {
     "client/huggingface.py",
-    "client/watsonx.py",
     "hf_config.py",
-    "ibm_config.py",
-    "registry.py",
-    "tools/forecasting.py",
-    "tools/workflows.py",
 }
+
+_SUMMARIZING_COMPOSITES = ["triage", "health_check", "portal_overview", "capacity_plan", "diagnose"]
+
+
+def _tool(name: str):
+    return next(tool for tool in registry.TOOLS if tool.name == name)
 
 
 def test_registry_has_no_watsonx_manifest():
@@ -56,9 +59,36 @@ def test_server_holds_no_watsonx_state(attribute):
     assert not hasattr(server, attribute)
 
 
-def test_tools_watsonx_does_not_import():
+@pytest.mark.parametrize(
+    "module",
+    ["lm_mcp.tools.watsonx", "lm_mcp.client.watsonx", "lm_mcp.ibm_config"],
+)
+def test_removed_module_does_not_import(module):
     with pytest.raises(ModuleNotFoundError):
-        importlib.import_module("lm_mcp.tools.watsonx")
+        importlib.import_module(module)
+
+
+@pytest.mark.parametrize("name", _SUMMARIZING_COMPOSITES)
+def test_composite_schema_has_no_summarize_argument(name):
+    assert "summarize" not in _tool(name).inputSchema["properties"]
+
+
+@pytest.mark.parametrize("name", _SUMMARIZING_COMPOSITES)
+def test_composite_handler_has_no_summarize_argument(name):
+    assert "summarize" not in inspect.signature(registry.get_tool_handler(name)).parameters
+
+
+def test_forecast_metric_methods_are_the_statistical_ones():
+    method = _tool("forecast_metric").inputSchema["properties"]["method"]
+
+    assert method["enum"] == ["auto", "linear", "holt_winters"]
+
+
+@pytest.mark.parametrize("module", ["registry.py", "tools/forecasting.py", "tools/workflows.py"])
+def test_module_names_neither_summarize_nor_ttm(module):
+    text = (_SRC / module).read_text()
+
+    assert re.findall(r"\bsummarize\b|\bttm\b", text, flags=re.IGNORECASE) == []
 
 
 def test_tool_categories_have_no_watsonx_category():

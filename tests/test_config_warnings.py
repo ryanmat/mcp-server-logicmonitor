@@ -1,5 +1,5 @@
 # Description: Tests that unusable optional-integration configuration is logged, not dropped.
-# Description: Covers the watsonx, HuggingFace and Terraform loaders and the unconfigured silence.
+# Description: Covers the HuggingFace and Terraform loaders and the unconfigured silence.
 
 from __future__ import annotations
 
@@ -11,12 +11,10 @@ import pytest
 
 from lm_mcp.awx_config import get_awx_config, reset_awx_config
 from lm_mcp.hf_config import get_hf_config, reset_hf_config
-from lm_mcp.ibm_config import get_watsonx_config, reset_watsonx_config
 from lm_mcp.terraform_config import get_terraform_config, reset_terraform_config
 
 _LOADERS = {
     "awx": (get_awx_config, reset_awx_config),
-    "watsonx": (get_watsonx_config, reset_watsonx_config),
     "huggingface": (get_hf_config, reset_hf_config),
     "terraform": (get_terraform_config, reset_terraform_config),
 }
@@ -28,7 +26,7 @@ def _clean_integration_env(monkeypatch):
     import os
 
     for name in list(os.environ):
-        if name.startswith(("AWX_", "WATSONX_", "HF_", "TF_")):
+        if name.startswith(("AWX_", "HF_", "TF_")):
             monkeypatch.delenv(name)
     for _get, reset in _LOADERS.values():
         reset()
@@ -44,11 +42,6 @@ def _warnings(caplog) -> list[str]:
 @pytest.mark.parametrize(
     ("loader", "env", "named"),
     [
-        (
-            "watsonx",
-            {"WATSONX_API_KEY": "key-0123", "WATSONX_PROJECT_ID": "p1", "WATSONX_TIMEOUT": "soon"},
-            "WATSONX_TIMEOUT",
-        ),
         ("terraform", {"TF_WORKSPACE_DIR": "/srv/tf", "TF_TIMEOUT": "soon"}, "TF_TIMEOUT"),
     ],
 )
@@ -95,7 +88,6 @@ def test_huggingface_settings_failure_is_logged(monkeypatch, caplog):
     ("loader", "unrelated"),
     [
         ("awx", {}),
-        ("watsonx", {}),
         ("terraform", {"TF_LOG": "DEBUG", "TF_VAR_region": "us-east-1"}),
     ],
 )

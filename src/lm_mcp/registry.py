@@ -4684,12 +4684,12 @@ TOOLS.extend(
                     },
                     "method": {
                         "type": "string",
-                        "enum": ["auto", "linear", "holt_winters", "ttm"],
+                        "enum": ["auto", "linear", "holt_winters"],
                         "default": "auto",
                         "description": (
-                            "Forecasting method. 'ttm' uses IBM Granite TTM via "
-                            "watsonx.ai (requires WATSONX_API_KEY). 'auto' selects "
-                            "based on data and watsonx availability."
+                            "Forecasting method. 'auto' picks 'holt_winters' when at least "
+                            "168 hours of history autocorrelate strongly at a 12 or 24 hour "
+                            "lag, and 'linear' otherwise."
                         ),
                     },
                 },
@@ -6131,14 +6131,6 @@ TOOLS.extend(
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
                     },
-                    "summarize": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Append plain-English NL summary via IBM Granite "
-                            "(requires WATSONX_API_KEY)"
-                        ),
-                    },
                 },
             },
         ),
@@ -6163,14 +6155,6 @@ TOOLS.extend(
                         "enum": ["summary", "full"],
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
-                    },
-                    "summarize": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Append plain-English NL summary via IBM Granite "
-                            "(requires WATSONX_API_KEY)"
-                        ),
                     },
                 },
             },
@@ -6206,14 +6190,6 @@ TOOLS.extend(
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
                     },
-                    "summarize": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Append plain-English NL summary via IBM Granite "
-                            "(requires WATSONX_API_KEY)"
-                        ),
-                    },
                 },
             },
         ),
@@ -6238,14 +6214,6 @@ TOOLS.extend(
                         "enum": ["summary", "full"],
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
-                    },
-                    "summarize": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Append plain-English NL summary via IBM Granite "
-                            "(requires WATSONX_API_KEY)"
-                        ),
                     },
                 },
             },
@@ -6277,14 +6245,6 @@ TOOLS.extend(
                         "enum": ["summary", "full"],
                         "default": "summary",
                         "description": "Output detail level (default: summary)",
-                    },
-                    "summarize": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Append plain-English NL summary via IBM Granite "
-                            "(requires WATSONX_API_KEY)"
-                        ),
                     },
                 },
             },

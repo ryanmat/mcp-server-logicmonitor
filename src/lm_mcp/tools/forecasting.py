@@ -38,9 +38,8 @@ async def forecast_metric(
 ) -> list[TextContent]:
     """Forecast when a metric will breach a threshold.
 
-    Supports linear regression, Holt-Winters (triple exponential smoothing),
-    and IBM Granite TTM via watsonx.ai. Auto mode selects the best available
-    method based on data characteristics and watsonx availability.
+    Supports linear regression and Holt-Winters (triple exponential smoothing).
+    Auto mode selects between them based on data characteristics.
 
     Args:
         client: LogicMonitor API client.
@@ -50,7 +49,7 @@ async def forecast_metric(
         threshold: Value that, if exceeded, constitutes a breach.
         datapoints: Comma-separated datapoint names (all if omitted).
         hours_back: Hours of historical data for the regression (default: 168).
-        method: Forecasting method - auto, linear, holt_winters, or ttm (default: auto).
+        method: Forecasting method - auto, linear, or holt_winters (default: auto).
 
     Returns:
         Per-datapoint forecast with slope, breach time, trend direction,
@@ -81,47 +80,33 @@ async def forecast_metric(
                 continue
 
             # Determine method to use
-            method_used, fallback_reason = _select_forecast_method(
+            method_used = _select_forecast_method(
                 method,
                 values,
                 timestamps,
                 hours_back,
             )
 
-            if fallback_reason is not None:
-                forecast_result = _forecast_linear_fallback(
+            # Convert timestamps to hours relative to first
+            t0 = timestamps[0]
+            x_hours = [(t - t0) / 3600.0 for t in timestamps]
+
+            if method_used == "holt_winters":
+                forecast_result = _forecast_holt_winters(
                     values,
                     timestamps,
                     threshold,
-                    fallback_reason,
-                )
-            elif method_used == "ttm":
-                forecast_result = await _forecast_ttm(
-                    values,
-                    timestamps,
-                    threshold,
+                    t0,
+                    x_hours,
                 )
             else:
-                # Convert timestamps to hours relative to first
-                t0 = timestamps[0]
-                x_hours = [(t - t0) / 3600.0 for t in timestamps]
-
-                if method_used == "holt_winters":
-                    forecast_result = _forecast_holt_winters(
-                        values,
-                        timestamps,
-                        threshold,
-                        t0,
-                        x_hours,
-                    )
-                else:
-                    forecast_result = _forecast_linear(
-                        values,
-                        timestamps,
-                        threshold,
-                        t0,
-                        x_hours,
-                    )
+                forecast_result = _forecast_linear(
+                    values,
+                    timestamps,
+                    threshold,
+                    t0,
+                    x_hours,
+                )
 
             forecasts[dp_name] = forecast_result
 
@@ -145,37 +130,26 @@ def _select_forecast_method(
     values: list[float],
     timestamps: list[int],
     hours_back: int,
-) -> tuple[str, str | None]:
+) -> str:
     """Select the forecasting method based on data characteristics.
 
     Args:
-        method: Requested method (auto, linear, holt_winters, ttm).
+        method: Requested method (auto, linear, holt_winters).
         values: Time series values.
         timestamps: Epoch timestamps.
         hours_back: Hours of historical data.
 
     Returns:
-        The method to use ('linear', 'holt_winters', or 'ttm') and, when an
-        explicitly requested method cannot run, the reason linear runs instead.
+        The method to use ('linear' or 'holt_winters').
     """
     if method == "linear":
-        return "linear", None
+        return "linear"
     if method == "holt_winters":
-        return "holt_winters", None
-    if method == "ttm":
-        if not _is_watsonx_available():
-            return "linear", "TTM requested but watsonx is not configured"
-        if len(values) < 512:
-            return "linear", f"TTM needs at least 512 points; got {len(values)}"
-        return "ttm", None
+        return "holt_winters"
 
-    # Auto selection: prefer TTM when watsonx is configured and enough data
-    if _is_watsonx_available() and len(values) >= 512:
-        return "ttm", None
-
-    # Fall through to statistical methods
+    # Auto selection: too little history to judge seasonality stays linear
     if hours_back < 168 or len(values) < 48:
-        return "linear", None
+        return "linear"
 
     # Check autocorrelation at standard periods to detect seasonality
     if len(timestamps) >= 2:
@@ -195,69 +169,9 @@ def _select_forecast_method(
     # Require strong seasonality and enough data for 2 full seasons
     min_season_len = 12
     if best_ac > 0.5 and len(values) >= 2 * min_season_len:
-        return "holt_winters", None
+        return "holt_winters"
 
-    return "linear", None
-
-
-def _is_watsonx_available() -> bool:
-    """Check if the watsonx client is configured and available."""
-    try:
-        from lm_mcp.server import get_watsonx_client
-
-        return get_watsonx_client() is not None
-    except Exception:
-        return False
-
-
-async def _forecast_ttm(
-    values: list[float],
-    timestamps: list[int],
-    threshold: float,
-) -> dict:
-    """Run Granite TTM forecast via watsonx.ai.
-
-    Falls back to linear regression if the watsonx call fails.
-
-    Args:
-        values: Historical metric values.
-        timestamps: Epoch seconds for each value.
-        threshold: Breach threshold.
-
-    Returns:
-        Forecast result dict matching the standard forecast format.
-    """
-    try:
-        from lm_mcp.server import get_watsonx_client
-        from lm_mcp.tools.watsonx import ttm_forecast_helper
-
-        wx = get_watsonx_client()
-        if wx is None:
-            return _forecast_linear_fallback(
-                values,
-                timestamps,
-                threshold,
-                "TTM requested but watsonx is not configured",
-            )
-
-        return await ttm_forecast_helper(
-            watsonx_client=wx,
-            timestamps=timestamps,
-            values=values,
-            threshold=threshold,
-        )
-    except Exception as exc:
-        logger.warning(
-            "watsonx TTM forecast failed; falling back to linear regression: %s",
-            exc,
-            exc_info=True,
-        )
-        return _forecast_linear_fallback(
-            values,
-            timestamps,
-            threshold,
-            f"watsonx TTM forecast failed: {exc}",
-        )
+    return "linear"
 
 
 def _forecast_linear_fallback(

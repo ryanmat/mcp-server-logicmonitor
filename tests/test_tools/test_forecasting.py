@@ -400,16 +400,6 @@ class TestForecastMethodLabels:
     """R4.1: method_used names the method that produced the numbers; fallbacks say why."""
 
     @respx.mock
-    async def test_ttm_without_watsonx_falls_back_with_reason(self, client):
-        """method=ttm with no watsonx client reports linear and names watsonx."""
-        values = [[float(10 + i)] for i in range(600)]
-
-        cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "linear"
-        assert "watsonx" in cpu["fallback_reason"]
-
-    @respx.mock
     async def test_holt_winters_failure_falls_back_with_reason_and_warning(self, client, caplog):
         """Five points cannot fill two seasons, so Holt-Winters raises and linear runs."""
         values = [[float(10 + i * 10)] for i in range(5)]
@@ -448,6 +438,15 @@ class TestForecastMethodLabels:
 
         assert cpu["method_used"] == "linear"
         assert "fallback_reason" not in cpu
+
+    @respx.mock
+    async def test_auto_picks_holt_winters_on_a_strong_daily_cycle(self, client):
+        """A week of five-minute samples with a daily cycle autocorrelates at the 24 hour lag."""
+        values = [[50.0 + 20.0 * math.sin(2 * math.pi * i / 288)] for i in range(2016)]
+
+        cpu = await _forecast_cpu(client, values, method="auto")
+
+        assert cpu["method_used"] == "holt_winters"
 
 
 class TestDetectChangePoints:

@@ -480,11 +480,6 @@
           "default": 168,
           "description": "Hours of historical data (default: 168 = 1 week)",
           "type": "integer"
-        },
-        "summarize": {
-          "default": false,
-          "description": "Append plain-English NL summary via IBM Granite (requires WATSONX_API_KEY)",
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -2802,11 +2797,6 @@
         "device_name": {
           "description": "Device name to diagnose (finds most recent critical alert)",
           "type": "string"
-        },
-        "summarize": {
-          "default": false,
-          "description": "Append plain-English NL summary via IBM Granite (requires WATSONX_API_KEY)",
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -3128,12 +3118,11 @@
         },
         "method": {
           "default": "auto",
-          "description": "Forecasting method. 'ttm' uses IBM Granite TTM via watsonx.ai (requires WATSONX_API_KEY). 'auto' selects based on data and watsonx availability.",
+          "description": "Forecasting method. 'auto' picks 'holt_winters' when at least 168 hours of history autocorrelate strongly at a 12 or 24 hour lag, and 'linear' otherwise.",
           "enum": [
             "auto",
             "linear",
-            "holt_winters",
-            "ttm"
+            "holt_winters"
           ],
           "type": "string"
         },
@@ -7182,11 +7171,6 @@
         "device_name": {
           "description": "Device display name (used if device_id not provided)",
           "type": "string"
-        },
-        "summarize": {
-          "default": false,
-          "description": "Append plain-English NL summary via IBM Granite (requires WATSONX_API_KEY)",
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -7707,11 +7691,6 @@
           "default": 4,
           "description": "Hours to look back (default: 4)",
           "type": "integer"
-        },
-        "summarize": {
-          "default": false,
-          "description": "Append plain-English NL summary via IBM Granite (requires WATSONX_API_KEY)",
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -8483,11 +8462,6 @@
             "info"
           ],
           "type": "string"
-        },
-        "summarize": {
-          "default": false,
-          "description": "Append plain-English NL summary via IBM Granite (requires WATSONX_API_KEY)",
-          "type": "boolean"
         }
       },
       "type": "object"

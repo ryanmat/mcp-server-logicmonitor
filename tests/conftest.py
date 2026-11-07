@@ -6,7 +6,6 @@ import pytest
 from lm_mcp import portals
 from lm_mcp.awx_config import reset_awx_config
 from lm_mcp.config import reset_config
-from lm_mcp.ibm_config import reset_watsonx_config
 from lm_mcp.server import _set_awx_client, _set_client, _set_tf_runner
 
 
@@ -16,18 +15,15 @@ def _reset_config_cache():
 
     Tests that use monkeypatch to set environment variables need
     fresh config instances. This fixture clears LM config, AWX config,
-    watsonx config, their clients, and the Terraform runner before and
-    after each test.
+    the AWX client, and the Terraform runner before and after each test.
     """
     reset_config()
     reset_awx_config()
-    reset_watsonx_config()
     _set_awx_client(None)
     _set_tf_runner(None)
     yield
     reset_config()
     reset_awx_config()
-    reset_watsonx_config()
     _set_awx_client(None)
     _set_tf_runner(None)
 

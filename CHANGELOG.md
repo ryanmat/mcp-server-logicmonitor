@@ -14,6 +14,13 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 |---|---|
 | `watsonx_summarize` | None. The calling model summarizes tool results itself. |
 
+- The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
+  `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
+  summary from the report.
+- The `ttm` method on `forecast_metric`. `method` takes `auto`, `linear` or `holt_winters`.
+- The `lm-mcp[ibm]` integration's settings: `WATSONX_API_KEY`, `WATSONX_URL`,
+  `WATSONX_PROJECT_ID` and `WATSONX_TIMEOUT` are no longer read.
+
 ### Changed
 
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,

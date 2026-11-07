@@ -828,7 +828,7 @@ class TestCapacityPlan:
             patch(
                 "lm_mcp.tools.forecasting.forecast_metric",
                 new_callable=AsyncMock,
-                side_effect=RuntimeError("ttm down"),
+                side_effect=RuntimeError("forecast down"),
             ),
             _patch_sub("lm_mcp.tools.forecasting.classify_trend", trend_data),
             _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
@@ -838,7 +838,7 @@ class TestCapacityPlan:
         data = json.loads(result[0].text)
         inst0 = data["datasources"][0]["instances"][0]
         assert inst0["forecast"] is None
-        assert "ttm down" in inst0["forecast_error"]
+        assert "forecast down" in inst0["forecast_error"]
         reset_config()
 
     async def test_required_tool_blocked(self, client, monkeypatch):
