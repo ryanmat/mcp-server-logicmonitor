@@ -20,7 +20,7 @@ from lm_mcp.logging import (
     redact_arguments,
 )
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
+from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.tools import ErrorContent, is_error_result
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes up to 306 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes up to 305 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
@@ -111,35 +111,6 @@ def _set_awx_client(client) -> None:
     """
     global _awx_client
     _awx_client = client
-
-
-# Global watsonx client (initialized when WATSONX_API_KEY is set)
-_watsonx_client = None
-
-# Set of watsonx tool names for dispatch routing
-WATSONX_TOOL_NAMES = {t.name for t in WATSONX_TOOLS}
-
-
-def get_watsonx_client():
-    """Get the initialized watsonx client.
-
-    Returns:
-        The WatsonxClient instance, or None if not configured.
-    """
-    return _watsonx_client
-
-
-def _set_watsonx_client(client) -> None:
-    """Set the global watsonx client.
-
-    Called by transport runners during initialization when watsonx
-    credentials are available.
-
-    Args:
-        client: The WatsonxClient instance, or None to clear.
-    """
-    global _watsonx_client
-    _watsonx_client = client
 
 
 # Global Terraform runner (initialized when TF_WORKSPACE_DIR is set)
@@ -226,14 +197,12 @@ async def list_tools():
 def collect_tools() -> list[Tool]:
     """The tools this server can dispatch with its configured backends, before operator filters.
 
-    The AWX, watsonx and Terraform tools are included only when their backend is set.
+    The AWX and Terraform tools are included only when their backend is set.
     Both transports build their tool lists from this.
     """
     tools = list(TOOLS)
     if _awx_client is not None:
         tools.extend(AWX_TOOLS)
-    if _watsonx_client is not None:
-        tools.extend(WATSONX_TOOLS)
     if _tf_runner is not None:
         tools.extend(TF_TOOLS)
     return tools
@@ -321,7 +290,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
             tools_index = {t.name: t for t in TOOLS}
             tools_index.update({t.name: t for t in AWX_TOOLS})
-            tools_index.update({t.name: t for t in WATSONX_TOOLS})
             tools_index.update({t.name: t for t in TF_TOOLS})
             if not tool_in_categories(name, tools_index, config.mcp_categories):
                 return [
@@ -415,18 +383,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                     )
                 ]
             result = await handler(_awx_client, **arguments)
-        elif name in WATSONX_TOOL_NAMES:
-            # WatsonX tools use the watsonx client
-            if _watsonx_client is None:
-                return [
-                    ErrorContent(
-                        type="text",
-                        text="Error: IBM watsonx not configured. "
-                        "Set WATSONX_API_KEY, WATSONX_URL, and "
-                        "WATSONX_PROJECT_ID environment variables.",
-                    )
-                ]
-            result = await handler(_watsonx_client, **arguments)
         elif name in TF_TOOL_NAMES:
             # The LM Terraform provider needs fixed LM_* credentials; multi-portal
             # credentials are selected at runtime and never reach the subprocess.

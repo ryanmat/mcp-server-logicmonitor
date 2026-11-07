@@ -44,11 +44,10 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
 
     if not blocked and config.mcp_categories:
         from lm_mcp.categories import tool_in_categories
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
 
         tools_index = {t.name: t for t in TOOLS}
         tools_index.update({t.name: t for t in AWX_TOOLS})
-        tools_index.update({t.name: t for t in WATSONX_TOOLS})
         tools_index.update({t.name: t for t in TF_TOOLS})
         blocked = [
             t for t in required if not tool_in_categories(t, tools_index, config.mcp_categories)
@@ -114,42 +113,6 @@ def _trim_detail(report: dict, detail_level: str, full_keys: set[str]) -> dict:
     return report
 
 
-async def _maybe_summarize(
-    report: dict,
-    workflow_name: str,
-    summarize: bool,
-    warnings: list[str],
-) -> None:
-    """Optionally append NL summary to a workflow report via watsonx.
-
-    Does nothing if summarize is False. When no summary model is configured, or
-    the summary call fails, appends a warning and attaches the warnings list to
-    the report, so the warning is returned even if it is the only one.
-    """
-    if not summarize:
-        return
-
-    try:
-        from lm_mcp.server import get_watsonx_client
-        from lm_mcp.tools.watsonx import nl_summarize_helper
-
-        wx = get_watsonx_client()
-        if wx is None:
-            warnings.append(
-                "NL summary requested but not configured: set WATSONX_API_KEY or "
-                "install the HuggingFace fallback"
-            )
-            report["warnings"] = warnings
-            return
-
-        summary = await nl_summarize_helper(wx, report, workflow_name)
-        report["nl_summary"] = summary
-    except Exception as exc:
-        _AUDIT.warning("%s: NL summary failed: %s", workflow_name, exc, exc_info=True)
-        warnings.append(f"NL summary failed: {exc}")
-        report["warnings"] = warnings
-
-
 # ---------------------------------------------------------------------------
 # Composite tool: triage
 # ---------------------------------------------------------------------------
@@ -171,7 +134,6 @@ async def triage(
     group_id: int | None = None,
     hours_back: int = 4,
     detail_level: str = "summary",
-    summarize: bool = False,
 ) -> list[TextContent]:
     """Composite triage: correlate, cluster, score, and assess alerts.
 
@@ -303,7 +265,6 @@ async def triage(
             "blast_radius",
         }
         report = _trim_detail(report, detail_level, full_keys)
-        await _maybe_summarize(report, "triage", summarize, warnings)
 
         return format_response(report)
     except Exception as e:
@@ -330,7 +291,6 @@ async def health_check(
     client: LogicMonitorClient,
     device_id: int | None = None,
     device_name: str | None = None,
-    summarize: bool = False,
     detail_level: str = "summary",
 ) -> list[TextContent]:
     """Composite health check for a single device.
@@ -488,7 +448,6 @@ async def health_check(
 
         full_keys = {"anomalies", "health_scores"}
         report = _trim_detail(report, detail_level, full_keys)
-        await _maybe_summarize(report, "health_check", summarize, warnings)
 
         return format_response(report)
     except Exception as e:
@@ -517,7 +476,6 @@ async def capacity_plan(
     datasource: str | None = None,
     hours_back: int = 168,
     detail_level: str = "summary",
-    summarize: bool = False,
 ) -> list[TextContent]:
     """Composite capacity planning for a device.
 
@@ -716,7 +674,6 @@ async def capacity_plan(
 
         full_keys = {"datasources"}
         report = _trim_detail(report, detail_level, full_keys)
-        await _maybe_summarize(report, "capacity_plan", summarize, warnings)
 
         return format_response(report)
     except Exception as e:
@@ -802,7 +759,6 @@ async def portal_overview(
     client: LogicMonitorClient,
     hours_back: int = 4,
     detail_level: str = "summary",
-    summarize: bool = False,
 ) -> list[TextContent]:
     """Composite portal overview for shift-handoff reporting.
 
@@ -920,7 +876,6 @@ async def portal_overview(
 
         full_keys = {"critical_alerts", "error_alerts", "dead_devices"}
         report = _trim_detail(report, detail_level, full_keys)
-        await _maybe_summarize(report, "portal_overview", summarize, warnings)
 
         return format_response(report)
     except Exception as e:
@@ -948,7 +903,6 @@ async def diagnose(
     alert_id: str | None = None,
     device_name: str | None = None,
     detail_level: str = "summary",
-    summarize: bool = False,
 ) -> list[TextContent]:
     """Composite diagnosis for an alert or device.
 
@@ -1090,7 +1044,6 @@ async def diagnose(
 
         full_keys = {"device_properties", "blast_radius"}
         report = _trim_detail(report, detail_level, full_keys)
-        await _maybe_summarize(report, "diagnose", summarize, warnings)
 
         return format_response(report)
     except Exception as e:
@@ -1153,17 +1106,15 @@ async def search_tools(
         Matching tools with relevance scores.
     """
     try:
-        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+        from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS
         from lm_mcp.resources.guides import TOOL_CATEGORIES
-        from lm_mcp.server import get_awx_client, get_tf_runner, get_watsonx_client
+        from lm_mcp.server import get_awx_client, get_tf_runner
 
-        # Mirror the server's advertised tool surface so configured AWX / watsonx /
+        # Mirror the server's advertised tool surface so configured AWX and
         # Terraform tools are searchable, not just the core TOOLS list.
         search_corpus = list(TOOLS)
         if get_awx_client() is not None:
             search_corpus.extend(AWX_TOOLS)
-        if get_watsonx_client() is not None:
-            search_corpus.extend(WATSONX_TOOLS)
         if get_tf_runner() is not None:
             search_corpus.extend(TF_TOOLS)
 

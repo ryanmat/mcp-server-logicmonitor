@@ -245,7 +245,7 @@ class TestLogicMonitorClientErrors:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_500_raises_server_error(self):
+    async def test_500_raises_server_error(self, waits):
         """500 response raises ServerError."""
         from lm_mcp.auth.bearer import BearerAuth
         from lm_mcp.client import LogicMonitorClient

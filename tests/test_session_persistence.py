@@ -225,9 +225,8 @@ class TestPersistenceIntegration:
         """Leave every optional backend unconfigured so bootstrap builds none."""
         from lm_mcp.terraform_config import reset_terraform_config
 
-        for var in ("AWX_URL", "AWX_TOKEN", "WATSONX_API_KEY", "TF_WORKSPACE_DIR"):
+        for var in ("AWX_URL", "AWX_TOKEN", "TF_WORKSPACE_DIR"):
             monkeypatch.delenv(var, raising=False)
-        monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: None)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         reset_terraform_config()

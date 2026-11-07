@@ -8,19 +8,28 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
+### Removed
+
+| Tool | Replacement |
+|---|---|
+| `watsonx_summarize` | None. The calling model summarizes tool results itself. |
+
+- The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
+  `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
+  summary from the report.
+- The `ttm` method on `forecast_metric`. `method` takes `auto`, `linear` or `holt_winters`.
+- The `watsonx` category in `lm://guide/tool-categories`, which `search_tools` reads for its
+  `category` argument.
+- The `ibm` and `huggingface` extras, and the settings only they read: `WATSONX_API_KEY`,
+  `WATSONX_URL`, `WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`,
+  `HF_DEVICE` and `HF_CACHE_DIR`.
+
 ### Changed
 
+- `uv.lock` holds 59 packages, down from 142, with the model stack gone.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
   pyjwt 2.15.1 and websockets 17.4.
-
-### Known limits
-
-- `accelerate` does not sanitize `weight_map` entries in a sharded checkpoint index
-  (GHSA-4j2p-28q2-5m79). The advisory lists versions through 1.14.0, but 1.15.0 has the same code
-  and the project declined the fix. Only the `huggingface` extra installs `accelerate`, and the
-  exposure is an untrusted model named by `HF_TTM_MODEL` or `HF_LLM_MODEL`. Whether this server's
-  model loading reaches the affected functions has not been checked.
 
 ## [4.3.0] - 2026-11-06
 

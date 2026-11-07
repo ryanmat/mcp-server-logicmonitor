@@ -26,6 +26,7 @@ def client(auth):
         auth=auth,
         timeout=30,
         api_version=3,
+        max_retries=0,
     )
 
 

@@ -359,13 +359,11 @@ def _http_server_env(_set_env, monkeypatch):
     for var in (
         "AWX_URL",
         "AWX_TOKEN",
-        "WATSONX_API_KEY",
         "TF_WORKSPACE_DIR",
         "LM_HTTP_ALLOW_UNAUTHENTICATED",
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("LM_TRANSPORT", "http")
-    monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: None)
 
 
 class TestUnauthenticatedBindRefusal:

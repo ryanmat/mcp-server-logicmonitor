@@ -4,7 +4,6 @@
 import json
 import logging
 import math
-from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -12,7 +11,6 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
-from tests.watsonx_sdk import real_watsonx_client
 
 
 @pytest.fixture
@@ -29,6 +27,7 @@ def client(auth):
         auth=auth,
         timeout=30,
         api_version=3,
+        max_retries=0,
     )
 
 
@@ -401,75 +400,6 @@ class TestForecastMethodLabels:
     """R4.1: method_used names the method that produced the numbers; fallbacks say why."""
 
     @respx.mock
-    async def test_ttm_without_watsonx_falls_back_with_reason(self, client, monkeypatch):
-        """method=ttm with no watsonx client reports linear and names watsonx."""
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", None)
-        values = [[float(10 + i)] for i in range(600)]
-
-        cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "linear"
-        assert "watsonx" in cpu["fallback_reason"]
-
-    @respx.mock
-    async def test_ttm_under_512_points_falls_back_with_reason(self, client, monkeypatch):
-        """method=ttm with watsonx but 100 points reports linear and the 512 minimum."""
-        wx = real_watsonx_client()
-        wx._run_ttm_forecast = MagicMock()
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", wx)
-        values = [[float(10 + i)] for i in range(100)]
-
-        cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "linear"
-        assert "512" in cpu["fallback_reason"]
-        wx._run_ttm_forecast.assert_not_called()
-
-    @respx.mock
-    async def test_ttm_failure_falls_back_with_reason_and_warning(
-        self, client, monkeypatch, caplog
-    ):
-        """A TTM call that raises reports linear, the failure, and a WARNING."""
-        wx = real_watsonx_client()
-        wx._run_ttm_forecast = MagicMock(side_effect=Exception("connection timeout"))
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", wx)
-        values = [[float(10 + i)] for i in range(600)]
-
-        with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.forecasting"):
-            cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "linear"
-        assert "TTM" in cpu["fallback_reason"]
-        warnings = [
-            r
-            for r in caplog.records
-            if r.name == "lm_mcp.tools.forecasting" and r.levelno == logging.WARNING
-        ]
-        assert len(warnings) == 1
-        assert "TTM" in warnings[0].getMessage()
-
-    @respx.mock
-    async def test_ttm_success_is_labeled_ttm(self, client, monkeypatch):
-        """A TTM forecast that succeeds reports ttm and no fallback reason."""
-        from lm_mcp.client.watsonx import TTM_MODEL_ID
-
-        wx = real_watsonx_client()
-        wx._run_ttm_forecast = MagicMock(
-            return_value={
-                "forecast_values": [70.0, 71.0, 72.0],
-                "forecast_count": 3,
-                "model": TTM_MODEL_ID,
-            }
-        )
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", wx)
-        values = [[float(10 + i * 0.1)] for i in range(600)]
-
-        cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "ttm"
-        assert "fallback_reason" not in cpu
-
-    @respx.mock
     async def test_holt_winters_failure_falls_back_with_reason_and_warning(self, client, caplog):
         """Five points cannot fill two seasons, so Holt-Winters raises and linear runs."""
         values = [[float(10 + i * 10)] for i in range(5)]
@@ -500,15 +430,57 @@ class TestForecastMethodLabels:
 
     @pytest.mark.parametrize("method", ["linear", "auto"])
     @respx.mock
-    async def test_selected_linear_carries_no_fallback_reason(self, client, monkeypatch, method):
+    async def test_selected_linear_carries_no_fallback_reason(self, client, method):
         """Linear that was asked for, or chosen by auto, is not a fallback."""
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", None)
         values = [[float(10 + i)] for i in range(10)]
 
         cpu = await _forecast_cpu(client, values, method=method)
 
         assert cpu["method_used"] == "linear"
         assert "fallback_reason" not in cpu
+
+    @respx.mock
+    async def test_auto_picks_holt_winters_on_a_strong_daily_cycle(self, client):
+        """A week of five-minute samples with a daily cycle autocorrelates at the 24 hour lag."""
+        values = [[50.0 + 20.0 * math.sin(2 * math.pi * i / 288)] for i in range(2016)]
+
+        cpu = await _forecast_cpu(client, values, method="auto")
+
+        assert cpu["method_used"] == "holt_winters"
+
+    @pytest.mark.parametrize(
+        ("samples", "interval_sec", "hours_back", "expected"),
+        [
+            (48, 14400, 168, "holt_winters"),
+            (47, 14400, 168, "linear"),
+            (48, 14400, 167, "linear"),
+            (48, 1440, 168, "linear"),
+        ],
+    )
+    def test_auto_rule_boundaries(self, samples, interval_sec, hours_back, expected):
+        """auto wants hours_back of 168, 48 samples, and a lag shorter than half the series."""
+        from lm_mcp.tools.forecasting import _select_forecast_method
+
+        values = [50.0 + 20.0 * math.sin(2 * math.pi * i / 6) for i in range(samples)]
+        timestamps = [BASE_EPOCH + i * interval_sec for i in range(samples)]
+
+        assert _select_forecast_method("auto", values, timestamps, hours_back) == expected
+
+    def test_method_description_states_the_auto_rule(self):
+        """The schema names each condition _select_forecast_method applies."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "forecast_metric")
+        description = " ".join(tool.inputSchema["properties"]["method"]["description"].split())
+
+        for condition in (
+            "hours_back is at least 168",
+            "at least 48 samples",
+            "exceeds 0.5 in magnitude",
+            "12 or 24 hour lag",
+            "shorter than half the series",
+        ):
+            assert condition in description
 
 
 class TestDetectChangePoints:

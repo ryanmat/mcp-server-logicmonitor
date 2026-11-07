@@ -115,13 +115,6 @@ class TestExecuteToolInlineErrors:
         assert is_error_result(result)
         assert result[0].text.startswith("Error: Ansible Automation Platform not configured")
 
-    async def test_watsonx_not_configured(self, single_portal):
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("watsonx_summarize", {"data": "x"})
-        assert is_error_result(result)
-        assert result[0].text.startswith("Error: IBM watsonx not configured")
-
     async def test_terraform_not_configured(self, single_portal):
         from lm_mcp.server import execute_tool
 

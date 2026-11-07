@@ -5,10 +5,10 @@ import inspect
 
 import pytest
 
-from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS, get_tool_handler
+from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, get_tool_handler
 from lm_mcp.server import PORTAL_TOOLS, SESSION_TOOLS
 
-ALL_TOOLS = [*TOOLS, *AWX_TOOLS, *WATSONX_TOOLS, *TF_TOOLS]
+ALL_TOOLS = [*TOOLS, *AWX_TOOLS, *TF_TOOLS]
 
 _NAMED = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
 
@@ -16,7 +16,7 @@ _NAMED = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONL
 def _caller_params(tool_name: str) -> list[inspect.Parameter]:
     """Return the handler parameters the caller fills from tool arguments.
 
-    execute_tool passes the LM, AWX or watsonx client or the Terraform runner as the
+    execute_tool passes the LM or AWX client or the Terraform runner as the
     first positional argument, except for session and portal tools, which receive the
     arguments alone.
     """

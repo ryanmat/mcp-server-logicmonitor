@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 306 tools, 15 workflow prompts, and 26 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 305 tools, 15 workflow prompts, and 26 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Tools are read-only until you set `LM_ENABLE_WRITE_OPERATIONS=true`. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 306 counts every tool the server can advertise (277 LM + 18 AAP + 10 Terraform + 1 watsonx). The AAP, Terraform, and watsonx tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
+The 305 counts every tool the server can advertise (277 LM + 18 AAP + 10 Terraform). The AAP and Terraform tools appear only when their settings are present, and four of the LM tools only in multi-portal mode; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
-- the `lm://guide/tool-categories` resource: all 306 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 305 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -148,11 +148,11 @@ These run server-side in pure Python, so an assistant gets the result in one cal
 
 - Alert correlation clusters, statistics by severity and device, noise scoring with flap detection, and burst detection
 - Metric anomaly detection (z-score, IQR, MAD), saved baselines and drift, correlation, change points, trend classification, and seasonality
-- Forecasting with linear regression, Holt-Winters, or IBM Granite TTM (optional), with confidence intervals and breach prediction. The response names the method that ran and why it fell back
+- Forecasting with linear regression or Holt-Winters, with confidence intervals and breach prediction. The response names the method that ran and why it fell back
 - Availability with MTTR from active and cleared alerts, SLO error budgets, and device health scoring
 - Topology-based blast radius, and change correlation against audit logs
 
-Composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) combine these. Each takes `detail_level` (`summary` or `full`) and `summarize=true` for a plain-English summary from IBM Granite, and returns partial results when a sub-tool fails.
+Composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) combine these. Each takes `detail_level` (`summary` or `full`) and returns partial results when a sub-tool fails.
 
 ### Claude Code skills
 
@@ -169,7 +169,7 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 
 ## Integrations
 
-Each integration is optional. Add its variables to the `env` block or `claude mcp add` command from [Setup](#setup), and change the package to the extra it names.
+Each integration is optional. Add its variables to the `env` block or `claude mcp add` command from [Setup](#setup).
 
 ### Ansible Automation Platform
 
@@ -180,35 +180,6 @@ They list, inspect, and launch job templates with extra variables and host limit
 `launch_job`, `launch_workflow`, `cancel_job`, and `relaunch_job` require `LM_ENABLE_WRITE_OPERATIONS=true`. All `extra_vars` inputs are validated to prevent Jinja2 template injection.
 
 See [Example Playbooks](https://github.com/ryanmat/mcp-server-logicmonitor/tree/main/examples/playbooks) for remediation templates.
-
-### IBM watsonx.ai
-
-IBM Granite models through watsonx.ai. The tools appear when `WATSONX_API_KEY` and `WATSONX_PROJECT_ID` are set, and the package is `lm-mcp[ibm]`:
-
-```bash
-claude mcp add logicmonitor \
-  -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=<your-bearer-token> \
-  -e WATSONX_API_KEY=<your-ibm-cloud-api-key> \
-  -e WATSONX_URL=https://us-south.ml.cloud.ibm.com \
-  -e WATSONX_PROJECT_ID=your-watsonx-project-id \
-  -- uvx --from "lm-mcp[ibm]" lm-mcp-server
-```
-
-`method="ttm"` on `forecast_metric` gives 96-step Granite TTM predictions that detect seasonality and non-linear patterns. It requires 512+ data points and falls back to statistical methods when data is insufficient. `summarize=true` on `triage`, `diagnose`, `health_check`, `capacity_plan`, and `portal_overview` appends a plain-English Granite summary to the structured output, and `watsonx_summarize` generates a concise summary of any JSON data.
-
-To set up watsonx.ai (the Lite plan is free):
-
-1. Create an IBM Cloud account at [cloud.ibm.com](https://cloud.ibm.com).
-2. Provision **watsonx.ai Runtime** from the IBM Cloud catalog.
-3. Create a watsonx.ai project and associate the Runtime instance.
-4. Generate an IBM Cloud API key at [cloud.ibm.com/iam/apikeys](https://cloud.ibm.com/iam/apikeys).
-
-### HuggingFace local models
-
-Install `lm-mcp[huggingface]` to run TTM forecasting and NL summaries locally when watsonx.ai credentials are not configured. The server tries watsonx.ai first, then HuggingFace, then statistical methods.
-
-The TTM model is `ibm-granite/granite-timeseries-ttm-r2` (512 context, 96 forecast) and the LLM model is `ibm-granite/granite-3.3-2b-instruct` (2B params, runs on CPU). Models load on the first inference call (initial download: ~500MB TTM, ~4GB LLM).
 
 ### Terraform
 
@@ -322,18 +293,10 @@ To get LMv1 credentials:
 | `AWX_VERIFY_SSL` | No | `true` | Verify SSL certificates for AAP connections |
 | `AWX_TIMEOUT` | No | `30` | Request timeout in seconds for AAP API calls |
 | `AWX_MAX_RETRIES` | No | `3` | Max retries for rate-limited AAP requests, and for server errors on idempotent ones; a job launch that gets a 5xx is not resent. A `Retry-After` lengthens the backoff up to 120 seconds |
-| `WATSONX_API_KEY` | No | - | IBM Cloud API key for watsonx.ai (enables Granite TTM + NL summaries) |
-| `WATSONX_URL` | No | `https://us-south.ml.cloud.ibm.com` | IBM watsonx.ai endpoint URL |
-| `WATSONX_PROJECT_ID` | No | - | IBM watsonx.ai project ID |
-| `WATSONX_TIMEOUT` | No | `60` | Request timeout in seconds for watsonx.ai API calls |
 | `TF_WORKSPACE_DIR` | No | - | Root directory for Terraform workspaces (enables Terraform tools) |
 | `TF_TERRAFORM_BINARY` | No | `terraform` | Path to the terraform binary |
 | `TF_TIMEOUT` | No | `300` | Terraform command timeout in seconds |
 | `TF_AUTO_APPROVE_ENABLED` | No | `false` | Enable terraform apply/destroy operations |
-| `HF_TTM_MODEL` | No | `ibm-granite/granite-timeseries-ttm-r2` | HuggingFace TTM model name or path |
-| `HF_LLM_MODEL` | No | `ibm-granite/granite-3.3-2b-instruct` | HuggingFace LLM model name or path |
-| `HF_DEVICE` | No | `auto` | Torch device for inference (cpu, cuda, mps, auto) |
-| `HF_CACHE_DIR` | No | - | HuggingFace model cache directory |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -367,7 +330,7 @@ Clients read these through the standard MCP resource and prompt calls. Prompt an
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 306 tools organized by domain category |
+| `lm://guide/tool-categories` | All 305 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

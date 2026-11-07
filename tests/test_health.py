@@ -328,7 +328,7 @@ class TestHttpServerClientConstruction:
         from lm_mcp import server as server_module
         from lm_mcp.transport.http import create_http_server
 
-        for var in ("AWX_URL", "AWX_TOKEN", "WATSONX_API_KEY", "TF_WORKSPACE_DIR"):
+        for var in ("AWX_URL", "AWX_TOKEN", "TF_WORKSPACE_DIR"):
             monkeypatch.delenv(var, raising=False)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
@@ -336,7 +336,6 @@ class TestHttpServerClientConstruction:
         monkeypatch.setenv("LM_HTTP_HOST", "127.0.0.1")
         monkeypatch.setenv("LM_MAX_RETRIES", "7")
         monkeypatch.setenv("LM_RETRY_AFTER_CAP_SECONDS", "45")
-        monkeypatch.setattr("lm_mcp.hf_config.get_hf_config", lambda: None)
         # Shutdown closes the client, so read it while the server is "serving".
         serving_clients = []
         serve = AsyncMock(side_effect=lambda: serving_clients.append(server_module._client))

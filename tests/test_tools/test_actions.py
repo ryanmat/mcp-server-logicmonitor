@@ -49,7 +49,7 @@ def _chain(**overrides) -> dict:
         "description": "Migrated from diagnostic rule",
         "stages": [
             {"id": 2, "type": "diagnosticSource", "name": "Precursor Diagnostic"},
-            {"id": 3, "type": "diagnosticSource", "name": "IBM_Granite_NL_Summary"},
+            {"id": 3, "type": "diagnosticSource", "name": "Summary Diagnostic"},
         ],
     }
     item.update(overrides)
