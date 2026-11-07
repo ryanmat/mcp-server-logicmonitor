@@ -92,10 +92,13 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   `LM_ACCESS_ID` without `LM_ACCESS_KEY` and the reverse), and the `ImportError` guard in
   `run_http` (`mcp` installs starlette and uvicorn). The health check's config entry reads the
   loaded configuration instead of validating the environment a second time.
-- MCP argument completions: the server does not advertise the `completions` capability.
-- The `lm://guide/example-responses` resource; 25 resources remain.
-- Field validation of the `fields` and `filter` arguments, which picked a schema by a substring of
-  the tool name, and `LM_FIELD_VALIDATION`, which the server ignores if set.
+- MCP argument completions and the `lm_mcp.completions` package: the server does not advertise the
+  `completions` capability.
+- The `lm://guide/example-responses` resource and its module, `lm_mcp.resources.examples`; 25
+  resources remain.
+- Field validation of the `fields` and `filter` arguments (`lm_mcp.validation`), which picked a
+  schema by a substring of the tool name, and `LM_FIELD_VALIDATION`, which the server ignores if
+  set.
 - CORS on the HTTP transport and `LM_CORS_ORIGINS`, which the server ignores if set. A browser
   preflight gets no CORS headers, and with `LM_HTTP_AUTH_TOKEN` set it gets `401`.
 - `LM_API_VERSION`, which the server ignores if set, and the client's `api_version` argument. The
