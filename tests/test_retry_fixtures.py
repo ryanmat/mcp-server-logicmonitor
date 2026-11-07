@@ -1,4 +1,4 @@
-# Description: Guards the per-file client fixtures that stub 5xx responses against real backoff.
+# Description: R1.1: the per-file client fixtures that stub 5xx responses skip real backoff.
 # Description: A zero-retry client sends once and never waits; a default client still waits.
 
 from __future__ import annotations
