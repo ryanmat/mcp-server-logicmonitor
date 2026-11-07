@@ -51,9 +51,7 @@ async def run_stdio() -> None:
     backends = bootstrap.bootstrap_backends(config)
 
     # Initialize session with config settings
-    if config.session_enabled:
-        session = get_session()
-        session.max_history_size = config.session_history_size
+    get_session().max_history_size = config.session_history_size
 
     try:
         async with stdio_server() as (read_stream, write_stream):

@@ -37,7 +37,6 @@ services:
       # Host names the server answers besides loopback; Caddy forwards the
       # client's Host, so the tls profile needs its DOMAIN here.
       - LM_HTTP_ALLOWED_HOSTS=${LM_HTTP_ALLOWED_HOSTS:-${DOMAIN:-localhost}}
-      - LM_SESSION_ENABLED=${LM_SESSION_ENABLED:-true}
       - LM_FIELD_VALIDATION=${LM_FIELD_VALIDATION:-warn}
     healthcheck:
       test: ["CMD", "python", "-c", "import os, sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('LM_HTTP_PORT', '8080'), timeout=5).status == 200 else 1)"]

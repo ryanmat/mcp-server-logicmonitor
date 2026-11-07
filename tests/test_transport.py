@@ -352,3 +352,17 @@ class TestOneBootstrapForBothTransports:
             assert spy.call_count == 1
             assert await _http_healthz(monkeypatch) == 200
             assert spy.call_count == 2
+
+    async def test_each_transport_sizes_session_history_from_config(self, monkeypatch):
+        """Both transports set the session's history length from LM_SESSION_HISTORY_SIZE."""
+        from lm_mcp import session as session_module
+
+        monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "7")
+
+        monkeypatch.setattr(session_module, "_session", None)
+        await _stdio_tool_names(self.serve)
+        assert session_module.get_session().max_history_size == 7
+
+        monkeypatch.setattr(session_module, "_session", None)
+        assert await _http_healthz(monkeypatch) == 200
+        assert session_module.get_session().max_history_size == 7

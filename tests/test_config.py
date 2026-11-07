@@ -124,27 +124,6 @@ class TestLMConfigMissingPortal:
 class TestLMConfigSession:
     """Tests for session configuration options."""
 
-    def test_session_enabled_default(self, monkeypatch):
-        """Session is enabled by default."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        assert config.session_enabled is True
-
-    def test_session_disabled_from_env(self, monkeypatch):
-        """Session can be disabled via environment."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-        monkeypatch.setenv("LM_SESSION_ENABLED", "false")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        assert config.session_enabled is False
-
     def test_session_history_size_default(self, monkeypatch):
         """Session history size has default value."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -187,27 +166,6 @@ class TestLMConfigSession:
 
         with pytest.raises(ValueError):
             LMConfig()
-
-    def test_session_persist_path_default_is_none(self, monkeypatch):
-        """R4.6: session variables are in-memory only unless a path is configured."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-        monkeypatch.delenv("LM_SESSION_PERSIST_PATH", raising=False)
-
-        from lm_mcp.config import LMConfig
-
-        assert LMConfig().session_persist_path is None
-
-    def test_session_persist_path_from_env(self, monkeypatch, tmp_path):
-        """R4.6: LM_SESSION_PERSIST_PATH parses into session_persist_path."""
-        path = str(tmp_path / "session.json")
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token")
-        monkeypatch.setenv("LM_SESSION_PERSIST_PATH", path)
-
-        from lm_mcp.config import LMConfig
-
-        assert LMConfig().session_persist_path == path
 
 
 class TestLMConfigValidation:

@@ -102,7 +102,6 @@ class LMConfig(BaseSettings):
         LM_HTTP_SSL_CERTFILE: TLS certificate path for the HTTP transport
         LM_HTTP_SSL_KEYFILE: TLS private key path for the HTTP transport
         LM_HTTP_SSL_KEYFILE_PASSWORD: Password for an encrypted TLS private key
-        LM_SESSION_ENABLED: Enable session context tracking (default: true)
         LM_SESSION_HISTORY_SIZE: Number of tool calls to keep in history (default: 50)
         LM_FIELD_VALIDATION: Field validation mode - off, warn, or error (default: warn)
         LM_ENABLED_TOOLS: Comma-separated tool names or glob patterns to enable (default: all)
@@ -149,9 +148,7 @@ class LMConfig(BaseSettings):
     http_ssl_keyfile_password: str | None = None
 
     # Session settings
-    session_enabled: bool = True
     session_history_size: int = 50
-    session_persist_path: str | None = None
 
     # Validation settings
     field_validation: Literal["off", "warn", "error"] = "warn"

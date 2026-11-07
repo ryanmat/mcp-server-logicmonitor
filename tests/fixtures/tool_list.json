@@ -512,7 +512,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Clear all session context (last results, variables, and history)",
+    "description": "Clear all session context (variables and history)",
     "inputSchema": {
       "properties": {},
       "type": "object"
@@ -6117,7 +6117,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get current session context (last results, variables, history)",
+    "description": "Get current session context (variables and history)",
     "inputSchema": {
       "properties": {},
       "type": "object"

@@ -122,11 +122,10 @@ class TestExecuteToolMiddleware:
         mock_log.assert_called_once_with("create_device", {"name": "test"}, success=True)
 
     @pytest.mark.asyncio
-    async def test_records_session_when_enabled(self, monkeypatch, mock_handler, mock_client):
-        """execute_tool records results in session when session is enabled."""
+    async def test_records_result_in_session(self, monkeypatch, mock_handler, mock_client):
+        """execute_tool records each non-session tool result in the session."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
 
         mock_session = MagicMock()
 
@@ -148,7 +147,6 @@ class TestExecuteToolMiddleware:
         """execute_tool does not record session tools in session history."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
 
         mock_session = MagicMock()
 
@@ -314,15 +312,15 @@ class TestMultiPortalDispatch:
         self._multi_env(monkeypatch, tmp_path)
 
         from lm_mcp.server import execute_tool
-        from lm_mcp.session import get_session, reset_session
+        from lm_mcp.session import get_session
 
-        reset_session()
+        get_session().clear()
         try:
             await execute_tool("use_portal", {"customer": "acme"})
             history = get_session().history
             assert history and history[-1].tool_name == "use_portal"
         finally:
-            reset_session()
+            get_session().clear()
 
 
 DEVICE_URL = "https://test.logicmonitor.com/santaba/rest/device/devices/7"
@@ -348,7 +346,6 @@ def write_portal(monkeypatch, reset_portals):
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
     monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
     monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
-    monkeypatch.delenv("LM_SESSION_ENABLED", raising=False)
 
     from lm_mcp.auth import create_auth_provider
     from lm_mcp.client import LogicMonitorClient
@@ -404,13 +401,12 @@ class TestCredentialsInUrlArguments:
     async def test_real_write_keeps_the_url_for_the_api_and_masks_the_records(
         self, write_portal, monkeypatch, caplog
     ):
-        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
         from lm_mcp.config import reset_config
         from lm_mcp.server import execute_tool
-        from lm_mcp.session import get_session, reset_session
+        from lm_mcp.session import get_session
 
         reset_config()
-        reset_session()
+        get_session().clear()
         route = respx.post(INTEGRATIONS_URL).mock(
             return_value=httpx.Response(200, json={"id": 9, "name": "hook"})
         )
@@ -421,7 +417,7 @@ class TestCredentialsInUrlArguments:
                 )
             recorded = get_session().history[-1].arguments
         finally:
-            reset_session()
+            get_session().clear()
 
         assert json.loads(route.calls[0].request.content)["url"] == CREDENTIAL_URL
         assert recorded == {"name": "hook", "url": MASKED_URL}
@@ -440,7 +436,6 @@ class TestCredentialsInUrlArguments:
     ):
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
 
         client = MagicMock()
         handler = AsyncMock(return_value=[TextContent(type="text", text=text)])
@@ -539,22 +534,21 @@ class TestWriteOutcomeFromResult:
 
     @respx.mock
     async def test_forbidden_delete_recorded_as_failure_in_session(self, write_portal, monkeypatch):
-        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
         respx.get(DEVICE_URL).mock(return_value=httpx.Response(200, json=DEVICE_7))
         respx.delete(DEVICE_URL).mock(return_value=httpx.Response(403, json=FORBIDDEN))
         from lm_mcp.config import reset_config
         from lm_mcp.server import execute_tool
-        from lm_mcp.session import get_session, reset_session
+        from lm_mcp.session import get_session
 
         reset_config()
-        reset_session()
+        get_session().clear()
         try:
             await execute_tool("delete_device", {"device_id": 7})
             entry = get_session().history[-1]
             assert entry.tool_name == "delete_device"
             assert entry.success is False
         finally:
-            reset_session()
+            get_session().clear()
 
     @pytest.mark.parametrize(
         ("content", "expected"),
@@ -568,13 +562,12 @@ class TestWriteOutcomeFromResult:
         self, write_portal, monkeypatch, content, expected
     ):
         """Session success comes from the result type, whether or not the text parses."""
-        monkeypatch.setenv("LM_SESSION_ENABLED", "true")
         from lm_mcp.config import reset_config
         from lm_mcp.server import execute_tool
-        from lm_mcp.session import get_session, reset_session
+        from lm_mcp.session import get_session
 
         reset_config()
-        reset_session()
+        get_session().clear()
         try:
             with patch(
                 "lm_mcp.server.get_tool_handler", return_value=AsyncMock(return_value=[content])
@@ -582,7 +575,7 @@ class TestWriteOutcomeFromResult:
                 await execute_tool("get_devices", {})
             assert get_session().history[-1].success is expected
         finally:
-            reset_session()
+            get_session().clear()
 
     @respx.mock
     async def test_call_tool_marks_failure_is_error(self, write_portal):

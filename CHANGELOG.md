@@ -78,6 +78,12 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 - `contrib/eda/`, the Event-Driven Ansible source kept for reference since 1.9.5 and never part of
   the package; `scripts/add-mcp-to-project.sh`; `scripts/smoke_http_integration.py`, the 3.7.1
   live smoke for the integration tools; and the unused `tools/metric_presets.py` module.
+- The session's last-result tracking and the `last_results` key of `get_session_context`, which
+  returns `variables`, `history` and `history_count`.
+- Session persistence and `LM_SESSION_PERSIST_PATH`, which the server ignores if set. Session
+  variables and history live in memory and are lost when the process exits.
+- `LM_SESSION_ENABLED`, which the server ignores if set. Every tool call outside the session tools
+  is recorded in session history; `LM_SESSION_HISTORY_SIZE` still sets how many entries it keeps.
 
 ### Changed
 

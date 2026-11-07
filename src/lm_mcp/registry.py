@@ -5067,7 +5067,7 @@ TOOLS.extend(
     [
         Tool(
             name="get_session_context",
-            description="Get current session context (last results, variables, history)",
+            description="Get current session context (variables and history)",
             annotations=_SESSION_READ,
             inputSchema={
                 "type": "object",
@@ -5115,7 +5115,7 @@ TOOLS.extend(
         ),
         Tool(
             name="clear_session_context",
-            description="Clear all session context (last results, variables, and history)",
+            description="Clear all session context (variables and history)",
             annotations=_SESSION_WRITE,
             inputSchema={
                 "type": "object",

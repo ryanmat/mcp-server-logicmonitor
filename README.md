@@ -257,7 +257,6 @@ To get LMv1 credentials:
 | `LM_HTTP_SSL_CERTFILE` | No | - | TLS certificate path. Set with `LM_HTTP_SSL_KEYFILE` to serve HTTPS. HTTP transport only. |
 | `LM_HTTP_SSL_KEYFILE` | No | - | TLS private key path. HTTP transport only. |
 | `LM_HTTP_SSL_KEYFILE_PASSWORD` | No | - | Password for an encrypted TLS private key. HTTP transport only. |
-| `LM_SESSION_ENABLED` | No | `true` | Enable session context tracking |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
 | `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error`. Records go to stderr; write audit lines (`info` for a success, `warning` for a failure) redact argument values under credential-shaped keys such as `password`, `token`, `api_key` and `extra_vars`, LogicMonitor credential properties such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one |
 | `LM_FIELD_VALIDATION` | No | `warn` | Field validation: `off`, `warn`, or `error` |
@@ -265,7 +264,6 @@ To get LMv1 credentials:
 | `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable (e.g., `delete_*`). Mutually exclusive with `LM_ENABLED_TOOLS`. |
 | `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include an LM API ping in `/health` for authenticated callers (never in `/readyz`) |
-| `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 

@@ -1,14 +1,13 @@
-# Description: Tests for the session context module.
-# Description: Validates session state tracking, history, and variable management.
+# Description: Tests for the in-memory session state behind the session tools.
+# Description: Covers variables, history, the module's session, and the names R1.6 removed.
 
+import dataclasses
 
-from lm_mcp.session import (
-    HistoryEntry,
-    SessionContext,
-    get_session,
-    reset_session,
-    set_session,
-)
+import pytest
+
+from lm_mcp import session as session_module
+from lm_mcp.config import LMConfig
+from lm_mcp.session import HistoryEntry, SessionContext, get_session
 
 
 class TestHistoryEntry:
@@ -49,9 +48,6 @@ class TestSessionContext:
         """SessionContext initializes with empty state."""
         session = SessionContext()
 
-        assert session.last_device is None
-        assert session.last_alert is None
-        assert session.last_device_list == []
         assert session.variables == {}
         assert session.history == []
 
@@ -91,75 +87,6 @@ class TestSessionContext:
         assert session.history[0].tool_name == "get_devices"
         assert session.history[0].success is True
 
-    def test_record_result_stores_device(self):
-        """Recording get_device stores the device result."""
-        session = SessionContext()
-
-        device_data = {"id": 123, "name": "server01", "displayName": "Server 01"}
-        session.record_result(
-            tool_name="get_device",
-            arguments={"device_id": 123},
-            result=device_data,
-            success=True,
-        )
-
-        assert session.last_device == device_data
-
-    def test_record_result_stores_device_list(self):
-        """Recording get_devices stores the device list and first device."""
-        session = SessionContext()
-
-        devices = [
-            {"id": 1, "name": "server01"},
-            {"id": 2, "name": "server02"},
-        ]
-        session.record_result(
-            tool_name="get_devices",
-            arguments={"limit": 10},
-            result={"items": devices},
-            success=True,
-        )
-
-        assert session.last_device_list == devices
-        assert session.last_device == devices[0]
-
-    def test_record_result_stores_alert(self):
-        """Recording get_alert_details stores the alert result."""
-        session = SessionContext()
-
-        alert_data = {"id": "LMA123", "severity": 4, "type": "alertAck"}
-        session.record_result(
-            tool_name="get_alert_details",
-            arguments={"alert_id": "LMA123"},
-            result=alert_data,
-            success=True,
-        )
-
-        assert session.last_alert == alert_data
-
-    def test_get_implicit_id(self):
-        """Implicit ID can be retrieved from last result."""
-        session = SessionContext()
-
-        session.last_device = {"id": 123, "name": "server01"}
-
-        assert session.get_implicit_id("device") == 123
-        assert session.get_implicit_id("alert") is None
-        assert session.get_implicit_id("nonexistent") is None
-
-    def test_get_implicit_ids_from_list(self):
-        """Implicit IDs can be retrieved from last list result."""
-        session = SessionContext()
-
-        session.last_device_list = [
-            {"id": 1, "name": "server01"},
-            {"id": 2, "name": "server02"},
-            {"id": 3, "name": "server03"},
-        ]
-
-        ids = session.get_implicit_ids("device")
-        assert ids == [1, 2, 3]
-
     def test_history_size_limit(self):
         """History is trimmed when exceeding max size."""
         session = SessionContext()
@@ -181,17 +108,11 @@ class TestSessionContext:
         """Clear resets all session state."""
         session = SessionContext()
 
-        session.last_device = {"id": 123}
-        session.last_alert = {"id": "LMA123"}
-        session.last_device_list = [{"id": 1}]
         session.set_variable("key", "value")
         session.record_result("get_devices", {}, {}, True)
 
         session.clear()
 
-        assert session.last_device is None
-        assert session.last_alert is None
-        assert session.last_device_list == []
         assert session.variables == {}
         assert session.history == []
 
@@ -199,76 +120,37 @@ class TestSessionContext:
         """Session can be serialized to dictionary."""
         session = SessionContext()
         session.set_variable("filter", "name~prod*")
-        # record_result will update last_device
         session.record_result(
             "get_device", {"device_id": 123}, {"id": 123, "name": "server01"}, True
         )
 
         result = session.to_dict()
 
-        assert "last_results" in result
-        assert result["last_results"]["device"] == {"id": 123, "name": "server01"}
         assert result["variables"] == {"filter": "name~prod*"}
         assert "history" in result
         assert result["history_count"] == 1
 
 
 class TestGlobalSession:
-    """Tests for global session management functions."""
+    """Tests for the module's session."""
 
-    def test_get_session_creates_if_missing(self):
+    def test_get_session_creates_if_missing(self, monkeypatch):
         """get_session creates a new session if none exists."""
-        set_session(None)
+        monkeypatch.setattr(session_module, "_session", None)
 
         session = get_session()
 
         assert session is not None
         assert isinstance(session, SessionContext)
 
-    def test_get_session_returns_same_instance(self):
+    def test_get_session_returns_same_instance(self, monkeypatch):
         """get_session returns the same instance on subsequent calls."""
-        set_session(None)
+        monkeypatch.setattr(session_module, "_session", None)
 
         session1 = get_session()
         session2 = get_session()
 
         assert session1 is session2
-
-    def test_reset_session_clears_state(self):
-        """reset_session clears the current session state."""
-        session = get_session()
-        session.set_variable("key", "value")
-
-        reset_session()
-
-        assert session.get_variable("key") is None
-
-    def test_set_session_replaces_global(self):
-        """set_session replaces the global session instance."""
-        # Get reference to current session
-        _ = get_session()
-        new_session = SessionContext()
-        new_session.set_variable("new", True)
-
-        set_session(new_session)
-
-        current = get_session()
-        assert current is new_session
-        assert current.get_variable("new") is True
-
-
-class TestToolResourceMap:
-    """R4.6: the resource map names only tools the server registers."""
-
-    def test_every_mapped_tool_is_registered(self):
-        """A mapped name no tool carries can never record a result."""
-        from lm_mcp.registry import TOOLS
-
-        registered = {t.name for t in TOOLS}
-
-        unregistered = [n for n in SessionContext()._tool_resource_map if n not in registered]
-
-        assert unregistered == []
 
 
 class TestResultSummarization:
@@ -325,3 +207,39 @@ class TestResultSummarization:
         )
 
         assert session.history[0].result_summary is None
+
+
+class TestRemovedSessionNames:
+    """R1.6: the session keeps variables and history only, in memory."""
+
+    def test_session_holds_no_last_result_field(self):
+        """The session has no last_* result field and no tool-to-type map."""
+        names = {field.name for field in dataclasses.fields(SessionContext)}
+
+        assert "variables" in names
+        assert {name for name in names if name.startswith("last_")} == set()
+        assert "_tool_resource_map" not in names
+
+    @pytest.mark.parametrize("name", ["get_implicit_id", "get_implicit_ids"])
+    def test_session_has_no_implicit_id_lookup(self, name):
+        assert not hasattr(SessionContext, name)
+
+    @pytest.mark.parametrize(
+        "name",
+        ["get_persistence_path", "set_persistence_path", "reset_session", "set_session"],
+    )
+    def test_module_has_no_removed_function(self, name):
+        assert not hasattr(session_module, name)
+
+    def test_recorded_device_leaves_no_last_results(self):
+        """A recorded get_device lands in history and nowhere else."""
+        session = SessionContext()
+        session.record_result("get_device", {}, {"id": 123, "name": "server01"}, True)
+
+        assert set(session.to_dict()) == {"variables", "history", "history_count"}
+
+    @pytest.mark.parametrize("field", ["session_enabled", "session_persist_path"])
+    def test_config_has_no_removed_session_setting(self, field):
+        """LM_SESSION_ENABLED and LM_SESSION_PERSIST_PATH are not settings."""
+        assert "session_history_size" in LMConfig.model_fields
+        assert field not in LMConfig.model_fields

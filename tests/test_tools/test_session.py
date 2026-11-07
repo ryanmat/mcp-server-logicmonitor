@@ -5,7 +5,8 @@ import json
 
 import pytest
 
-from lm_mcp.session import SessionContext, get_session, set_session
+from lm_mcp import session as session_module
+from lm_mcp.session import get_session
 from lm_mcp.tools.session import (
     clear_session_context,
     delete_session_variable,
@@ -17,11 +18,9 @@ from lm_mcp.tools.session import (
 
 
 @pytest.fixture(autouse=True)
-def reset_session_for_tests():
-    """Reset session before each test."""
-    set_session(SessionContext())
-    yield
-    set_session(SessionContext())
+def fresh_session(monkeypatch):
+    """Give each test a new session; the module's own comes back afterwards."""
+    monkeypatch.setattr(session_module, "_session", None)
 
 
 class TestGetSessionContext:
@@ -34,19 +33,8 @@ class TestGetSessionContext:
         assert len(result) == 1
         data = json.loads(result[0].text)
 
-        assert "last_results" in data
         assert "variables" in data
         assert "history" in data
-
-    async def test_returns_session_with_device(self):
-        """Returns session with last device."""
-        session = get_session()
-        session.last_device = {"id": 123, "name": "server01"}
-
-        result = await get_session_context()
-        data = json.loads(result[0].text)
-
-        assert data["last_results"]["device"] == {"id": 123, "name": "server01"}
 
     async def test_returns_session_with_variables(self):
         """Returns session with user variables."""
@@ -187,7 +175,6 @@ class TestClearSessionContext:
     async def test_clears_all_session_state(self):
         """Clears all session state."""
         session = get_session()
-        session.last_device = {"id": 123}
         session.set_variable("key", "value")
         session.record_result("get_devices", {}, {}, True)
 
@@ -196,7 +183,6 @@ class TestClearSessionContext:
         data = json.loads(result[0].text)
         assert data["success"] is True
 
-        assert session.last_device is None
         assert session.variables == {}
         assert session.history == []
 
