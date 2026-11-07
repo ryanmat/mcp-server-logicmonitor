@@ -308,21 +308,6 @@ class TestMultiPortalDispatch:
         assert "No portal selected" not in result[0].text
 
     @pytest.mark.asyncio
-    async def test_terraform_tools_unsupported_in_multi_portal(
-        self, monkeypatch, tmp_path, reset_portals
-    ):
-        self._multi_env(monkeypatch, tmp_path)
-
-        from lm_mcp.server import _set_tf_runner, execute_tool
-
-        _set_tf_runner(MagicMock())
-        try:
-            result = await execute_tool("terraform_init", {})
-            assert "not supported in multi-portal mode" in result[0].text
-        finally:
-            _set_tf_runner(None)
-
-    @pytest.mark.asyncio
     async def test_use_portal_recorded_in_session_history(
         self, monkeypatch, tmp_path, reset_portals
     ):

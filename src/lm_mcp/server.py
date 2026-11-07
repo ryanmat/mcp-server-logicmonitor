@@ -20,7 +20,7 @@ from lm_mcp.logging import (
     redact_arguments,
 )
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
-from lm_mcp.registry import TF_TOOLS, TOOLS, get_tool_handler
+from lm_mcp.registry import TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.tools import ErrorContent, is_error_result
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes up to 287 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes up to 277 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
@@ -84,35 +84,6 @@ def _set_client(client: LogicMonitorClient) -> None:
     _client = client
 
 
-# Global Terraform runner (initialized when TF_WORKSPACE_DIR is set)
-_tf_runner = None
-
-# Set of Terraform tool names for dispatch routing
-TF_TOOL_NAMES = {t.name for t in TF_TOOLS}
-
-
-def get_tf_runner():
-    """Get the initialized Terraform runner.
-
-    Returns:
-        The TerraformRunner instance, or None if not configured.
-    """
-    return _tf_runner
-
-
-def _set_tf_runner(runner) -> None:
-    """Set the global Terraform runner.
-
-    Called by transport runners during initialization when Terraform
-    workspace directory is configured.
-
-    Args:
-        runner: The TerraformRunner instance, or None to clear.
-    """
-    global _tf_runner
-    _tf_runner = runner
-
-
 def _filter_tools(tools: list, config) -> list:
     """Filter tools based on LM_ENABLED_TOOLS, LM_DISABLED_TOOLS, and LM_MCP_CATEGORIES.
 
@@ -158,23 +129,16 @@ def _filter_tools(tools: list, config) -> list:
 
 @server.list_tools()
 async def list_tools():
-    """Return available tools, filtered by config.
-
-    Includes TF_TOOLS only when the Terraform runner is configured.
-    """
+    """Return available tools, filtered by config."""
     return _filter_tools(collect_tools(), get_config())
 
 
 def collect_tools() -> list[Tool]:
-    """The tools this server can dispatch with its configured backends, before operator filters.
+    """The tools this server can dispatch, before operator filters.
 
-    TF_TOOLS are included only when their backend is set.
-    Both transports build their tool lists from this.
+    The MCP list_tools handler, which the stdio transport serves, builds its list from this.
     """
-    tools = list(TOOLS)
-    if _tf_runner is not None:
-        tools.extend(TF_TOOLS)
-    return tools
+    return list(TOOLS)
 
 
 # Session tools that don't require the LM client
@@ -258,7 +222,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             from lm_mcp.categories import tool_in_categories
 
             tools_index = {t.name: t for t in TOOLS}
-            tools_index.update({t.name: t for t in TF_TOOLS})
             if not tool_in_categories(name, tools_index, config.mcp_categories):
                 return [
                     ErrorContent(
@@ -340,28 +303,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         # Session and portal tools don't need an LM client
         if name in SESSION_TOOLS or name in PORTAL_TOOLS:
             result = await handler(**arguments)
-        elif name in TF_TOOL_NAMES:
-            # The LM Terraform provider needs fixed LM_* credentials; multi-portal
-            # credentials are selected at runtime and never reach the subprocess.
-            if config.multi_portal:
-                return [
-                    ErrorContent(
-                        type="text",
-                        text="Error: Terraform tools are not supported in multi-portal mode "
-                        "(the Terraform provider needs fixed LM_* credentials). "
-                        "Run a single-portal server for Terraform.",
-                    )
-                ]
-            # Terraform tools use the Terraform runner
-            if _tf_runner is None:
-                return [
-                    ErrorContent(
-                        type="text",
-                        text="Error: Terraform not configured. "
-                        "Set TF_WORKSPACE_DIR environment variable.",
-                    )
-                ]
-            result = await handler(_tf_runner, **arguments)
         elif name in CLIENT_OPTIONAL_TOOLS:
             # These handlers ignore the client; pass the global as-is (possibly
             # None before use_portal) so discovery works portal-free.

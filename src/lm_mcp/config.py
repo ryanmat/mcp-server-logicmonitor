@@ -89,9 +89,10 @@ class LMConfig(BaseSettings):
             LM_HTTP_ALLOW_UNAUTHENTICATED=true, or the server refuses to start.
         LM_HTTP_PORT: HTTP server port (default: 8080)
         LM_CORS_ORIGINS: Comma-separated CORS origins (default: empty, no CORS)
-        LM_HTTP_AUTH_TOKEN: Require this bearer token on /mcp and /api/v1/*
-            (default: unset, no inbound auth; minimum 16 characters). The health
-            endpoints and / stay open for probes. HTTP transport only.
+        LM_HTTP_AUTH_TOKEN: Require this bearer token on every HTTP path outside
+            the health endpoints and / (default: unset, no inbound auth; minimum
+            16 characters). The health endpoints and / stay open for probes. HTTP
+            transport only.
         LM_HTTP_ALLOW_UNAUTHENTICATED: Accept a non-loopback HTTP bind with no
             LM_HTTP_AUTH_TOKEN, for a listener protected some other way such as
             an authenticating proxy (default: false). HTTP transport only.
@@ -151,9 +152,6 @@ class LMConfig(BaseSettings):
     session_enabled: bool = True
     session_history_size: int = 50
     session_persist_path: str | None = None
-
-    # Analysis workflows (HTTP transport) running at once; later submissions queue
-    analysis_max_concurrency: int = 4
 
     # Validation settings
     field_validation: Literal["off", "warn", "error"] = "warn"
@@ -258,14 +256,6 @@ class LMConfig(BaseSettings):
             raise ValueError("session_history_size must be non-negative")
         if v > 1000:
             raise ValueError("session_history_size must not exceed 1000")
-        return v
-
-    @field_validator("analysis_max_concurrency", mode="after")
-    @classmethod
-    def validate_analysis_max_concurrency(cls, v: int) -> int:
-        """Validate at least one analysis workflow can run."""
-        if v < 1:
-            raise ValueError("analysis_max_concurrency must be at least 1")
         return v
 
     @model_validator(mode="after")

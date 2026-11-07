@@ -2,7 +2,6 @@
 # Description: Covers the response helpers and every inline error return in execute_tool.
 
 import logging
-from unittest.mock import MagicMock
 
 import pytest
 from mcp.types import TextContent
@@ -107,27 +106,6 @@ class TestExecuteToolInlineErrors:
         result = await execute_tool("get_devices", {"filter": "notAField:1"})
         assert is_error_result(result)
         assert '"code": "INVALID_FILTER_FIELDS"' in result[0].text
-
-    async def test_terraform_not_configured(self, single_portal):
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("terraform_init", {})
-        assert is_error_result(result)
-        assert result[0].text.startswith("Error: Terraform not configured")
-
-    async def test_terraform_in_multi_portal_mode(self, monkeypatch, tmp_path, reset_portals):
-        p = tmp_path / "portals.json"
-        p.write_text('{"acme": {"portal": "acme.example.com", "bearer_token": "t"}}')
-        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
-        monkeypatch.setenv("LM_PORTALS_FILE", str(p))
-        monkeypatch.delenv("LM_PORTAL", raising=False)
-        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
-        from lm_mcp.server import _set_tf_runner, execute_tool
-
-        _set_tf_runner(MagicMock())
-        result = await execute_tool("terraform_init", {})
-        assert is_error_result(result)
-        assert "not supported in multi-portal mode" in result[0].text
 
     async def test_unknown_tool_value_error_path(self, single_portal):
         from lm_mcp.server import execute_tool

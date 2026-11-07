@@ -1,5 +1,5 @@
 # Description: Tests for opt-in inbound bearer authentication on the HTTP transport.
-# Description: Covers gated routes, open probe paths, CORS preflight, and config validation.
+# Description: Covers gated paths, open probe paths, CORS preflight, and config validation.
 
 import logging
 
@@ -37,7 +37,7 @@ def _client():
 
 
 class TestHttpAuthRejection:
-    """Requests without a valid token are rejected on gated routes."""
+    """Requests without a valid token are rejected on gated paths."""
 
     @pytest.mark.asyncio
     async def test_mcp_missing_header_rejected(self, _set_env_with_auth):
@@ -61,32 +61,6 @@ class TestHttpAuthRejection:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_analyze_missing_header_rejected(self, _set_env_with_auth):
-        """POST /api/v1/analyze with no header returns 401."""
-        async with _client() as client:
-            resp = await client.post(
-                "/api/v1/analyze", json={"workflow": "health_check", "arguments": {}}
-            )
-        assert resp.status_code == 401
-
-    @pytest.mark.asyncio
-    async def test_analysis_get_missing_header_rejected(self, _set_env_with_auth):
-        """GET /api/v1/analysis/{id} returns 401, not the handler's 404.
-
-        Proves the middleware short-circuits before the route handler runs.
-        """
-        async with _client() as client:
-            resp = await client.get("/api/v1/analysis/unknown-id")
-        assert resp.status_code == 401
-
-    @pytest.mark.asyncio
-    async def test_webhook_missing_header_rejected(self, _set_env_with_auth):
-        """POST /api/v1/webhooks/alert with no header returns 401."""
-        async with _client() as client:
-            resp = await client.post("/api/v1/webhooks/alert", json={"deviceId": 1, "alertId": 2})
-        assert resp.status_code == 401
-
-    @pytest.mark.asyncio
     async def test_401_includes_www_authenticate(self, _set_env_with_auth):
         """A 401 advertises the expected scheme."""
         async with _client() as client:
@@ -95,30 +69,18 @@ class TestHttpAuthRejection:
 
 
 class TestHttpAuthAccepted:
-    """Requests carrying the configured token reach their handlers."""
+    """Requests carrying the configured token pass the middleware to the router."""
 
     @pytest.mark.asyncio
     async def test_mcp_correct_token_accepted(self, _set_env_with_auth):
-        """POST /mcp tools/list with the token returns the tool list."""
+        """POST /mcp with the token passes auth; the router has no /mcp route, so 404."""
         async with _client() as client:
             resp = await client.post(
                 "/mcp",
                 json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
                 headers={"Authorization": f"Bearer {TOKEN}"},
             )
-        assert resp.status_code == 200
-        assert isinstance(resp.json()["result"], list)
-
-    @pytest.mark.asyncio
-    async def test_analyze_correct_token_accepted(self, _set_env_with_auth):
-        """POST /api/v1/analyze with the token is accepted for processing."""
-        async with _client() as client:
-            resp = await client.post(
-                "/api/v1/analyze",
-                json={"workflow": "health_check", "arguments": {}},
-                headers={"Authorization": f"Bearer {TOKEN}"},
-            )
-        assert resp.status_code == 202
+        assert resp.status_code == 404
 
 
 class TestHttpAuthOpenPaths:
@@ -185,12 +147,12 @@ class TestHttpAuthDisabled:
 
     @pytest.mark.asyncio
     async def test_no_token_configured_allows_requests(self, _set_env):
-        """POST /mcp with no header succeeds when no token is set."""
+        """POST /mcp with no header passes auth when no token is set; the router answers 404."""
         async with _client() as client:
             resp = await client.post(
                 "/mcp", json={"jsonrpc": "2.0", "method": "tools/list", "id": 1}
             )
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
     def test_no_token_logs_warning(self, _set_env, caplog):
         """Building the app without a token warns that the surface is open."""
@@ -253,7 +215,7 @@ class TestHttpAuthHardening:
 
     @pytest.mark.asyncio
     async def test_scheme_is_case_insensitive(self, _set_env_with_auth):
-        """RFC 7235 defines auth-scheme as case-insensitive."""
+        """RFC 7235 defines auth-scheme as case-insensitive; each form passes auth to a 404."""
         async with _client() as client:
             for scheme in ("Bearer", "bearer", "BEARER", "BeArEr"):
                 resp = await client.post(
@@ -261,7 +223,7 @@ class TestHttpAuthHardening:
                     json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
                     headers={"Authorization": f"{scheme} {TOKEN}"},
                 )
-                assert resp.status_code == 200, scheme
+                assert resp.status_code == 404, scheme
 
     @pytest.mark.asyncio
     async def test_wrong_scheme_still_rejected(self, _set_env_with_auth):
@@ -356,11 +318,7 @@ def live_server(monkeypatch):
 @pytest.fixture
 def _http_server_env(_set_env, monkeypatch):
     """Configure create_http_server for a live start with no optional integrations."""
-    for var in (
-        "TF_WORKSPACE_DIR",
-        "LM_HTTP_ALLOW_UNAUTHENTICATED",
-    ):
-        monkeypatch.delenv(var, raising=False)
+    monkeypatch.delenv("LM_HTTP_ALLOW_UNAUTHENTICATED", raising=False)
     monkeypatch.setenv("LM_TRANSPORT", "http")
 
 
@@ -427,83 +385,6 @@ class TestUnauthenticatedBindRefusal:
         assert resp.status_code == 200
 
 
-async def _post_variants(live_server, headers):
-    """POST JSON-RPC and API bodies under several Content-Types to a live server."""
-    import json
-
-    import httpx
-    import uvicorn
-
-    from lm_mcp.transport.http import create_asgi_app
-
-    body = json.dumps({"jsonrpc": "2.0", "method": "tools/list", "id": 1})
-    server = uvicorn.Server(
-        uvicorn.Config(create_asgi_app(), host="127.0.0.1", port=0, log_level="warning")
-    )
-    async with (
-        live_server(server.serve()) as port,
-        httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
-    ):
-
-        async def mcp(content_type):
-            extra = {"Content-Type": content_type} if content_type else {}
-            resp = await client.post("/mcp", content=body, headers={**headers, **extra})
-            return resp.status_code
-
-        return {
-            "text/plain": await mcp("text/plain"),
-            "missing": await mcp(None),
-            "json; charset": await mcp("application/json; charset=utf-8"),
-            "JSON upper": await mcp("Application/JSON"),
-            "analyze form": (
-                await client.post("/api/v1/analyze", data={"workflow": "x"}, headers=headers)
-            ).status_code,
-            "webhook text/plain": (
-                await client.post(
-                    "/api/v1/webhooks/alert",
-                    content="{}",
-                    headers={**headers, "Content-Type": "text/plain"},
-                )
-            ).status_code,
-            "analysis GET": (
-                await client.get("/api/v1/analysis/unknown-id", headers=headers)
-            ).status_code,
-        }
-
-
-class TestJsonContentType:
-    """R3.3: POSTs to /mcp and /api/v1/* must carry Content-Type: application/json."""
-
-    async def test_non_json_posts_refused_with_valid_token(self, _set_env_with_auth, live_server):
-        """With a valid token, non-JSON POSTs get 415; JSON with parameters is accepted."""
-        statuses = await _post_variants(live_server, {"Authorization": f"Bearer {TOKEN}"})
-
-        assert statuses == {
-            "text/plain": 415,
-            "missing": 415,
-            "json; charset": 200,
-            "JSON upper": 200,
-            "analyze form": 415,
-            "webhook text/plain": 415,
-            "analysis GET": 404,
-        }
-
-    async def test_non_json_posts_refused_without_auth(self, _set_env, live_server):
-        """The Content-Type check holds when no inbound token is configured."""
-        statuses = await _post_variants(live_server, {})
-
-        assert statuses["text/plain"] == 415
-        assert statuses["analyze form"] == 415
-        assert statuses["json; charset"] == 200
-
-    async def test_unauthenticated_text_plain_gets_401_first(self, _set_env_with_auth, live_server):
-        """Auth runs before the Content-Type check, so an anonymous caller learns nothing more."""
-        statuses = await _post_variants(live_server, {})
-
-        assert statuses["text/plain"] == 401
-        assert statuses["analyze form"] == 401
-
-
 async def _statuses_by_host(live_server, requests):
     """Send (method, path, Host) requests to a live server; return their status codes.
 
@@ -537,34 +418,22 @@ class TestHostAllowlist:
     """R3.3: every route except /healthz and /readyz answers only expected Host names."""
 
     async def test_unknown_host_is_refused_before_the_handler(self, _set_env, live_server):
-        """Host: evil.example gets 400 and execute_tool never runs."""
-        from unittest.mock import AsyncMock, patch
+        """Host: evil.example gets the middleware's 400 on GET /, with or without a port."""
+        import httpx
+        import uvicorn
 
-        with patch("lm_mcp.server.execute_tool", new_callable=AsyncMock) as mock_exec:
-            import httpx
-            import uvicorn
+        from lm_mcp.transport.http import create_asgi_app
 
-            from lm_mcp.transport.http import create_asgi_app
+        server = uvicorn.Server(
+            uvicorn.Config(create_asgi_app(), host="127.0.0.1", port=0, log_level="warning")
+        )
+        async with (
+            live_server(server.serve()) as port,
+            httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
+        ):
+            bare = await client.get("/", headers={"Host": "evil.example"})
+            with_port = await client.get("/", headers={"Host": f"evil.example:{port}"})
 
-            server = uvicorn.Server(
-                uvicorn.Config(create_asgi_app(), host="127.0.0.1", port=0, log_level="warning")
-            )
-            call = {
-                "jsonrpc": "2.0",
-                "method": "tools/call",
-                "params": {"name": "get_devices", "arguments": {}},
-                "id": 1,
-            }
-            async with (
-                live_server(server.serve()) as port,
-                httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
-            ):
-                bare = await client.post("/mcp", json=call, headers={"Host": "evil.example"})
-                with_port = await client.post(
-                    "/mcp", json=call, headers={"Host": f"evil.example:{port}"}
-                )
-
-        mock_exec.assert_not_called()
         assert bare.status_code == 400
         assert with_port.status_code == 400
         assert bare.json() == {"error": "Invalid Host header"}
@@ -574,10 +443,10 @@ class TestHostAllowlist:
         statuses = await _statuses_by_host(
             live_server,
             [
-                ("POST", "/mcp", "127.0.0.1:{port}"),
-                ("POST", "/mcp", "localhost:{port}"),
-                ("POST", "/mcp", "LOCALHOST"),
-                ("POST", "/mcp", "[::1]:{port}"),
+                ("GET", "/", "127.0.0.1:{port}"),
+                ("GET", "/", "localhost:{port}"),
+                ("GET", "/", "LOCALHOST"),
+                ("GET", "/", "[::1]:{port}"),
             ],
         )
 
@@ -589,11 +458,11 @@ class TestHostAllowlist:
         statuses = await _statuses_by_host(
             live_server,
             [
-                ("POST", "/mcp", "mcp.internal"),
-                ("POST", "/mcp", "other.internal:443"),
-                ("POST", "/mcp", "localhost:{port}"),
+                ("GET", "/", "mcp.internal"),
+                ("GET", "/", "other.internal:443"),
+                ("GET", "/", "localhost:{port}"),
+                ("GET", "/", "evil.example"),
                 ("POST", "/mcp", "evil.example"),
-                ("POST", "/api/v1/analyze", "evil.example"),
             ],
         )
 
@@ -620,13 +489,13 @@ class TestHostAllowlist:
     async def test_specific_bind_host_is_accepted(self, _set_env, live_server, monkeypatch):
         """A configured non-wildcard LM_HTTP_HOST is an allowed Host name."""
         monkeypatch.setenv("LM_HTTP_HOST", "10.9.8.7")
-        statuses = await _statuses_by_host(live_server, [("POST", "/mcp", "10.9.8.7:{port}")])
+        statuses = await _statuses_by_host(live_server, [("GET", "/", "10.9.8.7:{port}")])
 
         assert statuses == [200]
 
     async def test_wildcard_bind_host_is_not_a_host_name(self, _set_env, live_server, monkeypatch):
         """No client addresses a server as 0.0.0.0, so the wildcard bind adds nothing."""
         monkeypatch.setenv("LM_HTTP_HOST", "0.0.0.0")
-        statuses = await _statuses_by_host(live_server, [("POST", "/mcp", "0.0.0.0:{port}")])
+        statuses = await _statuses_by_host(live_server, [("GET", "/", "0.0.0.0:{port}")])
 
         assert statuses == [400]

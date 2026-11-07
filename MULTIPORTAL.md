@@ -6,9 +6,8 @@ process-per-customer, and the full tool set is loaded **once**, not per portal.
 
 Multi-portal mode is **stdio-only**. The server refuses to start with
 `LM_TRANSPORT=http`: the HTTP transport serves every caller from one process, so a
-shared "active portal" would leak data between users. The Terraform workspace tools are
-also unavailable in this mode (the LM Terraform provider needs fixed credentials) — run a
-single-portal server for IaC work. Health endpoints do not exist under stdio.
+shared "active portal" would leak data between users. Health endpoints do not exist
+under stdio.
 
 ## What it adds
 

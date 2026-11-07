@@ -243,12 +243,12 @@ class TestReadyzStaysLocal:
 
 
 class TestHealthConnectivityGate:
-    """R1.5: /health runs the connectivity check only for callers that could reach /mcp."""
+    """R1.5: /health runs the connectivity check only for callers that pass the bearer check."""
 
     async def test_health_checks_connectivity_when_no_token_configured(
         self, connectivity_env, admins_route
     ):
-        """With no inbound token, /mcp is open, so /health may ping the portal once."""
+        """With no inbound token, every path is open, so /health may ping the portal once."""
         async with _asgi_client() as client:
             resp = await client.get("/health")
 
@@ -328,7 +328,6 @@ class TestHttpServerClientConstruction:
         from lm_mcp import server as server_module
         from lm_mcp.transport.http import create_http_server
 
-        monkeypatch.delenv("TF_WORKSPACE_DIR", raising=False)
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
         monkeypatch.setenv("LM_TRANSPORT", "http")

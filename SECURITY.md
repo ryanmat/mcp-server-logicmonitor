@@ -33,35 +33,29 @@ You can expect:
   LogicMonitor credential properties such as `ssh.pass`, and URL userinfo and
   credential-named query values. Signature parameters such as `X-Amz-Signature`
   stay visible in a logged URL.
-- The `terraform` subprocess does not inherit server or cloud credentials. See
-  the Terraform section of the [README](README.md).
 
 ### Inbound HTTP exposure
-- The HTTP transport drives the full tool surface with the server's LogicMonitor
-  credentials. Anyone who can reach the port can use them.
-- It serves the `/api/v1` analysis API and a minimal JSON-RPC `/mcp` route, not
-  the MCP protocol: `/mcp` has no `initialize`, so standard MCP clients cannot
-  connect to it. Prefer stdio when an MCP client is the caller.
+- The HTTP transport serves health, readiness and info routes only. It exposes
+  no tool and no MCP endpoint; its one use of the server's LogicMonitor
+  credentials is the optional `/health` connectivity check described below. Use
+  stdio when an MCP client is the caller.
 - Set `LM_HTTP_AUTH_TOKEN` whenever the port is reachable beyond localhost:
-  `/mcp` and `/api/v1/*` then require `Authorization: Bearer <token>` and
-  return 401 otherwise. A bind outside `127.0.0.1`, `::1` and `localhost`
+  every path outside `/` and the health endpoints then requires
+  `Authorization: Bearer <token>` and returns 401 otherwise. A bind outside `127.0.0.1`, `::1` and `localhost`
   refuses to start without it unless `LM_HTTP_ALLOW_UNAUTHENTICATED=true`
   accepts the exposure; the default `LM_HTTP_HOST` is `0.0.0.0`.
-- Request bodies on `/mcp` and `/api/v1/*` must be `application/json` (415
-  otherwise), and every route except `/healthz` and `/readyz` answers only the
-  loopback names, a non-wildcard `LM_HTTP_HOST` and `LM_HTTP_ALLOWED_HOSTS` in
-  `Host` (400 otherwise). Together they block cross-site form posts and DNS
-  rebinding from a page in the operator's browser.
-- `tools/call` validates arguments against the tool's schema, and the client
-  refuses an API path holding a `.` or `..` segment or an encoded separator,
-  which blocks path traversal through an argument.
+- Every route except `/healthz` and `/readyz` answers only the loopback names,
+  a non-wildcard `LM_HTTP_HOST` and `LM_HTTP_ALLOWED_HOSTS` in `Host` (400
+  otherwise), which blocks DNS rebinding from a page in the operator's browser.
+- The LogicMonitor client refuses an API path holding a `.` or `..` segment or
+  an encoded separator, which blocks path traversal through a tool argument.
 - `/`, `/health`, `/healthz`, and `/readyz` stay unauthenticated so container
   healthchecks and orchestrator probes keep working. Their responses carry
   component status, never LogicMonitor data. None of them calls the
   LogicMonitor API for an unauthenticated caller: `/readyz` never does, and
   with `LM_HEALTH_CHECK_CONNECTIVITY=true` (off by default) `/health` adds the
   API connectivity check only when the request carries `LM_HTTP_AUTH_TOKEN`,
-  or when no token is configured and `/mcp` is open anyway. Earlier releases
+  or when no token is configured. Earlier releases
   pinged the API on every `/readyz` request when that flag was on, letting an
   anonymous caller consume your portal's API quota; that is fixed (issue #56).
 - Pair the token with TLS (the Caddy profile in `deploy/`, or
@@ -72,8 +66,6 @@ You can expect:
 ### Write operations
 - Write operations are disabled by default
 - Enable only when needed: `LM_ENABLE_WRITE_OPERATIONS=true`
-- `terraform_init` and `terraform_plan` count as writes, since providers and data
-  sources call live APIs during them
 - A POST or PATCH that gets a 5xx is not resent, so a retry cannot apply a change
   twice
 - Review permissions granted to your LogicMonitor API token

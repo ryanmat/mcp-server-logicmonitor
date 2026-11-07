@@ -222,15 +222,9 @@ class TestPersistenceIntegration:
 
     @pytest.fixture
     def _no_backends(self, monkeypatch):
-        """Leave every optional backend unconfigured so bootstrap builds none."""
-        from lm_mcp.terraform_config import reset_terraform_config
-
-        monkeypatch.delenv("TF_WORKSPACE_DIR", raising=False)
+        """Configure a single portal; bootstrap has no optional backend to build."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        reset_terraform_config()
-        yield
-        reset_terraform_config()
 
     @pytest.mark.usefixtures("_no_backends")
     async def test_transport_bootstrap_wires_the_configured_path(self, monkeypatch, tmp_path):

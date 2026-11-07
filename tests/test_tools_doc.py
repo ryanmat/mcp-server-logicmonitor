@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from lm_mcp.logging import is_write_tool
-from lm_mcp.registry import TF_TOOLS, TOOLS
+from lm_mcp.registry import TOOLS
 from lm_mcp.resources.guides import TOOL_CATEGORIES
 
 DOC = Path(__file__).parent.parent / "documentation" / "tools.md"
@@ -54,9 +54,9 @@ _TITLES = {
 
 
 def _tool_index() -> dict:
-    """Map tool name -> Tool across the full advertisable surface (core plus conditionals)."""
+    """Map tool name -> Tool across the full advertisable surface."""
     index: dict = {}
-    for tool in [*TOOLS, *TF_TOOLS]:
+    for tool in TOOLS:
         index[tool.name] = tool
     return index
 
@@ -77,8 +77,7 @@ def render_tools_doc() -> str:
         "<!-- GENERATED FILE. Do not edit by hand. "
         "Regenerate: uv run python tests/test_tools_doc.py -->",
         "",
-        f"Reference for all {total} tools the LogicMonitor MCP server can advertise (core plus "
-        "the optional Terraform integration). "
+        f"Reference for all {total} tools the LogicMonitor MCP server can advertise. "
         "The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.",
         "",
         "This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain "

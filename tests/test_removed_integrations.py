@@ -1,4 +1,4 @@
-# Description: R1.2 and R1.3: the 5.0 server carries no watsonx, HuggingFace or AWX integration.
+# Description: R1.2 to R1.4: no watsonx, HuggingFace, AWX or Terraform runner integration.
 # Description: Covers the registry, the server's dispatch state, bootstrap and the stdio start.
 
 from __future__ import annotations
@@ -28,11 +28,28 @@ _SRC = Path(lm_mcp.__file__).parent
 _REPO = Path(__file__).resolve().parent.parent
 
 # Word-bounded where a plain substring overmatches: "TestOrchestrationGuide" holds "torch".
+# The Terraform runner is named by its settings and internals, not by the word terraform,
+# which terraform_generate keeps.
 _REMOVED_WORDS = re.compile(
     r"watsonx|huggingface|granite|\btorch\b|\bhf_|\bttm\b|nl_summary"
-    r"|awx|ansible|\baap\b|remediate_workflow",
+    r"|awx|ansible|\baap\b|remediate_workflow"
+    r"|tf_runner|tf_tool|terraformrunner|terraform_config"
+    r"|\btf_(workspace_dir|terraform_binary|timeout|auto_approve_enabled)\b",
     re.IGNORECASE,
 )
+
+_TERRAFORM_RUNNER_TOOLS = [
+    "terraform_init",
+    "terraform_validate",
+    "terraform_plan",
+    "terraform_apply",
+    "terraform_destroy",
+    "terraform_import",
+    "terraform_output",
+    "terraform_state_list",
+    "terraform_state_show",
+    "terraform_write_config",
+]
 
 _SUMMARIZING_COMPOSITES = ["triage", "health_check", "portal_overview", "capacity_plan", "diagnose"]
 
@@ -56,6 +73,7 @@ _REMOVED_TOOLS = [
     "get_organizations",
     "get_job_events",
     "get_hosts",
+    *_TERRAFORM_RUNNER_TOOLS,
 ]
 
 
@@ -63,14 +81,20 @@ def _tool(name: str):
     return next(tool for tool in registry.TOOLS if tool.name == name)
 
 
-@pytest.mark.parametrize("manifest", ["WATSONX_TOOLS", "AWX_TOOLS"])
+@pytest.mark.parametrize("manifest", ["WATSONX_TOOLS", "AWX_TOOLS", "TF_TOOLS"])
 def test_registry_has_no_removed_manifest(manifest):
     assert not hasattr(registry, manifest)
 
 
 @pytest.mark.parametrize("name", _REMOVED_TOOLS)
 def test_removed_tool_is_not_registered(name):
-    assert name not in {tool.name for tool in (*registry.TOOLS, *registry.TF_TOOLS)}
+    assert name not in {tool.name for tool in registry.TOOLS}
+
+
+def test_terraform_generate_is_the_only_terraform_tool():
+    terraform = {tool.name for tool in registry.TOOLS if tool.name.startswith("terraform_")}
+
+    assert terraform == {"terraform_generate"}
 
 
 @pytest.mark.parametrize("name", _REMOVED_TOOLS)
@@ -90,6 +114,10 @@ def test_removed_tool_has_no_handler(name):
         "_set_awx_client",
         "_awx_client",
         "AWX_TOOL_NAMES",
+        "get_tf_runner",
+        "_set_tf_runner",
+        "_tf_runner",
+        "TF_TOOL_NAMES",
     ],
 )
 def test_server_holds_no_removed_integration_state(attribute):
@@ -107,6 +135,9 @@ def test_server_holds_no_removed_integration_state(attribute):
         "lm_mcp.tools.ansible",
         "lm_mcp.client.awx",
         "lm_mcp.awx_config",
+        "lm_mcp.client.terraform",
+        "lm_mcp.terraform_config",
+        "lm_mcp.config_warnings",
     ],
 )
 def test_removed_module_does_not_import(module):
@@ -144,7 +175,7 @@ def test_tool_categories_have_no_removed_category(category):
     assert category not in categories
 
 
-@pytest.mark.parametrize("backend", ["watsonx", "awx"])
+@pytest.mark.parametrize("backend", ["watsonx", "awx", "terraform"])
 def test_backends_have_no_removed_field(backend):
     assert backend not in {field.name for field in dataclasses.fields(Backends)}
 
@@ -169,6 +200,27 @@ async def test_execute_tool_reports_removed_tool_as_unknown(name, monkeypatch):
     assert f"Unknown tool: {name}" in result[0].text
 
 
+def _start_stdio(settings: dict[str, str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run a real server process with stdin at EOF, single-portal unless settings say otherwise."""
+    env = {
+        **os.environ,
+        "LM_PORTAL": "test.logicmonitor.com",
+        "LM_BEARER_TOKEN": "test-token",
+        "LM_MULTI_PORTAL": "false",
+        **settings,
+    }
+    return subprocess.run(
+        [sys.executable, "-m", "lm_mcp.server"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=cwd,
+        timeout=60,
+        check=False,
+    )
+
+
 @pytest.mark.parametrize(
     "settings",
     [
@@ -179,27 +231,37 @@ async def test_execute_tool_reports_removed_tool_as_unknown(name, monkeypatch):
 )
 def test_stdio_start_with_removed_settings_logs_nothing_about_them(settings, tmp_path):
     """A real server process with stdin at EOF ignores the settings and exits cleanly."""
-    env = {
-        **os.environ,
-        "LM_PORTAL": "test.logicmonitor.com",
-        "LM_BEARER_TOKEN": "test-token",
-        "LM_MULTI_PORTAL": "false",
-        **settings,
-    }
-
-    done = subprocess.run(
-        [sys.executable, "-m", "lm_mcp.server"],
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=tmp_path,
-        timeout=60,
-        check=False,
-    )
+    done = _start_stdio(settings, tmp_path)
 
     assert done.returncode == 0, done.stderr
     assert _REMOVED_WORDS.findall(done.stdout + done.stderr) == []
+
+
+def test_multi_portal_start_with_terraform_settings_logs_nothing_about_terraform(tmp_path):
+    """A multi-portal start with a category filter and TF_WORKSPACE_DIR set logs no Terraform."""
+    portals_file = tmp_path / "portals.json"
+    portals_file.write_text('{"acme": {"portal": "acme.example.com", "bearer_token": "t"}}')
+
+    done = _start_stdio(
+        {
+            "LM_MULTI_PORTAL": "true",
+            "LM_PORTALS_FILE": str(portals_file),
+            "LM_MCP_CATEGORIES": "read,session",
+            "TF_WORKSPACE_DIR": str(tmp_path),
+        },
+        tmp_path,
+    )
+
+    assert done.returncode == 0, done.stderr
+    assert re.findall("terraform", done.stdout + done.stderr, flags=re.IGNORECASE) == []
+
+
+def test_src_starts_no_process_except_the_vault_decrypt():
+    """R1.4: no module spawns a process, apart from portals.py running age on the vault."""
+    texts = {path.relative_to(_SRC).as_posix(): path.read_text() for path in _SRC.rglob("*.py")}
+
+    assert {name for name, text in texts.items() if "create_subprocess" in text} == set()
+    assert {name for name, text in texts.items() if "subprocess" in text} == {"portals.py"}
 
 
 def test_pyproject_declares_only_the_http_extra():
@@ -275,6 +337,8 @@ def test_tests_name_no_removed_integration():
         "README.md",
         "CONTRIBUTING.md",
         "SECURITY.md",
+        "MULTIPORTAL.md",
+        "deploy/k8s/deployment.yaml",
         "documentation/client-setup.md",
         "documentation/tools.md",
         ".github/workflows/test.yml",
