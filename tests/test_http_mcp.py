@@ -159,9 +159,11 @@ class TestRequestShape:
         assert data["id"] == 3
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("raw", [b"{bad", b"\xff"])
+    @pytest.mark.parametrize(
+        "raw", [b"{bad", b"\xff", b"[" * 100000], ids=["not_json", "not_utf8", "too_deep"]
+    )
     async def test_unparseable_body_is_a_400_jsonrpc_error(self, raw):
-        """Text that is not JSON and bytes that are not UTF-8 both return -32700 with HTTP 400."""
+        """A body that is not JSON, not UTF-8 or nested too deep to parse returns -32700 and 400."""
         from lm_mcp.transport.http import create_asgi_app
 
         transport = ASGITransport(app=create_asgi_app(), raise_app_exceptions=False)

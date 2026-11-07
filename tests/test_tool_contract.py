@@ -101,7 +101,7 @@ def test_server_instructions_point_to_search_tools():
 
 
 def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
-    """R4.5: write tools stay listed with writes off and are refused, so they are not absent."""
+    """Write tools stay listed with writes off and are refused, so they are not absent."""
     from lm_mcp.config import LMConfig
     from lm_mcp.registry import TOOLS
     from lm_mcp.server import SERVER_INSTRUCTIONS, _filter_tools

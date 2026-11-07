@@ -271,9 +271,9 @@ def create_asgi_app() -> Starlette:
 
         try:
             body = await request.json()
-        except ValueError:
-            # JSONDecodeError for text that is not JSON, UnicodeDecodeError for bytes that are not
-            # UTF-8; both are ValueError.
+        except (ValueError, RecursionError):
+            # ValueError covers JSONDecodeError for text that is not JSON and UnicodeDecodeError
+            # for bytes that are not UTF-8; RecursionError is nesting too deep to parse.
             return rpc_error(-32700, "Parse error", None)
 
         req_id = None
