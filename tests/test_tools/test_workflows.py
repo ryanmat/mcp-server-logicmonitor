@@ -1119,15 +1119,15 @@ class TestSearchTools:
         assert "forecast_metric" in tool_names
 
     async def test_configured_integration_tools_are_searchable(self, client):
-        """search_tools adds the Terraform tools to its corpus only when their runner is set."""
+        """search_tools adds TF_TOOLS to its corpus only when the Terraform runner is set."""
         from unittest.mock import patch
 
-        # Not configured -> Terraform tools are absent from the search corpus.
+        # Not configured -> TF_TOOLS are absent from the search corpus.
         result = await search_tools(client, query="terraform state list")
         names = [m["name"] for m in json.loads(result[0].text)["matches"]]
         assert "terraform_state_list" not in names
 
-        # Configured -> Terraform tools are searchable.
+        # Configured -> TF_TOOLS are searchable.
         with patch("lm_mcp.server.get_tf_runner", return_value=object()):
             result = await search_tools(client, query="terraform state list")
         names = [m["name"] for m in json.loads(result[0].text)["matches"]]

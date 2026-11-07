@@ -160,7 +160,7 @@ def _filter_tools(tools: list, config) -> list:
 async def list_tools():
     """Return available tools, filtered by config.
 
-    Includes Terraform tools only when the Terraform runner is configured.
+    Includes TF_TOOLS only when the Terraform runner is configured.
     """
     return _filter_tools(collect_tools(), get_config())
 
@@ -168,7 +168,7 @@ async def list_tools():
 def collect_tools() -> list[Tool]:
     """The tools this server can dispatch with its configured backends, before operator filters.
 
-    The Terraform tools are included only when their backend is set.
+    TF_TOOLS are included only when their backend is set.
     Both transports build their tool lists from this.
     """
     tools = list(TOOLS)

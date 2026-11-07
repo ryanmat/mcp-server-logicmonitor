@@ -12,7 +12,7 @@ from lm_mcp.registry import TOOLS
 
 SKILLS_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills"
 
-# Build a set of all tool names from the registry for cross-referencing
+# Build a set of the core tool names from the registry for cross-referencing
 ALL_REGISTRY_TOOLS = {tool.name for tool in TOOLS}
 
 # lm-remediate's allowed-tools name tools outside the registry, so name resolution skips it.
@@ -113,10 +113,11 @@ class TestSkillFileStructure:
             assert len(fm["allowed-tools"]) > 0, f"Skill '{name}' 'allowed-tools' is empty"
 
     def test_skill_allowed_tools_exist_in_registry(self):
-        """Every tool referenced in skill frontmatter maps to a real registry tool.
+        """Each frontmatter tool maps to a registry tool, outside _SKILLS_PENDING_REWRITE.
 
         Skill files reference tools as 'mcp__logicmonitor__<tool_name>'.
-        This test strips the prefix and checks against TOOLS.
+        This test strips the prefix and checks against TOOLS. A skill in that
+        set still has its prefix checked.
         """
         prefix = "mcp__logicmonitor__"
         for name, fm in self.skills.items():

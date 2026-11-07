@@ -1109,7 +1109,7 @@ async def search_tools(
         from lm_mcp.resources.guides import TOOL_CATEGORIES
         from lm_mcp.server import get_tf_runner
 
-        # The Terraform tools join the search corpus only when their runner is set.
+        # TF_TOOLS join the search corpus only when the Terraform runner is set.
         search_corpus = list(TOOLS)
         if get_tf_runner() is not None:
             search_corpus.extend(TF_TOOLS)
