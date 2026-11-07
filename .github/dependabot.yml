@@ -7,6 +7,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # granite-tsfm caps torch, and a bump past the cap resolves granite-tsfm and
+    # transformers downward to satisfy it, so torch's minor moves by hand.
+    ignore:
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       uv-minor-and-patch:
         patterns: ["*"]
