@@ -136,7 +136,7 @@ async def list_tools():
 def collect_tools() -> list[Tool]:
     """The tools this server can dispatch, before operator filters.
 
-    Both transports build their tool lists from this.
+    The MCP list_tools handler, which the stdio transport serves, builds its list from this.
     """
     return list(TOOLS)
 

@@ -168,7 +168,7 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 
 ## Integrations
 
-Each integration is optional. Add its variables to the `env` block or `claude mcp add` command from [Setup](#setup).
+`terraform_generate` needs no settings. Multi-portal mode is optional; add its variables to the `env` block or `claude mcp add` command from [Setup](#setup).
 
 ### Terraform
 
