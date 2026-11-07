@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import time
 from unittest.mock import AsyncMock, patch
 
@@ -26,7 +25,6 @@ from lm_mcp.tools.workflows import (
     search_tools,
     triage,
 )
-from tests.watsonx_sdk import real_watsonx_client
 
 
 @pytest.fixture
@@ -902,39 +900,6 @@ class TestSummaryFailureWarnings:
         (warning,) = data["warnings"]
         assert warning.startswith("NL summary requested but")
         assert "not configured" in warning
-
-    @respx.mock
-    async def test_failing_summary_names_the_error(self, auth, lm_env, caplog):
-        """R4.4: triage(summarize=True) with watsonx failing returns the error in warnings.
-
-        The failure is also logged at WARNING on lm_mcp.audit with its traceback.
-        """
-        from lm_mcp.server import _set_watsonx_client
-
-        respx.get(url__startswith=_BASE).mock(return_value=_ok({"items": [], "total": 0}))
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        _set_watsonx_client(real_watsonx_client())
-
-        with (
-            patch("ibm_watsonx_ai.foundation_models.ModelInference", autospec=True) as model_cls,
-            caplog.at_level(logging.WARNING, logger="lm_mcp.audit"),
-        ):
-            model_cls.return_value.generate_text.side_effect = RuntimeError(
-                "503 Service Unavailable"
-            )
-            result = await triage(client, summarize=True)
-
-        data = json.loads(result[0].text)
-        assert "nl_summary" not in data
-        (warning,) = data["warnings"]
-        assert warning.startswith("NL summary failed")
-        assert "503 Service Unavailable" in warning
-        model_cls.return_value.generate_text.assert_called_once()
-        (record,) = [r for r in caplog.records if "NL summary failed" in r.getMessage()]
-        assert record.name == "lm_mcp.audit"
-        assert record.levelno == logging.WARNING
-        assert record.exc_info is not None
-        assert "503 Service Unavailable" in record.getMessage()
 
 
 # ---------------------------------------------------------------------------

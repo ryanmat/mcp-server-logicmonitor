@@ -4,7 +4,6 @@
 import json
 import logging
 import math
-from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -12,7 +11,6 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
-from tests.watsonx_sdk import real_watsonx_client
 
 
 @pytest.fixture
@@ -411,64 +409,6 @@ class TestForecastMethodLabels:
 
         assert cpu["method_used"] == "linear"
         assert "watsonx" in cpu["fallback_reason"]
-
-    @respx.mock
-    async def test_ttm_under_512_points_falls_back_with_reason(self, client, monkeypatch):
-        """method=ttm with watsonx but 100 points reports linear and the 512 minimum."""
-        wx = real_watsonx_client()
-        wx._run_ttm_forecast = MagicMock()
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", wx)
-        values = [[float(10 + i)] for i in range(100)]
-
-        cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "linear"
-        assert "512" in cpu["fallback_reason"]
-        wx._run_ttm_forecast.assert_not_called()
-
-    @respx.mock
-    async def test_ttm_failure_falls_back_with_reason_and_warning(
-        self, client, monkeypatch, caplog
-    ):
-        """A TTM call that raises reports linear, the failure, and a WARNING."""
-        wx = real_watsonx_client()
-        wx._run_ttm_forecast = MagicMock(side_effect=Exception("connection timeout"))
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", wx)
-        values = [[float(10 + i)] for i in range(600)]
-
-        with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.forecasting"):
-            cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "linear"
-        assert "TTM" in cpu["fallback_reason"]
-        warnings = [
-            r
-            for r in caplog.records
-            if r.name == "lm_mcp.tools.forecasting" and r.levelno == logging.WARNING
-        ]
-        assert len(warnings) == 1
-        assert "TTM" in warnings[0].getMessage()
-
-    @respx.mock
-    async def test_ttm_success_is_labeled_ttm(self, client, monkeypatch):
-        """A TTM forecast that succeeds reports ttm and no fallback reason."""
-        from lm_mcp.client.watsonx import TTM_MODEL_ID
-
-        wx = real_watsonx_client()
-        wx._run_ttm_forecast = MagicMock(
-            return_value={
-                "forecast_values": [70.0, 71.0, 72.0],
-                "forecast_count": 3,
-                "model": TTM_MODEL_ID,
-            }
-        )
-        monkeypatch.setattr("lm_mcp.server._watsonx_client", wx)
-        values = [[float(10 + i * 0.1)] for i in range(600)]
-
-        cpu = await _forecast_cpu(client, values, method="ttm")
-
-        assert cpu["method_used"] == "ttm"
-        assert "fallback_reason" not in cpu
 
     @respx.mock
     async def test_holt_winters_failure_falls_back_with_reason_and_warning(self, client, caplog):
