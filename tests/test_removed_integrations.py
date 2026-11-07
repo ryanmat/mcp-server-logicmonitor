@@ -172,6 +172,21 @@ def test_dependabot_ignores_nothing_for_uv():
     assert "ignore" not in uv
 
 
+def _locked_package_names() -> set[str]:
+    lock = tomllib.loads((_REPO / "uv.lock").read_text())
+    return {package["name"] for package in lock["package"]}
+
+
+def test_lock_holds_no_model_dependency():
+    removed = {"torch", "transformers", "granite-tsfm", "accelerate", "ibm-watsonx-ai", "pandas"}
+
+    assert _locked_package_names().isdisjoint(removed)
+
+
+def test_lock_stays_under_eighty_packages():
+    assert len(_locked_package_names()) < 80
+
+
 def test_src_names_no_removed_integration():
     naming = {
         path.relative_to(_SRC).as_posix()

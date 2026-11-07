@@ -50,8 +50,7 @@ jobs:
         run: uv run ruff format --check src tests
 
       # Fails when mypy's error count rises above mypy-baseline.txt. Only the 3.11
-      # leg runs it: pyproject.toml pins mypy to python_version 3.11, and the numpy
-      # the 3.12 and 3.13 legs install ships stubs mypy cannot parse at 3.11.
+      # leg runs it: pyproject.toml pins mypy to python_version 3.11.
       - name: Type check (ratchet)
         if: matrix.python-version == '3.11'
         run: uv run python scripts/mypy_ratchet.py
