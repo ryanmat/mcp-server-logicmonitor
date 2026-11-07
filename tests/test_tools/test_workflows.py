@@ -1119,10 +1119,9 @@ class TestSearchTools:
         assert "forecast_metric" in tool_names
 
     async def test_configured_integration_tools_are_searchable(self, client):
-        """Terraform tools (conditional) become searchable when their runner is set.
+        """Terraform tools (conditional) are searchable only when their runner is set.
 
-        Regression for the drift where search_tools iterated only the core TOOLS list,
-        leaving the Terraform tools unsearchable even when configured.
+        search_tools mirrors the server's advertised surface, not just the core TOOLS list.
         """
         from unittest.mock import patch
 

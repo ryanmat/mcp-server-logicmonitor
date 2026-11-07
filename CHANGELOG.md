@@ -45,7 +45,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   `lm://guide/tool-categories`, the `remediate_workflow` prompt, `examples/playbooks/`, and the
   settings `AWX_URL`, `AWX_TOKEN`, `AWX_VERIFY_SSL`, `AWX_TIMEOUT` and `AWX_MAX_RETRIES`, which
   the server ignores if set. LogicMonitor's own remediation stays: `execute_remediation`, the
-  RemediationSource tools and the `remediation` prompt.
+  RemediationSource tools and the `remediation` prompt. Red Hat announced its AAP MCP server as a
+  Technology Preview for AAP 2.6.4, which it does not support in production; whether it works with
+  AWX is unconfirmed.
 
 ### Changed
 

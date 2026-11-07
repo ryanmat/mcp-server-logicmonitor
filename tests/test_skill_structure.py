@@ -15,8 +15,7 @@ SKILLS_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills"
 # Build a set of all tool names from the registry for cross-referencing
 ALL_REGISTRY_TOOLS = {tool.name for tool in TOOLS}
 
-# lm-remediate's allowed-tools name tools outside the registry until the skill is rewritten
-# onto LogicMonitor remediation (spec R2.14), so name resolution skips it.
+# lm-remediate's allowed-tools name tools outside the registry, so name resolution skips it.
 _SKILLS_PENDING_REWRITE = {"lm-remediate"}
 
 # Expected skills (directory names under .claude/skills/)
