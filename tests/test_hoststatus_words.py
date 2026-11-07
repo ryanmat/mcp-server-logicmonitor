@@ -31,9 +31,12 @@ NUMERIC = re.compile(r"hostStatus[!:= ]+[0-9]")
 # HTTP 400 "invalid filter" (live, 2026-10-24).
 UNQUOTED = re.compile(r'hostStatus!?:(?!\\?"(?:' + "|".join(HOST_STATUS_WORDS) + r')\\?")')
 
+# A status word labelled with a code in prose, "normal(0), dead(1)": the API has no such codes.
+NUMERIC_LABEL = re.compile(r"\b(?:" + "|".join(HOST_STATUS_WORDS) + r")\([0-9]\)")
+
 
 def _violations(text: str) -> list[str]:
-    matches = (*NUMERIC.finditer(text), *UNQUOTED.finditer(text))
+    matches = (*NUMERIC.finditer(text), *UNQUOTED.finditer(text), *NUMERIC_LABEL.finditer(text))
     return [text[m.start() : m.end() + 12] for m in matches]
 
 
@@ -51,6 +54,7 @@ class TestPatterns:
             "displayName~prod,hostStatus:alive",
             "hostStatus:normal",
             'hostStatus:"alive"',
+            "normal(0), dead(1), etc.",
         ],
     )
     def test_rejected_forms(self, text):

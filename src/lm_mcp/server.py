@@ -9,6 +9,7 @@ from fnmatch import fnmatch
 from mcp.server import Server
 from mcp.types import CallToolResult, CompleteResult, GetPromptResult, TextContent, Tool
 
+from lm_mcp import __version__
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
@@ -29,15 +30,15 @@ logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes 306 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes up to 306 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
     "`detect_site_outage` -- answer common multi-step investigations in a single call. "
     "Write operations (create/update/delete/run) are gated behind "
-    "`LM_ENABLE_WRITE_OPERATIONS` and are absent unless the operator enabled them."
+    "`LM_ENABLE_WRITE_OPERATIONS` and are refused unless the operator enabled them."
 )
-server = Server("logicmonitor-platform", instructions=SERVER_INSTRUCTIONS)
+server = Server("logicmonitor-platform", version=__version__, instructions=SERVER_INSTRUCTIONS)
 
 # Global client (initialized on startup)
 _client: LogicMonitorClient | None = None

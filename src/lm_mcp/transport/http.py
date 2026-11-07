@@ -1,5 +1,5 @@
 # Description: HTTP transport implementation for MCP server.
-# Description: Uses Starlette and Uvicorn for streamable HTTP mode.
+# Description: Serves the /api/v1 analysis API and a minimal JSON-RPC /mcp route over Starlette.
 
 from __future__ import annotations
 
@@ -271,7 +271,9 @@ def create_asgi_app() -> Starlette:
 
         try:
             body = await request.json()
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError):
+            # ValueError covers JSONDecodeError for text that is not JSON and UnicodeDecodeError
+            # for bytes that are not UTF-8; RecursionError is nesting too deep to parse.
             return rpc_error(-32700, "Parse error", None)
 
         req_id = None

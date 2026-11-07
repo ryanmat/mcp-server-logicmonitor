@@ -100,6 +100,29 @@ def test_server_instructions_point_to_search_tools():
     assert "search_tools" in SERVER_INSTRUCTIONS
 
 
+def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
+    """Write tools stay listed with writes off and are refused, so they are not absent."""
+    from lm_mcp.config import LMConfig
+    from lm_mcp.registry import AWX_TOOLS, TF_TOOLS, TOOLS, WATSONX_TOOLS
+    from lm_mcp.server import SERVER_INSTRUCTIONS, _filter_tools
+
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    for name in (
+        "LM_ENABLE_WRITE_OPERATIONS",
+        "LM_ENABLED_TOOLS",
+        "LM_DISABLED_TOOLS",
+        "LM_MCP_CATEGORIES",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    assert "acknowledge_alert" in {tool.name for tool in _filter_tools(TOOLS, LMConfig())}
+    assert "refused" in SERVER_INSTRUCTIONS
+    assert "absent" not in SERVER_INSTRUCTIONS
+    total = len(TOOLS) + len(AWX_TOOLS) + len(TF_TOOLS) + len(WATSONX_TOOLS)
+    assert f"up to {total} " in SERVER_INSTRUCTIONS
+
+
 if __name__ == "__main__":
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
     surface = canonical_tool_surface()

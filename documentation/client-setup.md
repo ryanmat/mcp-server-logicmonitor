@@ -2,7 +2,7 @@
 
 Per-client configuration for connecting the LogicMonitor MCP server. Every client runs the
 same server (`uvx --from lm-mcp lm-mcp-server`); only the config format and file location
-differ. For the fastest path (Claude Code) see the [README Quick Start](../README.md#quick-start).
+differ. For the fastest path (Claude Code) see the [README Setup](../README.md#setup).
 
 Back to the [README](../README.md).
 
@@ -101,7 +101,7 @@ For surgical control, combine with `LM_ENABLED_TOOLS`:
 }
 ```
 
-The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. Default behavior (env var unset) returns all 306 tools — backwards compatible.
+The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. With the env var unset, no category filter applies, and the server lists every tool its configuration enables, up to 306 tools.
 
 ### Claude Desktop
 

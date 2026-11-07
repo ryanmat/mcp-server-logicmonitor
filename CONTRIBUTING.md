@@ -40,7 +40,8 @@ commit hook: run it yourself before pushing. Never bypass a failing hook with
 `--no-verify`; fix the cause.
 
 Run the server locally over stdio with `uv run lm-mcp-server`, which needs
-`LM_PORTAL` and `LM_BEARER_TOKEN` in your environment or a local `.env`.
+`LM_PORTAL` and `LM_BEARER_TOKEN` in your environment. The server does not read a
+`.env` file itself; to use one, run `uv run --env-file .env lm-mcp-server`.
 
 ## Expectations for a pull request
 

@@ -1,13 +1,13 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Supported versions
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 2.x     | Yes                |
-| < 2.0   | No                 |
+| 4.x     | Yes                |
+| < 4.0   | No                 |
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
 If you discover a security vulnerability in this project, please report it responsibly:
 
@@ -22,16 +22,26 @@ You can expect:
 - Regular updates on the fix progress
 - Credit in the security advisory (unless you prefer anonymity)
 
-## Security Considerations
+## Security considerations
 
-### Credential Handling
-- Bearer tokens are passed via environment variables only
+### Credential handling
+- Bearer tokens are passed via environment variables, or through an age-encrypted
+  vault in multi-portal mode
 - Never commit tokens to version control
 - Use `.env` files locally (included in `.gitignore`)
+- Write audit lines and session history mask credential-shaped argument values,
+  LogicMonitor credential properties such as `ssh.pass`, and URL userinfo and
+  credential-named query values. Signature parameters such as `X-Amz-Signature`
+  stay visible in a logged URL.
+- The `terraform` subprocess does not inherit server or cloud credentials. See
+  the Terraform section of the [README](README.md).
 
-### Inbound HTTP Exposure
+### Inbound HTTP exposure
 - The HTTP transport drives the full tool surface with the server's LogicMonitor
   credentials. Anyone who can reach the port can use them.
+- It serves the `/api/v1` analysis API and a minimal JSON-RPC `/mcp` route, not
+  the MCP protocol: `/mcp` has no `initialize`, so standard MCP clients cannot
+  connect to it. Prefer stdio when an MCP client is the caller.
 - Set `LM_HTTP_AUTH_TOKEN` whenever the port is reachable beyond localhost:
   `/mcp` and `/api/v1/*` then require `Authorization: Bearer <token>` and
   return 401 otherwise. A bind outside `127.0.0.1`, `::1` and `localhost`
@@ -42,6 +52,9 @@ You can expect:
   loopback names, a non-wildcard `LM_HTTP_HOST` and `LM_HTTP_ALLOWED_HOSTS` in
   `Host` (400 otherwise). Together they block cross-site form posts and DNS
   rebinding from a page in the operator's browser.
+- `tools/call` validates arguments against the tool's schema, and the client
+  refuses an API path holding a `.` or `..` segment or an encoded separator,
+  which blocks path traversal through an argument.
 - `/`, `/health`, `/healthz`, and `/readyz` stay unauthenticated so container
   healthchecks and orchestrator probes keep working. Their responses carry
   component status, never LogicMonitor data. None of them calls the
@@ -51,21 +64,27 @@ You can expect:
   or when no token is configured and `/mcp` is open anyway. Earlier releases
   pinged the API on every `/readyz` request when that flag was on, letting an
   anonymous caller consume your portal's API quota; that is fixed (issue #56).
-- Pair the token with TLS (the Caddy profile in `deploy/`, or `LM_HTTP_SSL_*`)
-  so it is not sent in cleartext.
+- Pair the token with TLS (the Caddy profile in `deploy/`, or
+  `LM_HTTP_SSL_CERTFILE` and `LM_HTTP_SSL_KEYFILE`) so it is not sent in
+  cleartext.
 - The stdio transport is unaffected: it has no listening socket.
 
-### Write Operations
+### Write operations
 - Write operations are disabled by default
 - Enable only when needed: `LM_ENABLE_WRITE_OPERATIONS=true`
+- `terraform_init` and `terraform_plan` count as writes, since providers and data
+  sources call live APIs during them
+- A POST, PATCH or AWX job launch that gets a 5xx is not resent, so a retry cannot
+  apply a change twice
 - Review permissions granted to your LogicMonitor API token
 
-### Container Security
-- Docker image runs as non-root user
-- Minimal base image (python:slim)
+### Container security
+- The image runs as a fixed non-root UID (10001)
+- The base image is a slim Python image, pinned by digest
+- Dependencies install from `uv.lock` with hash checking
 - No sensitive data persisted in container
 
-### Best Practices
+### Best practices
 - Use dedicated API tokens with minimal required permissions
 - Rotate tokens regularly
 - Monitor LogicMonitor audit logs for unexpected API activity
