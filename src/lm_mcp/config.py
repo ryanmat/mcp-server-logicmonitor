@@ -332,11 +332,6 @@ class LMConfig(BaseSettings):
         return self
 
     @property
-    def has_lmv1_auth(self) -> bool:
-        """Check if LMv1 credentials are configured."""
-        return bool(self.access_id and self.access_key)
-
-    @property
     def base_url(self) -> str:
         """Return the base URL for LogicMonitor REST API."""
         if not self.portal:

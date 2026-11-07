@@ -356,10 +356,8 @@ class LogicMonitorClient:
 
         log_api_request(method, path, params)
 
-        last_retry_after: int | None = None
-        last_message = "Rate limited"
-
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        while True:
             request_start = time.monotonic()
             try:
                 response = await self._client.request(
@@ -373,14 +371,11 @@ class LogicMonitorClient:
                 raise transport_error(e, "LogicMonitor API", method, url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry(method, response.status_code):
-                message, retry_after = self._parse_error_response(response)
-                last_message = message
-                last_retry_after = retry_after
-
-                if attempt < self.max_retries:
-                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                    continue
+            if should_retry(method, response.status_code) and attempt < self.max_retries:
+                _, retry_after = self._parse_error_response(response)
+                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
+                attempt += 1
+                continue
 
             if response.status_code >= 400:
                 message, retry_after = self._parse_error_response(response)
@@ -391,8 +386,6 @@ class LogicMonitorClient:
             data = response.json()
             self._check_response_body_errors(data)
             return data
-
-        raise RateLimitError(last_message, retry_after=last_retry_after)
 
     async def get(self, path: str, params: dict | None = None) -> dict:
         """Make a GET request.
@@ -461,10 +454,8 @@ class LogicMonitorClient:
 
         log_api_request("POST", path, None)
 
-        last_retry_after: int | None = None
-        last_message = "Rate limited"
-
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        while True:
             request_start = time.monotonic()
             try:
                 response = await self._client.request(
@@ -478,14 +469,11 @@ class LogicMonitorClient:
                 raise transport_error(e, "LogicMonitor API", "POST", url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry("POST", response.status_code):
-                message, retry_after = self._parse_error_response(response)
-                last_message = message
-                last_retry_after = retry_after
-
-                if attempt < self.max_retries:
-                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                    continue
+            if should_retry("POST", response.status_code) and attempt < self.max_retries:
+                _, retry_after = self._parse_error_response(response)
+                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
+                attempt += 1
+                continue
 
             if response.status_code >= 400:
                 message, retry_after = self._parse_error_response(response)
@@ -496,8 +484,6 @@ class LogicMonitorClient:
             data = response.json()
             self._check_response_body_errors(data)
             return data
-
-        raise RateLimitError(last_message, retry_after=last_retry_after)
 
     async def put(self, path: str, json_body: dict | None = None) -> dict:
         """Make a PUT request.
@@ -579,10 +565,8 @@ class LogicMonitorClient:
         }
         headers.update(self.auth.get_auth_headers("POST", path, body_str))
 
-        last_retry_after: int | None = None
-        last_message = "Rate limited"
-
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        while True:
             try:
                 response = await self._client.request(
                     method="POST",
@@ -595,14 +579,11 @@ class LogicMonitorClient:
                 raise transport_error(e, "LogicMonitor ingest", "POST", url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry("POST", response.status_code):
-                message, retry_after = self._parse_error_response(response)
-                last_message = message
-                last_retry_after = retry_after
-
-                if attempt < self.max_retries:
-                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                    continue
+            if should_retry("POST", response.status_code) and attempt < self.max_retries:
+                _, retry_after = self._parse_error_response(response)
+                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
+                attempt += 1
+                continue
 
             # Handle 202 Accepted (success for ingestion)
             if response.status_code == 202:
@@ -629,5 +610,3 @@ class LogicMonitorClient:
                 self._raise_for_status(response, message, retry_after)
 
             return response.json()
-
-        raise RateLimitError(last_message, retry_after=last_retry_after)

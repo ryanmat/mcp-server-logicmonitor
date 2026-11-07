@@ -73,15 +73,8 @@ async def run_http() -> None:
     """Run the MCP server with HTTP transport.
 
     This transport is for remote deployments and shared access.
-    Requires the 'http' optional dependencies: starlette, uvicorn.
     """
-    try:
-        from lm_mcp.transport.http import create_http_server
-    except ImportError as e:
-        raise ImportError(
-            "HTTP transport requires additional dependencies. "
-            "Install with: pip install lm-mcp[http]"
-        ) from e
+    from lm_mcp.transport.http import create_http_server
 
     await create_http_server()
 

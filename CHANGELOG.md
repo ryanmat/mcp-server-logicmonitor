@@ -84,6 +84,11 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   variables and history live in memory and are lost when the process exits.
 - `LM_SESSION_ENABLED`, which the server ignores if set. Every tool call outside the session tools
   is recorded in session history; `LM_SESSION_HISTORY_SIZE` still sets how many entries it keeps.
+- Unreachable code: `LMConfig.has_lmv1_auth`, the `RateLimitError` raised after each client retry
+  loop, the partial-LMv1 refusals in `create_auth_provider` (`LMConfig` already refuses an
+  `LM_ACCESS_ID` without `LM_ACCESS_KEY` and the reverse), and the `ImportError` guard in
+  `run_http` (`mcp` installs starlette and uvicorn). The health check's config entry reads the
+  loaded configuration instead of validating the environment a second time.
 
 ### Changed
 
