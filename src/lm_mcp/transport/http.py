@@ -271,7 +271,9 @@ def create_asgi_app() -> Starlette:
 
         try:
             body = await request.json()
-        except json.JSONDecodeError:
+        except ValueError:
+            # JSONDecodeError for text that is not JSON, UnicodeDecodeError for bytes that are not
+            # UTF-8; both are ValueError.
             return rpc_error(-32700, "Parse error", None)
 
         req_id = None

@@ -158,6 +158,23 @@ class TestRequestShape:
         assert data["error"]["code"] == -32602
         assert data["id"] == 3
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("raw", [b"{bad", b"\xff"])
+    async def test_unparseable_body_is_a_400_jsonrpc_error(self, raw):
+        """Text that is not JSON and bytes that are not UTF-8 both return -32700 with HTTP 400."""
+        from lm_mcp.transport.http import create_asgi_app
+
+        transport = ASGITransport(app=create_asgi_app(), raise_app_exceptions=False)
+        async with AsyncClient(transport=transport, base_url="http://localhost") as client:
+            resp = await client.post(
+                "/mcp", content=raw, headers={"Content-Type": "application/json"}
+            )
+
+        assert resp.status_code == 400
+        data = resp.json()
+        assert data["error"]["code"] == -32700
+        assert data["id"] is None
+
 
 @pytest.mark.usefixtures("_env")
 class TestInternalErrorText:
