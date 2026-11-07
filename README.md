@@ -339,7 +339,7 @@ To get LMv1 credentials:
 
 ## MCP resources and prompts
 
-Clients read these through the standard MCP resource and prompt calls. Tool arguments also offer auto-complete through MCP completions.
+Clients read these through the standard MCP resource and prompt calls. Prompt and resource-template arguments also offer auto-complete through MCP completions.
 
 <details>
 <summary>26 reference resources</summary>

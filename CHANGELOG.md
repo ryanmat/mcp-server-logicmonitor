@@ -121,11 +121,13 @@ where a collector is down, because `get_collector_health` can now report one.
   with no such device returns an empty list, which does not show it stayed up.
 - `get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only
   portal tested, one with no NetFlow-enabled device.
-- `get_device_data`, `get_metric_anomalies`, `save_baseline`, `compare_to_baseline` and
-  `get_interface_metrics` read one page of at most 500 samples, the newest, and do not say so
-  when the window holds more.
+- `get_device_data`, `get_metric_anomalies`, `save_baseline`, `compare_to_baseline`,
+  `get_interface_metrics`, `get_trace_service_metrics` and `get_trace_operation_metrics` read one
+  page of at most 500 samples, the newest, and do not say so when the window holds more.
 - `update_logicmodule` fails on `topologysource` with `Unknown tool: export_topologysource`,
-  before any request goes out, since topology sources have no export tool.
+  before any request goes out, since topology sources have no export tool, although
+  `update_topologysource`'s description recommends it. Use `update_topologysource` with a full
+  definition.
 - `correlate_metrics` pairs samples by position, not by timestamp, so sources with different sample
   intervals are approximate.
 - `health_check`'s summary drops a truncated-read warning, which its 4-hour default window cannot
