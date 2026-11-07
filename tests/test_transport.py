@@ -153,55 +153,6 @@ class TestTransportConfig:
         with pytest.raises(ValueError):
             LMConfig()
 
-    def test_cors_origins_default(self, monkeypatch):
-        """Default CORS origins is wildcard."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-
-        assert config.cors_origins == ""
-
-    def test_cors_origins_from_env(self, monkeypatch):
-        """CORS origins can be set from environment."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        monkeypatch.setenv("LM_CORS_ORIGINS", "https://example.com,https://other.com")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-
-        assert config.cors_origins == "https://example.com,https://other.com"
-
-    def test_cors_origins_list_property(self, monkeypatch):
-        """cors_origins_list property parses comma-separated origins."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        monkeypatch.setenv("LM_CORS_ORIGINS", "https://a.com,https://b.com")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        origins = config.cors_origins_list
-
-        assert origins == ["https://a.com", "https://b.com"]
-
-    def test_cors_origins_list_wildcard(self, monkeypatch):
-        """cors_origins_list returns wildcard as single-item list."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
-        monkeypatch.setenv("LM_CORS_ORIGINS", "*")
-
-        from lm_mcp.config import LMConfig
-
-        config = LMConfig()
-        origins = config.cors_origins_list
-
-        assert origins == ["*"]
-
 
 def _fake_stdio_server():
     """Stand-in for mcp.stdio_server that yields placeholder streams."""
@@ -268,6 +219,18 @@ class TestRunStdioStartup:
         assert serving_clients[0] is not None
         assert serving_clients[0].max_retries == 7
         assert serving_clients[0].retry_after_cap == 45
+
+    async def test_single_portal_client_sends_api_version_3(self, monkeypatch):
+        """R1.6: LM_API_VERSION is not read; the client the server builds sends X-Version 3."""
+        from lm_mcp import server as server_module
+
+        monkeypatch.setenv("LM_API_VERSION", "4")
+        serving_clients = []
+        self.serve.side_effect = lambda *args: serving_clients.append(server_module._client)
+
+        await run_stdio()
+
+        assert serving_clients[0]._get_headers("GET", "/device/devices")["X-Version"] == "3"
 
 
 async def _stdio_tool_names(serve: AsyncMock) -> list[str]:
@@ -352,3 +315,17 @@ class TestOneBootstrapForBothTransports:
             assert spy.call_count == 1
             assert await _http_healthz(monkeypatch) == 200
             assert spy.call_count == 2
+
+    async def test_each_transport_sizes_session_history_from_config(self, monkeypatch):
+        """Both transports set the session's history length from LM_SESSION_HISTORY_SIZE."""
+        from lm_mcp import session as session_module
+
+        monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "7")
+
+        monkeypatch.setattr(session_module, "_session", None)
+        await _stdio_tool_names(self.serve)
+        assert session_module.get_session().max_history_size == 7
+
+        monkeypatch.setattr(session_module, "_session", None)
+        assert await _http_healthz(monkeypatch) == 200
+        assert session_module.get_session().max_history_size == 7

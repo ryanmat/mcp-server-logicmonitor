@@ -1,5 +1,5 @@
-# Description: R1.5: the HTTP transport serves health and info routes only, on a live socket.
-# Description: The analysis API, its webhook and the JSON-RPC /mcp route answer 404.
+# Description: R1.5, R1.6: the HTTP transport serves health and info routes only, on a live socket.
+# Description: The analysis API, its webhook and /mcp answer 404; no preflight gets a CORS answer.
 
 from __future__ import annotations
 
@@ -28,7 +28,6 @@ def http_env(monkeypatch):
         "LM_MULTI_PORTAL",
         "LM_HTTP_AUTH_TOKEN",
         "LM_HTTP_ALLOW_UNAUTHENTICATED",
-        "LM_CORS_ORIGINS",
         "LM_HEALTH_CHECK_CONNECTIVITY",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -62,6 +61,16 @@ async def test_removed_routes_are_404(http_env, monkeypatch):
     responses = await _send(monkeypatch, _REMOVED_ROUTES)
 
     assert [r.status_code for r in responses] == [404, 404, 404, 404]
+
+
+async def test_preflight_gets_no_cors_answer_with_origins_set(http_env, monkeypatch):
+    """R1.6: the server has no CORS support, so LM_CORS_ORIGINS changes nothing."""
+    monkeypatch.setenv("LM_CORS_ORIGINS", "https://example.com")
+    origin = {"Origin": "https://example.com", "Access-Control-Request-Method": "GET"}
+
+    (response,) = await _send(monkeypatch, [("OPTIONS", "/health", {"headers": origin})])
+
+    assert "access-control-allow-origin" not in response.headers
 
 
 async def test_post_to_mcp_is_404_whatever_its_body_type(http_env, monkeypatch):

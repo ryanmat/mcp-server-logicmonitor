@@ -1,4 +1,4 @@
-# Description: R1.2 to R1.4: no watsonx, HuggingFace, AWX or Terraform runner integration.
+# Description: R1.2 to R1.4 and R1.6: no watsonx, HuggingFace, AWX, Terraform runner or dead module.
 # Description: Covers the registry, the server's dispatch state, bootstrap and the stdio start.
 
 from __future__ import annotations
@@ -138,6 +138,10 @@ def test_server_holds_no_removed_integration_state(attribute):
         "lm_mcp.client.terraform",
         "lm_mcp.terraform_config",
         "lm_mcp.config_warnings",
+        "lm_mcp.tools.metric_presets",
+        "lm_mcp.completions",
+        "lm_mcp.validation",
+        "lm_mcp.resources.examples",
     ],
 )
 def test_removed_module_does_not_import(module):
@@ -299,6 +303,29 @@ def test_lock_holds_no_model_dependency():
     removed = {"torch", "transformers", "granite-tsfm", "accelerate", "ibm-watsonx-ai", "pandas"}
 
     assert _locked_package_names().isdisjoint(removed)
+
+
+def _lm_mcp_declared_names() -> set[str]:
+    """Every name lm-mcp's own lock entry declares: runtime, extras, dev, and their metadata."""
+    lock = tomllib.loads((_REPO / "uv.lock").read_text())
+    (entry,) = [package for package in lock["package"] if package["name"] == "lm-mcp"]
+    metadata = entry["metadata"]
+    lists = [
+        entry.get("dependencies", []),
+        *entry.get("optional-dependencies", {}).values(),
+        *entry.get("dev-dependencies", {}).values(),
+        metadata.get("requires-dist", []),
+        *metadata.get("requires-dev", {}).values(),
+    ]
+    return {dependency["name"] for listed in lists for dependency in listed}
+
+
+def test_lock_declares_no_direct_dotenv():
+    """R1.6: lm-mcp declares no python-dotenv; pydantic-settings and uvicorn[standard] need it."""
+    declared = _lm_mcp_declared_names()
+
+    assert "pydantic-settings" in declared
+    assert "python-dotenv" not in declared
 
 
 def test_lock_stays_under_eighty_packages():

@@ -40,7 +40,6 @@ class TestIngestLogs:
             base_url=config.base_url,
             auth=auth,
             timeout=config.timeout,
-            api_version=config.api_version,
             ingest_url=config.ingest_url,
         )
 
@@ -136,7 +135,6 @@ class TestPushMetrics:
             base_url=config.base_url,
             auth=auth,
             timeout=config.timeout,
-            api_version=config.api_version,
             ingest_url=config.ingest_url,
         )
 
@@ -240,7 +238,6 @@ class TestIngestionWriteGate:
             base_url=config.base_url,
             auth=auth,
             timeout=config.timeout,
-            api_version=config.api_version,
             ingest_url=config.ingest_url,
         )
 
@@ -297,7 +294,6 @@ class TestIngestionValidationErrors:
             base_url=config.base_url,
             auth=auth,
             timeout=config.timeout,
-            api_version=config.api_version,
             ingest_url=config.ingest_url,
         )
 

@@ -8,9 +8,10 @@ import httpx
 import pytest
 import respx
 
+from lm_mcp import session as session_module
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
-from lm_mcp.session import get_session, reset_session, set_session
+from lm_mcp.session import get_session
 from lm_mcp.tools import is_error_result
 
 
@@ -27,19 +28,14 @@ def client(auth):
         base_url="https://test.logicmonitor.com/santaba/rest",
         auth=auth,
         timeout=30,
-        api_version=3,
         max_retries=0,
     )
 
 
 @pytest.fixture(autouse=True)
-def _clean_session():
-    """Reset session before each test."""
-    reset_session()
-    set_session(None)
-    yield
-    reset_session()
-    set_session(None)
+def _clean_session(monkeypatch):
+    """Give each test a new session; the module's own comes back afterwards."""
+    monkeypatch.setattr(session_module, "_session", None)
 
 
 # Base epoch for test data

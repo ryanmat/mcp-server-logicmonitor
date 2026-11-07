@@ -1,5 +1,5 @@
 # Description: Optional-backend setup shared by the stdio and HTTP transports.
-# Description: Sets session persistence; no optional backend exists to build.
+# Description: No optional backend exists to build, so it returns an empty Backends.
 
 from __future__ import annotations
 
@@ -22,10 +22,7 @@ class Backends:
 
 
 def bootstrap_backends(config: LMConfig) -> Backends:
-    """Set session persistence and return the optional backends, which are none.
-
-    Session variables persist to LM_SESSION_PERSIST_PATH when it is set; the path
-    is set here, before the transport first creates the session, which loads the file.
+    """Return the optional backends, which are none.
 
     Args:
         config: The LogicMonitor server configuration.
@@ -33,8 +30,4 @@ def bootstrap_backends(config: LMConfig) -> Backends:
     Returns:
         The backends built, for the transport to close at shutdown.
     """
-    from lm_mcp.session import set_persistence_path
-
-    set_persistence_path(config.session_persist_path)
-
     return Backends()

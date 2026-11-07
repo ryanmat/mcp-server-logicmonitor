@@ -7,11 +7,10 @@ import logging
 from fnmatch import fnmatch
 
 from mcp.server import Server
-from mcp.types import CallToolResult, CompleteResult, GetPromptResult, TextContent, Tool
+from mcp.types import CallToolResult, GetPromptResult, TextContent, Tool
 
 from lm_mcp import __version__
 from lm_mcp.client import LogicMonitorClient
-from lm_mcp.completions import get_completions
 from lm_mcp.config import get_config
 from lm_mcp.logging import (
     configure_logging,
@@ -24,7 +23,6 @@ from lm_mcp.registry import TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
 from lm_mcp.tools import ErrorContent, is_error_result
-from lm_mcp.validation import infer_resource_type, validate_fields, validate_filter_fields
 
 logger = logging.getLogger(__name__)
 
@@ -231,75 +229,6 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                     )
                 ]
 
-        # Field validation (if enabled and not a session tool)
-        if (
-            config.field_validation != "off"
-            and name not in SESSION_TOOLS
-            and name not in PORTAL_TOOLS
-        ):
-            resource_type = infer_resource_type(name)
-            if resource_type:
-                # Validate 'fields' argument if present
-                if arguments.get("fields"):
-                    validation = validate_fields(resource_type, arguments["fields"])
-                    if not validation.valid:
-                        msg = f"Invalid fields: {validation.invalid_fields}"
-                        if validation.suggestions:
-                            suggestions = ", ".join(
-                                f"{k} -> {v}" for k, v in validation.suggestions.items()
-                            )
-                            msg += f". Did you mean: {suggestions}?"
-
-                        if config.field_validation == "error":
-                            return [
-                                ErrorContent(
-                                    type="text",
-                                    text=json.dumps(
-                                        {
-                                            "error": True,
-                                            "code": "INVALID_FIELDS",
-                                            "message": msg,
-                                            "invalid_fields": validation.invalid_fields,
-                                            "suggestions": validation.suggestions,
-                                            "valid_fields": validation.valid_field_names[:20],
-                                        },
-                                        indent=2,
-                                    ),
-                                )
-                            ]
-                        else:
-                            logger.warning(f"Field validation warning for {name}: {msg}")
-
-                # Validate 'filter' argument if present
-                if arguments.get("filter"):
-                    validation = validate_filter_fields(resource_type, arguments["filter"])
-                    if not validation.valid:
-                        msg = f"Invalid filter fields: {validation.invalid_fields}"
-                        if validation.suggestions:
-                            suggestions = ", ".join(
-                                f"{k} -> {v}" for k, v in validation.suggestions.items()
-                            )
-                            msg += f". Did you mean: {suggestions}?"
-
-                        if config.field_validation == "error":
-                            return [
-                                ErrorContent(
-                                    type="text",
-                                    text=json.dumps(
-                                        {
-                                            "error": True,
-                                            "code": "INVALID_FILTER_FIELDS",
-                                            "message": msg,
-                                            "invalid_fields": validation.invalid_fields,
-                                            "suggestions": validation.suggestions,
-                                        },
-                                        indent=2,
-                                    ),
-                                )
-                            ]
-                        else:
-                            logger.warning(f"Filter validation warning for {name}: {msg}")
-
         # Session and portal tools don't need an LM client
         if name in SESSION_TOOLS or name in PORTAL_TOOLS:
             result = await handler(**arguments)
@@ -318,11 +247,11 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         if is_write_tool(name):
             log_write_operation(name, arguments, success=not failed)
 
-        # Record result in session if enabled. Portal tools are recorded too:
+        # Record the result in session history. Portal tools are recorded too:
         # a portal switch is the marker that scopes every entry around it. History
         # is shown back to clients, so it holds the same redacted arguments the
         # audit line shows.
-        if config.session_enabled and name not in SESSION_TOOLS:
+        if name not in SESSION_TOOLS:
             session = get_session()
             recorded_arguments = redact_arguments(arguments)
             # Try to parse the result for session storage
@@ -393,24 +322,6 @@ async def read_resource(uri) -> str:
         return content
     except ValueError as e:
         raise ValueError(f"Resource not found: {uri}") from e
-
-
-@server.completion()
-async def complete(ref, argument) -> CompleteResult:
-    """Provide auto-complete suggestions for argument values.
-
-    Supports completions for common LogicMonitor argument names like
-    severity, status, and sdt_type.
-
-    Args:
-        ref: Reference to the prompt or resource template.
-        argument: The argument being completed (name and partial value).
-
-    Returns:
-        CompleteResult with matching completion values.
-    """
-    completion = get_completions(argument.name, argument.value)
-    return CompleteResult(completion=completion)
 
 
 @server.list_prompts()

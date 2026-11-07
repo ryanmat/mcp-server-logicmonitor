@@ -463,11 +463,11 @@ Session context, variable management, and baselines
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_session_context` | Get current session context (last results, variables, history) | No |
+| `get_session_context` | Get current session context (variables and history) | No |
 | `set_session_variable` | Set a user-defined session variable for use across tool calls | No |
 | `get_session_variable` | Get a user-defined session variable | No |
 | `delete_session_variable` | Delete a user-defined session variable | Yes |
-| `clear_session_context` | Clear all session context (last results, variables, and history) | No |
+| `clear_session_context` | Clear all session context (variables and history) | No |
 | `list_session_history` | List recent tool call history | No |
 | `save_baseline` | Save a metric baseline from historical data. Computes mean, min, max, stddev per datapoint and stores as a session variable for later comparison. | No |
 | `compare_to_baseline` | Compare current metrics against a stored baseline. Reports deviation percentage and status (normal, elevated, reduced, anomalous) per datapoint. | No |

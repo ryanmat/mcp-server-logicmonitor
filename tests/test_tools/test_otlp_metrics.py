@@ -26,7 +26,6 @@ def client(auth):
         base_url=BASE,
         auth=auth,
         timeout=30,
-        api_version=3,
     )
 
 

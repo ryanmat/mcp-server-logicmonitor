@@ -133,7 +133,6 @@ class TestRealWriteToolsBlocked:
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
             timeout=30,
-            api_version=3,
         )
 
         result = asyncio.run(
@@ -165,7 +164,6 @@ class TestRealWriteToolsBlocked:
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
             timeout=30,
-            api_version=3,
         )
 
         result = asyncio.run(delete_device(client, device_id=123))
@@ -195,7 +193,6 @@ class TestRealWriteToolsBlocked:
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
             timeout=30,
-            api_version=3,
         )
 
         result = asyncio.run(import_datasource(client, definition={"name": "test"}))

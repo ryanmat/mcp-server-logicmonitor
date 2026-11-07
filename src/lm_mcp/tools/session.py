@@ -13,7 +13,6 @@ async def get_session_context() -> list[TextContent]:
     """Get the current session context.
 
     Returns the current session state including:
-    - Last results from recent operations (for implicit ID resolution)
     - User-defined variables
     - Recent tool call history
 

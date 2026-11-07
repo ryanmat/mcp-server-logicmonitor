@@ -70,11 +70,11 @@ async def run_health_checks(include_connectivity: bool = False) -> HealthRespons
         )
         client = None
 
-    # Check 3: Config valid
+    # Check 3: Config loaded
     try:
-        from lm_mcp.config import LMConfig
+        from lm_mcp.config import get_config
 
-        LMConfig()
+        get_config()
         checks["config"] = HealthCheck(name="config", status="pass", message="Configuration valid")
     except Exception as e:
         checks["config"] = HealthCheck(

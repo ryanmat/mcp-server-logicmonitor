@@ -19,7 +19,6 @@ def client():
         base_url="https://test.logicmonitor.com/santaba/rest",
         auth=BearerAuth("test-token"),
         timeout=30,
-        api_version=3,
     )
 
 

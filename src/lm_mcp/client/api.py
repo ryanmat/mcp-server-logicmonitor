@@ -132,6 +132,9 @@ def _serialize_json_body(json_body: list | dict | None) -> str:
 # Percent-encoded dot, slash, ``?`` and ``#``, in either case.
 _ENCODED_ESCAPE_RE = re.compile(r"%(?:2e|2f|3f|23)", re.IGNORECASE)
 
+# X-Version on requests to the santaba REST API; portals refuse version 4 to API credentials.
+_API_VERSION = "3"
+
 
 def _check_path(path: str) -> None:
     """Refuse a resource path with a segment that could escape the resource it names.
@@ -170,7 +173,6 @@ class LogicMonitorClient:
         base_url: str,
         auth: AuthProvider,
         timeout: int = 30,
-        api_version: int = 3,
         max_retries: int = 3,
         ingest_url: str | None = None,
         retry_after_cap: int = DEFAULT_RETRY_AFTER_CAP,
@@ -181,7 +183,6 @@ class LogicMonitorClient:
             base_url: LogicMonitor API base URL (e.g., https://company.logicmonitor.com/santaba/rest)
             auth: Authentication provider for generating auth headers.
             timeout: Request timeout in seconds.
-            api_version: LogicMonitor API version.
             max_retries: Maximum retry attempts for rate-limited requests.
             ingest_url: Base URL for ingestion APIs (e.g., https://company.logicmonitor.com).
             retry_after_cap: Longest wait in seconds between retries, whatever a
@@ -189,7 +190,6 @@ class LogicMonitorClient:
         """
         self.base_url = base_url.rstrip("/")
         self.auth = auth
-        self.api_version = api_version
         self.max_retries = max_retries
         self.retry_after_cap = retry_after_cap
         self._client = httpx.AsyncClient(timeout=timeout)
@@ -220,7 +220,7 @@ class LogicMonitorClient:
         """
         headers = {
             "Content-Type": "application/json",
-            "X-Version": str(self.api_version),
+            "X-Version": _API_VERSION,
         }
         headers.update(self.auth.get_auth_headers(method, path, body))
         return headers
@@ -356,10 +356,8 @@ class LogicMonitorClient:
 
         log_api_request(method, path, params)
 
-        last_retry_after: int | None = None
-        last_message = "Rate limited"
-
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        while True:
             request_start = time.monotonic()
             try:
                 response = await self._client.request(
@@ -373,14 +371,11 @@ class LogicMonitorClient:
                 raise transport_error(e, "LogicMonitor API", method, url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry(method, response.status_code):
-                message, retry_after = self._parse_error_response(response)
-                last_message = message
-                last_retry_after = retry_after
-
-                if attempt < self.max_retries:
-                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                    continue
+            if should_retry(method, response.status_code) and attempt < self.max_retries:
+                _, retry_after = self._parse_error_response(response)
+                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
+                attempt += 1
+                continue
 
             if response.status_code >= 400:
                 message, retry_after = self._parse_error_response(response)
@@ -391,8 +386,6 @@ class LogicMonitorClient:
             data = response.json()
             self._check_response_body_errors(data)
             return data
-
-        raise RateLimitError(last_message, retry_after=last_retry_after)
 
     async def get(self, path: str, params: dict | None = None) -> dict:
         """Make a GET request.
@@ -452,7 +445,7 @@ class LogicMonitorClient:
 
         # Build headers without Content-Type (httpx sets multipart boundary)
         headers = {
-            "X-Version": str(self.api_version),
+            "X-Version": _API_VERSION,
         }
         # Use empty body string for auth signature (multipart bodies aren't signed)
         headers.update(self.auth.get_auth_headers("POST", path, ""))
@@ -461,10 +454,8 @@ class LogicMonitorClient:
 
         log_api_request("POST", path, None)
 
-        last_retry_after: int | None = None
-        last_message = "Rate limited"
-
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        while True:
             request_start = time.monotonic()
             try:
                 response = await self._client.request(
@@ -478,14 +469,11 @@ class LogicMonitorClient:
                 raise transport_error(e, "LogicMonitor API", "POST", url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry("POST", response.status_code):
-                message, retry_after = self._parse_error_response(response)
-                last_message = message
-                last_retry_after = retry_after
-
-                if attempt < self.max_retries:
-                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                    continue
+            if should_retry("POST", response.status_code) and attempt < self.max_retries:
+                _, retry_after = self._parse_error_response(response)
+                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
+                attempt += 1
+                continue
 
             if response.status_code >= 400:
                 message, retry_after = self._parse_error_response(response)
@@ -496,8 +484,6 @@ class LogicMonitorClient:
             data = response.json()
             self._check_response_body_errors(data)
             return data
-
-        raise RateLimitError(last_message, retry_after=last_retry_after)
 
     async def put(self, path: str, json_body: dict | None = None) -> dict:
         """Make a PUT request.
@@ -579,10 +565,8 @@ class LogicMonitorClient:
         }
         headers.update(self.auth.get_auth_headers("POST", path, body_str))
 
-        last_retry_after: int | None = None
-        last_message = "Rate limited"
-
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        while True:
             try:
                 response = await self._client.request(
                     method="POST",
@@ -595,14 +579,11 @@ class LogicMonitorClient:
                 raise transport_error(e, "LogicMonitor ingest", "POST", url) from e
 
             # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry("POST", response.status_code):
-                message, retry_after = self._parse_error_response(response)
-                last_message = message
-                last_retry_after = retry_after
-
-                if attempt < self.max_retries:
-                    await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                    continue
+            if should_retry("POST", response.status_code) and attempt < self.max_retries:
+                _, retry_after = self._parse_error_response(response)
+                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
+                attempt += 1
+                continue
 
             # Handle 202 Accepted (success for ingestion)
             if response.status_code == 202:
@@ -629,5 +610,3 @@ class LogicMonitorClient:
                 self._raise_for_status(response, message, retry_after)
 
             return response.json()
-
-        raise RateLimitError(last_message, retry_after=last_retry_after)

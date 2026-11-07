@@ -32,13 +32,10 @@ services:
       - LM_HTTP_HOST=0.0.0.0
       - LM_HTTP_PORT=8080
       - LM_ENABLE_WRITE_OPERATIONS=${LM_ENABLE_WRITE_OPERATIONS:-false}
-      - LM_CORS_ORIGINS=${LM_CORS_ORIGINS:-}
       - LM_HTTP_AUTH_TOKEN=${LM_HTTP_AUTH_TOKEN:?set LM_HTTP_AUTH_TOKEN in deploy/.env (16+ characters); the server refuses to start without it}
       # Host names the server answers besides loopback; Caddy forwards the
       # client's Host, so the tls profile needs its DOMAIN here.
       - LM_HTTP_ALLOWED_HOSTS=${LM_HTTP_ALLOWED_HOSTS:-${DOMAIN:-localhost}}
-      - LM_SESSION_ENABLED=${LM_SESSION_ENABLED:-true}
-      - LM_FIELD_VALIDATION=${LM_FIELD_VALIDATION:-warn}
     healthcheck:
       test: ["CMD", "python", "-c", "import os, sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:%s/healthz' % os.environ.get('LM_HTTP_PORT', '8080'), timeout=5).status == 200 else 1)"]
       interval: 30s

@@ -73,6 +73,36 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   bearer check, and no route takes a request body, so no request gets `415`. Use stdio for MCP
   clients.
 - `jsonschema` as a direct dependency; `mcp` still installs it.
+- `python-dotenv` as a direct dependency. Nothing under `src/` imported it, and `pydantic-settings`
+  still installs it.
+- `contrib/eda/`, the Event-Driven Ansible source kept for reference since 1.9.5 and never part of
+  the package; `scripts/add-mcp-to-project.sh`; `scripts/smoke_http_integration.py`, the 3.7.1
+  live smoke for the integration tools; and the unused `tools/metric_presets.py` module.
+- The session's last-result tracking and the `last_results` key of `get_session_context`, which
+  returns `variables`, `history` and `history_count`. From `lm_mcp.session`: the `last_*` fields of
+  `SessionContext`, its tool-to-type map, `get_implicit_id`, `get_implicit_ids`, `reset_session`
+  and `set_session`.
+- Session persistence and `LM_SESSION_PERSIST_PATH`, which the server ignores if set, with
+  `get_persistence_path` and `set_persistence_path` in `lm_mcp.session`. Session variables and
+  history live in memory and are lost when the process exits.
+- `LM_SESSION_ENABLED`, which the server ignores if set. Every tool call outside the session tools
+  is recorded in session history; `LM_SESSION_HISTORY_SIZE` still sets how many entries it keeps.
+- Unreachable code: `LMConfig.has_lmv1_auth`, the `RateLimitError` raised after each client retry
+  loop, the partial-LMv1 refusals in `create_auth_provider` (`LMConfig` already refuses an
+  `LM_ACCESS_ID` without `LM_ACCESS_KEY` and the reverse), and the `ImportError` guard in
+  `run_http` (`mcp` installs starlette and uvicorn). The health check's config entry reads the
+  loaded configuration instead of validating the environment a second time.
+- MCP argument completions and the `lm_mcp.completions` package: the server does not advertise the
+  `completions` capability.
+- The `lm://guide/example-responses` resource and its module, `lm_mcp.resources.examples`; 25
+  resources remain.
+- Field validation of the `fields` and `filter` arguments (`lm_mcp.validation`), which picked a
+  schema by a substring of the tool name, and `LM_FIELD_VALIDATION`, which the server ignores if
+  set.
+- CORS on the HTTP transport and `LM_CORS_ORIGINS`, which the server ignores if set. A browser
+  preflight gets no CORS headers, and with `LM_HTTP_AUTH_TOKEN` set it gets `401`.
+- `LM_API_VERSION`, which the server ignores if set, and the client's `api_version` argument. The
+  client sends `X-Version: 3` to the REST API; ingestion requests carry no version header.
 
 ### Changed
 

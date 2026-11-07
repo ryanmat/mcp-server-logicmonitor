@@ -208,7 +208,6 @@ def connectivity_env(monkeypatch, reset_portals):
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
     monkeypatch.setenv("LM_HEALTH_CHECK_CONNECTIVITY", "true")
     monkeypatch.delenv("LM_HTTP_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("LM_CORS_ORIGINS", raising=False)
     _set_client(LogicMonitorClient(base_url=PORTAL_BASE, auth=BearerAuth("test-token")))
 
 
@@ -344,3 +343,35 @@ class TestHttpServerClientConstruction:
         serve.assert_awaited_once()
         assert serving_clients[0].max_retries == 7
         assert serving_clients[0].retry_after_cap == 45
+
+
+class TestConfigCheckReadsLoadedConfig:
+    """R1.6: the config check reads the loaded config instead of validating a new one."""
+
+    async def test_reads_get_config_once_and_builds_no_new_config(self, monkeypatch):
+        """run_health_checks calls get_config() once and never constructs LMConfig."""
+        from lm_mcp import config as config_module
+        from lm_mcp import server as server_module
+        from lm_mcp.health import run_health_checks
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-1234")
+        loaded = config_module.get_config()
+        calls: list[int] = []
+
+        def counting_get_config():
+            calls.append(1)
+            return loaded
+
+        def refuse_new_config(*_args, **_kwargs):
+            raise AssertionError("the health check built a new LMConfig")
+
+        # A bound client keeps get_client from reading the config itself.
+        monkeypatch.setattr(server_module, "_client", object())
+        monkeypatch.setattr(config_module, "get_config", counting_get_config)
+        monkeypatch.setattr(config_module, "LMConfig", refuse_new_config)
+
+        response = await run_health_checks()
+
+        assert len(calls) == 1
+        assert response.checks["config"].status == "pass"

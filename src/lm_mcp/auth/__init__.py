@@ -65,12 +65,6 @@ def create_auth_provider(config: "LMConfig") -> AuthProvider:
 
         return LMv1Auth(config.access_id, config.access_key)
 
-    # Handle partial LMv1 configuration
-    if config.access_id:
-        raise ConfigurationError("LMv1 access_key is required when access_id is set")
-    if config.access_key:
-        raise ConfigurationError("LMv1 access_id is required when access_key is set")
-
     raise ConfigurationError(
         "No authentication configured. Set LM_BEARER_TOKEN or both LM_ACCESS_ID and LM_ACCESS_KEY"
     )

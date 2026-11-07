@@ -20,12 +20,10 @@ class TestLogicMonitorClientInit:
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
             timeout=60,
-            api_version=3,
         )
 
         assert client.base_url == "https://test.logicmonitor.com/santaba/rest"
         assert client.auth == auth
-        assert client.api_version == 3
 
     def test_client_strips_trailing_slash(self):
         """Client removes trailing slash from base_url."""
@@ -67,7 +65,6 @@ class TestLogicMonitorClientHeaders:
         client = LogicMonitorClient(
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
-            api_version=3,
         )
 
         headers = client._get_headers("GET", "/alert/alerts")
@@ -1063,6 +1060,42 @@ class TestRetryPolicy:
             with pytest.raises(ServerError):
                 await client.ingest_post("/rest/log/ingest", json_body=[{"msg": "x"}])
         assert failing.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    @pytest.mark.parametrize(
+        ("url", "call"),
+        [
+            (f"{_API}/device/devices", lambda c: c.get("/device/devices")),
+            (f"{_API}/device/devices", lambda c: c.post_multipart("/device/devices", {"a": 1})),
+            (
+                "https://test.logicmonitor.com/rest/log/ingest",
+                lambda c: c.ingest_post("/rest/log/ingest", json_body=[{"msg": "x"}]),
+            ),
+        ],
+        ids=["request", "post_multipart", "ingest_post"],
+    )
+    async def test_429_on_every_attempt_raises_after_the_last(self, url, call, waits):
+        """With LM_MAX_RETRIES=2 a 429 on every attempt is sent three times, then raises."""
+        from lm_mcp.exceptions import RateLimitError
+
+        route = respx.route(url=url).mock(return_value=Response(429, json={"errorMessage": "slow"}))
+        async with _retry_client() as client:
+            with pytest.raises(RateLimitError, match="slow"):
+                await call(client)
+
+        assert route.call_count == 3
+        assert len(waits) == 2
+
+
+def test_rate_limit_error_has_one_raise_site():
+    """R1.6: RateLimitError is raised from _raise_for_status alone, not after the retry loops."""
+    import inspect
+
+    from lm_mcp.client import api
+
+    assert inspect.getsource(api).count("raise RateLimitError") == 1
+    assert "raise RateLimitError" in inspect.getsource(api.LogicMonitorClient._raise_for_status)
 
 
 class TestTransportErrorTranslation:

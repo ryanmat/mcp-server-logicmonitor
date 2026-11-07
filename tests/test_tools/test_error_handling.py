@@ -26,7 +26,6 @@ def client(auth):
         base_url="https://test.logicmonitor.com/santaba/rest",
         auth=auth,
         timeout=30,
-        api_version=3,
         max_retries=0,
     )
 
@@ -202,7 +201,6 @@ class TestHandleErrorLogsLMErrors:
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
             timeout=30,
-            api_version=3,
             max_retries=0,
         )
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/batchjobs").mock(
