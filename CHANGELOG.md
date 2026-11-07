@@ -63,6 +63,16 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   `TF_TIMEOUT` and `TF_AUTO_APPROVE_ENABLED`, which the server ignores if set. The only process the
   server still starts is `age`, to decrypt a multi-portal vault. `terraform_generate` stays, and the
   `terraform` category in `lm://guide/tool-categories` now lists only it.
+- The HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}` and the alert webhook
+  `POST /api/v1/webhooks/alert`, and the `LM_ANALYSIS_MAX_CONCURRENCY` setting, which the server
+  ignores if set. Run the composite tools, such as `triage`, `diagnose` and `health_check`, from an
+  MCP client over stdio instead.
+- The JSON-RPC route at `/mcp` on the HTTP transport, which answered `tools/list`, `tools/call`,
+  `resources/list` and `prompts/list` without the MCP handshake. The HTTP transport serves `/`,
+  `/health`, `/healthz` and `/readyz` only, so `/mcp` and `/api/v1/*` answer `404` once past the
+  bearer check, and no route takes a request body, so no request gets `415`. Use stdio for MCP
+  clients.
+- `jsonschema` as a direct dependency; `mcp` still installs it.
 
 ### Changed
 

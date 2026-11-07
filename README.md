@@ -184,7 +184,7 @@ Stdio is the default transport and the one MCP clients use. It needs no deployme
 
 ### HTTP transport
 
-The HTTP transport serves the `/api/v1` analysis API, for triggering workflows such as alert correlation, RCA, top talkers, and health checks from schedulers and webhooks. It also serves a minimal JSON-RPC route at `/mcp` that answers `tools/list` (names and descriptions, no input schemas), `tools/call`, `resources/list`, and `prompts/list`. `/mcp` has no `initialize`, so standard MCP clients cannot connect to it.
+The HTTP transport serves health, readiness and info routes only; it exposes no tool and no MCP endpoint, so `/mcp` and `/api/v1/*` have no route (`404` once past the bearer check). Use stdio for MCP clients.
 
 ```bash
 cd deploy
@@ -203,7 +203,7 @@ The server exposes health endpoints for container orchestration:
 - `GET /healthz` - Liveness probe (200 OK or 503)
 - `GET /readyz` - Readiness probe (local checks only; never calls the LM API)
 
-POST requests to `/mcp` and `/api/v1/*` must send `Content-Type: application/json`; any other body type gets `415`. Every route except `/healthz` and `/readyz`, `/health` included, answers only the `Host` names the server expects (the loopback names, a non-wildcard `LM_HTTP_HOST`, and `LM_HTTP_ALLOWED_HOSTS`) and refuses others with `400`; those two probes accept any `Host` so probes by pod IP keep working. The compose file requires `LM_HTTP_AUTH_TOKEN` for every profile and passes `DOMAIN` through as an allowed host for the Caddy `tls` profile.
+Every route except `/healthz` and `/readyz`, `/health` included, answers only the `Host` names the server expects (the loopback names, a non-wildcard `LM_HTTP_HOST`, and `LM_HTTP_ALLOWED_HOSTS`) and refuses others with `400`; those two probes accept any `Host` so probes by pod IP keep working. The compose file requires `LM_HTTP_AUTH_TOKEN` for every profile and passes `DOMAIN` through as an allowed host for the Caddy `tls` profile.
 
 See [SECURITY.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/SECURITY.md) for the exposure model.
 
@@ -251,7 +251,7 @@ To get LMv1 credentials:
 | `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address. With `LM_TRANSPORT=http`, an address other than `127.0.0.1`, `::1` or `localhost` needs `LM_HTTP_AUTH_TOKEN` or `LM_HTTP_ALLOW_UNAUTHENTICATED=true`, or the server refuses to start. |
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
 | `LM_CORS_ORIGINS` | No | - | Comma-separated CORS origins (default: none) |
-| `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on `/mcp` and `/api/v1/*` (min 16 chars). Needed to start on a non-loopback `LM_HTTP_HOST`, the default `0.0.0.0` included, unless `LM_HTTP_ALLOW_UNAUTHENTICATED=true`. Health endpoints and `/` stay open for probes. HTTP transport only. |
+| `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on every path outside `/` and the health endpoints (min 16 chars). Needed to start on a non-loopback `LM_HTTP_HOST`, the default `0.0.0.0` included, unless `LM_HTTP_ALLOW_UNAUTHENTICATED=true`. Health endpoints and `/` stay open for probes. HTTP transport only. |
 | `LM_HTTP_ALLOWED_HOSTS` | No | - | Comma-separated `Host` names the server accepts on every route except `/healthz` and `/readyz`, besides `127.0.0.1`, `::1`, `localhost` and a non-wildcard `LM_HTTP_HOST` (for example the public name a reverse proxy forwards). HTTP transport only. |
 | `LM_HTTP_ALLOW_UNAUTHENTICATED` | No | `false` | Start on a non-loopback `LM_HTTP_HOST` with no `LM_HTTP_AUTH_TOKEN`, for a listener protected another way (an authenticating proxy, a private network). HTTP transport only. |
 | `LM_HTTP_SSL_CERTFILE` | No | - | TLS certificate path. Set with `LM_HTTP_SSL_KEYFILE` to serve HTTPS. HTTP transport only. |
@@ -266,7 +266,6 @@ To get LMv1 credentials:
 | `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
 | `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include an LM API ping in `/health` for authenticated callers (never in `/readyz`) |
 | `LM_SESSION_PERSIST_PATH` | No | - | File path for persistent session variables (survives restarts) |
-| `LM_ANALYSIS_MAX_CONCURRENCY` | No | `4` | Analysis workflows (`/api/v1/analyze` and the alert webhook) that run at once; later submissions are accepted and wait as `pending`. At least 1. HTTP transport only. |
 
 *Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
 
@@ -400,7 +399,7 @@ uv run ruff format src tests
 | `src/lm_mcp/tools/` | Tool handlers, one module per domain |
 | `src/lm_mcp/client/` | Async HTTP client for the LogicMonitor API |
 | `src/lm_mcp/auth/` | Bearer and LMv1 authentication |
-| `src/lm_mcp/transport/` | HTTP transport and analysis API |
+| `src/lm_mcp/transport/` | Stdio and HTTP transports |
 | `src/lm_mcp/prompts/`, `resources/`, `completions/` | MCP prompts, reference resources, and argument completions |
 | `.claude/skills/` | Claude Code skills |
 | `documentation/` | Tool reference (generated), client setup, networking intelligence |

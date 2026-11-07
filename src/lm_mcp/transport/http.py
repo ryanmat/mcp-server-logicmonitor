@@ -1,9 +1,8 @@
 # Description: HTTP transport implementation for MCP server.
-# Description: Serves the /api/v1 analysis API and a minimal JSON-RPC /mcp route over Starlette.
+# Description: Serves health, readiness and info routes over Starlette behind the HTTP middleware.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import secrets
@@ -109,8 +108,8 @@ _BODYLESS_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _requires_json_body(path: str) -> bool:
-    """Match the routes whose request bodies must be JSON: /mcp and /api/v1/*."""
-    return path.rstrip("/") == "/mcp" or path.startswith("/api/v1/")
+    """Match the routes whose request bodies must be JSON; no route takes a body."""
+    return False
 
 
 def _media_type(headers: Iterable[tuple[bytes, bytes]]) -> str:
@@ -122,10 +121,10 @@ def _media_type(headers: Iterable[tuple[bytes, bytes]]) -> str:
 
 
 class JsonContentTypeMiddleware:
-    """Refuse a non-JSON request body on /mcp and /api/v1/* with 415.
+    """Refuse a non-JSON request body with 415 on the routes _requires_json_body matches.
 
     A browser sends a text/plain or form POST cross-origin without a CORS
-    preflight, so a page the operator has open could otherwise drive these
+    preflight, so a page the operator has open could otherwise drive those
     routes on a server it can reach. Requiring application/json forces the
     preflight, which CORS then answers. Raw ASGI, like BearerAuthMiddleware.
     """
@@ -193,7 +192,7 @@ class HostAllowlistMiddleware:
 
 
 def create_asgi_app() -> Starlette:
-    """Create the ASGI application with MCP and health endpoints.
+    """Create the ASGI application with the health and info endpoints.
 
     Returns:
         Starlette application configured with routes and middleware.
@@ -213,9 +212,10 @@ def create_asgi_app() -> Starlette:
         """Detailed health check endpoint.
 
         Adds the LM API connectivity check when LM_HEALTH_CHECK_CONNECTIVITY is on
-        and the caller could also reach /mcp: no inbound token is configured, or the
-        request carries it. /health is an open path, so anonymous callers get the
-        local checks only and cannot spend the portal's API quota.
+        and the caller would pass the bearer check on a gated path: no inbound token
+        is configured, or the request carries it. /health is an open path, so
+        anonymous callers get the local checks only and cannot spend the portal's
+        API quota.
         """
         from lm_mcp.health import run_health_checks
 
@@ -249,194 +249,6 @@ def create_asgi_app() -> Starlette:
             return Response(content="not ready", status_code=503)
         return Response(content="ready", status_code=200)
 
-    def rpc_error(code: int, message: str, req_id: object, status_code: int = 400) -> Response:
-        """Build a JSON-RPC 2.0 error response."""
-        return JSONResponse(
-            {"jsonrpc": "2.0", "error": {"code": code, "message": message}, "id": req_id},
-            status_code=status_code,
-        )
-
-    async def mcp_endpoint(request: Request) -> Response:
-        """MCP JSON-RPC endpoint for tool calls.
-
-        Delegates tool execution to the shared execute_tool middleware,
-        ensuring consistent behavior (filtering, validation, audit logging,
-        session recording) across stdio and HTTP transports. tools/call
-        arguments are checked against the tool's input schema first, so a
-        malformed call never reaches a handler.
-        """
-        import jsonschema
-
-        from lm_mcp.server import _filter_tools, collect_tools, execute_tool
-
-        try:
-            body = await request.json()
-        except (ValueError, RecursionError):
-            # ValueError covers JSONDecodeError for text that is not JSON and UnicodeDecodeError
-            # for bytes that are not UTF-8; RecursionError is nesting too deep to parse.
-            return rpc_error(-32700, "Parse error", None)
-
-        req_id = None
-        try:
-            if not isinstance(body, dict):
-                return rpc_error(-32600, "Invalid Request", None)
-
-            method = body.get("method")
-            params = body.get("params", {})
-            req_id = body.get("id")
-            if not isinstance(params, dict):
-                return rpc_error(-32602, "Invalid params: params must be an object", req_id)
-
-            # The tools this server can dispatch, before operator filters.
-            all_tools = collect_tools()
-
-            if method == "tools/list":
-                filtered = _filter_tools(all_tools, config)
-                result = [{"name": t.name, "description": t.description} for t in filtered]
-                return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})
-
-            elif method == "tools/call":
-                tool_name = params.get("name")
-                arguments = params.get("arguments", {})
-
-                if not tool_name:
-                    return rpc_error(-32602, "Missing tool name", req_id)
-
-                # A name outside the manifest goes to execute_tool, which owns the
-                # unknown-tool and integration-not-configured refusals.
-                tool = next((t for t in all_tools if t.name == tool_name), None)
-                if tool is not None:
-                    try:
-                        jsonschema.validate(arguments, tool.inputSchema)
-                    except jsonschema.ValidationError as e:
-                        message = f"Invalid arguments for {tool_name}: {e.message}"
-                        location = "/".join(str(part) for part in e.absolute_path)
-                        if location:
-                            message += f" (at {location})"
-                        return rpc_error(-32602, message, req_id)
-
-                result = await execute_tool(tool_name, arguments)
-
-                # Extract text content from result
-                if result and len(result) > 0:
-                    text = result[0].text
-                    try:
-                        content = json.loads(text)
-                    except json.JSONDecodeError:
-                        content = text
-                else:
-                    content = None
-
-                return JSONResponse({"jsonrpc": "2.0", "result": content, "id": req_id})
-
-            elif method == "resources/list":
-                from lm_mcp.resources import RESOURCES
-
-                result = [{"uri": str(r.uri), "name": r.name} for r in RESOURCES]
-                return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})
-
-            elif method == "prompts/list":
-                from lm_mcp.prompts import PROMPTS
-
-                result = [{"name": p.name, "description": p.description} for p in PROMPTS]
-                return JSONResponse({"jsonrpc": "2.0", "result": result, "id": req_id})
-
-            else:
-                return rpc_error(-32601, f"Method not found: {method}", req_id)
-
-        # Exception text can carry internal state (URLs, credentials in a DSN), so
-        # the caller gets a fixed message and the traceback goes to the log.
-        except ValueError:
-            logger.exception("Invalid params in MCP request")
-            return rpc_error(-32602, "Invalid params", req_id)
-        except Exception:
-            logger.exception("Error handling MCP request")
-            return rpc_error(-32603, "Internal error", req_id, status_code=500)
-
-    # Analysis store (shared across requests within the ASGI app)
-    from lm_mcp.analysis import AnalysisStore, run_analysis, validate_workflow
-
-    analysis_store = AnalysisStore(ttl_minutes=60, max_concurrency=config.analysis_max_concurrency)
-    # Hold references to background tasks to prevent garbage collection (RUF006)
-    _background_tasks: set[asyncio.Task] = set()  # type: ignore[type-arg]
-
-    async def post_analyze(request: Request) -> Response:
-        """Start an analysis workflow.
-
-        Accepts JSON body with 'workflow' and 'arguments' fields.
-        Returns 202 with analysis_id for async polling.
-        """
-        try:
-            body = await request.json()
-        except (json.JSONDecodeError, Exception):
-            return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
-
-        workflow = body.get("workflow")
-        if not workflow:
-            return JSONResponse({"error": "Missing 'workflow' field"}, status_code=400)
-
-        try:
-            validate_workflow(workflow)
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-        arguments = body.get("arguments", {})
-        req = analysis_store.create(workflow, arguments)
-
-        # Run analysis in background
-        task = asyncio.create_task(run_analysis(analysis_store, req.id))
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
-
-        return JSONResponse(
-            {"analysis_id": req.id, "status": "pending"},
-            status_code=202,
-        )
-
-    async def get_analysis(request: Request) -> Response:
-        """Poll analysis status and results.
-
-        Returns the current state of an analysis request.
-        """
-        analysis_id = request.path_params["analysis_id"]
-        req = analysis_store.get(analysis_id)
-
-        if req is None:
-            return JSONResponse({"error": "Analysis not found"}, status_code=404)
-
-        return JSONResponse(req.to_dict())
-
-    async def webhook_alert(request: Request) -> Response:
-        """Receive LM alert webhook and trigger RCA workflow.
-
-        Accepts alert payload and starts an automatic RCA analysis.
-        """
-        try:
-            body = await request.json()
-        except (json.JSONDecodeError, Exception):
-            return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
-
-        # Extract alert context for RCA
-        device_id = body.get("deviceId")
-        alert_id = body.get("alertId")
-        arguments = {
-            "hours_back": 4,
-        }
-        if device_id:
-            arguments["device_id"] = device_id
-        if alert_id:
-            arguments["alert_id"] = alert_id
-
-        req = analysis_store.create("rca_workflow", arguments)
-        task = asyncio.create_task(run_analysis(analysis_store, req.id))
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
-
-        return JSONResponse(
-            {"analysis_id": req.id, "status": "pending"},
-            status_code=202,
-        )
-
     async def root(request: Request) -> Response:
         """Root endpoint with server info."""
         from lm_mcp import __version__
@@ -447,13 +259,9 @@ def create_asgi_app() -> Starlette:
                 "version": __version__,
                 "transport": "http",
                 "endpoints": {
-                    "mcp": "/mcp",
                     "health": "/health",
                     "healthz": "/healthz",
                     "readyz": "/readyz",
-                    "analyze": "/api/v1/analyze",
-                    "analysis": "/api/v1/analysis/{id}",
-                    "webhook_alert": "/api/v1/webhooks/alert",
                 },
                 "timestamp": datetime.now(UTC).isoformat(),
             }
@@ -461,13 +269,9 @@ def create_asgi_app() -> Starlette:
 
     routes = [
         Route("/", root, methods=["GET"]),
-        Route("/mcp", mcp_endpoint, methods=["POST"]),
         Route("/health", health, methods=["GET"]),
         Route("/healthz", healthz, methods=["GET"]),
         Route("/readyz", readyz, methods=["GET"]),
-        Route("/api/v1/analyze", post_analyze, methods=["POST"]),
-        Route("/api/v1/analysis/{analysis_id}", get_analysis, methods=["GET"]),
-        Route("/api/v1/webhooks/alert", webhook_alert, methods=["POST"]),
     ]
 
     # Order matters: the first entry is outermost. The Host check runs first, so
@@ -493,7 +297,7 @@ def create_asgi_app() -> Starlette:
         middleware.append(Middleware(BearerAuthMiddleware, token=config.http_auth_token))
     else:
         logger.warning(
-            "Inbound HTTP authentication is disabled; /mcp and /api/v1/* accept "
+            "Inbound HTTP authentication is disabled; every route accepts "
             "unauthenticated requests. Set LM_HTTP_AUTH_TOKEN to require a bearer token."
         )
     middleware.append(Middleware(JsonContentTypeMiddleware))

@@ -284,8 +284,8 @@ async def _stdio_tool_names(serve: AsyncMock) -> list[str]:
     return names
 
 
-async def _http_tool_names(monkeypatch) -> list[str]:
-    """Start the HTTP server on loopback and return the tool names tools/list gives."""
+async def _http_healthz(monkeypatch) -> int:
+    """Start the HTTP server on loopback and return the status GET /healthz gives."""
     import httpx
 
     from lm_mcp.transport.http import create_http_server
@@ -295,12 +295,12 @@ async def _http_tool_names(monkeypatch) -> list[str]:
         live(create_http_server()) as port,
         httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}") as client,
     ):
-        resp = await client.post("/mcp", json={"jsonrpc": "2.0", "method": "tools/list", "id": 1})
-    return [tool["name"] for tool in resp.json()["result"]]
+        resp = await client.get("/healthz")
+    return resp.status_code
 
 
 class TestOneBootstrapForBothTransports:
-    """R4.7: both transports build backends through one function and list the same tools.
+    """R4.7: both transports build backends through one function.
 
     The stdio serve loop and streams are faked; the HTTP server runs on a real
     loopback socket. Backend construction runs for real.
@@ -329,8 +329,8 @@ class TestOneBootstrapForBothTransports:
         monkeypatch.setattr(server_module.server, "run", self.serve)
         monkeypatch.setattr("mcp.stdio_server", _fake_stdio_server())
 
-    async def test_no_backends_list_the_filtered_core_tools(self, monkeypatch):
-        """With no backend configured both transports list exactly the filtered TOOLS."""
+    async def test_no_backends_list_the_filtered_core_tools(self):
+        """With no backend configured stdio lists exactly the filtered TOOLS."""
         from lm_mcp.config import get_config
         from lm_mcp.registry import TOOLS
         from lm_mcp.server import _filter_tools
@@ -338,7 +338,6 @@ class TestOneBootstrapForBothTransports:
         expected = [t.name for t in _filter_tools(list(TOOLS), get_config())]
 
         assert await _stdio_tool_names(self.serve) == expected
-        assert await _http_tool_names(monkeypatch) == expected
 
     async def test_each_transport_calls_bootstrap_backends_once(self, monkeypatch):
         """bootstrap_backends is the one function both transports build backends with."""
@@ -351,5 +350,5 @@ class TestOneBootstrapForBothTransports:
         ) as spy:
             await _stdio_tool_names(self.serve)
             assert spy.call_count == 1
-            await _http_tool_names(monkeypatch)
+            assert await _http_healthz(monkeypatch) == 200
             assert spy.call_count == 2

@@ -13,9 +13,9 @@
 #
 # Then:  kubectl apply -f deploy/k8s/deployment.yaml
 #
-# Clients reach the server at http://mcp-server-logicmonitor:8080/mcp inside the
-# cluster and must send "Authorization: Bearer <http-auth-token>". Expose it
-# outside the cluster only behind TLS (an Ingress or Route that terminates HTTPS).
+# Inside the cluster the server answers at http://mcp-server-logicmonitor:8080, and
+# every path outside / and the probes needs "Authorization: Bearer <http-auth-token>".
+# Expose it outside the cluster only behind TLS (an Ingress or Route that terminates HTTPS).
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -72,7 +72,7 @@ spec:
                 secretKeyRef:
                   name: lm-mcp-credentials
                   key: bearer-token
-            # Requires a bearer token on /mcp and /api/v1/*. The pod binds 0.0.0.0,
+            # Requires a bearer token outside / and the probes. The pod binds 0.0.0.0,
             # so the server refuses to start without it unless
             # LM_HTTP_ALLOW_UNAUTHENTICATED is true (a listener protected another way).
             - name: LM_HTTP_AUTH_TOKEN
