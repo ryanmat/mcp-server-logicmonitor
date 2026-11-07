@@ -18,6 +18,8 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
   summary from the report.
 - The `ttm` method on `forecast_metric`. `method` takes `auto`, `linear` or `holt_winters`.
+- The `watsonx` category in `lm://guide/tool-categories`, which `search_tools` reads for its
+  `category` argument.
 - The `ibm` and `huggingface` extras, and the settings only they read: `WATSONX_API_KEY`,
   `WATSONX_URL`, `WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`,
   `HF_DEVICE` and `HF_CACHE_DIR`.

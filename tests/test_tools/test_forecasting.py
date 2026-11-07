@@ -448,6 +448,40 @@ class TestForecastMethodLabels:
 
         assert cpu["method_used"] == "holt_winters"
 
+    @pytest.mark.parametrize(
+        ("samples", "interval_sec", "hours_back", "expected"),
+        [
+            (48, 14400, 168, "holt_winters"),
+            (47, 14400, 168, "linear"),
+            (48, 14400, 167, "linear"),
+            (48, 1440, 168, "linear"),
+        ],
+    )
+    def test_auto_rule_boundaries(self, samples, interval_sec, hours_back, expected):
+        """auto wants hours_back of 168, 48 samples, and a lag shorter than half the series."""
+        from lm_mcp.tools.forecasting import _select_forecast_method
+
+        values = [50.0 + 20.0 * math.sin(2 * math.pi * i / 6) for i in range(samples)]
+        timestamps = [BASE_EPOCH + i * interval_sec for i in range(samples)]
+
+        assert _select_forecast_method("auto", values, timestamps, hours_back) == expected
+
+    def test_method_description_states_the_auto_rule(self):
+        """The schema names each condition _select_forecast_method applies."""
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "forecast_metric")
+        description = " ".join(tool.inputSchema["properties"]["method"]["description"].split())
+
+        for condition in (
+            "hours_back is at least 168",
+            "at least 48 samples",
+            "exceeds 0.5 in magnitude",
+            "12 or 24 hour lag",
+            "shorter than half the series",
+        ):
+            assert condition in description
+
 
 class TestDetectChangePoints:
     """Tests for detect_change_points tool."""

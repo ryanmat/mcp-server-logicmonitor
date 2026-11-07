@@ -4687,9 +4687,10 @@ TOOLS.extend(
                         "enum": ["auto", "linear", "holt_winters"],
                         "default": "auto",
                         "description": (
-                            "Forecasting method. 'auto' picks 'holt_winters' when at least "
-                            "168 hours of history autocorrelate strongly at a 12 or 24 hour "
-                            "lag, and 'linear' otherwise."
+                            "Forecasting method. 'auto' picks 'holt_winters' when hours_back "
+                            "is at least 168, the series has at least 48 samples, and its "
+                            "autocorrelation exceeds 0.5 in magnitude at a 12 or 24 hour lag "
+                            "shorter than half the series; otherwise 'linear'."
                         ),
                     },
                 },

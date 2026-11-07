@@ -26,7 +26,7 @@ from lm_mcp.transport.bootstrap import Backends
 _SRC = Path(lm_mcp.__file__).parent
 _REPO = Path(__file__).resolve().parent.parent
 
-# Word-bounded where a plain substring would match an ordinary word: "orchestration" holds "torch".
+# Word-bounded where a plain substring overmatches: "TestOrchestrationGuide" holds "torch".
 _REMOVED_WORDS = re.compile(
     r"watsonx|huggingface|granite|\btorch\b|\bhf_|\bttm\b|nl_summary", re.IGNORECASE
 )
