@@ -216,20 +216,21 @@ def is_write_tool(tool_name: str) -> bool:
 def _portal_marker() -> str:
     """Return " portal=<name>" for audit lines in multi-portal mode, else "".
 
-    Looked up lazily so single-portal deployments pay nothing and audit logging
-    never depends on portal state being importable.
+    The name is the call's bound portal (spec R2.12), fixed when the call started,
+    so a use_portal while the handler runs does not move it. Looked up lazily so
+    single-portal deployments pay nothing and audit logging never fails a call.
     """
     try:
         from lm_mcp.config import get_config
 
         if not get_config().multi_portal:
             return ""
-        from lm_mcp import portals
+        from lm_mcp.context import current_binding
 
-        name = portals.active().get("active")
+        name = current_binding().portal
         return f" portal={name}" if name else ""
     except Exception:
-        _audit_logger.debug("could not resolve active portal for audit line", exc_info=True)
+        _audit_logger.debug("could not resolve the bound portal for audit line", exc_info=True)
         return ""
 
 
@@ -242,7 +243,8 @@ def log_write_operation(
 
     Successful operations are logged at INFO level.
     Failed operations are logged at WARNING level.
-    In multi-portal mode each line carries the active portal name.
+    In multi-portal mode each line carries the portal bound to the call, and
+    none outside a call or before use_portal.
     Argument values under credential-shaped keys are redacted first
     (see :func:`redact_arguments`).
 

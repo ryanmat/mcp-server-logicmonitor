@@ -92,6 +92,7 @@ class TestPortalAuditVisibility:
         import json
 
         from lm_mcp import portals
+        from lm_mcp.context import bind
         from lm_mcp.logging import log_write_operation
 
         p = tmp_path / "portals.json"
@@ -102,7 +103,10 @@ class TestPortalAuditVisibility:
         monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
         portals.activate("acme")
 
-        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+        with (
+            bind(portals.call_binding(writes_enabled=True)),
+            caplog.at_level(logging.INFO, logger="lm_mcp.audit"),
+        ):
             log_write_operation("create_device", {}, success=True)
         assert any("portal=acme" in r.getMessage() for r in caplog.records)
 
