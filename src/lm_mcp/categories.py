@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+from fnmatch import fnmatch
+from typing import Any
+
 from mcp.types import Tool
 
 # Workflow is a curated frozenset, not annotation-derived, because composite
@@ -39,6 +42,25 @@ WORKFLOW_TOOLS: frozenset[str] = frozenset(
 KNOWN_CATEGORIES: frozenset[str] = frozenset(
     {"read", "write", "delete", "export", "import", "session", "workflow"}
 )
+
+
+def passes_name_filter(name: str, config: Any) -> bool:
+    """Return whether LM_ENABLED_TOOLS and LM_DISABLED_TOOLS let a tool name through.
+
+    Each holds comma-separated tool names and glob patterns (``get_*``). When
+    LM_ENABLED_TOOLS is set it wins and admits only the names it matches; otherwise
+    LM_DISABLED_TOOLS refuses the names it matches. The tool list, the call gate and
+    the composite tools' check of the tools they need all read the filter here.
+
+    Args:
+        name: Tool name to check.
+        config: Settings carrying ``enabled_tools`` and ``disabled_tools``.
+    """
+    csv = config.enabled_tools or config.disabled_tools
+    if not csv:
+        return True
+    matched = any(fnmatch(name, p.strip()) for p in csv.split(",") if p.strip())
+    return matched if config.enabled_tools else not matched
 
 
 def writes_to_portal(tool: Tool) -> bool:

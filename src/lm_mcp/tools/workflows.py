@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Awaitable, Callable
-from fnmatch import fnmatch
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
@@ -39,17 +38,11 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
 
     Returns None if OK, error TextContent list if any tool is blocked.
     """
+    from lm_mcp.categories import passes_name_filter
     from lm_mcp.config import get_config
 
     config = get_config()
-    blocked: list[str] = []
-
-    if config.enabled_tools:
-        patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
-        blocked = [t for t in required if not any(fnmatch(t, p) for p in patterns)]
-    elif config.disabled_tools:
-        patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
-        blocked = [t for t in required if any(fnmatch(t, p) for p in patterns)]
+    blocked = [t for t in required if not passes_name_filter(t, config)]
 
     if not blocked and config.mcp_categories:
         from lm_mcp.categories import tool_in_categories

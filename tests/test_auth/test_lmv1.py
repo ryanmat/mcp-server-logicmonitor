@@ -246,12 +246,12 @@ class TestLMv1AuthFactory:
         # Clear bearer token to avoid conflict
         monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
 
-        from lm_mcp.auth import create_auth_provider
+        from lm_mcp.auth import validate_auth
         from lm_mcp.auth.lmv1 import LMv1Auth
         from lm_mcp.config import LMConfig
 
         config = LMConfig()
-        auth = create_auth_provider(config)
+        auth = validate_auth(config.bearer_token, config.access_id, config.access_key)
 
         assert isinstance(auth, LMv1Auth)
         assert auth.access_id == "my_access_id"
@@ -264,12 +264,12 @@ class TestLMv1AuthFactory:
         monkeypatch.setenv("LM_ACCESS_ID", "access_id")
         monkeypatch.setenv("LM_ACCESS_KEY", "access_key")
 
-        from lm_mcp.auth import create_auth_provider
+        from lm_mcp.auth import validate_auth
         from lm_mcp.auth.bearer import BearerAuth
         from lm_mcp.config import LMConfig
 
         config = LMConfig()
-        auth = create_auth_provider(config)
+        auth = validate_auth(config.bearer_token, config.access_id, config.access_key)
 
         assert isinstance(auth, BearerAuth)
 

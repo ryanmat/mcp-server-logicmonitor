@@ -962,7 +962,7 @@ def waits(monkeypatch):
     async def fake_sleep(seconds):
         recorded.append(seconds)
 
-    monkeypatch.setattr("lm_mcp.client.api.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("lm_mcp.client._retry.asyncio.sleep", fake_sleep)
     return recorded
 
 
@@ -1169,3 +1169,86 @@ class TestTransportErrorTranslation:
 
         assert "timed out" in exc_info.value.message
         assert args[0] in exc_info.value.message
+
+
+class TestOneClientFactory:
+    """Single- and multi-portal clients come from build_client (spec R2.6)."""
+
+    def test_client_is_constructed_only_in_build_client(self):
+        import ast
+        from pathlib import Path
+
+        src = Path(__file__).resolve().parent.parent.parent / "src" / "lm_mcp"
+        builders: list[str] = []
+        for path in sorted(src.rglob("*.py")):
+            for func in ast.walk(ast.parse(path.read_text())):
+                if not isinstance(func, ast.FunctionDef | ast.AsyncFunctionDef):
+                    continue
+                for node in ast.walk(func):
+                    if (
+                        isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id == "LogicMonitorClient"
+                    ):
+                        builders.append(f"{path.relative_to(src)}:{func.name}")
+
+        assert sorted(set(builders)) == ["client/__init__.py:build_client"]
+
+    def test_single_portal_client_takes_the_config(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "acme.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-12345")
+        monkeypatch.setenv("LM_TIMEOUT", "45")
+        monkeypatch.setenv("LM_MAX_RETRIES", "2")
+        monkeypatch.setenv("LM_RETRY_AFTER_CAP_SECONDS", "60")
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import build_client
+        from lm_mcp.config import get_config
+
+        config = get_config()
+        client = build_client(
+            config.portal,
+            bearer_token=config.bearer_token,
+            access_id=config.access_id,
+            access_key=config.access_key,
+        )
+
+        assert client.base_url == "https://acme.logicmonitor.com/santaba/rest"
+        assert client.ingest_url == "https://acme.logicmonitor.com"
+        assert isinstance(client.auth, BearerAuth)
+        assert (client.max_retries, client.retry_after_cap) == (2, 60)
+        assert client._client.timeout.read == 45
+
+    def test_missing_portal_is_refused(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "acme.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-12345")
+        from lm_mcp.client import build_client
+        from lm_mcp.exceptions import ConfigurationError
+
+        with pytest.raises(ConfigurationError, match="LM_PORTAL"):
+            build_client(None, bearer_token="test-token-12345", access_id=None, access_key=None)
+
+    def test_multi_portal_client_comes_from_build_client(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "internal.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-12345")
+        import lm_mcp.client
+        from lm_mcp import portals
+
+        calls: list[tuple[str, dict]] = []
+        real = lm_mcp.client.build_client
+
+        def spy(portal, **credentials):
+            calls.append((portal, credentials))
+            return real(portal, **credentials)
+
+        monkeypatch.setattr(lm_mcp.client, "build_client", spy)
+        client = portals._build_client(
+            {"portal": "https://beta.logicmonitor.com/", "access_id": "id", "access_key": "key"}
+        )
+
+        assert calls == [
+            (
+                "beta.logicmonitor.com",
+                {"bearer_token": None, "access_id": "id", "access_key": "key"},
+            )
+        ]
+        assert client.base_url == "https://beta.logicmonitor.com/santaba/rest"

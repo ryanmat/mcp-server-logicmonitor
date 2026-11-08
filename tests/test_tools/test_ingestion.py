@@ -31,12 +31,12 @@ class TestIngestLogs:
 
         reload(lm_mcp.config)
 
-        from lm_mcp.auth import create_auth_provider
+        from lm_mcp.auth import validate_auth
         from lm_mcp.client import LogicMonitorClient
         from lm_mcp.config import LMConfig
 
         config = LMConfig()
-        auth = create_auth_provider(config)
+        auth = validate_auth(config.bearer_token, config.access_id, config.access_key)
         return LogicMonitorClient(
             base_url=config.base_url,
             auth=auth,
@@ -126,12 +126,12 @@ class TestPushMetrics:
 
         reload(lm_mcp.config)
 
-        from lm_mcp.auth import create_auth_provider
+        from lm_mcp.auth import validate_auth
         from lm_mcp.client import LogicMonitorClient
         from lm_mcp.config import LMConfig
 
         config = LMConfig()
-        auth = create_auth_provider(config)
+        auth = validate_auth(config.bearer_token, config.access_id, config.access_key)
         return LogicMonitorClient(
             base_url=config.base_url,
             auth=auth,
@@ -229,12 +229,12 @@ class TestIngestionWriteGate:
 
         reload(lm_mcp.config)
 
-        from lm_mcp.auth import create_auth_provider
+        from lm_mcp.auth import validate_auth
         from lm_mcp.client import LogicMonitorClient
         from lm_mcp.config import LMConfig
 
         config = LMConfig()
-        auth = create_auth_provider(config)
+        auth = validate_auth(config.bearer_token, config.access_id, config.access_key)
         return LogicMonitorClient(
             base_url=config.base_url,
             auth=auth,
@@ -285,12 +285,12 @@ class TestIngestionValidationErrors:
 
         reload(lm_mcp.config)
 
-        from lm_mcp.auth import create_auth_provider
+        from lm_mcp.auth import validate_auth
         from lm_mcp.client import LogicMonitorClient
         from lm_mcp.config import LMConfig
 
         config = LMConfig()
-        auth = create_auth_provider(config)
+        auth = validate_auth(config.bearer_token, config.access_id, config.access_key)
         return LogicMonitorClient(
             base_url=config.base_url,
             auth=auth,

@@ -9,7 +9,7 @@ import pytest
 import respx
 from httpx import Request, Response
 
-from lm_mcp.auth import create_auth_provider
+from lm_mcp.auth import validate_auth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.config import LMConfig
 
@@ -29,7 +29,7 @@ def lmv1_client(monkeypatch):
     config = LMConfig()
     return LogicMonitorClient(
         base_url=config.base_url,
-        auth=create_auth_provider(config),
+        auth=validate_auth(config.bearer_token, config.access_id, config.access_key),
         max_retries=0,
         ingest_url=INGEST_URL,
     )

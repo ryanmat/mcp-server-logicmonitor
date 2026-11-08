@@ -144,7 +144,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `lm_mcp.hf_config`, `lm_mcp.ibm_config`, `lm_mcp.terraform_config`, `lm_mcp.tools.ansible` and
   `lm_mcp.tools.watsonx`; the `AWX_TOOLS`, `WATSONX_TOOLS` and `TF_TOOLS` manifests in
   `lm_mcp.registry`; `AWX_TOOL_NAMES`, `WATSONX_TOOL_NAMES`, `TF_TOOL_NAMES`, `get_awx_client`,
-  `get_watsonx_client` and `get_tf_runner` in `lm_mcp.server`.
+  `get_watsonx_client` and `get_tf_runner` in `lm_mcp.server`; `create_auth_provider` in
+  `lm_mcp.auth`, which `validate_auth` replaces, and `WRITE_TOOL_PREFIXES` in `lm_mcp.logging`.
 
 ### Fixed
 
@@ -216,6 +217,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `LM_MCP_CATEGORIES` or single-portal mode answers `FEATURE_DISABLED`, an unknown tool name
   `INVALID_REQUEST`, and an exception no handler expected `UPSTREAM_ERROR` (`TIMEOUT` for a raw
   timeout) with its class name in `details.exception`.
+- The write audit trail records a call when the tool's annotations say it is not read-only, in
+  place of a list of name prefixes. `set_session_variable` and `clear_session_context` now get an
+  audit line, as `delete_session_variable` did, and a name no tool answers to, such as
+  `delete_no_such_resource`, gets none.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other

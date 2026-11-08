@@ -238,3 +238,46 @@ class TestPortalToolCategoryExemption:
         from lm_mcp.categories import WORKFLOW_TOOLS
 
         assert names <= WORKFLOW_TOOLS
+
+
+class TestOneNameFilter:
+    """LM_ENABLED_TOOLS and LM_DISABLED_TOOLS are read by one function (spec R2.6)."""
+
+    @pytest.mark.parametrize(
+        ("enabled", "disabled", "name", "allowed"),
+        [
+            (None, None, "delete_device", True),
+            ("get_*, health_check", None, "get_devices", True),
+            ("get_*, health_check", None, "health_check", True),
+            ("get_*, health_check", None, "delete_device", False),
+            (None, "delete_*,bulk_*", "delete_device", False),
+            (None, "delete_*,bulk_*", "get_devices", True),
+            ("get_*", "get_devices", "get_devices", True),
+        ],
+    )
+    def test_passes_name_filter(self, enabled, disabled, name, allowed):
+        from lm_mcp.categories import passes_name_filter
+
+        config = _MockConfig(enabled_tools=enabled, disabled_tools=disabled)
+
+        assert passes_name_filter(name, config) is allowed
+
+    def test_fnmatch_is_called_only_in_passes_name_filter(self):
+        import ast
+        from pathlib import Path
+
+        src = Path(__file__).resolve().parent.parent / "src" / "lm_mcp"
+        callers: list[str] = []
+        for path in sorted(src.rglob("*.py")):
+            for func in ast.walk(ast.parse(path.read_text())):
+                if not isinstance(func, ast.FunctionDef | ast.AsyncFunctionDef):
+                    continue
+                for node in ast.walk(func):
+                    if (
+                        isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id == "fnmatch"
+                    ):
+                        callers.append(f"{path.relative_to(src)}:{func.name}")
+
+        assert sorted(set(callers)) == ["categories.py:passes_name_filter"]

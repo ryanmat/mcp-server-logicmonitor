@@ -17,7 +17,7 @@ def no_sleep(monkeypatch):
     async def fake_sleep(seconds):
         return None
 
-    monkeypatch.setattr("lm_mcp.client.api.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("lm_mcp.client._retry.asyncio.sleep", fake_sleep)
 
 
 @pytest.fixture
@@ -189,3 +189,48 @@ class TestRetryConfig:
         monkeypatch.setenv("LM_RETRY_AFTER_CAP_SECONDS", "-1")
         with pytest.raises(pydantic.ValidationError, match="retry_after_cap_seconds"):
             LMConfig()
+
+
+class TestOneRetryLoop:
+    """request, post_multipart and ingest_post resend through one function (spec R2.6)."""
+
+    @respx.mock
+    async def test_all_three_paths_retry_through_run(self, auth, monkeypatch):
+        from lm_mcp.client import _retry
+
+        real_run = _retry.run
+        seen: list[tuple[str, str]] = []
+
+        async def spy(send, **kwargs):
+            seen.append((kwargs["method"], kwargs["service"]))
+            return await real_run(send, **kwargs)
+
+        monkeypatch.setattr(_retry, "run", spy)
+        client = LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=auth,
+            timeout=30,
+            max_retries=3,
+            ingest_url="https://test.logicmonitor.com",
+        )
+        throttled = httpx.Response(429, headers={"Retry-After": "1"})
+        rest = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            side_effect=[throttled, httpx.Response(200, json={"items": []})]
+        )
+        upload = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/datasources/importjson"
+        ).mock(side_effect=[throttled, httpx.Response(200, json={"id": 7})])
+        ingest = respx.post("https://test.logicmonitor.com/rest/log/ingest").mock(
+            side_effect=[throttled, httpx.Response(202, json={"success": True})]
+        )
+
+        await client.get("/device/devices")
+        await client.post_multipart("/setting/datasources/importjson", {"name": "x"})
+        await client.ingest_post("/rest/log/ingest", [{"msg": "x"}])
+
+        assert seen == [
+            ("GET", "LogicMonitor API"),
+            ("POST", "LogicMonitor API"),
+            ("POST", "LogicMonitor ingest"),
+        ]
+        assert (rest.call_count, upload.call_count, ingest.call_count) == (2, 2, 2)

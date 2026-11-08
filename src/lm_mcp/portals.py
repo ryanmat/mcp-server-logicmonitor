@@ -142,30 +142,22 @@ def names() -> list[dict]:
 
 
 def _build_client(rec: dict):
-    from lm_mcp.auth.bearer import BearerAuth
-    from lm_mcp.auth.lmv1 import LMv1Auth
-    from lm_mcp.client import LogicMonitorClient
-    from lm_mcp.config import get_config, normalize_portal_host
+    from lm_mcp.client import build_client
+    from lm_mcp.config import normalize_portal_host
+    from lm_mcp.exceptions import ConfigurationError
 
-    cfg = get_config()
     portal = rec.get("portal")
     if not portal:
         raise ValueError("portal record is missing the 'portal' hostname")
-    portal = normalize_portal_host(str(portal))
-    if rec.get("bearer_token"):
-        auth = BearerAuth(rec["bearer_token"])
-    elif rec.get("access_id") and rec.get("access_key"):
-        auth = LMv1Auth(rec["access_id"], rec["access_key"])
-    else:
-        raise ValueError("portal record needs bearer_token or access_id + access_key")
-    return LogicMonitorClient(
-        base_url=f"https://{portal}/santaba/rest",
-        auth=auth,
-        timeout=cfg.timeout,
-        max_retries=cfg.max_retries,
-        retry_after_cap=cfg.retry_after_cap_seconds,
-        ingest_url=f"https://{portal}",
-    )
+    try:
+        return build_client(
+            normalize_portal_host(str(portal)),
+            bearer_token=rec.get("bearer_token"),
+            access_id=rec.get("access_id"),
+            access_key=rec.get("access_key"),
+        )
+    except ConfigurationError as e:
+        raise ValueError("portal record needs bearer_token or access_id + access_key") from e
 
 
 def activate(customer: str) -> dict:
