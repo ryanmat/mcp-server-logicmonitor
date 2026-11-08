@@ -1,5 +1,5 @@
 # Description: Tests for the shared list pagination response helper and its call sites.
-# Description: A negative API total (a lower bound) must read as more results, with a note.
+# Description: A negative API total (a lower bound) reads as more results when the page has rows.
 
 import json
 
