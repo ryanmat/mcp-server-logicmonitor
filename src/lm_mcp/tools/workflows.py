@@ -5,12 +5,21 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from fnmatch import fnmatch
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
 from lm_mcp.tools import call_sub_tool, format_response, handle_error
+from lm_mcp.tools.configsources import update_configsource
+from lm_mcp.tools.datasources import update_datasource
+from lm_mcp.tools.diagnosticsources import update_diagnosticsource
+from lm_mcp.tools.eventsources import update_eventsource
+from lm_mcp.tools.logsources import update_logsource
+from lm_mcp.tools.propertysources import update_propertysource
+from lm_mcp.tools.remediationsources import update_remediationsource
+from lm_mcp.tools.topologysources import update_topologysource
 
 # Audit logger for write workflows. Configured via standard logging; if no
 # handler is attached, records propagate to the root logger.
@@ -1206,25 +1215,43 @@ async def search_tools(
 # Composite tool: update_logicmodule (safe export-modify-update for source types)
 # ---------------------------------------------------------------------------
 
-# Map of LogicModule type -> (export tool name, update tool name, id arg name).
-# Diagnostic and Remediation sources are intentionally excluded:
-# DiagnosticSource is read-only; RemediationSource has its own execute path.
-_LM_TYPES: dict[str, tuple[str, str, str]] = {
-    "configsource": ("export_configsource", "update_configsource", "configsource_id"),
-    "datasource": ("export_datasource", "update_datasource", "datasource_id"),
-    "eventsource": ("export_eventsource", "update_eventsource", "eventsource_id"),
-    "logsource": ("export_logsource", "update_logsource", "logsource_id"),
-    "propertysource": ("export_propertysource", "update_propertysource", "propertysource_id"),
-    "topologysource": ("export_topologysource", "update_topologysource", "topologysource_id"),
+# Map of LogicModule type -> (export tool that reads the full definition, full-replace PUT
+# handler, id argument name, fields the merged definition must keep). The PUT handlers are
+# internal, not registered tools. No export tool exists for TopologySources, so their
+# definition is read from the settings path directly; LM_ENABLED_TOOLS and LM_DISABLED_TOOLS
+# patterns on the export name still gate it. Only DataSource and ConfigSource bodies carry
+# displayName.
+_LogicModuleRow = tuple[str, Callable[..., Awaitable[list[TextContent]]], str, tuple[str, ...]]
+_NAME_AND_DISPLAY_NAME = ("name", "displayName")
+_NAME = ("name",)
+_LM_TYPES: dict[str, _LogicModuleRow] = {
+    "configsource": (
+        "export_configsource",
+        update_configsource,
+        "configsource_id",
+        _NAME_AND_DISPLAY_NAME,
+    ),
+    "datasource": ("export_datasource", update_datasource, "datasource_id", _NAME_AND_DISPLAY_NAME),
+    "eventsource": ("export_eventsource", update_eventsource, "eventsource_id", _NAME),
+    "logsource": ("export_logsource", update_logsource, "logsource_id", _NAME),
+    "propertysource": ("export_propertysource", update_propertysource, "propertysource_id", _NAME),
+    "topologysource": (
+        "export_topologysource",
+        update_topologysource,
+        "topologysource_id",
+        _NAME,
+    ),
     "diagnosticsource": (
         "export_diagnosticsource",
-        "update_diagnosticsource",
+        update_diagnosticsource,
         "diagnosticsource_id",
+        _NAME,
     ),
     "remediationsource": (
         "export_remediationsource",
-        "update_remediationsource",
+        update_remediationsource,
         "remediationsource_id",
+        _NAME,
     ),
 }
 
@@ -1302,14 +1329,15 @@ async def update_logicmodule(
 ) -> list[TextContent]:
     """Safe partial update for LogicMonitor source types.
 
-    Workflow: export the current full definition, deep-merge the provided
-    changes onto it, validate that LM-required fields (name, displayName)
-    are present, then either return a dry-run diff (mode='preview') or
-    apply the merged definition via the existing update_<type> handler
-    (mode='apply').
+    Workflow: read the current full definition, deep-merge the provided
+    changes onto it, validate that LM-required fields (name, plus
+    displayName for DataSources and ConfigSources) are present, then either
+    return a dry-run diff (mode='preview') or apply the merged definition
+    through the type's internal full-replace PUT handler (mode='apply').
 
-    This avoids the full-replace blanking footgun documented in lessons.md:
-    naive update_<type> calls wipe any field not in the payload.
+    The LogicModule PUT is full-replace and can blank fields left out of
+    the payload, so sending the merged full definition keeps every field
+    the caller did not change.
 
     Args:
         client: LogicMonitor API client.
@@ -1350,27 +1378,27 @@ async def update_logicmodule(
                 }
             )
 
-        export_name, update_name, id_arg = _LM_TYPES[type]
+        export_name, update_handler, id_arg, required_fields = _LM_TYPES[type]
 
-        blocked = check_required_tools([export_name, update_name])
+        blocked = check_required_tools([export_name])
         if blocked:
             return blocked
 
-        from lm_mcp.registry import get_tool_handler
+        if type == "topologysource":
+            base = await client.get(f"/setting/topologysources/{id}")
+        else:
+            from lm_mcp.registry import get_tool_handler
 
-        export_handler = get_tool_handler(export_name)
-        update_handler = get_tool_handler(update_name)
-
-        current = await call_sub_tool(export_handler, client, **{id_arg: id})
-        # DO NOT use `.get("definition") or current` -- an empty dict definition
-        # is falsy and would silently fall through to the envelope wrapper.
-        # `.get(key, default)` returns the value when key is present (even if
-        # falsy) and the default only when key is absent.
-        base = current.get("definition", current)
+            current = await call_sub_tool(get_tool_handler(export_name), client, **{id_arg: id})
+            # DO NOT use `.get("definition") or current` -- an empty dict definition
+            # is falsy and would silently fall through to the envelope wrapper.
+            # `.get(key, default)` returns the value when key is present (even if
+            # falsy) and the default only when key is absent.
+            base = current.get("definition", current)
 
         merged, merge_warnings = _deep_merge(base, changes)
 
-        for required in ("name", "displayName"):
+        for required in required_fields:
             if not merged.get(required):
                 return format_response(
                     {

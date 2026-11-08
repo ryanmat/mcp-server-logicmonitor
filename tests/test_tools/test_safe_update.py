@@ -5,10 +5,15 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
+import respx
 
+from lm_mcp.auth.bearer import BearerAuth
+from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools.workflows import (
     _LM_TYPES,
     _deep_merge,
@@ -104,7 +109,7 @@ class TestDiff:
 
 @pytest.fixture
 def patched_handlers(monkeypatch):
-    """Patch get_tool_handler to return mock export and update handlers.
+    """Patch get_tool_handler to return a mock export handler, and every type's PUT to a mock.
 
     Also configures the env so check_required_tools can build LMConfig
     without raising on missing portal/auth.
@@ -125,13 +130,13 @@ def patched_handlers(monkeypatch):
     def fake_get_tool_handler(name):
         if name.startswith("export_"):
             return export_mock
-        if name.startswith("update_"):
-            return update_mock
         raise ValueError(f"unexpected handler: {name}")
 
     import lm_mcp.registry as registry
 
     monkeypatch.setattr(registry, "get_tool_handler", fake_get_tool_handler)
+    for module_type, (export_name, _, id_arg, required) in list(_LM_TYPES.items()):
+        monkeypatch.setitem(_LM_TYPES, module_type, (export_name, update_mock, id_arg, required))
     yield export_mock, update_mock
     reset_config()
 
@@ -398,3 +403,145 @@ class TestApplyPassesConfirm:
         )
 
         assert update_mock.await_args.kwargs["confirm"] is True
+
+
+_RAW_UPDATE_TOOLS = (
+    "update_datasource",
+    "update_configsource",
+    "update_eventsource",
+    "update_propertysource",
+    "update_logsource",
+    "update_topologysource",
+    "update_diagnosticsource",
+    "update_remediationsource",
+)
+
+# GET /setting/topologysources/1 on a live portal, 2026-11-07, with the groovy script cut to
+# its header comment. A TopologySource has no displayName.
+_TOPOLOGYSOURCE = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "topologysource_1.json").read_text()
+)
+_TOPOLOGYSOURCE_URL = "https://test.logicmonitor.com/santaba/rest/setting/topologysources/1"
+
+
+@pytest.fixture
+def lm_client():
+    return LogicMonitorClient(
+        base_url="https://test.logicmonitor.com/santaba/rest",
+        auth=BearerAuth("test-token"),
+        timeout=30,
+    )
+
+
+@pytest.fixture
+def writes_on(monkeypatch):
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token-value")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+    for name in ("LM_ENABLED_TOOLS", "LM_DISABLED_TOOLS", "LM_MCP_CATEGORIES"):
+        monkeypatch.delenv(name, raising=False)
+
+
+class TestTopologysourceArm:
+    """R1.8: update_logicmodule reads a TopologySource from its settings path and PUTs it back."""
+
+    @respx.mock
+    async def test_apply_puts_the_merged_definition(self, lm_client, writes_on):
+        respx.get(_TOPOLOGYSOURCE_URL).mock(return_value=httpx.Response(200, json=_TOPOLOGYSOURCE))
+        put = respx.put(_TOPOLOGYSOURCE_URL).mock(
+            return_value=httpx.Response(200, json={**_TOPOLOGYSOURCE, "description": "probe"})
+        )
+
+        result = await update_logicmodule(
+            lm_client, type="topologysource", id=1, changes={"description": "probe"}, mode="apply"
+        )
+
+        payload = json.loads(result[0].text)
+        assert payload["applied"] is True
+        assert put.call_count == 1
+        from lm_mcp.tools import normalize_definition_fields
+
+        expected = {k: v for k, v in _TOPOLOGYSOURCE.items() if k != "id"}
+        expected["description"] = "probe"
+        assert json.loads(put.calls[0].request.content) == normalize_definition_fields(expected)
+
+    @respx.mock
+    async def test_preview_reads_and_does_not_write(self, lm_client, writes_on):
+        get = respx.get(_TOPOLOGYSOURCE_URL).mock(
+            return_value=httpx.Response(200, json=_TOPOLOGYSOURCE)
+        )
+        put = respx.put(_TOPOLOGYSOURCE_URL).mock(return_value=httpx.Response(200, json={}))
+
+        result = await update_logicmodule(
+            lm_client, type="topologysource", id=1, changes={"description": "probe"}
+        )
+
+        payload = json.loads(result[0].text)
+        assert get.call_count == 1
+        assert put.call_count == 0
+        assert payload["dry_run"] is True
+        assert payload["diff"] == [
+            {
+                "path": "description",
+                "op": "change",
+                "before": _TOPOLOGYSOURCE["description"],
+                "after": "probe",
+            }
+        ]
+
+
+@pytest.mark.parametrize(
+    ("module_type", "needs_display_name"),
+    [
+        ("configsource", True),
+        ("datasource", True),
+        ("eventsource", False),
+        ("logsource", False),
+        ("propertysource", False),
+        ("diagnosticsource", False),
+        ("remediationsource", False),
+    ],
+)
+async def test_display_name_is_required_only_where_the_api_model_has_it(
+    patched_handlers, module_type, needs_display_name
+):
+    """Only DataSource and ConfigSource bodies carry displayName (swagger and a live read)."""
+    export_mock, _ = patched_handlers
+    export_mock.return_value = _wrap({"definition": {"name": "M"}})
+
+    result = await update_logicmodule(client=None, type=module_type, id=1, changes={})
+
+    refused = "missing required field 'displayName'" in result[0].text
+    assert refused is needs_display_name
+
+
+async def test_an_allowlist_needs_only_the_export_tool(patched_handlers, monkeypatch):
+    """The PUT handler is no tool, so LM_ENABLED_TOOLS gates the read alone."""
+    monkeypatch.setenv("LM_ENABLED_TOOLS", "update_logicmodule,export_datasource")
+    export_mock, _ = patched_handlers
+    export_mock.return_value = _wrap({"definition": {"name": "DS", "displayName": "DS"}})
+
+    result = await update_logicmodule(client=None, type="datasource", id=1, changes={})
+
+    assert json.loads(result[0].text)["dry_run"] is True
+
+
+class TestRawUpdatesLeaveTheSurface:
+    """R1.8: the eight raw update_<module> names are neither registered nor dispatchable."""
+
+    def test_raw_update_tools_are_not_registered(self):
+        from lm_mcp.registry import TOOLS
+
+        names = {tool.name for tool in TOOLS}
+
+        assert names.isdisjoint(_RAW_UPDATE_TOOLS)
+        assert "update_device_eventsource" in names
+
+    async def test_execute_tool_refuses_a_raw_update(self, writes_on):
+        from lm_mcp.server import execute_tool
+
+        result = await execute_tool(
+            "update_datasource", {"datasource_id": 1, "definition": {}, "confirm": True}
+        )
+
+        assert result[0].text == "Error: Unknown tool: update_datasource"

@@ -42,6 +42,14 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 | `terraform_state_show` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_write_config` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `get_workflow` | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
+| `update_datasource` | `update_logicmodule` with `type="datasource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_configsource` | `update_logicmodule` with `type="configsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_eventsource` | `update_logicmodule` with `type="eventsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_propertysource` | `update_logicmodule` with `type="propertysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_logsource` | `update_logicmodule` with `type="logsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_topologysource` | `update_logicmodule` with `type="topologysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_diagnosticsource` | `update_logicmodule` with `type="diagnosticsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_remediationsource` | `update_logicmodule` with `type="remediationsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -110,6 +118,16 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   remain. The `get_workflow` tool, which returned prompt text to clients without prompt support,
   leaves with them, and the `universal_reference` category in `lm://guide/tool-categories` now
   lists only `get_reference`.
+
+### Fixed
+
+- `update_logicmodule` with `type="topologysource"` reads the TopologySource from
+  `/setting/topologysources/{id}` and writes it back; it failed before, naming an export tool that
+  does not exist.
+- `update_logicmodule` requires `displayName` in the merged definition only for DataSources and
+  ConfigSources, the two types whose definitions have that field. EventSources, LogSources,
+  PropertySources, DiagnosticSources and RemediationSources were refused unless the changes added
+  a `displayName`.
 
 ### Changed
 
