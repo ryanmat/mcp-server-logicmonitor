@@ -243,7 +243,8 @@ def log_write_operation(
 
     Successful operations are logged at INFO level.
     Failed operations are logged at WARNING level.
-    In multi-portal mode each line carries the active portal name.
+    In multi-portal mode each line carries the portal bound to the call, and
+    none outside a call or before use_portal.
     Argument values under credential-shaped keys are redacted first
     (see :func:`redact_arguments`).
 

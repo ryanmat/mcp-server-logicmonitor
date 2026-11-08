@@ -231,9 +231,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   an error envelope carries it as `details.portal`, `null` before a portal is selected. The four
   portal tools' results are unchanged, since `use_portal` and `current_portal` already carry the
   vault host as `portal`. The audit line for a `use_portal` names the portal the call started on;
-  its arguments name the one it switched to. Code that calls a write-gated handler, `portal_url`
-  or the audit logger outside `execute_tool` in multi-portal mode gets a `RuntimeError`, and
-  `lm_mcp.portals.is_active_writable` is removed.
+  its arguments name the one it switched to. Code that calls a write-gated handler or
+  `portal_url` outside `execute_tool` in multi-portal mode gets a `RuntimeError`; an audit line
+  written outside a call carries no portal. `lm_mcp.portals.is_active_writable` is removed.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
