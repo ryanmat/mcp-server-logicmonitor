@@ -8,22 +8,34 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
-    safe_total,
-    sanitize_filter_value,
+    list_tool,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _service_row(item: dict) -> dict:
+    """Project one deviceType 6 /device/devices row onto the get_services fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("displayName"),
+        "description": item.get("description"),
+        "group_ids": item.get("hostGroupIds"),
+        "alert_status": item.get("alertStatus"),
+        "alert_status_priority": item.get("alertStatusPriority"),
+        "sdt_status": item.get("sdtStatus"),
+        "host_status": item.get("hostStatus"),
+    }
+
+
 async def get_services(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List Service Insight business services.
 
@@ -35,46 +47,21 @@ async def get_services(
         client: LogicMonitor API client.
         name_filter: Filter by service display name (substring match).
         limit: Maximum number of services to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with service data or error.
     """
-    try:
-        params: dict = {"size": limit, "filter": "deviceType:6"}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] += f",displayName~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/device/devices", params=params)
-
-        services = []
-        for item in result.get("items", []):
-            services.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("displayName"),
-                    "description": item.get("description"),
-                    "group_ids": item.get("hostGroupIds"),
-                    "alert_status": item.get("alertStatus"),
-                    "alert_status_priority": item.get("alertStatusPriority"),
-                    "sdt_status": item.get("sdtStatus"),
-                    "host_status": item.get("hostStatus"),
-                }
-            )
-
-        response = {
-            "total": safe_total(result),
-            "count": len(services),
-            "services": services,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/device/devices",
+        key="services",
+        project=_service_row,
+        limit=limit,
+        offset=offset,
+        named={"displayName~": name_filter},
+        clauses=["deviceType:6"],
+    )
 
 
 async def get_service(
@@ -118,10 +105,23 @@ async def get_service(
         return handle_error(e)
 
 
+def _service_group_row(item: dict) -> dict:
+    """Project one BizService /device/groups row onto the get_service_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "parent_id": item.get("parentId"),
+        "full_path": item.get("fullPath"),
+        "num_of_services": item.get("numOfHosts"),
+    }
+
+
 async def get_service_groups(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List Service Insight service groups (BizService device groups).
 
@@ -129,41 +129,18 @@ async def get_service_groups(
         client: LogicMonitor API client.
         name_filter: Filter by group name (substring match).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with service group data or error.
     """
-    try:
-        params: dict = {"size": limit, "filter": 'groupType:"BizService"'}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] += f",name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/device/groups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "parent_id": item.get("parentId"),
-                    "full_path": item.get("fullPath"),
-                    "num_of_services": item.get("numOfHosts"),
-                }
-            )
-
-        response = {
-            "total": safe_total(result),
-            "count": len(groups),
-            "service_groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/device/groups",
+        key="service_groups",
+        project=_service_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+        clauses=['groupType:"BizService"'],
+    )

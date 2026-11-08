@@ -8,21 +8,36 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
-    sanitize_filter_value,
+    list_tool,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+# DataSources whose name holds one of interface, port, ethernet or network; the device
+# DataSource list matches ~ case-insensitively and | between values as OR.
+_INTERFACE_DATASOURCE_CLAUSE = 'dataSourceName~"interface"|"port"|"ethernet"|"network"'
+
+
+def _topology_row(item: dict) -> dict:
+    """Project one /topology/topologies row onto the get_topology_map fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "node_count": item.get("nodeCount"),
+        "edge_count": item.get("edgeCount"),
+    }
+
+
 async def get_topology_map(
     client: LogicMonitorClient,
     include_connections: bool = True,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get network topology map data.
 
@@ -30,35 +45,19 @@ async def get_topology_map(
         client: LogicMonitor API client.
         include_connections: Include connection/relationship data.
         limit: Maximum number of nodes to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with topology data or error.
     """
-    try:
-        params: dict = {"size": limit}
-
-        result = await client.get("/topology/topologies", params=params)
-
-        topologies = []
-        for item in result.get("items", []):
-            topology = {
-                "id": item.get("id"),
-                "name": item.get("name"),
-                "description": item.get("description"),
-                "node_count": item.get("nodeCount"),
-                "edge_count": item.get("edgeCount"),
-            }
-            topologies.append(topology)
-
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(topologies),
-                "topologies": topologies,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/topology/topologies",
+        key="topologies",
+        project=_topology_row,
+        limit=limit,
+        offset=offset,
+    )
 
 
 async def get_device_neighbors(
@@ -108,51 +107,62 @@ async def get_device_neighbors(
         return handle_error(e)
 
 
+def _interface_row(item: dict) -> dict:
+    """Project one devicedatasources row onto the get_device_interfaces fields."""
+    return {
+        "id": item.get("id"),
+        "datasource_id": item.get("dataSourceId"),
+        "datasource_name": item.get("dataSourceName"),
+        "instance_count": item.get("instanceNumber"),
+        "status": item.get("status"),
+    }
+
+
 async def get_device_interfaces(
     client: LogicMonitorClient,
     device_id: int,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get network interfaces for a device.
+
+    The portal returns the device's DataSources whose name contains interface,
+    port, ethernet or network, so limit and offset page through those only.
 
     Args:
         client: LogicMonitor API client.
         device_id: Device ID.
         limit: Maximum number of interfaces to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with interface data or error.
     """
-    try:
-        params: dict = {"size": limit}
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/devicedatasources",
+        key="interfaces",
+        project=_interface_row,
+        limit=limit,
+        offset=offset,
+        clauses=[_INTERFACE_DATASOURCE_CLAUSE],
+        extra={"device_id": device_id},
+    )
 
-        result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
 
-        # Filter to interface-related datasources
-        interfaces = []
-        for item in result.get("items", []):
-            ds_name = item.get("dataSourceName", "").lower()
-            if any(keyword in ds_name for keyword in ["interface", "port", "ethernet", "network"]):
-                interfaces.append(
-                    {
-                        "id": item.get("id"),
-                        "datasource_id": item.get("dataSourceId"),
-                        "datasource_name": item.get("dataSourceName"),
-                        "instance_count": item.get("instanceNumber"),
-                        "status": item.get("status"),
-                    }
-                )
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "total": len(interfaces),
-                "count": len(interfaces),
-                "interfaces": interfaces,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+def _flow_row(item: dict) -> dict:
+    """Project one /netflow/flows row onto the get_network_flows fields."""
+    return {
+        "id": item.get("id"),
+        "source_ip": item.get("srcIP"),
+        "source_port": item.get("srcPort"),
+        "dest_ip": item.get("dstIP"),
+        "dest_port": item.get("dstPort"),
+        "protocol": item.get("protocol"),
+        "bytes": item.get("bytes"),
+        "packets": item.get("packets"),
+        "exporter_device": item.get("exporterDeviceDisplayName"),
+    }
 
 
 async def get_network_flows(
@@ -161,6 +171,7 @@ async def get_network_flows(
     source_ip: str | None = None,
     dest_ip: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get network flow data (NetFlow/sFlow).
 
@@ -170,57 +181,21 @@ async def get_network_flows(
         source_ip: Filter by source IP address.
         dest_ip: Filter by destination IP address.
         limit: Maximum number of flows to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with flow data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        filters = []
-        if device_id:
-            filters.append(f"exporterDeviceId:{device_id}")
-        if source_ip:
-            clean_ip, was_modified = sanitize_filter_value(source_ip)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"srcIP:{quote_filter_value(clean_ip)}")
-        if dest_ip:
-            clean_ip, was_modified = sanitize_filter_value(dest_ip)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"dstIP:{quote_filter_value(clean_ip)}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/netflow/flows", params=params)
-
-        flows = []
-        for item in result.get("items", []):
-            flows.append(
-                {
-                    "id": item.get("id"),
-                    "source_ip": item.get("srcIP"),
-                    "source_port": item.get("srcPort"),
-                    "dest_ip": item.get("dstIP"),
-                    "dest_port": item.get("dstPort"),
-                    "protocol": item.get("protocol"),
-                    "bytes": item.get("bytes"),
-                    "packets": item.get("packets"),
-                    "exporter_device": item.get("exporterDeviceDisplayName"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(flows),
-            "flows": flows,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/netflow/flows",
+        key="flows",
+        project=_flow_row,
+        limit=limit,
+        offset=offset,
+        named={"srcIP:": source_ip, "dstIP:": dest_ip},
+        clauses=[f"exporterDeviceId:{device_id}"] if device_id else [],
+    )
 
 
 async def get_device_connections(

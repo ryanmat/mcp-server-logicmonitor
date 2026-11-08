@@ -178,3 +178,35 @@ class TestGetDeviceBatchjobs:
         assert data["batchjobs"][0]["datasource_id"] == 123
         # BatchJob datasources are filtered server-side by type BJ
         assert route.calls[0].request.url.params["filter"] == 'dataSourceType:"BJ"'
+
+
+class TestGetScheduledDowntimeJobs:
+    """Tests for get_scheduled_downtime_jobs tool."""
+
+    @respx.mock
+    async def test_portal_matches_downtime_words_in_name_or_description(self, client):
+        """The portal applies the keyword match, so total counts the matching jobs."""
+        from lm_mcp.tools.batchjobs import get_scheduled_downtime_jobs
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/setting/batchjobs").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {"id": 4, "name": "Nightly Backup", "description": "", "status": "active"}
+                    ],
+                    "total": 3,
+                },
+            )
+        )
+
+        result = await get_scheduled_downtime_jobs(client, limit=1)
+
+        assert route.calls[0].request.url.params["filter"] == (
+            'name~"maintenance"|"downtime"|"backup"|"scheduled"'
+            '||description~"maintenance"|"downtime"|"backup"|"scheduled"'
+        )
+        data = json.loads(result[0].text)
+        assert data["scheduled_jobs"][0]["name"] == "Nightly Backup"
+        assert data["total"] == 3
+        assert data["has_more"] is True

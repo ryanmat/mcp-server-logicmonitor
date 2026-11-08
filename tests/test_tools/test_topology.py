@@ -49,7 +49,7 @@ class TestGetTopologyMap:
 
         tool = next(item for item in TOOLS if item.name == "get_topology_map")
 
-        assert set(tool.inputSchema["properties"]) == {"include_connections", "limit"}
+        assert set(tool.inputSchema["properties"]) == {"include_connections", "limit", "offset"}
 
     @respx.mock
     async def test_get_topology_map_returns_list(self, client):
@@ -131,10 +131,10 @@ class TestGetDeviceInterfaces:
 
     @respx.mock
     async def test_get_device_interfaces_filters_interfaces(self, client):
-        """get_device_interfaces returns only interface datasources."""
+        """get_device_interfaces asks the portal for the interface DataSources only."""
         from lm_mcp.tools.topology import get_device_interfaces
 
-        respx.get(
+        route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/123/devicedatasources"
         ).mock(
             return_value=httpx.Response(
@@ -149,13 +149,6 @@ class TestGetDeviceInterfaces:
                             "status": "active",
                         },
                         {
-                            "id": 2,
-                            "dataSourceId": 200,
-                            "dataSourceName": "CPU",
-                            "instanceNumber": 1,
-                            "status": "active",
-                        },
-                        {
                             "id": 3,
                             "dataSourceId": 300,
                             "dataSourceName": "Ethernet_Ports",
@@ -163,17 +156,21 @@ class TestGetDeviceInterfaces:
                             "status": "active",
                         },
                     ],
-                    "total": 3,
+                    "total": 2,
                 },
             )
         )
 
         result = await get_device_interfaces(client, device_id=123)
 
+        assert (
+            route.calls[0].request.url.params["filter"]
+            == 'dataSourceName~"interface"|"port"|"ethernet"|"network"'
+        )
         data = json.loads(result[0].text)
         assert data["device_id"] == 123
-        # Should only include interface-related datasources (not CPU)
         assert data["count"] == 2
+        assert data["total"] == 2
 
 
 class TestGetNetworkFlows:
