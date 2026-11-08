@@ -879,6 +879,7 @@ TOOLS.extend(
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
                 "required": ["device_id"],
             },
@@ -896,6 +897,7 @@ TOOLS.extend(
                         "description": "Device-DataSource ID (from get_device_datasources)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
                 "required": ["device_id", "device_datasource_id"],
             },
@@ -2818,6 +2820,7 @@ TOOLS.extend(
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
                 "required": ["device_id"],
             },
@@ -2959,6 +2962,7 @@ TOOLS.extend(
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
                 "required": ["device_id"],
             },
@@ -5550,10 +5554,6 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name_filter": {
-                        "type": "string",
-                        "description": "Filter by chain name (substring, client-side)",
-                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {
                         "type": "integer",
@@ -5674,7 +5674,7 @@ TOOLS.extend(
                 "properties": {
                     "name_filter": {
                         "type": "string",
-                        "description": "Filter by rule name (substring, client-side)",
+                        "description": "Filter by rule name (case-insensitive substring)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {

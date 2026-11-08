@@ -13,14 +13,6 @@ from lm_mcp.registry import TOOLS, get_tool_handler
 # entry whose handler no longer exists or no longer formats its own query, so an entry
 # leaves when its handler moves.
 _LIST_TOOL_PENDING: dict[str, int] = {
-    "get_action_chains": 24,
-    "get_action_rules": 24,
-    "get_configsource_update_reasons": 24,
-    "get_device_config": 24,
-    "get_device_datasources": 24,
-    "get_device_eventsources": 24,
-    "get_device_instances": 24,
-    "get_device_logsources": 24,
     "get_access_groups": 25,
     "get_alert_rules": 25,
     "get_api_tokens": 25,

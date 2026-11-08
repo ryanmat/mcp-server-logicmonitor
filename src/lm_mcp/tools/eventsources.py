@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    list_tool,
     normalize_definition_fields,
     paginated_response,
     quote_filter_value,
@@ -242,10 +243,22 @@ async def get_eventsource(
         return handle_error(e)
 
 
+def _device_eventsource_row(item: dict) -> dict:
+    """Project one deviceeventsources row onto the get_device_eventsources fields."""
+    return {
+        "id": item.get("id"),
+        "eventsource_id": item.get("eventSourceId"),
+        "name": item.get("eventSourceDisplayName") or item.get("dataSourceDisplayName", ""),
+        "alerting_disabled": item.get("alertDisableStatus", "none"),
+        "alert_status": item.get("alertStatus", "none"),
+    }
+
+
 async def get_device_eventsources(
     client: LogicMonitorClient,
     device_id: int,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get EventSources applied to a device.
 
@@ -253,37 +266,20 @@ async def get_device_eventsources(
         client: LogicMonitor API client.
         device_id: Device ID.
         limit: Maximum results.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with device EventSource associations or error.
     """
-    try:
-        params: dict = {"size": limit}
-        result = await client.get(f"/device/devices/{device_id}/deviceeventsources", params=params)
-
-        eventsources = []
-        for item in result.get("items", []):
-            eventsources.append(
-                {
-                    "id": item.get("id"),
-                    "eventsource_id": item.get("eventSourceId"),
-                    "name": item.get("eventSourceDisplayName")
-                    or item.get("dataSourceDisplayName", ""),
-                    "alerting_disabled": item.get("alertDisableStatus", "none"),
-                    "alert_status": item.get("alertStatus", "none"),
-                }
-            )
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "total": result.get("total", 0),
-                "count": len(eventsources),
-                "eventsources": eventsources,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/deviceeventsources",
+        key="eventsources",
+        project=_device_eventsource_row,
+        limit=limit,
+        offset=offset,
+        extra={"device_id": device_id},
+    )
 
 
 @require_write_permission

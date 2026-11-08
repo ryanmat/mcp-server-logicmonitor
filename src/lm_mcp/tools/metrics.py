@@ -8,16 +8,25 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+
+def _device_datasource_row(item: dict) -> dict:
+    """Project one devicedatasources row onto the get_device_datasources fields."""
+    return {
+        "id": item.get("id"),
+        "datasource_id": item.get("dataSourceId"),
+        "name": item.get("dataSourceName"),
+        "instance_count": item.get("instanceNumber"),
+        "monitoring_status": item.get("monitoringInstanceNumber"),
+    }
 
 
 async def get_device_datasources(
@@ -25,6 +34,7 @@ async def get_device_datasources(
     device_id: int,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List DataSources applied to a device.
 
@@ -33,44 +43,33 @@ async def get_device_datasources(
         device_id: Device ID to get DataSources for.
         name_filter: Filter by DataSource name (supports wildcards).
         limit: Maximum number of DataSources to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with DataSource data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/devicedatasources",
+        key="datasources",
+        project=_device_datasource_row,
+        limit=limit,
+        offset=offset,
+        named={"dataSourceName~": name_filter},
+        extra={"device_id": device_id},
+    )
 
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"dataSourceName~{quote_filter_value(clean_name)}"
 
-        result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
-
-        datasources = []
-        for item in result.get("items", []):
-            datasources.append(
-                {
-                    "id": item.get("id"),
-                    "datasource_id": item.get("dataSourceId"),
-                    "name": item.get("dataSourceName"),
-                    "instance_count": item.get("instanceNumber"),
-                    "monitoring_status": item.get("monitoringInstanceNumber"),
-                }
-            )
-
-        response = {
-            "device_id": device_id,
-            "total": result.get("total", 0),
-            "count": len(datasources),
-            "datasources": datasources,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+def _device_instance_row(item: dict) -> dict:
+    """Project one instances row onto the get_device_instances fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("displayName"),
+        "description": item.get("description"),
+        "group_name": item.get("groupName"),
+        "lock_description": item.get("lockDescription"),
+        "stop_monitoring": item.get("stopMonitoring"),
+    }
 
 
 async def get_device_instances(
@@ -79,6 +78,7 @@ async def get_device_instances(
     device_datasource_id: int,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List instances for a DataSource on a device.
 
@@ -88,49 +88,21 @@ async def get_device_instances(
         device_datasource_id: Device DataSource ID (from get_device_datasources).
         name_filter: Filter by instance name (supports wildcards).
         limit: Maximum number of instances to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with instance data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"displayName~{quote_filter_value(clean_name)}"
-
-        result = await client.get(
-            f"/device/devices/{device_id}/devicedatasources/{device_datasource_id}/instances",
-            params=params,
-        )
-
-        instances = []
-        for item in result.get("items", []):
-            instances.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("displayName"),
-                    "description": item.get("description"),
-                    "group_name": item.get("groupName"),
-                    "lock_description": item.get("lockDescription"),
-                    "stop_monitoring": item.get("stopMonitoring"),
-                }
-            )
-
-        response = {
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "total": result.get("total", 0),
-            "count": len(instances),
-            "instances": instances,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/devicedatasources/{device_datasource_id}/instances",
+        key="instances",
+        project=_device_instance_row,
+        limit=limit,
+        offset=offset,
+        named={"displayName~": name_filter},
+        extra={"device_id": device_id, "device_datasource_id": device_datasource_id},
+    )
 
 
 async def get_device_data(

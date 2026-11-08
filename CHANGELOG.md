@@ -71,6 +71,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
   summary from the report.
 - The `ttm` method on `forecast_metric`. `method` takes `auto`, `linear` or `holt_winters`.
+- The `name_filter` argument on `get_action_chains`. The portal applies no filter on the action
+  chain list, and the tool matched names only among the one page of rows it fetched. Page through
+  the list with `offset`.
 - The `watsonx` category in `lm://guide/tool-categories`, which `search_tools` reads for its
   `category` argument.
 - The `ibm` and `huggingface` extras, and the settings only they read: `WATSONX_API_KEY`,
@@ -160,6 +163,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   them. It fetched `limit` reports of every kind and kept the scheduled ones, so a portal with more
   reports than `limit` could return none of its scheduled reports, and `total` counted only that
   page.
+- `get_action_rules` sends `name_filter` to the portal as a `name~` filter, a case-insensitive
+  substring match, so `limit` and `offset` page through the matching rules and `total` counts
+  them. It matched names only among the one page of rows it fetched.
 
 ### Changed
 
@@ -173,13 +179,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - When the API reports a page with a negative total, its sign that more rows exist than it
   counted, a list tool leaves `total` out of the response rather than reporting that number as a
   lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
-  exact. This covers the 31 list tools on the shared pagination helper, `get_devices`,
+  exact. This covers the 37 list tools on the shared pagination helper, `get_devices`,
   `get_alerts` and `get_audit_logs` among them.
 - `get_device_groups`, `get_collector_groups`, `get_website_groups`, `get_dashboard_widgets`,
   `list_sdts`, `get_active_sdts`, `get_upcoming_sdts`, `get_roles`, `get_report_groups`,
-  `get_scheduled_reports`, `get_escalation_chains`, `get_recipient_groups` and `get_integrations`
-  return `offset` and `has_more` beside `count`, the envelope the shared pagination helper builds,
-  and all but `get_collector_groups` and `get_roles`, which had it, take an `offset` argument.
+  `get_scheduled_reports`, `get_escalation_chains`, `get_recipient_groups`, `get_integrations`,
+  `get_action_chains`, `get_action_rules`, `get_device_datasources`, `get_device_instances`,
+  `get_device_eventsources` and `get_device_logsources` return `offset` and `has_more` beside
+  `count`, the envelope the shared pagination helper builds, and all but `get_collector_groups`,
+  `get_roles`, `get_action_chains` and `get_action_rules`, which had it, take an `offset` argument.
   `get_dashboard_widgets` lists its `limit` argument in its schema.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
