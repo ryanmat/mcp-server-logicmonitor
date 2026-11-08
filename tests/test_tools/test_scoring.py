@@ -1071,8 +1071,8 @@ class TestCalculateAvailabilityDeviceLookup:
     Prior behavior: a 404/403 on the device lookup proceeded with
     unfiltered alerts, producing availability numbers for a different
     device set than the caller asked for. Now a device that does not exist
-    returns NOT_FOUND and any other lookup failure returns
-    UPSTREAM_ERROR, both before any alert is read.
+    returns NOT_FOUND and any other lookup failure returns the code
+    lm_error_code gives it (a 403 is AUTH_FAILED), both before any alert is read.
     """
 
     @respx.mock
