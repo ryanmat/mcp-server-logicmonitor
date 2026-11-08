@@ -8,7 +8,10 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from lm_mcp.context import CallBinding
 
 logger = logging.getLogger(__name__)
 
@@ -173,9 +176,6 @@ def activate(customer: str) -> dict:
         client = _build_client(rec)
         _state["clients"][customer] = client
 
-    from lm_mcp.server import _set_client
-
-    _set_client(client)
     _state["active"] = customer
     _state["active_writable"] = bool(rec.get("writable", False))
     return {
@@ -209,16 +209,11 @@ async def reload() -> dict:
     _state["clients"] = {}
     _state["loaded"] = True
 
-    from lm_mcp.server import _set_client
-
     if keep_active:
         _state["clients"][prev_active] = new_client
-        _set_client(new_client)
         _state["active"] = prev_active
         _state["active_writable"] = bool((new_portals[prev_active] or {}).get("writable", False))
     else:
-        if prev_active:
-            _set_client(None)
         _state["active"] = None
         _state["active_writable"] = False
 
@@ -239,16 +234,35 @@ async def reload() -> dict:
 def active() -> dict:
     """Return the currently active portal (or nulls if none selected yet)."""
     name = _state["active"]
-    portal = (_state["portals"].get(name) or {}).get("portal") if name else None
-    return {"active": name, "portal": portal, "writable": _state["active_writable"]}
+    return {"active": name, "portal": host(name), "writable": _state["active_writable"]}
+
+
+def host(name: str | None) -> str | None:
+    """Return the portal hostname the vault records for ``name``, or None."""
+    return (_state["portals"].get(name) or {}).get("portal") if name else None
+
+
+def call_binding(writes_enabled: bool) -> CallBinding:
+    """Return the selected portal as a call binding: its client, write flag and name.
+
+    use_portal sets this default; execute_tool reads it once when a call starts, so
+    a switch while a call runs leaves that call on the portal it started with.
+
+    Args:
+        writes_enabled: The operator's LM_ENABLE_WRITE_OPERATIONS gate.
+    """
+    from lm_mcp.context import CallBinding
+
+    name = _state["active"]
+    return CallBinding(
+        client=_state["clients"].get(name) if name is not None else None,
+        writable=writes_enabled and bool(_state["active_writable"]),
+        portal=name,
+    )
 
 
 def has_active() -> bool:
     return _state["active"] is not None
-
-
-def is_active_writable() -> bool:
-    return bool(_state["active_writable"])
 
 
 async def close_all() -> None:
@@ -259,8 +273,3 @@ async def close_all() -> None:
         except Exception:
             logger.debug("error closing a portal client", exc_info=True)
     _state["clients"] = {}
-
-    # Never leave the process-global client pointing at a closed instance.
-    from lm_mcp.server import _set_client
-
-    _set_client(None)

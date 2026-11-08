@@ -37,7 +37,7 @@ class TestExecuteToolMiddleware:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=mock_handler),
-            patch("lm_mcp.server.get_client", return_value=mock_client),
+            patch("lm_mcp.server._client", mock_client),
         ):
             from lm_mcp.server import execute_tool
 
@@ -96,7 +96,7 @@ class TestExecuteToolMiddleware:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=mock_handler),
-            patch("lm_mcp.server.get_client", return_value=mock_client),
+            patch("lm_mcp.server._client", mock_client),
         ):
             from lm_mcp.server import execute_tool
 
@@ -114,7 +114,7 @@ class TestExecuteToolMiddleware:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=mock_handler),
-            patch("lm_mcp.server.get_client", return_value=mock_client),
+            patch("lm_mcp.server._client", mock_client),
             patch("lm_mcp.server.log_write_operation") as mock_log,
         ):
             from lm_mcp.server import execute_tool
@@ -133,7 +133,7 @@ class TestExecuteToolMiddleware:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=mock_handler),
-            patch("lm_mcp.server.get_client", return_value=mock_client),
+            patch("lm_mcp.server._client", mock_client),
             patch("lm_mcp.server.get_session", return_value=mock_session),
         ):
             from lm_mcp.server import execute_tool
@@ -172,7 +172,7 @@ class TestExecuteToolMiddleware:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=failing_handler),
-            patch("lm_mcp.server.get_client", return_value=mock_client),
+            patch("lm_mcp.server._client", mock_client),
         ):
             from lm_mcp.server import execute_tool
 
@@ -198,7 +198,7 @@ class TestExecuteToolMiddleware:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=failing_handler),
-            patch("lm_mcp.server.get_client", return_value=mock_client),
+            patch("lm_mcp.server._client", mock_client),
             caplog.at_level(logging.ERROR, logger="lm_mcp.server"),
         ):
             from lm_mcp.server import execute_tool
@@ -435,7 +435,7 @@ class TestCredentialsInUrlArguments:
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=handler),
-            patch("lm_mcp.server.get_client", return_value=client),
+            patch("lm_mcp.server._client", client),
             patch("lm_mcp.server.get_session", return_value=session),
         ):
             from lm_mcp.server import execute_tool
@@ -499,7 +499,7 @@ class TestWriteOutcomeFromResult:
         ]
 
     async def test_write_raising_before_handler_audits_failure(self, write_portal, caplog):
-        """No client bound: get_client raises and the except path audits the write as failed."""
+        """No client bound: current_client raises and the except path audits the write as failed."""
         from lm_mcp.server import _set_client, execute_tool
 
         _set_client(None)

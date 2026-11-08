@@ -317,7 +317,10 @@ def portal_url(resource_type: str, resource_id: int | str) -> str:
     Returns:
         Full HTTPS URL to the resource in the LM portal UI,
         or empty string if the resource type is unknown or config
-        is unavailable.
+        is unavailable. In multi-portal mode the host is the call's bound portal.
+
+    Raises:
+        RuntimeError: In multi-portal mode, outside a tool call.
     """
     try:
         from lm_mcp.config import get_config
@@ -341,8 +344,9 @@ def portal_url(resource_type: str, resource_id: int | str) -> str:
 
     if config.multi_portal:
         from lm_mcp import portals
+        from lm_mcp.context import current_binding
 
-        host = portals.active().get("portal")
+        host = portals.host(current_binding().portal)
     else:
         host = config.portal
     if not host:
@@ -535,6 +539,36 @@ def format_response(data: Any) -> list[TextContent]:
     return [TextContent(type="text", text=text)]
 
 
+def stamp_portal(result: list[TextContent], portal: str | None) -> list[TextContent]:
+    """Add the call's portal name to a result that is one JSON object (multi-portal mode).
+
+    A success object carries it as ``portal``. An error envelope carries it as
+    ``error.details.portal``, so the envelope keeps its one ``error`` key (spec R2.7).
+    Any other result passes through unchanged.
+
+    Args:
+        result: The content list execute_tool produced.
+        portal: The bound portal name, None before use_portal.
+    """
+    if len(result) != 1:
+        return result
+    try:
+        data = json.loads(result[0].text)
+    except json.JSONDecodeError:
+        return result
+    if not isinstance(data, dict):
+        return result
+    if isinstance(result[0], ErrorContent):
+        error = data["error"]
+        return error_content(
+            error["code"],
+            error["message"],
+            details={**(error["details"] or {}), "portal": portal},
+            retry_after=error["retry_after"],
+        )
+    return format_response({**data, "portal": portal})
+
+
 def handle_error(error: Exception) -> list[TextContent]:
     """Log an exception and convert it to the error envelope.
 
@@ -642,7 +676,9 @@ def require_write_permission(func: F) -> F:
     """Decorator to enforce write permission check.
 
     When LM_ENABLE_WRITE_OPERATIONS is false (default), decorated functions
-    will return an error response instead of executing.
+    will return an error response instead of executing. In multi-portal mode the
+    portal and its write flag come from the call's binding, and a decorated
+    function called outside a tool call raises RuntimeError.
 
     Args:
         func: The async function to wrap.
@@ -659,9 +695,10 @@ def require_write_permission(func: F) -> F:
         if not config.enable_write_operations:
             return write_disabled_response()
         if config.multi_portal:
-            from lm_mcp import portals
+            from lm_mcp.context import current_binding
 
-            if not portals.has_active():
+            binding = current_binding()
+            if binding.portal is None:
                 return format_response(
                     {
                         "error": True,
@@ -670,7 +707,7 @@ def require_write_permission(func: F) -> F:
                         "suggestion": "Call use_portal(<customer>) first (see list_portals)",
                     }
                 )
-            if not portals.is_active_writable():
+            if not binding.writable:
                 return format_response(
                     {
                         "error": True,

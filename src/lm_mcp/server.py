@@ -8,10 +8,11 @@ import logging
 from mcp.server import Server
 from mcp.types import CallToolResult, GetPromptResult, TextContent, Tool
 
-from lm_mcp import __version__
+from lm_mcp import __version__, portals
 from lm_mcp.categories import passes_name_filter, writes_to_portal
 from lm_mcp.client import LogicMonitorClient
-from lm_mcp.config import get_config
+from lm_mcp.config import LMConfig, get_config
+from lm_mcp.context import CallBinding, bind, current_binding, current_client, missing_client_error
 from lm_mcp.logging import (
     configure_logging,
     is_write_tool,
@@ -26,6 +27,7 @@ from lm_mcp.tools import (
     error_content,
     error_from_exception,
     is_error_result,
+    stamp_portal,
     write_disabled_response,
 )
 
@@ -48,31 +50,32 @@ _client: LogicMonitorClient | None = None
 
 
 def get_client() -> LogicMonitorClient:
-    """Get the initialized LogicMonitor client.
+    """Get the default LogicMonitor client.
+
+    The client built at startup, or in multi-portal mode the one use_portal selected.
+    A tool call takes its client from its own binding (:mod:`lm_mcp.context`); this
+    serves callers outside a call, such as the health check.
 
     Returns:
         The LogicMonitor API client instance.
 
     Raises:
-        RuntimeError: If called before server initialization.
+        RuntimeError: If no client is built yet, or no portal is selected.
     """
-    if _client is None:
-        # Only surface the multi-portal hint when we can confirm multi-portal mode.
-        # If the config can't be built yet (e.g. no env in a unit test), fall back to
-        # the plain "not initialized" message rather than leaking a config error.
-        multi = False
-        try:
-            from lm_mcp.config import get_config
-
-            multi = get_config().multi_portal
-        except Exception:
-            multi = False
-        if multi:
-            raise RuntimeError(
-                "No portal selected. Call use_portal(<customer>) first (see list_portals)."
-            )
-        raise RuntimeError("Client not initialized")
-    return _client
+    if _client is not None:
+        return _client
+    # Only surface the multi-portal hint when we can confirm multi-portal mode.
+    # If the config can't be built yet (e.g. no env in a unit test), fall back to
+    # the plain "not initialized" message rather than leaking a config error.
+    multi = False
+    try:
+        multi = get_config().multi_portal
+    except Exception:
+        logger.debug("config unavailable; reporting the client as not initialized", exc_info=True)
+    client = portals.call_binding(writes_enabled=False).client if multi else None
+    if client is None:
+        raise missing_client_error(multi)
+    return client
 
 
 def _set_client(client: LogicMonitorClient) -> None:
@@ -171,11 +174,20 @@ CLIENT_OPTIONAL_TOOLS = {
 }
 
 
+def _call_binding(config: LMConfig) -> CallBinding:
+    """The client, write flag and portal name a call runs against, read once at its start."""
+    if config.multi_portal:
+        return portals.call_binding(writes_enabled=config.enable_write_operations)
+    return CallBinding(client=_client, writable=config.enable_write_operations, portal=None)
+
+
 async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute a LogicMonitor tool with full middleware chain.
 
-    Applies tool filtering, the write gate, write audit logging and session
-    recording. The MCP call_tool handler delegates to it.
+    Binds the call's client, write flag and portal name for its duration (spec
+    R2.12), then applies tool filtering, the write gate, write audit logging and
+    session recording. In multi-portal mode every result except a portal tool's
+    carries the bound portal name. The MCP call_tool handler delegates to it.
 
     Args:
         name: Tool name to execute.
@@ -185,7 +197,16 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         List of TextContent with the tool result.
     """
     config = get_config()
+    binding = _call_binding(config)
+    with bind(binding):
+        result = await _execute_bound(name, arguments, config)
+    if config.multi_portal and name not in PORTAL_TOOLS:
+        return stamp_portal(result, binding.portal)
+    return result
 
+
+async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[TextContent]:
+    """Run one tool call inside its binding: the filters, the gate, the handler, the audit."""
     try:
         handler = get_tool_handler(name)
 
@@ -226,12 +247,11 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         if name in SESSION_TOOLS or name in PORTAL_TOOLS:
             result = await handler(**arguments)
         elif name in CLIENT_OPTIONAL_TOOLS:
-            # These handlers ignore the client; pass the global as-is (possibly
+            # These handlers ignore the client; pass the bound one as-is (possibly
             # None before use_portal) so discovery works portal-free.
-            result = await handler(_client, **arguments)
+            result = await handler(current_binding().client, **arguments)
         else:
-            client = get_client()
-            result = await handler(client, **arguments)
+            result = await handler(current_client(), **arguments)
 
         # Handlers return errors rather than raise, so the outcome comes from the result
         failed = is_error_result(result)

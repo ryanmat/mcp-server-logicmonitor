@@ -161,7 +161,7 @@ class TestApiTokens:
             return_value=httpx.Response(200, json={"items": [LIVE_API_TOKEN], "total": 1})
         )
 
-        with patch("lm_mcp.server.get_client", return_value=client):
+        with patch("lm_mcp.server._client", client):
             from lm_mcp.server import execute_tool
 
             listed = await execute_tool("get_api_tokens", {"limit": 25})

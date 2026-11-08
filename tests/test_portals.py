@@ -5,6 +5,7 @@ import json
 import pytest
 
 from lm_mcp import portals, server
+from lm_mcp.context import bind
 from lm_mcp.tools import format_response, require_write_permission
 from tests.envelope import envelope
 
@@ -54,7 +55,7 @@ def test_activate_sets_active_and_installs_client(tmp_path, monkeypatch, reset_p
     assert result == {"active": "acme", "portal": "acme.example.com", "writable": False}
     assert portals.has_active() is True
     assert portals.active()["active"] == "acme"
-    # the global client is now set, so data tools can run
+    # the selected portal's client is now the default, so data tools can run
     assert server.get_client() is not None
 
 
@@ -139,7 +140,8 @@ async def test_write_gate_blocks_read_only_portal(tmp_path, monkeypatch, reset_p
         return format_response({"ok": True})
 
     # Error responses are rendered as human-readable text, not JSON.
-    text = (await _do_write())[0].text
+    with bind(portals.call_binding(writes_enabled=True)):
+        text = (await _do_write())[0].text
     assert "read-only" in text
 
 
@@ -156,7 +158,8 @@ async def test_write_gate_allows_writable_portal(tmp_path, monkeypatch, reset_po
     async def _do_write():
         return format_response({"ok": True})
 
-    payload = json.loads((await _do_write())[0].text)
+    with bind(portals.call_binding(writes_enabled=True)):
+        payload = json.loads((await _do_write())[0].text)
     assert payload == {"ok": True}
 
 
@@ -228,7 +231,8 @@ async def test_write_gate_reports_no_portal_selected(tmp_path, monkeypatch, rese
     async def _do_write():
         return format_response({"ok": True})
 
-    text = (await _do_write())[0].text
+    with bind(portals.call_binding(writes_enabled=True)):
+        text = (await _do_write())[0].text
     assert "No portal selected" in text
     assert "use_portal" in text
 
@@ -379,7 +383,8 @@ def test_portal_url_uses_active_portal_in_multi_mode(tmp_path, monkeypatch, rese
     _multi(monkeypatch, vault)
     portals.activate("acme")
 
-    assert portal_url("device", 5) == "https://acme.example.com/santaba/uiv4/devices/5"
+    with bind(portals.call_binding(writes_enabled=False)):
+        assert portal_url("device", 5) == "https://acme.example.com/santaba/uiv4/devices/5"
 
 
 def test_portal_url_empty_before_use_portal(tmp_path, monkeypatch, reset_portals):
@@ -388,4 +393,5 @@ def test_portal_url_empty_before_use_portal(tmp_path, monkeypatch, reset_portals
     vault = _vault(tmp_path, {"acme": {"portal": "acme.example.com", "bearer_token": "t"}})
     _multi(monkeypatch, vault)
 
-    assert portal_url("device", 5) == ""
+    with bind(portals.call_binding(writes_enabled=False)):
+        assert portal_url("device", 5) == ""
