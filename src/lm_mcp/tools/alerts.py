@@ -10,15 +10,12 @@ from mcp.types import TextContent
 
 from lm_mcp.tools import (
     SEVERITY_MAP,
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
+    list_tool,
     portal_url,
-    quote_filter_value,
     require_write_permission,
     resolve_group_filter,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
@@ -94,6 +91,17 @@ def _normalize_alert_id(alert_id: str) -> str:
     return alert_id
 
 
+def _alert_row(item: dict) -> dict:
+    """Project one /alert/alerts row onto the get_alerts fields."""
+    return {
+        "id": item.get("id"),
+        "severity": item.get("severity"),
+        "device": item.get("monitorObjectName"),
+        "message": item.get("alertValue"),
+        "start_time": item.get("startEpoch"),
+    }
+
+
 async def get_alerts(
     client: LogicMonitorClient,
     severity: str | None = None,
@@ -142,83 +150,50 @@ async def get_alerts(
     Returns:
         List of TextContent with alert data or error.
     """
-    try:
-        params: dict = {"size": min(limit, 1000), "offset": offset}
-        wildcards_stripped = False
+    clauses = []
+    if severity and severity.lower() in SEVERITY_MAP:
+        clauses.append(f"severity:{SEVERITY_MAP[severity.lower()]}")
+    if status:
+        if status.lower() == "active":
+            clauses.append("cleared:false")
+            clauses.append("acked:false")
+        elif status.lower() == "acknowledged":
+            clauses.append("acked:true")
+    if cleared is not None:
+        clauses.append(f"cleared:{str(cleared).lower()}")
+    if acked is not None:
+        clauses.append(f"acked:{str(acked).lower()}")
+    if sdted is not None:
+        clauses.append(f"sdted:{str(sdted).lower()}")
+    if start_epoch is not None:
+        clauses.append(f"startEpoch>:{start_epoch}")
+    if end_epoch is not None:
+        clauses.append(f"endEpoch<:{end_epoch}")
+    # The group lookup is an API call, so it runs only when no raw filter replaces the clauses.
+    if group_id is not None and not filter:
+        try:
+            clauses.append(await resolve_group_filter(client, group_id))
+        except Exception as e:
+            return handle_error(e)
+    if device_id is not None:
+        clauses.append(f"monitorObjectId:{device_id}")
 
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if severity and severity.lower() in SEVERITY_MAP:
-                filters.append(f"severity:{SEVERITY_MAP[severity.lower()]}")
-            if status:
-                if status.lower() == "active":
-                    filters.append("cleared:false")
-                    filters.append("acked:false")
-                elif status.lower() == "acknowledged":
-                    filters.append("acked:true")
-            if cleared is not None:
-                filters.append(f"cleared:{str(cleared).lower()}")
-            if acked is not None:
-                filters.append(f"acked:{str(acked).lower()}")
-            if sdted is not None:
-                filters.append(f"sdted:{str(sdted).lower()}")
-            if start_epoch is not None:
-                filters.append(f"startEpoch>:{start_epoch}")
-            if end_epoch is not None:
-                filters.append(f"endEpoch<:{end_epoch}")
-            if datapoint:
-                clean_val, was_modified = sanitize_filter_value(datapoint)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"dataPointName~{quote_filter_value(clean_val)}")
-            if instance:
-                clean_val, was_modified = sanitize_filter_value(instance)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"instanceName~{quote_filter_value(clean_val)}")
-            if datasource:
-                clean_val, was_modified = sanitize_filter_value(datasource)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"resourceTemplateName~{quote_filter_value(clean_val)}")
-            if device:
-                clean_val, was_modified = sanitize_filter_value(device)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
-            if group_id is not None:
-                filters.append(await resolve_group_filter(client, group_id))
-            if device_id is not None:
-                filters.append(f"monitorObjectId:{device_id}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/alert/alerts", params=params)
-
-        alerts = []
-        for item in result.get("items", []):
-            alerts.append(
-                {
-                    "id": item.get("id"),
-                    "severity": item.get("severity"),
-                    "device": item.get("monitorObjectName"),
-                    "message": item.get("alertValue"),
-                    "start_time": item.get("startEpoch"),
-                }
-            )
-
-        response = {
-            **paginated_response(alerts, result, offset),
-            "alerts": alerts,
-        }
-
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/alert/alerts",
+        key="alerts",
+        project=_alert_row,
+        limit=min(limit, 1000),
+        offset=offset,
+        filter=filter,
+        named={
+            "dataPointName~": datapoint,
+            "instanceName~": instance,
+            "resourceTemplateName~": datasource,
+            "monitorObjectName~": device,
+        },
+        clauses=clauses,
+    )
 
 
 async def get_alert_details(

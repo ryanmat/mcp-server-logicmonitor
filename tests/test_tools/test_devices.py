@@ -10,6 +10,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -969,3 +970,28 @@ class TestHostStatusFilterForm:
         from lm_mcp.tools.diagnostic_remediation import _is_dead_host_status
 
         assert not _is_dead_host_status(value)
+
+
+# (handler name, endpoint path, extra required arguments)
+_DEVICES_LISTS = [
+    ("get_devices", "/device/devices", {}),
+    ("get_device_groups", "/device/groups", {}),
+]
+
+
+class TestDeviceListPaging:
+    """R2.5: the device list tools declare offset, send it, and read a negative total as more."""
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _DEVICES_LISTS)
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client, name, path, kwargs):
+        from lm_mcp.tools import devices
+
+        await assert_offset_declared_and_sent(client, getattr(devices, name), path, kwargs)
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _DEVICES_LISTS)
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client, name, path, kwargs):
+        from lm_mcp.tools import devices
+
+        await assert_negative_total_reads_as_more(client, getattr(devices, name), path, kwargs)

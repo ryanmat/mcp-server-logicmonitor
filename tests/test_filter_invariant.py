@@ -6,8 +6,9 @@
 A LogicMonitor filter clause is ``field<op>value``. A value interpolated raw from a
 user string can close its quotes and append clauses (``a"|"b`` becomes two clauses),
 so every string value must pass through ``quote_filter_value``. This test walks every
-f-string in ``src/lm_mcp/tools/*.py`` whose enclosing statement builds a filter and
-whose literal text ends in a filter operator right before an interpolation, and fails
+f-string in ``src/lm_mcp/tools/*.py`` whose enclosing statement builds a filter or a
+``list_tool`` clause and whose literal text ends in a filter operator right before an
+interpolation, and fails
 unless the interpolated expression is a ``quote_filter_value(...)`` call or is listed
 in ``tests/fixtures/filter_interpolation_allowlist.txt`` as ``module.py: expression``.
 
@@ -70,8 +71,8 @@ def collect_filter_interpolations(tools_dir: Path = TOOLS_DIR) -> list[Hit]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.JoinedStr):
                 continue
-            statement = _enclosing_statement_source(src, node, parents)
-            if "filter" not in statement.lower():
+            statement = _enclosing_statement_source(src, node, parents).lower()
+            if "filter" not in statement and "clause" not in statement:
                 continue
             previous = ""
             for part in node.values:

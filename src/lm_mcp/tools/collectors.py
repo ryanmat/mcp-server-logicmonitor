@@ -10,20 +10,40 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
+    list_tool,
     quote_filter_value,
     require_write_permission,
     safe_total,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 logger = logging.getLogger(__name__)
+
+
+def _collector_row(item: dict) -> dict:
+    """Project one /setting/collector/collectors row onto the get_collectors fields."""
+    return {
+        "id": item.get("id"),
+        "hostname": item.get("hostname"),
+        "status": item.get("status"),
+        "device_count": item.get("numberOfHosts"),
+    }
+
+
+def _collector_group_row(item: dict) -> dict:
+    """Project one /setting/collector/groups row onto the get_collector_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "num_of_collectors": item.get("numOfCollectors"),
+        "auto_balance": item.get("autoBalance"),
+        "auto_balance_strategy": item.get("autoBalanceStrategy"),
+    }
 
 
 async def get_collectors(
@@ -51,48 +71,19 @@ async def get_collectors(
     Returns:
         List of TextContent with collector data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if hostname_filter:
-                clean_hostname, was_modified = sanitize_filter_value(hostname_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"hostname~{quote_filter_value(clean_hostname)}")
-            if collector_group_id is not None:
-                filters.append(f"collectorGroupId:{collector_group_id}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/collector/collectors", params=params)
-
-        collectors = []
-        for item in result.get("items", []):
-            collectors.append(
-                {
-                    "id": item.get("id"),
-                    "hostname": item.get("hostname"),
-                    "status": item.get("status"),
-                    "device_count": item.get("numberOfHosts"),
-                }
-            )
-
-        response = {
-            **paginated_response(collectors, result, offset),
-            "collectors": collectors,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/collector/collectors",
+        key="collectors",
+        project=_collector_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"hostname~": hostname_filter},
+        clauses=(
+            [f"collectorGroupId:{collector_group_id}"] if collector_group_id is not None else []
+        ),
+    )
 
 
 async def get_collector(
@@ -138,43 +129,16 @@ async def get_collector_groups(
     Returns:
         List of TextContent with collector group data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        elif name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/setting/collector/groups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "num_of_collectors": item.get("numOfCollectors"),
-                    "auto_balance": item.get("autoBalance"),
-                    "auto_balance_strategy": item.get("autoBalanceStrategy"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "collector_groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/collector/groups",
+        key="collector_groups",
+        project=_collector_group_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter},
+    )
 
 
 async def get_collector_group(

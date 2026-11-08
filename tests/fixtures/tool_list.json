@@ -4461,6 +4461,11 @@
           "description": "Filter by group name (substring match)",
           "type": "string"
         },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        },
         "parent_id": {
           "description": "Filter by parent group ID",
           "type": "integer"
