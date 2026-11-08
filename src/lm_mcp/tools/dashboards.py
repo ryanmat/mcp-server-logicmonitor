@@ -198,8 +198,8 @@ async def get_dashboard_widgets(
         List of TextContent with widget data or error.
     """
     # Position (column/row/spans) lives on the parent dashboard's widgetsConfig
-    # keyed by widget id, not on the widget objects -- which is why these came back
-    # null before. Fetch the dashboard and map placement onto each widget.
+    # keyed by widget id, not on the widget objects. Fetch the dashboard and map
+    # placement onto each widget.
     try:
         dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
     except Exception as e:
