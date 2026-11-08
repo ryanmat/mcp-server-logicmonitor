@@ -1,3 +1,3 @@
 # Description: Route all pull request reviews to the repository owner.
-# Description: GitHub requests the owner's review on each pull request; the main ruleset requires none.
+# Description: GitHub requests the owner's review on pull requests others open; the main ruleset requires none.
 * @ryanmat
