@@ -173,6 +173,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   scheduled, and a DataSource whose name contains interface, port, ethernet or network. `limit`
   and `offset` page through the matching rows and `total` counts them. Each matched only among
   the one page of rows it fetched, and `total` counted the matches on that page.
+- A tool called before `use_portal`, or before the startup client exists, answers
+  `INVALID_REQUEST`, which is not retryable. It answered `UPSTREAM_ERROR` with `isRetryable` true
+  and logged a traceback, so a client that follows `isRetryable` retried a call that could not
+  succeed.
 
 ### Changed
 
@@ -221,6 +225,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   place of a list of name prefixes. `set_session_variable` and `clear_session_context` now get an
   audit line, as `delete_session_variable` did, and a name no tool answers to, such as
   `delete_no_such_resource`, gets none.
+- In multi-portal mode a tool call runs against the portal selected when it starts. A
+  `use_portal` while it runs leaves its client, its `portal_url` links, its write permission and
+  its audit line on that portal. Every result object carries that portal's name as `portal`, and
+  an error envelope carries it as `details.portal`, `null` before a portal is selected. The four
+  portal tools' results are unchanged, since `use_portal` and `current_portal` already carry the
+  vault host as `portal`. The audit line for a `use_portal` names the portal the call started on;
+  its arguments name the one it switched to. Code that calls a write-gated handler, `portal_url`
+  or the audit logger outside `execute_tool` in multi-portal mode gets a `RuntimeError`, and
+  `lm_mcp.portals.is_active_writable` is removed.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
