@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    list_tool,
     normalize_definition_fields,
     paginated_response,
     quote_filter_value,
@@ -244,6 +245,16 @@ async def get_configsource(
         return handle_error(e)
 
 
+def _update_reason_row(item: dict) -> dict:
+    """Project one updatereasons row onto the get_configsource_update_reasons fields."""
+    return {
+        "version": item.get("version"),
+        "reason": item.get("reason"),
+        "date_time": item.get("dateTime"),
+        "user_name": item.get("userName"),
+    }
+
+
 async def get_configsource_update_reasons(
     client: LogicMonitorClient,
     configsource_id: int,
@@ -264,36 +275,33 @@ async def get_configsource_update_reasons(
     Returns:
         List of TextContent with update reason entries or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        result = await client.get(
-            f"/setting/configsources/{configsource_id}/updatereasons",
-            params=params,
-        )
-
-        reasons = []
-        for item in result.get("items", []):
-            reasons.append(
-                {
-                    "version": item.get("version"),
-                    "reason": item.get("reason"),
-                    "date_time": item.get("dateTime"),
-                    "user_name": item.get("userName"),
-                }
-            )
-
-        return format_response(
-            {
-                "configsource_id": configsource_id,
-                **paginated_response(reasons, result, offset),
-                "update_reasons": reasons,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        f"/setting/configsources/{configsource_id}/updatereasons",
+        key="update_reasons",
+        project=_update_reason_row,
+        limit=limit,
+        offset=offset,
+        extra={"configsource_id": configsource_id},
+    )
 
 
 # -- Device config data (instance-level) --------------------------------------
+
+
+def _device_config_row(item: dict) -> dict:
+    """Project one instance config row onto the get_device_config fields."""
+    return {
+        "id": item.get("id"),
+        "version": item.get("version"),
+        "poll_timestamp": item.get("pollTimestamp"),
+        "change_status": item.get("changeStatus"),
+        "config_status": item.get("configStatus"),
+        "config_error_message": item.get("configErrMsg"),
+        "device_display_name": item.get("deviceDisplayName"),
+        "instance_name": item.get("instanceName"),
+        "datasource_name": item.get("dataSourceName"),
+    }
 
 
 async def get_device_config(
@@ -325,41 +333,20 @@ async def get_device_config(
     Returns:
         List of TextContent with config version summaries or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        base = (
-            f"/device/devices/{device_id}/devicedatasources"
-            f"/{device_datasource_id}/instances/{instance_id}/config"
-        )
-        result = await client.get(base, params=params)
-
-        configs = []
-        for item in result.get("items", []):
-            configs.append(
-                {
-                    "id": item.get("id"),
-                    "version": item.get("version"),
-                    "poll_timestamp": item.get("pollTimestamp"),
-                    "change_status": item.get("changeStatus"),
-                    "config_status": item.get("configStatus"),
-                    "config_error_message": item.get("configErrMsg"),
-                    "device_display_name": item.get("deviceDisplayName"),
-                    "instance_name": item.get("instanceName"),
-                    "datasource_name": item.get("dataSourceName"),
-                }
-            )
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "device_datasource_id": device_datasource_id,
-                "instance_id": instance_id,
-                **paginated_response(configs, result, offset),
-                "configs": configs,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/devicedatasources"
+        f"/{device_datasource_id}/instances/{instance_id}/config",
+        key="configs",
+        project=_device_config_row,
+        limit=limit,
+        offset=offset,
+        extra={
+            "device_id": device_id,
+            "device_datasource_id": device_datasource_id,
+            "instance_id": instance_id,
+        },
+    )
 
 
 async def get_device_config_version(

@@ -74,24 +74,22 @@ class TestGetActionChains:
         assert chain["stages"][0]["type"] == "diagnosticSource"
 
     @respx.mock
-    async def test_get_action_chains_name_filter_client_side(self, client):
+    async def test_get_action_chains_takes_and_sends_no_filter(self, client):
+        """The portal applies no filter on the chains list, so the tool declares none."""
+        from lm_mcp.registry import TOOLS
         from lm_mcp.tools.actions import get_action_chains
 
-        respx.get(f"{BASE}/setting/action/chains").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [_chain(), _chain(id=2, name="Disk Cleanup Chain")],
-                    "total": 2,
-                },
-            )
+        (tool,) = [t for t in TOOLS if t.name == "get_action_chains"]
+        assert set(tool.inputSchema["properties"]) == {"limit", "offset"}
+        route = respx.get(f"{BASE}/setting/action/chains").mock(
+            return_value=httpx.Response(200, json={"items": [_chain()], "total": 1})
         )
 
-        result = await get_action_chains(client, name_filter="disk")
+        await get_action_chains(client, limit=5, offset=10)
 
-        data = json.loads(result[0].text)
-        assert data["count"] == 1
-        assert data["action_chains"][0]["name"] == "Disk Cleanup Chain"
+        params = route.calls[0].request.url.params
+        assert "filter" not in params
+        assert (params["size"], params["offset"]) == ("5", "10")
 
 
 class TestGetActionChain:
@@ -288,18 +286,19 @@ class TestGetActionRules:
 
     @respx.mock
     async def test_get_action_rules_name_filter(self, client):
+        """The portal applies name~ on the rules list, so the filter is sent, not run here."""
         from lm_mcp.tools.actions import get_action_rules
 
-        respx.get(f"{BASE}/setting/action/rules").mock(
-            return_value=httpx.Response(
-                200, json={"items": [_rule(), _rule(id=2, name="Other Rule")], "total": 2}
-            )
+        route = respx.get(f"{BASE}/setting/action/rules").mock(
+            return_value=httpx.Response(200, json={"items": [_rule()], "total": 1})
         )
 
         result = await get_action_rules(client, name_filter="precursor")
 
+        assert route.calls[0].request.url.params["filter"] == 'name~"precursor"'
         data = json.loads(result[0].text)
         assert data["count"] == 1
+        assert data["total"] == 1
 
 
 class TestGetActionRule:

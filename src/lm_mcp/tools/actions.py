@@ -10,8 +10,8 @@ from mcp.types import TextContent
 from lm_mcp.tools import (
     format_response,
     handle_error,
+    list_tool,
     require_write_permission,
-    safe_total,
 )
 
 if TYPE_CHECKING:
@@ -54,7 +54,6 @@ def _validate_stages(stages: list) -> str | None:
 
 async def get_action_chains(
     client: LogicMonitorClient,
-    name_filter: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[TextContent]:
@@ -62,37 +61,25 @@ async def get_action_chains(
 
     Action chains are the ADR automation unit: named sequences of
     DiagnosticSource and RemediationSource stages that action rules bind
-    to alerts. The list endpoint declares no filter support, so
-    name_filter is applied client-side.
+    to alerts. The portal applies no filter on this list, so the tool
+    takes none and returns the chains a page at a time.
 
     Args:
         client: LogicMonitor API client.
-        name_filter: Filter by chain name (substring, client-side).
         limit: Maximum number of chains to return.
         offset: Results to skip for pagination.
 
     Returns:
         List of TextContent with action chains or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        result = await client.get("/setting/action/chains", params=params)
-
-        chains = []
-        for item in result.get("items", []):
-            if name_filter and name_filter.lower() not in str(item.get("name", "")).lower():
-                continue
-            chains.append(_project_chain(item))
-
-        return format_response(
-            {
-                "total": safe_total(result),
-                "count": len(chains),
-                "action_chains": chains,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/action/chains",
+        key="action_chains",
+        project=_project_chain,
+        limit=limit,
+        offset=offset,
+    )
 
 
 async def get_action_chain(
@@ -274,36 +261,27 @@ async def get_action_rules(
 
     An action rule binds an action chain to alerts by severity, device
     groups, and optional datasource/instance/datapoint matchers. The list
-    endpoint declares no filter support, so name_filter is client-side.
+    endpoint's schema declares no filter, but the portal applies a name~
+    filter to it, so name_filter is sent as one.
 
     Args:
         client: LogicMonitor API client.
-        name_filter: Filter by rule name (substring, client-side).
+        name_filter: Filter by rule name (case-insensitive substring).
         limit: Maximum number of rules to return.
         offset: Results to skip for pagination.
 
     Returns:
         List of TextContent with action rules or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        result = await client.get("/setting/action/rules", params=params)
-
-        rules = []
-        for item in result.get("items", []):
-            if name_filter and name_filter.lower() not in str(item.get("name", "")).lower():
-                continue
-            rules.append(_project_rule(item))
-
-        return format_response(
-            {
-                "total": safe_total(result),
-                "count": len(rules),
-                "action_rules": rules,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/action/rules",
+        key="action_rules",
+        project=_project_rule,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 async def get_action_rule(

@@ -11,6 +11,7 @@ from lm_mcp.tools import (
     WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    list_tool,
     normalize_definition_fields,
     paginated_response,
     quote_filter_value,
@@ -246,10 +247,24 @@ async def get_logsource(
         return handle_error(e)
 
 
+def _device_logsource_row(item: dict) -> dict:
+    """Project one devicelogsources row onto the get_device_logsources fields."""
+    return {
+        "id": item.get("id"),
+        "logsource_id": item.get("logSourceId"),
+        "logsource_name": item.get("logSourceName"),
+        "device_id": item.get("deviceId"),
+        "device_name": item.get("deviceDisplayName"),
+        "status": item.get("status"),
+        "last_collection_time": item.get("lastCollectTime"),
+    }
+
+
 async def get_device_logsources(
     client: LogicMonitorClient,
     device_id: int,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get LogSources applied to a specific device.
 
@@ -257,38 +272,20 @@ async def get_device_logsources(
         client: LogicMonitor API client.
         device_id: Device ID.
         limit: Maximum number of LogSources to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with device LogSource data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        result = await client.get(f"/device/devices/{device_id}/devicelogsources", params=params)
-
-        logsources = []
-        for item in result.get("items", []):
-            logsources.append(
-                {
-                    "id": item.get("id"),
-                    "logsource_id": item.get("logSourceId"),
-                    "logsource_name": item.get("logSourceName"),
-                    "device_id": item.get("deviceId"),
-                    "device_name": item.get("deviceDisplayName"),
-                    "status": item.get("status"),
-                    "last_collection_time": item.get("lastCollectTime"),
-                }
-            )
-
-        return format_response(
-            {
-                "device_id": device_id,
-                "total": result.get("total", 0),
-                "count": len(logsources),
-                "logsources": logsources,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/devicelogsources",
+        key="logsources",
+        project=_device_logsource_row,
+        limit=limit,
+        offset=offset,
+        extra={"device_id": device_id},
+    )
 
 
 @require_write_permission

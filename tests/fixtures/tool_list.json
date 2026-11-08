@@ -3198,10 +3198,6 @@
           "description": "Max results",
           "type": "integer"
         },
-        "name_filter": {
-          "description": "Filter by chain name (substring, client-side)",
-          "type": "string"
-        },
         "offset": {
           "default": 0,
           "description": "Results to skip for pagination",
@@ -3250,7 +3246,7 @@
           "type": "integer"
         },
         "name_filter": {
-          "description": "Filter by rule name (substring, client-side)",
+          "description": "Filter by rule name (case-insensitive substring)",
           "type": "string"
         },
         "offset": {
@@ -4399,6 +4395,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "required": [
@@ -4425,6 +4426,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },
@@ -4512,6 +4518,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "required": [
@@ -4561,6 +4572,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },
