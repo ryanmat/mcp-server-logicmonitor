@@ -321,11 +321,12 @@ class TestOneBootstrapForBothTransports:
         from lm_mcp import session as session_module
 
         monkeypatch.setenv("LM_SESSION_HISTORY_SIZE", "7")
+        monkeypatch.setattr(session_module, "_history_size", session_module._history_size)
 
-        monkeypatch.setattr(session_module, "_session", None)
+        monkeypatch.setattr(session_module, "_sessions", {})
         await _stdio_tool_names(self.serve)
         assert session_module.get_session().max_history_size == 7
 
-        monkeypatch.setattr(session_module, "_session", None)
+        monkeypatch.setattr(session_module, "_sessions", {})
         assert await _http_healthz(monkeypatch) == 200
         assert session_module.get_session().max_history_size == 7

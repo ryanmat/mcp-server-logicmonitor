@@ -302,18 +302,19 @@ class TestMultiPortalDispatch:
     async def test_use_portal_recorded_in_session_history(
         self, monkeypatch, tmp_path, reset_portals
     ):
+        """A use_portal lands in the history of the portal the call started on."""
         self._multi_env(monkeypatch, tmp_path)
 
+        from lm_mcp import session as session_module
         from lm_mcp.server import execute_tool
-        from lm_mcp.session import get_session
 
-        get_session().clear()
-        try:
-            await execute_tool("use_portal", {"customer": "acme"})
-            history = get_session().history
-            assert history and history[-1].tool_name == "use_portal"
-        finally:
-            get_session().clear()
+        monkeypatch.setattr(session_module, "_sessions", {})
+        await execute_tool("use_portal", {"customer": "acme"})
+        await execute_tool("use_portal", {"customer": "acme"})
+        result = await execute_tool("list_session_history", {})
+
+        history = json.loads(result[0].text)["history"]
+        assert [entry["tool"] for entry in history] == ["use_portal"]
 
 
 DEVICE_URL = "https://test.logicmonitor.com/santaba/rest/device/devices/7"

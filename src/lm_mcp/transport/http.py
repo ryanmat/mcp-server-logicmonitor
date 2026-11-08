@@ -302,7 +302,7 @@ async def create_http_server() -> None:
     from lm_mcp.client import build_client
     from lm_mcp.config import get_config
     from lm_mcp.server import _set_client
-    from lm_mcp.session import get_session
+    from lm_mcp.session import set_history_size
 
     # Load config. Multi-portal mode is stdio-only and is rejected at config
     # construction, so the HTTP transport always binds a fixed client at startup.
@@ -320,7 +320,7 @@ async def create_http_server() -> None:
     backends = bootstrap.bootstrap_backends(config)
 
     # Initialize session with config settings
-    get_session().max_history_size = config.session_history_size
+    set_history_size(config.session_history_size)
 
     # Create ASGI app
     app = create_asgi_app()
