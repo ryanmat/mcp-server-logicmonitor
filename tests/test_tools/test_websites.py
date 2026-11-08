@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -293,3 +294,28 @@ class TestGetWebsiteData:
         result = await get_website_data(client, website_id=999, checkpoint_id=1)
 
         assert "Error:" in result[0].text
+
+
+# (handler name, endpoint path, extra required arguments)
+_WEBSITES_LISTS = [
+    ("get_websites", "/website/websites", {}),
+    ("get_website_groups", "/website/groups", {}),
+]
+
+
+class TestWebsiteListPaging:
+    """R2.5: the website list tools declare offset, send it, and read a negative total as more."""
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _WEBSITES_LISTS)
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client, name, path, kwargs):
+        from lm_mcp.tools import websites
+
+        await assert_offset_declared_and_sent(client, getattr(websites, name), path, kwargs)
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _WEBSITES_LISTS)
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client, name, path, kwargs):
+        from lm_mcp.tools import websites
+
+        await assert_negative_total_reads_as_more(client, getattr(websites, name), path, kwargs)

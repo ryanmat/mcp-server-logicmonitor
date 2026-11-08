@@ -9,12 +9,10 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
@@ -34,6 +32,18 @@ _SDT_TYPE_API_MAP: dict[str, str] = {
 }
 
 
+def _sdt_row(item: dict) -> dict:
+    """Project one /sdt/sdts row onto the list_sdts fields."""
+    return {
+        "id": item.get("id"),
+        "type": item.get("type"),
+        "device": item.get("deviceDisplayName"),
+        "start_time": item.get("startDateTime"),
+        "end_time": item.get("endDateTime"),
+        "comment": item.get("comment"),
+    }
+
+
 async def list_sdts(
     client: LogicMonitorClient,
     device_id: int | None = None,
@@ -42,6 +52,7 @@ async def list_sdts(
     admin: str | None = None,
     filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List scheduled downtimes from LogicMonitor.
 
@@ -57,61 +68,28 @@ async def list_sdts(
             ~ (contains), !~ (not contains).
             Examples: "type:DeviceSDT,admin~john"
         limit: Maximum number of SDTs to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with SDT data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
+    clauses = []
+    if device_id is not None:
+        clauses.append(f"deviceId:{device_id}")
+    if device_group_id is not None:
+        clauses.append(f"deviceGroupId:{device_group_id}")
 
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if device_id is not None:
-                filters.append(f"deviceId:{device_id}")
-            if device_group_id is not None:
-                filters.append(f"deviceGroupId:{device_group_id}")
-            if sdt_type:
-                clean_type, was_modified = sanitize_filter_value(sdt_type)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"type:{quote_filter_value(clean_type)}")
-            if admin:
-                clean_admin, was_modified = sanitize_filter_value(admin)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"admin~{quote_filter_value(clean_admin)}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/sdt/sdts", params=params)
-
-        sdts = []
-        for item in result.get("items", []):
-            sdts.append(
-                {
-                    "id": item.get("id"),
-                    "type": item.get("type"),
-                    "device": item.get("deviceDisplayName"),
-                    "start_time": item.get("startDateTime"),
-                    "end_time": item.get("endDateTime"),
-                    "comment": item.get("comment"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(sdts),
-            "sdts": sdts,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/sdt/sdts",
+        key="sdts",
+        project=_sdt_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"type:": sdt_type, "admin~": admin},
+        clauses=clauses,
+    )
 
 
 @require_write_permission
@@ -424,11 +402,26 @@ async def bulk_delete_sdt(
     )
 
 
+def _active_sdt_row(item: dict) -> dict:
+    """Project one /sdt/sdts row onto the get_active_sdts fields."""
+    return {
+        "id": item.get("id"),
+        "type": item.get("type"),
+        "device": item.get("deviceDisplayName"),
+        "device_group": item.get("deviceGroupFullPath"),
+        "start_time": item.get("startDateTime"),
+        "end_time": item.get("endDateTime"),
+        "comment": item.get("comment"),
+        "created_by": item.get("admin"),
+    }
+
+
 async def get_active_sdts(
     client: LogicMonitorClient,
     device_id: int | None = None,
     device_group_id: int | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get currently active SDTs.
 
@@ -437,56 +430,49 @@ async def get_active_sdts(
         device_id: Filter by device ID.
         device_group_id: Filter by device group ID.
         limit: Maximum number of SDTs to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with active SDT data or error.
     """
-    try:
-        params: dict = {"size": limit}
+    # Filter to only active SDTs (current time within start/end)
+    now = int(time.time() * 1000)
+    clauses = [f"startDateTime<:{now}", f"endDateTime>:{now}"]
 
-        # Filter to only active SDTs (current time within start/end)
-        now = int(time.time() * 1000)
-        filters = [f"startDateTime<:{now}", f"endDateTime>:{now}"]
+    if device_id:
+        clauses.append(f"deviceId:{device_id}")
+    if device_group_id:
+        clauses.append(f"deviceGroupId:{device_group_id}")
 
-        if device_id:
-            filters.append(f"deviceId:{device_id}")
-        if device_group_id:
-            filters.append(f"deviceGroupId:{device_group_id}")
+    return await list_tool(
+        client,
+        "/sdt/sdts",
+        key="active_sdts",
+        project=_active_sdt_row,
+        limit=limit,
+        offset=offset,
+        clauses=clauses,
+    )
 
-        params["filter"] = ",".join(filters)
 
-        result = await client.get("/sdt/sdts", params=params)
-
-        sdts = []
-        for item in result.get("items", []):
-            sdts.append(
-                {
-                    "id": item.get("id"),
-                    "type": item.get("type"),
-                    "device": item.get("deviceDisplayName"),
-                    "device_group": item.get("deviceGroupFullPath"),
-                    "start_time": item.get("startDateTime"),
-                    "end_time": item.get("endDateTime"),
-                    "comment": item.get("comment"),
-                    "created_by": item.get("admin"),
-                }
-            )
-
-        return format_response(
-            {
-                "total": result.get("total", 0),
-                "count": len(sdts),
-                "active_sdts": sdts,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+def _upcoming_sdt_row(item: dict) -> dict:
+    """Project one /sdt/sdts row onto the get_upcoming_sdts fields."""
+    return {
+        "id": item.get("id"),
+        "type": item.get("type"),
+        "device": item.get("deviceDisplayName"),
+        "device_group": item.get("deviceGroupFullPath"),
+        "start_time": item.get("startDateTime"),
+        "end_time": item.get("endDateTime"),
+        "comment": item.get("comment"),
+    }
 
 
 async def get_upcoming_sdts(
     client: LogicMonitorClient,
     hours_ahead: int = 24,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get SDTs scheduled to start within a time window.
 
@@ -494,42 +480,22 @@ async def get_upcoming_sdts(
         client: LogicMonitor API client.
         hours_ahead: How many hours ahead to look (default 24).
         limit: Maximum number of SDTs to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with upcoming SDT data or error.
     """
-    try:
-        params: dict = {"size": limit}
+    now = int(time.time() * 1000)
+    future = now + (hours_ahead * 60 * 60 * 1000)
 
-        now = int(time.time() * 1000)
-        future = now + (hours_ahead * 60 * 60 * 1000)
-
-        # Filter to SDTs starting in the future within the window
-        params["filter"] = f"startDateTime>:{now},startDateTime<:{future}"
-
-        result = await client.get("/sdt/sdts", params=params)
-
-        sdts = []
-        for item in result.get("items", []):
-            sdts.append(
-                {
-                    "id": item.get("id"),
-                    "type": item.get("type"),
-                    "device": item.get("deviceDisplayName"),
-                    "device_group": item.get("deviceGroupFullPath"),
-                    "start_time": item.get("startDateTime"),
-                    "end_time": item.get("endDateTime"),
-                    "comment": item.get("comment"),
-                }
-            )
-
-        return format_response(
-            {
-                "hours_ahead": hours_ahead,
-                "total": result.get("total", 0),
-                "count": len(sdts),
-                "upcoming_sdts": sdts,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    # Filter to SDTs starting in the future within the window
+    return await list_tool(
+        client,
+        "/sdt/sdts",
+        key="upcoming_sdts",
+        project=_upcoming_sdt_row,
+        limit=limit,
+        offset=offset,
+        clauses=[f"startDateTime>:{now}", f"startDateTime<:{future}"],
+        extra={"hours_ahead": hours_ahead},
+    )

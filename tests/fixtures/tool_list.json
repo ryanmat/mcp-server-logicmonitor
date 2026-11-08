@@ -3285,6 +3285,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -4061,6 +4066,16 @@
       "properties": {
         "dashboard_id": {
           "description": "Dashboard ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 100,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },
@@ -6572,6 +6587,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -6703,6 +6723,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         },
         "parent_id": {
@@ -7192,6 +7217,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         },
         "sdt_type": {

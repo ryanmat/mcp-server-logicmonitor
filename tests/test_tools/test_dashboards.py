@@ -9,6 +9,11 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.list_paging import (
+    BASE_URL,
+    assert_negative_total_reads_as_more,
+    assert_offset_declared_and_sent,
+)
 
 
 @pytest.fixture
@@ -225,13 +230,33 @@ class TestGetDashboardWidgets:
         """get_dashboard_widgets handles 404 error gracefully."""
         from lm_mcp.tools.dashboards import get_dashboard_widgets
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999").mock(
+            return_value=httpx.Response(200, json={"id": 999, "widgetsConfig": {}})
+        )
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999/widgets"
         ).mock(return_value=httpx.Response(404, json={"errorMessage": "Dashboard not found"}))
 
         result = await get_dashboard_widgets(client, dashboard_id=999)
 
-        assert "Error:" in result[0].text
+        assert "Error: Dashboard not found" in result[0].text
+
+    @respx.mock
+    async def test_get_dashboard_widgets_reports_a_missing_dashboard(self, client):
+        """A 404 on the dashboard read returns its error before any widget page is read."""
+        from lm_mcp.tools.dashboards import get_dashboard_widgets
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Dashboard not found"})
+        )
+        widgets = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999/widgets"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        result = await get_dashboard_widgets(client, dashboard_id=999)
+
+        assert "Error: Dashboard not found" in result[0].text
+        assert not widgets.called
 
 
 class TestCreateDashboard:
@@ -1206,3 +1231,36 @@ class TestAddWidgetFieldRemapping:
         body = json.loads(route.calls[0].request.content)
         assert body["content"] == "<h1>Hello</h1>"
         assert "html" not in body
+
+
+# (handler name, endpoint path, extra required arguments)
+_DASHBOARDS_LISTS = [
+    ("get_dashboards", "/dashboard/dashboards", {}),
+    ("get_dashboard_widgets", "/dashboard/dashboards/7/widgets", {"dashboard_id": 7}),
+]
+
+
+class TestDashboardListPaging:
+    """R2.5: the dashboard list tools declare offset, send it, and read a negative total as more."""
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _DASHBOARDS_LISTS)
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client, name, path, kwargs):
+        from lm_mcp.tools import dashboards
+
+        # get_dashboard_widgets reads widget placement from the dashboard itself.
+        respx.get(f"{BASE_URL}/dashboard/dashboards/7").mock(
+            return_value=httpx.Response(200, json={"id": 7, "widgetsConfig": {}})
+        )
+        await assert_offset_declared_and_sent(client, getattr(dashboards, name), path, kwargs)
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _DASHBOARDS_LISTS)
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client, name, path, kwargs):
+        from lm_mcp.tools import dashboards
+
+        # get_dashboard_widgets reads widget placement from the dashboard itself.
+        respx.get(f"{BASE_URL}/dashboard/dashboards/7").mock(
+            return_value=httpx.Response(200, json={"id": 7, "widgetsConfig": {}})
+        )
+        await assert_negative_total_reads_as_more(client, getattr(dashboards, name), path, kwargs)

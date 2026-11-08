@@ -10,14 +10,11 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
+    list_tool,
     portal_url,
-    quote_filter_value,
     require_write_permission,
-    sanitize_filter_value,
     strip_readonly,
 )
 
@@ -111,6 +108,19 @@ async def _place_widget(
     return position
 
 
+def _dashboard_row(item: dict) -> dict:
+    """Project one /dashboard/dashboards row onto the get_dashboards fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "group_id": item.get("groupId"),
+        "group_name": item.get("groupFullPath"),
+        "widget_count": _count_widgets(item),
+        "owner": item.get("owner"),
+    }
+
+
 async def get_dashboards(
     client: LogicMonitorClient,
     name_filter: str | None = None,
@@ -136,51 +146,17 @@ async def get_dashboards(
     Returns:
         List of TextContent with dashboard data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if group_id is not None:
-                filters.append(f"groupId:{group_id}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/dashboard/dashboards", params=params)
-
-        dashboards = []
-        for item in result.get("items", []):
-            dashboards.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "group_id": item.get("groupId"),
-                    "group_name": item.get("groupFullPath"),
-                    "widget_count": _count_widgets(item),
-                    "owner": item.get("owner"),
-                }
-            )
-
-        response = {
-            **paginated_response(dashboards, result, offset),
-            "dashboards": dashboards,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/dashboard/dashboards",
+        key="dashboards",
+        project=_dashboard_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter},
+        clauses=[f"groupId:{group_id}"] if group_id is not None else [],
+    )
 
 
 async def get_dashboard(
@@ -208,6 +184,7 @@ async def get_dashboard_widgets(
     client: LogicMonitorClient,
     dashboard_id: int,
     limit: int = 100,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get widgets for a specific dashboard.
 
@@ -215,51 +192,46 @@ async def get_dashboard_widgets(
         client: LogicMonitor API client.
         dashboard_id: Dashboard ID.
         limit: Maximum number of widgets to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with widget data or error.
     """
+    # Position (column/row/spans) lives on the parent dashboard's widgetsConfig
+    # keyed by widget id, not on the widget objects. Fetch the dashboard and map
+    # placement onto each widget.
     try:
-        params: dict = {"size": limit}
-
-        result = await client.get(f"/dashboard/dashboards/{dashboard_id}/widgets", params=params)
-
-        # Position (column/row/spans) lives on the parent dashboard's widgetsConfig
-        # keyed by widget id, not on the widget objects -- which is why these came back
-        # null before. Fetch the dashboard and map placement onto each widget.
         dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
-        config = dashboard.get("widgetsConfig")
-        if not isinstance(config, dict):
-            config = {}
-
-        widgets = []
-        for item in result.get("items", []):
-            pos = config.get(str(item.get("id")))
-            if not isinstance(pos, dict):
-                pos = {}
-            widgets.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "type": item.get("type"),
-                    "description": item.get("description"),
-                    "column": pos.get("col"),
-                    "row": pos.get("row"),
-                    "col_span": pos.get("sizex"),
-                    "row_span": pos.get("sizey"),
-                }
-            )
-
-        return format_response(
-            {
-                "dashboard_id": dashboard_id,
-                "total": result.get("total", 0),
-                "count": len(widgets),
-                "widgets": widgets,
-            }
-        )
     except Exception as e:
         return handle_error(e)
+    config = dashboard.get("widgetsConfig")
+    if not isinstance(config, dict):
+        config = {}
+
+    def widget_row(item: dict) -> dict:
+        pos = config.get(str(item.get("id")))
+        if not isinstance(pos, dict):
+            pos = {}
+        return {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "type": item.get("type"),
+            "description": item.get("description"),
+            "column": pos.get("col"),
+            "row": pos.get("row"),
+            "col_span": pos.get("sizex"),
+            "row_span": pos.get("sizey"),
+        }
+
+    return await list_tool(
+        client,
+        f"/dashboard/dashboards/{dashboard_id}/widgets",
+        key="widgets",
+        project=widget_row,
+        limit=limit,
+        offset=offset,
+        extra={"dashboard_id": dashboard_id},
+    )
 
 
 @require_write_permission

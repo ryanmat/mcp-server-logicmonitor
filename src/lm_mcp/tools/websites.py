@@ -8,18 +8,31 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
+    list_tool,
     portal_url,
-    quote_filter_value,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+
+def _website_row(item: dict) -> dict:
+    """Project one /website/websites row onto the get_websites fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "type": item.get("type"),
+        "description": item.get("description"),
+        "group_id": item.get("groupId"),
+        "status": item.get("status"),
+        "alert_status": item.get("alertStatus"),
+        "overall_status": item.get("overallAlertLevel"),
+        "polling_interval": item.get("pollingInterval"),
+        "host": item.get("host") or item.get("domain"),
+    }
 
 
 async def get_websites(
@@ -47,54 +60,17 @@ async def get_websites(
     Returns:
         List of TextContent with website data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if group_id is not None:
-                filters.append(f"groupId:{group_id}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/website/websites", params=params)
-
-        websites = []
-        for item in result.get("items", []):
-            websites.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "type": item.get("type"),
-                    "description": item.get("description"),
-                    "group_id": item.get("groupId"),
-                    "status": item.get("status"),
-                    "alert_status": item.get("alertStatus"),
-                    "overall_status": item.get("overallAlertLevel"),
-                    "polling_interval": item.get("pollingInterval"),
-                    "host": item.get("host") or item.get("domain"),
-                }
-            )
-
-        response = {
-            **paginated_response(websites, result, offset),
-            "websites": websites,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/website/websites",
+        key="websites",
+        project=_website_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter},
+        clauses=[f"groupId:{group_id}"] if group_id is not None else [],
+    )
 
 
 async def get_website(
@@ -150,11 +126,25 @@ async def get_website(
         return handle_error(e)
 
 
+def _website_group_row(item: dict) -> dict:
+    """Project one /website/groups row onto the get_website_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "parent_id": item.get("parentId"),
+        "full_path": item.get("fullPath"),
+        "website_count": item.get("numOfWebsites"),
+        "has_websites_disabled": item.get("hasWebsitesDisabled"),
+    }
+
+
 async def get_website_groups(
     client: LogicMonitorClient,
     parent_id: int | None = None,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List website groups from LogicMonitor.
 
@@ -163,51 +153,21 @@ async def get_website_groups(
         parent_id: Filter by parent group ID.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with group data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        filters = []
-        if parent_id is not None:
-            filters.append(f"parentId:{parent_id}")
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"name~{quote_filter_value(clean_name)}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/website/groups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "parent_id": item.get("parentId"),
-                    "full_path": item.get("fullPath"),
-                    "website_count": item.get("numOfWebsites"),
-                    "has_websites_disabled": item.get("hasWebsitesDisabled"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/website/groups",
+        key="groups",
+        project=_website_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+        clauses=[f"parentId:{parent_id}"] if parent_id is not None else [],
+    )
 
 
 async def get_website_data(
