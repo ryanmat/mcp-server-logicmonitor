@@ -155,6 +155,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `update_logicmodule` runs send `collectionMethod`, the name those REST models use. They renamed it
   to the DataSource field `collectMethod`, and the LogSource API answered a PUT carrying that
   rename with 400, so `update_logicmodule` could not apply a LogSource change.
+- `get_scheduled_reports` asks the portal for the reports whose schedule is not empty
+  (`schedule!:""`), so `limit` and `offset` page through scheduled reports and `total` counts
+  them. It fetched `limit` reports of every kind and kept the scheduled ones, so a portal with more
+  reports than `limit` could return none of its scheduled reports, and `total` counted only that
+  page.
 
 ### Changed
 
@@ -168,13 +173,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - When the API reports a page with a negative total, its sign that more rows exist than it
   counted, a list tool leaves `total` out of the response rather than reporting that number as a
   lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
-  exact. This covers the 25 list tools on the shared pagination helper, `get_devices`,
+  exact. This covers the 31 list tools on the shared pagination helper, `get_devices`,
   `get_alerts` and `get_audit_logs` among them.
 - `get_device_groups`, `get_collector_groups`, `get_website_groups`, `get_dashboard_widgets`,
-  `list_sdts`, `get_active_sdts` and `get_upcoming_sdts` return `offset` and `has_more` beside
-  `count`, the envelope the shared pagination helper builds, and all but `get_collector_groups`,
-  which had it, take an `offset` argument. `get_dashboard_widgets` lists its `limit` argument in
-  its schema.
+  `list_sdts`, `get_active_sdts`, `get_upcoming_sdts`, `get_roles`, `get_report_groups`,
+  `get_scheduled_reports`, `get_escalation_chains`, `get_recipient_groups` and `get_integrations`
+  return `offset` and `has_more` beside `count`, the envelope the shared pagination helper builds,
+  and all but `get_collector_groups` and `get_roles`, which had it, take an `offset` argument.
+  `get_dashboard_widgets` lists its `limit` argument in its schema.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other

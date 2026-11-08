@@ -1,11 +1,62 @@
 # Description: Tests for MCP tool registry.
 # Description: Validates tool definitions and handlers.
 
+import ast
 import inspect
 
 import pytest
 
 from lm_mcp.registry import TOOLS, get_tool_handler
+
+# List tool handlers that still format their own size or offset query, each mapped to
+# the plan step that moves it onto list_tool or removes it. The guard below fails on an
+# entry whose handler no longer exists or no longer formats its own query, so an entry
+# leaves when its handler moves.
+_LIST_TOOL_PENDING: dict[str, int] = {
+    "get_action_chains": 24,
+    "get_action_rules": 24,
+    "get_configsource_update_reasons": 24,
+    "get_device_config": 24,
+    "get_device_datasources": 24,
+    "get_device_eventsources": 24,
+    "get_device_instances": 24,
+    "get_device_logsources": 24,
+    "get_access_groups": 25,
+    "get_alert_rules": 25,
+    "get_api_tokens": 25,
+    "get_batchjobs": 25,
+    "get_cost_recommendations": 25,
+    "get_dashboard_groups": 25,
+    "get_device_batchjobs": 25,
+    "get_device_interfaces": 25,
+    "get_device_properties": 25,
+    "get_idle_resources": 25,
+    "get_netscans": 25,
+    "get_network_flows": 25,
+    "get_oids": 25,
+    "get_ops_notes": 25,
+    "get_scheduled_downtime_jobs": 25,
+    "get_service_groups": 25,
+    "get_services": 25,
+    "get_topology_map": 25,
+    "get_trace_operations": 37,
+    "get_trace_service_alerts": 37,
+    "get_trace_service_datasources": 37,
+    "get_trace_service_properties": 37,
+    "get_trace_services": 37,
+    "get_audit_logs": 38,
+    "get_api_token_audit": 39,
+    "get_change_audit": 39,
+    "get_login_audit": 39,
+    "get_configsources": 42,
+    "get_datasources": 42,
+    "get_diagnosticsources": 42,
+    "get_eventsources": 42,
+    "get_logsources": 42,
+    "get_propertysources": 42,
+    "get_remediationsources": 42,
+    "get_topologysources": 42,
+}
 
 
 class TestRegistry:
@@ -195,3 +246,89 @@ class TestRegistry:
                 f"Schema: {sorted(schema_props)}, "
                 f"Function: {sorted(func_params)}"
             )
+
+
+def _handler_sources() -> dict[str, tuple[inspect.Signature, ast.Module]]:
+    """Map each registered tool's handler name to its signature and parsed source."""
+    sources = {}
+    for tool in TOOLS:
+        handler = inspect.unwrap(get_tool_handler(tool.name))
+        sources[handler.__name__] = (
+            inspect.signature(handler),
+            ast.parse(inspect.getsource(handler)),
+        )
+    return sources
+
+
+def _calls_list_tool(tree: ast.Module) -> bool:
+    """Return True when the handler's source calls list_tool."""
+    return any(
+        isinstance(node, ast.Call)
+        and (getattr(node.func, "id", None) or getattr(node.func, "attr", None)) == "list_tool"
+        for node in ast.walk(tree)
+    )
+
+
+def _formats_own_page_query(tree: ast.Module) -> bool:
+    """Return True when the handler's source writes a size or offset query key itself.
+
+    Covers a dict literal with a "size" or "offset" key and an assignment to a "size"
+    or "offset" subscript, such as params["size"].
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Dict) and any(
+            isinstance(key, ast.Constant) and key.value in ("size", "offset") for key in node.keys
+        ):
+            return True
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.ctx, ast.Store)
+            and isinstance(node.slice, ast.Constant)
+            and node.slice.value in ("size", "offset")
+        ):
+            return True
+    return False
+
+
+class TestListToolGuard:
+    """R2.5: a list tool pages through list_tool and takes and declares limit and offset.
+
+    The guard covers the registered handlers that take ``limit``, and a handler that
+    formats its own page query passes only while _LIST_TOOL_PENDING names it. A handler
+    that takes no ``limit``, such as a size=1 lookup by name or id, stays outside it.
+    """
+
+    def test_list_tool_handlers_take_and_declare_limit_and_offset(self):
+        sources = _handler_sources()
+        schemas = {tool.name: tool.inputSchema.get("properties", {}) for tool in TOOLS}
+        missing = []
+        for name, (sig, tree) in sources.items():
+            if not _calls_list_tool(tree):
+                continue
+            for param in ("limit", "offset"):
+                if param not in sig.parameters:
+                    missing.append(f"{name} takes no {param}")
+                if param not in schemas[name]:
+                    missing.append(f"{name} schema declares no {param}")
+        assert not missing, missing
+
+    def test_handlers_that_format_their_own_page_query_are_pending(self):
+        unlisted = sorted(
+            name
+            for name, (sig, tree) in _handler_sources().items()
+            if "limit" in sig.parameters
+            and _formats_own_page_query(tree)
+            and name not in _LIST_TOOL_PENDING
+        )
+        assert not unlisted, f"move these onto list_tool or into _LIST_TOOL_PENDING: {unlisted}"
+
+    def test_pending_entries_still_format_their_own_page_query(self):
+        sources = _handler_sources()
+        stale = sorted(
+            name
+            for name in _LIST_TOOL_PENDING
+            if name not in sources
+            or "limit" not in sources[name][0].parameters
+            or not _formats_own_page_query(sources[name][1])
+        )
+        assert not stale, f"remove these from _LIST_TOOL_PENDING: {stale}"

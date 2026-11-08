@@ -285,11 +285,15 @@ class TestGetScheduledReports:
     """Tests for get_scheduled_reports tool (schedule is a string, not a dict)."""
 
     @respx.mock
-    async def test_returns_only_reports_with_nonempty_schedule(self, client):
-        """A report is scheduled when its schedule string is non-empty."""
+    async def test_portal_filters_on_a_nonempty_schedule(self, client):
+        """A report is scheduled when its schedule string is non-empty.
+
+        The portal applies the schedule!:"" filter, so total counts scheduled
+        reports only.
+        """
         from lm_mcp.tools.reports import get_scheduled_reports
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/report/reports").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -302,17 +306,19 @@ class TestGetScheduledReports:
                             "scheduleTimezone": "America/New_York",
                             "lastGenerateOn": 1702500000,
                         },
-                        {"id": 2, "name": "Unscheduled", "type": "Alert", "schedule": ""},
                     ],
-                    "total": 2,
+                    "total": 3,
                 },
             )
         )
 
-        result = await get_scheduled_reports(client)
+        result = await get_scheduled_reports(client, limit=1)
 
+        assert route.calls[0].request.url.params["filter"] == 'schedule!:""'
         data = json.loads(result[0].text)
         assert data["count"] == 1
+        assert data["total"] == 3
+        assert data["has_more"] is True
         assert data["scheduled_reports"][0]["id"] == 1
         assert data["scheduled_reports"][0]["schedule"] == "0 8 * * 1"
         assert data["scheduled_reports"][0]["schedule_timezone"] == "America/New_York"

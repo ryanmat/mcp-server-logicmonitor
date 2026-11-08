@@ -4912,6 +4912,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -5086,6 +5091,11 @@
         "name_filter": {
           "description": "Filter by integration name (supports wildcards).",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         },
         "type_filter": {
           "description": "Exact-match filter on the integration type, e.g. 'http' for Custom HTTP Delivery, 'slack-2', 'pagerduty'. Wildcards are not supported for type.",
@@ -5738,6 +5748,11 @@
         "name_filter": {
           "description": "Filter by group name (supports wildcards)",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -5903,6 +5918,11 @@
         "name_filter": {
           "description": "Filter by name (substring)",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -6053,6 +6073,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },

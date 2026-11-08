@@ -8,13 +8,10 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
     strip_readonly,
 )
 
@@ -34,6 +31,21 @@ _REPORT_READONLY_FIELDS = (
     "typeAlias",
     "customReportTypeName",
 )
+
+
+def _report_row(item: dict) -> dict:
+    """Project one /report/reports row onto the get_reports fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "type": item.get("type"),
+        "group_id": item.get("groupId"),
+        "group_path": item.get("groupFullPath"),
+        "format": item.get("format"),
+        "schedule": item.get("schedule"),
+        "last_generated": item.get("lastGenerateOn"),
+    }
 
 
 async def get_reports(
@@ -65,59 +77,18 @@ async def get_reports(
     Returns:
         List of TextContent with report data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        if include_nextgen:
-            params["showNextGenReports"] = "true"
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if group_id is not None:
-                filters.append(f"groupId:{group_id}")
-            if report_type:
-                clean_type, was_modified = sanitize_filter_value(report_type)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"type~{quote_filter_value(clean_type)}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/report/reports", params=params)
-
-        reports = []
-        for item in result.get("items", []):
-            reports.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "type": item.get("type"),
-                    "group_id": item.get("groupId"),
-                    "group_path": item.get("groupFullPath"),
-                    "format": item.get("format"),
-                    "schedule": item.get("schedule"),
-                    "last_generated": item.get("lastGenerateOn"),
-                }
-            )
-
-        response = {
-            **paginated_response(reports, result, offset),
-            "reports": reports,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/report/reports",
+        key="reports",
+        project=_report_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter, "type~": report_type},
+        clauses=[f"groupId:{group_id}"] if group_id is not None else [],
+        params={"showNextGenReports": "true"} if include_nextgen else None,
+    )
 
 
 async def get_report(
@@ -167,10 +138,21 @@ async def get_report(
         return handle_error(e)
 
 
+def _report_group_row(item: dict) -> dict:
+    """Project one /report/groups row onto the get_report_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "report_count": item.get("numOfReports"),
+    }
+
+
 async def get_report_groups(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List report groups from LogicMonitor.
 
@@ -178,42 +160,20 @@ async def get_report_groups(
         client: LogicMonitor API client.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with report group data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/report/groups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "report_count": item.get("numOfReports"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/report/groups",
+        key="groups",
+        project=_report_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 @require_write_permission
@@ -260,17 +220,32 @@ async def run_report(
         return handle_error(e)
 
 
+def _scheduled_report_row(item: dict) -> dict:
+    """Project one /report/reports row onto the get_scheduled_reports fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "type": item.get("type"),
+        "schedule": item.get("schedule"),
+        "schedule_timezone": item.get("scheduleTimezone"),
+        "last_generated": item.get("lastGenerateOn"),
+    }
+
+
 async def get_scheduled_reports(
     client: LogicMonitorClient,
     enabled_only: bool = False,
     include_nextgen: bool = False,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get reports that have a schedule configured.
 
     The LM report ``schedule`` is a single string (a cron expression; an empty string
     means the report is not scheduled), with the timezone in ``scheduleTimezone``. A
-    report is considered scheduled when ``schedule`` is non-empty.
+    report is considered scheduled when ``schedule`` is non-empty, and the portal
+    filters on that with ``schedule!:""``, so limit and offset page through the
+    scheduled reports only.
 
     Args:
         client: LogicMonitor API client.
@@ -278,41 +253,21 @@ async def get_scheduled_reports(
             active schedule, so this does not further filter.
         include_nextgen: Include NextGen reports (passes showNextGenReports).
         limit: Maximum number of reports to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with scheduled report data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        if include_nextgen:
-            params["showNextGenReports"] = "true"
-
-        result = await client.get("/report/reports", params=params)
-
-        scheduled = []
-        for item in result.get("items", []):
-            schedule = item.get("schedule")
-            if schedule:
-                scheduled.append(
-                    {
-                        "id": item.get("id"),
-                        "name": item.get("name"),
-                        "type": item.get("type"),
-                        "schedule": schedule,
-                        "schedule_timezone": item.get("scheduleTimezone"),
-                        "last_generated": item.get("lastGenerateOn"),
-                    }
-                )
-
-        return format_response(
-            {
-                "total": len(scheduled),
-                "count": len(scheduled),
-                "scheduled_reports": scheduled,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/report/reports",
+        key="scheduled_reports",
+        project=_scheduled_report_row,
+        limit=limit,
+        offset=offset,
+        clauses=['schedule!:""'],
+        params={"showNextGenReports": "true"} if include_nextgen else None,
+    )
 
 
 @require_write_permission

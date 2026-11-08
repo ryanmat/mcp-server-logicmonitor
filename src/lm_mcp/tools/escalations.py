@@ -8,22 +8,34 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _escalation_chain_row(item: dict) -> dict:
+    """Project one /setting/alert/chains row onto the get_escalation_chains fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "enable_throttling": item.get("enableThrottling"),
+        "throttling_period": item.get("throttlingPeriod"),
+        "throttling_alerts": item.get("throttlingAlerts"),
+        "in_alerting": item.get("inAlerting"),
+    }
+
+
 async def get_escalation_chains(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List escalation chains from LogicMonitor.
 
@@ -31,45 +43,20 @@ async def get_escalation_chains(
         client: LogicMonitor API client.
         name_filter: Filter by chain name (supports wildcards).
         limit: Maximum number of chains to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with escalation chain data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/setting/alert/chains", params=params)
-
-        chains = []
-        for item in result.get("items", []):
-            chains.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "enable_throttling": item.get("enableThrottling"),
-                    "throttling_period": item.get("throttlingPeriod"),
-                    "throttling_alerts": item.get("throttlingAlerts"),
-                    "in_alerting": item.get("inAlerting"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(chains),
-            "escalation_chains": chains,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/alert/chains",
+        key="escalation_chains",
+        project=_escalation_chain_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 async def get_escalation_chain(
@@ -224,10 +211,20 @@ def _format_recipient(recipient: dict) -> dict:
     }
 
 
+def _recipient_group_row(item: dict) -> dict:
+    """Project one /setting/recipientgroups row onto the get_recipient_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": _recipient_group_name(item),
+        "description": item.get("description"),
+    }
+
+
 async def get_recipient_groups(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
     detail: bool = False,
 ) -> list[TextContent]:
     """List recipient groups from LogicMonitor.
@@ -236,45 +233,30 @@ async def get_recipient_groups(
         client: LogicMonitor API client.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
         detail: When true, fetch each group's full recipient list via an
             extra GET per group. Off by default to avoid N+1 API calls.
 
     Returns:
         List of TextContent with recipient group data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
 
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
+    async def with_recipients(item: dict) -> dict:
+        entry = _recipient_group_row(item)
+        if entry["id"] is not None:
+            full = await client.get(f"/setting/recipientgroups/{entry['id']}")
+            entry["recipients"] = [_format_recipient(r) for r in full.get("recipients", [])]
+        return entry
 
-        result = await client.get("/setting/recipientgroups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            entry = {
-                "id": item.get("id"),
-                "name": _recipient_group_name(item),
-                "description": item.get("description"),
-            }
-            if detail and entry["id"] is not None:
-                full = await client.get(f"/setting/recipientgroups/{entry['id']}")
-                entry["recipients"] = [_format_recipient(r) for r in full.get("recipients", [])]
-            groups.append(entry)
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "recipient_groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/recipientgroups",
+        key="recipient_groups",
+        project=with_recipients if detail else _recipient_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 async def get_recipient_group(

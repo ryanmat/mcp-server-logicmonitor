@@ -8,17 +8,29 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+
+def _user_row(item: dict) -> dict:
+    """Project one /setting/admins row onto the get_users fields."""
+    return {
+        "id": item.get("id"),
+        "username": item.get("username"),
+        "email": item.get("email"),
+        "first_name": item.get("firstName"),
+        "last_name": item.get("lastName"),
+        "status": item.get("status"),
+        "roles": [r.get("name") for r in item.get("roles", [])],
+        "two_fa_enabled": item.get("twoFAEnabled"),
+        "api_only": item.get("apionly"),
+    }
 
 
 async def get_users(
@@ -44,45 +56,16 @@ async def get_users(
     Returns:
         List of TextContent with user data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        elif name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"username~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/setting/admins", params=params)
-
-        users = []
-        for item in result.get("items", []):
-            users.append(
-                {
-                    "id": item.get("id"),
-                    "username": item.get("username"),
-                    "email": item.get("email"),
-                    "first_name": item.get("firstName"),
-                    "last_name": item.get("lastName"),
-                    "status": item.get("status"),
-                    "roles": [r.get("name") for r in item.get("roles", [])],
-                    "two_fa_enabled": item.get("twoFAEnabled"),
-                    "api_only": item.get("apionly"),
-                }
-            )
-
-        response = {
-            **paginated_response(users, result, offset),
-            "users": users,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/admins",
+        key="users",
+        project=_user_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"username~": name_filter},
+    )
 
 
 async def get_user(
@@ -123,6 +106,18 @@ async def get_user(
         return handle_error(e)
 
 
+def _role_row(item: dict) -> dict:
+    """Project one /setting/roles row onto the get_roles fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "requires_eula": item.get("requireEULA"),
+        "two_fa_required": item.get("twoFARequired"),
+        "associated_user_count": item.get("associatedUserCount"),
+    }
+
+
 async def get_roles(
     client: LogicMonitorClient,
     name_filter: str | None = None,
@@ -146,43 +141,16 @@ async def get_roles(
     Returns:
         List of TextContent with role data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        elif name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/setting/roles", params=params)
-
-        roles = []
-        for item in result.get("items", []):
-            roles.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "requires_eula": item.get("requireEULA"),
-                    "two_fa_required": item.get("twoFARequired"),
-                    "associated_user_count": item.get("associatedUserCount"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(roles),
-            "roles": roles,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/roles",
+        key="roles",
+        project=_role_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter},
+    )
 
 
 async def get_role(
