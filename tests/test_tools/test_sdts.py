@@ -10,6 +10,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
@@ -214,9 +215,40 @@ class TestCreateSdt:
             duration_minutes=60,
         )
 
-        # Error responses are formatted as text, not JSON
-        assert is_error_result(result)
-        assert "Invalid type" in result[0].text
+        # The client raises the 200 body's errorCode as API_ERROR_1400: a refused request.
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["isRetryable"] is False
+        assert error["message"].startswith("Invalid type")
+        assert error["details"] == {"lm_code": "API_ERROR_1400"}
+
+    @respx.mock
+    async def test_create_sdt_body_error_without_code_has_no_lm_code(self, client, monkeypatch):
+        """A 200 body with errorMessage alone is refused with no lm_code to report."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import create_sdt
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(200, json={"errorMessage": "Invalid type"})
+        )
+
+        result = await create_sdt(
+            client, sdt_type="InvalidType", device_id=123, duration_minutes=60
+        )
+
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["message"].startswith("Invalid type")
+        assert error["details"] is None
 
     @respx.mock
     async def test_create_sdt_datasource_type(self, client, monkeypatch):

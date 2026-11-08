@@ -8,6 +8,7 @@ from mcp.types import TextContent
 
 from lm_mcp.exceptions import LMError
 from lm_mcp.tools import ErrorContent, format_response, handle_error, is_error_result
+from tests.envelope import envelope
 
 
 class TestErrorContentHelpers:
@@ -19,7 +20,7 @@ class TestErrorContentHelpers:
         assert isinstance(result[0], TextContent)
         assert result[0].type == "text"
         assert result[0].is_error is True
-        assert result[0].text.startswith("Error: Device 7 not found")
+        assert envelope(result)["message"].startswith("Device 7 not found")
 
     def test_handle_error_unexpected_returns_error_content_and_logs_traceback(self, caplog):
         """Handlers call handle_error inside their except block, as here."""
@@ -30,7 +31,7 @@ class TestErrorContentHelpers:
                 result = handle_error(e)
 
         assert isinstance(result[0], ErrorContent)
-        assert result[0].text.startswith("Error: boom")
+        assert envelope(result)["message"].startswith("boom")
         records = [r for r in caplog.records if r.name == "lm_mcp.tools"]
         assert records and records[-1].exc_info is not None
         assert records[-1].exc_info[0] is RuntimeError
@@ -58,14 +59,16 @@ def single_portal(monkeypatch):
 
 
 class TestExecuteToolInlineErrors:
-    """Every refusal execute_tool builds itself is an ErrorContent with its text unchanged."""
+    """Every refusal execute_tool builds itself is an ErrorContent carrying the envelope."""
 
     async def test_portal_tool_in_single_portal_mode(self, single_portal):
         from lm_mcp.server import execute_tool
 
         result = await execute_tool("list_portals", {})
         assert is_error_result(result)
-        assert result[0].text.startswith("Error: Tool 'list_portals' is only available")
+        error = envelope(result)
+        assert error["code"] == "FEATURE_DISABLED"
+        assert error["message"].startswith("Tool 'list_portals' is only available")
 
     async def test_tool_not_enabled(self, single_portal, monkeypatch):
         monkeypatch.setenv("LM_ENABLED_TOOLS", "get_alerts")
@@ -73,7 +76,9 @@ class TestExecuteToolInlineErrors:
 
         result = await execute_tool("get_devices", {})
         assert is_error_result(result)
-        assert "is not enabled" in result[0].text
+        error = envelope(result)
+        assert error["code"] == "FEATURE_DISABLED"
+        assert "is not enabled" in error["message"]
 
     async def test_tool_disabled(self, single_portal, monkeypatch):
         monkeypatch.setenv("LM_DISABLED_TOOLS", "delete_*")
@@ -81,7 +86,9 @@ class TestExecuteToolInlineErrors:
 
         result = await execute_tool("delete_device", {"device_id": 1})
         assert is_error_result(result)
-        assert "is disabled" in result[0].text
+        error = envelope(result)
+        assert error["code"] == "FEATURE_DISABLED"
+        assert "is disabled" in error["message"]
 
     async def test_tool_excluded_by_categories(self, single_portal, monkeypatch):
         monkeypatch.setenv("LM_MCP_CATEGORIES", "read")
@@ -89,13 +96,16 @@ class TestExecuteToolInlineErrors:
 
         result = await execute_tool("delete_device", {"device_id": 1})
         assert is_error_result(result)
-        assert "excluded by LM_MCP_CATEGORIES" in result[0].text
+        error = envelope(result)
+        assert error["code"] == "FEATURE_DISABLED"
+        assert "excluded by LM_MCP_CATEGORIES" in error["message"]
 
     async def test_unknown_tool_value_error_path(self, single_portal):
         from lm_mcp.server import execute_tool
 
         result = await execute_tool("no_such_tool", {})
         assert is_error_result(result)
+        assert envelope(result)["code"] == "INVALID_REQUEST"
 
     async def test_exception_path(self, single_portal, reset_portals):
         """No client bound: get_client raises and the dispatcher's except path answers."""
@@ -103,7 +113,10 @@ class TestExecuteToolInlineErrors:
 
         result = await execute_tool("get_devices", {})
         assert is_error_result(result)
-        assert result[0].text == "Error executing get_devices: Client not initialized"
+        error = envelope(result)
+        assert error["code"] == "UPSTREAM_ERROR"
+        assert error["message"] == "Client not initialized"
+        assert error["details"] == {"exception": "RuntimeError"}
 
     async def test_success_is_not_an_error(self, single_portal):
         from lm_mcp.server import execute_tool

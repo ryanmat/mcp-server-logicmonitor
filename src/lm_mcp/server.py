@@ -23,7 +23,12 @@ from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
-from lm_mcp.tools import ErrorContent, is_error_result, write_disabled_response
+from lm_mcp.tools import (
+    error_content,
+    error_from_exception,
+    is_error_result,
+    write_disabled_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -192,48 +197,37 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
         # Portal tools exist only in multi-portal mode
         if name in PORTAL_TOOLS and not config.multi_portal:
-            return [
-                ErrorContent(
-                    type="text",
-                    text=f"Error: Tool '{name}' is only available in multi-portal mode "
-                    "(set LM_MULTI_PORTAL=true).",
-                )
-            ]
+            return error_content(
+                "FEATURE_DISABLED",
+                f"Tool '{name}' is only available in multi-portal mode (set LM_MULTI_PORTAL=true).",
+            )
 
         # Reject calls to filtered-out tools
         if config.enabled_tools:
             patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
             if not any(fnmatch(name, pat) for pat in patterns):
-                return [
-                    ErrorContent(
-                        type="text",
-                        text=f"Error: Tool '{name}' is not enabled. "
-                        f"Enabled tools: {config.enabled_tools}",
-                    )
-                ]
+                return error_content(
+                    "FEATURE_DISABLED",
+                    f"Tool '{name}' is not enabled. Enabled tools: {config.enabled_tools}",
+                )
         elif config.disabled_tools:
             patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
             if any(fnmatch(name, pat) for pat in patterns):
-                return [
-                    ErrorContent(
-                        type="text",
-                        text=f"Error: Tool '{name}' is disabled. "
-                        f"Disabled tools: {config.disabled_tools}",
-                    )
-                ]
+                return error_content(
+                    "FEATURE_DISABLED",
+                    f"Tool '{name}' is disabled. Disabled tools: {config.disabled_tools}",
+                )
 
         if config.mcp_categories and not (name in PORTAL_TOOLS and config.multi_portal):
             from lm_mcp.categories import tool_in_categories
 
             tools_index = {t.name: t for t in TOOLS}
             if not tool_in_categories(name, tools_index, config.mcp_categories):
-                return [
-                    ErrorContent(
-                        type="text",
-                        text=f"Error: Tool '{name}' is excluded by LM_MCP_CATEGORIES "
-                        f"(active categories: {config.mcp_categories}).",
-                    )
-                ]
+                return error_content(
+                    "FEATURE_DISABLED",
+                    f"Tool '{name}' is excluded by LM_MCP_CATEGORIES "
+                    f"(active categories: {config.mcp_categories}).",
+                )
 
         if not config.enable_write_operations:
             tool = next((t for t in TOOLS if t.name == name), None)
@@ -282,12 +276,12 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         logger.exception("Tool %s rejected its arguments", name)
         if is_write_tool(name):
             log_write_operation(name, arguments, success=False)
-        return [ErrorContent(type="text", text=f"Error: {e}")]
+        return error_content("INVALID_REQUEST", str(e))
     except Exception as e:
         logger.exception("Tool %s raised", name)
         if is_write_tool(name):
             log_write_operation(name, arguments, success=False)
-        return [ErrorContent(type="text", text=f"Error executing {name}: {e}")]
+        return error_from_exception(e)
 
 
 @server.call_tool()

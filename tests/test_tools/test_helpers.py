@@ -4,6 +4,7 @@
 import json
 
 from lm_mcp.exceptions import AuthenticationError, LMError, NotFoundError
+from tests.envelope import envelope
 
 
 class TestFormatResponse:
@@ -45,34 +46,32 @@ class TestFormatResponse:
         assert result[0].text == "Simple message"
 
     def test_format_error_response(self):
-        """Error dict includes error message and suggestion."""
+        """Error dict's suggestion is joined onto the envelope's message."""
         from lm_mcp.tools import format_response
 
         data = {
             "error": True,
-            "code": "TEST_ERROR",
+            "code": "INVALID_REQUEST",
             "message": "Something went wrong",
             "suggestion": "Try again",
         }
         result = format_response(data)
 
         assert len(result) == 1
-        assert "Error: Something went wrong" in result[0].text
-        assert "Suggestion: Try again" in result[0].text
+        assert envelope(result)["message"] == "Something went wrong. Try again"
 
     def test_format_error_response_without_suggestion(self):
-        """Error dict without suggestion omits suggestion line."""
+        """Error dict without suggestion keeps its message as written."""
         from lm_mcp.tools import format_response
 
         data = {
             "error": True,
-            "code": "TEST_ERROR",
+            "code": "INVALID_REQUEST",
             "message": "Something went wrong",
         }
         result = format_response(data)
 
-        assert "Error: Something went wrong" in result[0].text
-        assert "Suggestion:" not in result[0].text
+        assert envelope(result)["message"] == "Something went wrong"
 
 
 class TestHandleError:
@@ -86,8 +85,10 @@ class TestHandleError:
         result = handle_error(error)
 
         assert len(result) == 1
-        assert "Error: Test error" in result[0].text
-        assert "Suggestion: Fix it" in result[0].text
+        error = envelope(result)
+        assert error["message"] == "Test error. Fix it"
+        assert error["code"] == "UPSTREAM_ERROR"
+        assert error["details"] == {"lm_code": "TEST_CODE"}
 
     def test_handle_authentication_error(self):
         """AuthenticationError preserves its code and suggestion."""
@@ -96,7 +97,7 @@ class TestHandleError:
         error = AuthenticationError("Invalid token")
         result = handle_error(error)
 
-        assert "Error: Invalid token" in result[0].text
+        assert envelope(result)["message"].startswith("Invalid token")
         # Should include the default suggestion from AuthenticationError
 
     def test_handle_not_found_error(self):
@@ -106,16 +107,16 @@ class TestHandleError:
         error = NotFoundError("Device 123 not found")
         result = handle_error(error)
 
-        assert "Error: Device 123 not found" in result[0].text
+        assert envelope(result)["message"].startswith("Device 123 not found")
 
     def test_handle_generic_exception(self):
-        """Generic exceptions are wrapped in UNEXPECTED_ERROR."""
+        """Generic exceptions map to UPSTREAM_ERROR."""
         from lm_mcp.tools import handle_error
 
         error = ValueError("Something unexpected")
         result = handle_error(error)
 
-        assert "Error: Something unexpected" in result[0].text
+        assert envelope(result)["message"].startswith("Something unexpected")
 
     def test_handle_error_returns_text_content(self):
         """handle_error returns list of TextContent."""
@@ -270,21 +271,15 @@ class TestCallSubTool:
         assert data == {"ok": True, "count": 3}
 
     async def test_error_text_raises_runtime_error(self):
-        """format_response error envelope becomes 'Error: ...' text -- must surface."""
+        """A sub-tool's error envelope surfaces as a RuntimeError carrying its message."""
         import pytest
-        from mcp.types import TextContent
 
-        from lm_mcp.tools import call_sub_tool
+        from lm_mcp.tools import call_sub_tool, validation_error
 
         async def handler(_client):
-            return [
-                TextContent(
-                    type="text",
-                    text="Error: device 42 not found\nSuggestion: Check the ID.",
-                )
-            ]
+            return validation_error("NOT_FOUND", "device 42 not found", "Check the ID.")
 
-        with pytest.raises(RuntimeError, match="device 42 not found"):
+        with pytest.raises(RuntimeError, match=r"^device 42 not found\. Check the ID\.$"):
             await call_sub_tool(handler, client=None)
 
     async def test_non_json_text_raises_with_snippet(self):
@@ -309,7 +304,7 @@ class TestCallSubTool:
             return [
                 TextContent(
                     type="text",
-                    text=json.dumps({"error": True, "code": "X", "message": "boom"}),
+                    text=json.dumps({"error": {"code": "NOT_FOUND", "message": "boom"}}),
                 )
             ]
 
@@ -329,19 +324,18 @@ class TestValidationError:
     def test_returns_canonical_envelope(self):
         from lm_mcp.tools import validation_error
 
-        result = validation_error("VALIDATION_ERROR", "name is required")
+        result = validation_error("INVALID_REQUEST", "name is required")
         assert len(result) == 1
-        text = result[0].text
-        assert text.startswith("Error: name is required")
+        assert envelope(result)["message"] == "name is required"
 
     def test_envelope_includes_suggestion(self):
         from lm_mcp.tools import validation_error
 
         result = validation_error(
-            "VALIDATION_ERROR",
+            "INVALID_REQUEST",
             "logs list cannot be empty",
             suggestion="Pass at least one log entry.",
         )
-        text = result[0].text
-        assert "Error: logs list cannot be empty" in text
-        assert "Suggestion: Pass at least one log entry." in text
+        assert envelope(result)["message"] == (
+            "logs list cannot be empty. Pass at least one log entry."
+        )

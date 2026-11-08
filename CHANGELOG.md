@@ -201,6 +201,21 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `offset` argument.
   `get_dashboard_widgets` and `get_device_interfaces` list their `limit` argument in their
   schemas.
+- A failed tool call returns one JSON error envelope as the text of its `isError: true` result,
+  `{"error": {"code", "message", "details", "retry_after", "errorCategory", "isRetryable"}}`,
+  in place of the `Error: <message>` and `Suggestion: <hint>` lines. `code` is one of
+  `NOT_FOUND`, `INVALID_REQUEST`, `WRITE_DISABLED`, `RATE_LIMITED`, `UPSTREAM_ERROR`, `TIMEOUT`,
+  `AUTH_FAILED`, `SCOPE_MISSING`, `FEATURE_DISABLED` and `REJECTED_BY_TOOL`, which replace the
+  codes the handlers used before (`VALIDATION_ERROR`, `NO_CHANGES`, `CONFIRMATION_REQUIRED`,
+  `DEVICE_NOT_FOUND` and the rest). A suggestion, where there was one, ends the message.
+  `errorCategory` is `transient`, `validation`, `business` or `permission`, and `isRetryable` is
+  true only for a transient error. When the API refused a call, `details.lm_code` keeps the
+  client's own code (`HTTP_400`, `API_ERROR_1007`, `PERMISSION_DENIED`) wherever it differs from
+  `code`, and `details.lm_message` the server's own words where the message rewrote them; a 429
+  carries its `Retry-After` header, in seconds, as `retry_after`. A tool turned off by `LM_ENABLED_TOOLS`, `LM_DISABLED_TOOLS`,
+  `LM_MCP_CATEGORIES` or single-portal mode answers `FEATURE_DISABLED`, an unknown tool name
+  `INVALID_REQUEST`, and an exception no handler expected `UPSTREAM_ERROR` with its class name in
+  `details.exception`.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other

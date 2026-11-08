@@ -63,15 +63,9 @@ class TestCodeTable:
 
 
 def _error_code_sites() -> list[tuple[str, int, ast.expr]]:
-    """Every validation_error call and every handler error dict in the handler modules.
-
-    The helpers in ``__init__.py`` build the dict from their own ``code`` argument;
-    their callers are the sites walked here.
-    """
+    """Every validation_error call and every handler error dict under src/lm_mcp/tools."""
     sites: list[tuple[str, int, ast.expr]] = []
     for path in sorted(TOOLS_DIR.rglob("*.py")):
-        if path.name == "__init__.py":
-            continue
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):

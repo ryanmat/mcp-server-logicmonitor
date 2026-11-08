@@ -150,11 +150,13 @@ async def create_sdt(
             )
             return format_response(
                 {
-                    "success": False,
                     "error": True,
                     "code": "INVALID_REQUEST",
                     "message": error_msg,
                     "suggestion": suggestion,
+                    "details": (
+                        {"lm_code": result["errorCode"]} if "errorCode" in result else None
+                    ),
                 }
             )
 

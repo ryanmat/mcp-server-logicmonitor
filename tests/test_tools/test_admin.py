@@ -11,6 +11,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
 
 
 @pytest.fixture
@@ -309,7 +310,7 @@ class TestApiTokens:
         )
 
         result = await get_api_token(client, token_id=999)
-        assert result[0].text.startswith("Error: API token 999 not found")
+        assert envelope(result)["message"].startswith("API token 999 not found")
 
 
 class TestAccessGroups:

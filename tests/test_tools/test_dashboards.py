@@ -10,6 +10,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
 from tests.list_paging import (
     BASE_URL,
     assert_negative_total_reads_as_more,
@@ -240,7 +241,7 @@ class TestGetDashboardWidgets:
 
         result = await get_dashboard_widgets(client, dashboard_id=999)
 
-        assert "Error: Dashboard not found" in result[0].text
+        assert envelope(result)["message"].startswith("Dashboard not found")
 
     @respx.mock
     async def test_get_dashboard_widgets_reports_a_missing_dashboard(self, client):
@@ -256,7 +257,7 @@ class TestGetDashboardWidgets:
 
         result = await get_dashboard_widgets(client, dashboard_id=999)
 
-        assert "Error: Dashboard not found" in result[0].text
+        assert envelope(result)["message"].startswith("Dashboard not found")
         assert not widgets.called
 
 
