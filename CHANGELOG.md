@@ -172,8 +172,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `get_alerts` and `get_audit_logs` among them.
 - `get_device_groups`, `get_collector_groups`, `get_website_groups`, `get_dashboard_widgets`,
   `list_sdts`, `get_active_sdts` and `get_upcoming_sdts` return `offset` and `has_more` beside
-  `count`, as the other list tools do, and all but `get_collector_groups`, which had it, take an
-  `offset` argument. `get_dashboard_widgets` lists its `limit` argument in its schema.
+  `count`, the envelope the shared pagination helper builds, and all but `get_collector_groups`,
+  which had it, take an `offset` argument. `get_dashboard_widgets` lists its `limit` argument in
+  its schema.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
