@@ -4,13 +4,12 @@
 import asyncio
 import json
 import logging
-from fnmatch import fnmatch
 
 from mcp.server import Server
 from mcp.types import CallToolResult, GetPromptResult, TextContent, Tool
 
 from lm_mcp import __version__
-from lm_mcp.categories import writes_to_portal
+from lm_mcp.categories import passes_name_filter, writes_to_portal
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.config import get_config
 from lm_mcp.logging import (
@@ -112,12 +111,7 @@ def _filter_tools(tools: list, config) -> list:
     if not config.enable_write_operations:
         tools = [t for t in tools if not writes_to_portal(t)]
 
-    if config.enabled_tools:
-        patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
-        tools = [t for t in tools if any(fnmatch(t.name, pat) for pat in patterns)]
-    elif config.disabled_tools:
-        patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
-        tools = [t for t in tools if not any(fnmatch(t.name, pat) for pat in patterns)]
+    tools = [t for t in tools if passes_name_filter(t.name, config)]
 
     if config.mcp_categories:
         from lm_mcp.categories import filter_by_categories
@@ -203,20 +197,12 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
             )
 
         # Reject calls to filtered-out tools
-        if config.enabled_tools:
-            patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
-            if not any(fnmatch(name, pat) for pat in patterns):
-                return error_content(
-                    "FEATURE_DISABLED",
-                    f"Tool '{name}' is not enabled. Enabled tools: {config.enabled_tools}",
-                )
-        elif config.disabled_tools:
-            patterns = [p.strip() for p in config.disabled_tools.split(",") if p.strip()]
-            if any(fnmatch(name, pat) for pat in patterns):
-                return error_content(
-                    "FEATURE_DISABLED",
-                    f"Tool '{name}' is disabled. Disabled tools: {config.disabled_tools}",
-                )
+        if not passes_name_filter(name, config):
+            if config.enabled_tools:
+                message = f"Tool '{name}' is not enabled. Enabled tools: {config.enabled_tools}"
+            else:
+                message = f"Tool '{name}' is disabled. Disabled tools: {config.disabled_tools}"
+            return error_content("FEATURE_DISABLED", message)
 
         if config.mcp_categories and not (name in PORTAL_TOOLS and config.multi_portal):
             from lm_mcp.categories import tool_in_categories
