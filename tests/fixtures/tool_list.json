@@ -2872,7 +2872,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export a ConfigSource definition (REST API format). Output can be used with create_configsource or update_configsource.",
+    "description": "Export a ConfigSource definition (REST API format). Output can be used with create_configsource.",
     "inputSchema": {
       "properties": {
         "configsource_id": {
@@ -2916,7 +2916,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export a datasource definition (REST API format). Output can be used with create_datasource or update_datasource.",
+    "description": "Export a datasource definition (REST API format). Output can be used with create_datasource.",
     "inputSchema": {
       "properties": {
         "datasource_id": {
@@ -2938,7 +2938,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource or update_diagnosticsource.",
+    "description": "Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource.",
     "inputSchema": {
       "properties": {
         "diagnosticsource_id": {
@@ -2982,7 +2982,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export an EventSource definition (REST API format). Output can be used with create_eventsource or update_eventsource.",
+    "description": "Export an EventSource definition (REST API format). Output can be used with create_eventsource.",
     "inputSchema": {
       "properties": {
         "eventsource_id": {
@@ -3004,7 +3004,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export a LogSource definition (REST API format). Output can be used with create_logsource or update_logsource.",
+    "description": "Export a LogSource definition (REST API format). Output can be used with create_logsource.",
     "inputSchema": {
       "properties": {
         "logsource_id": {
@@ -3026,7 +3026,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export a PropertySource definition (REST API format). Output can be used with create_propertysource or update_propertysource.",
+    "description": "Export a PropertySource definition (REST API format). Output can be used with create_propertysource.",
     "inputSchema": {
       "properties": {
         "propertysource_id": {
@@ -3048,7 +3048,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource or update_remediationsource.",
+    "description": "Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource.",
     "inputSchema": {
       "properties": {
         "remediationsource_id": {
@@ -6772,34 +6772,6 @@
       "type": "object"
     }
   },
-  "get_workflow": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, etc.). Mirrors MCP Prompt content for clients without Prompt support. Prefer the composite workflow tools (triage, diagnose, health_check, capacity_plan, portal_overview) when they exist -- those execute the procedure. Pass list=true to discover available workflows.",
-    "inputSchema": {
-      "properties": {
-        "arguments": {
-          "description": "Optional template arguments passed to the workflow text builder",
-          "type": "object"
-        },
-        "list": {
-          "default": false,
-          "description": "If true, return the list of available workflows with their arguments",
-          "type": "boolean"
-        },
-        "name": {
-          "description": "Workflow name (e.g., 'incident_triage')",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
   "health_check": {
     "annotations": {
       "destructiveHint": false,
@@ -7985,38 +7957,6 @@
       "type": "object"
     }
   },
-  "update_configsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='configsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "configsource_id": {
-          "description": "ConfigSource ID to update",
-          "type": "integer"
-        },
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL ConfigSource definition with all fields (will replace)",
-          "type": "object"
-        }
-      },
-      "required": [
-        "configsource_id",
-        "definition"
-      ],
-      "type": "object"
-    }
-  },
   "update_dashboard": {
     "annotations": {
       "destructiveHint": false,
@@ -8085,38 +8025,6 @@
       },
       "required": [
         "group_id"
-      ],
-      "type": "object"
-    }
-  },
-  "update_datasource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. Two prior production incidents wiped Groovy scripts via this tool. PREFER update_logicmodule(type='datasource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "datasource_id": {
-          "description": "DataSource ID to update",
-          "type": "integer"
-        },
-        "definition": {
-          "description": "FULL DataSource definition with all fields (will replace)",
-          "type": "object"
-        }
-      },
-      "required": [
-        "datasource_id",
-        "definition"
       ],
       "type": "object"
     }
@@ -8327,38 +8235,6 @@
       "type": "object"
     }
   },
-  "update_diagnosticsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='diagnosticsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL DiagnosticSource definition with all fields (will replace)",
-          "type": "object"
-        },
-        "diagnosticsource_id": {
-          "description": "DiagnosticSource ID to update",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "diagnosticsource_id",
-        "definition"
-      ],
-      "type": "object"
-    }
-  },
   "update_escalation_chain": {
     "annotations": {
       "destructiveHint": false,
@@ -8439,38 +8315,6 @@
       },
       "required": [
         "chain_id"
-      ],
-      "type": "object"
-    }
-  },
-  "update_eventsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='eventsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL EventSource definition with all fields (will replace)",
-          "type": "object"
-        },
-        "eventsource_id": {
-          "description": "EventSource ID to update",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "eventsource_id",
-        "definition"
       ],
       "type": "object"
     }
@@ -8592,7 +8436,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Safe partial update for LogicMonitor source types (configsource, datasource, eventsource, logsource, propertysource, topologysource). Exports the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (mode='preview', default) or applies the merged definition (mode='apply'). PREFER this over the raw update_<type> tools for partial updates -- the raw tools are full-replace and will blank any field omitted from the payload (two prior production incidents).",
+    "description": "Update a LogicModule definition (configsource, datasource, diagnosticsource, eventsource, logsource, propertysource, remediationsource, topologysource). Reads the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (mode='preview', default) or applies the merged definition (mode='apply'). The LogicMonitor update is full-replace, so the merged full definition is sent and fields you do not change are kept.",
     "inputSchema": {
       "properties": {
         "changes": {
@@ -8605,7 +8449,7 @@
         },
         "mode": {
           "default": "preview",
-          "description": "'preview' returns a dry-run diff without writing (default). 'apply' writes the merged definition via the underlying update_<type> handler.",
+          "description": "'preview' returns a dry-run diff without writing (default). 'apply' writes the merged definition with a full-replace PUT.",
           "enum": [
             "preview",
             "apply"
@@ -8631,38 +8475,6 @@
         "type",
         "id",
         "changes"
-      ],
-      "type": "object"
-    }
-  },
-  "update_logsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='logsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL LogSource definition with all fields (will replace)",
-          "type": "object"
-        },
-        "logsource_id": {
-          "description": "LogSource ID to update",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "logsource_id",
-        "definition"
       ],
       "type": "object"
     }
@@ -8715,38 +8527,6 @@
       "type": "object"
     }
   },
-  "update_propertysource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='propertysource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL PropertySource definition with all fields (will replace)",
-          "type": "object"
-        },
-        "propertysource_id": {
-          "description": "PropertySource ID to update",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "propertysource_id",
-        "definition"
-      ],
-      "type": "object"
-    }
-  },
   "update_recipient_group": {
     "annotations": {
       "destructiveHint": false,
@@ -8780,38 +8560,6 @@
       },
       "required": [
         "group_id"
-      ],
-      "type": "object"
-    }
-  },
-  "update_remediationsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='remediationsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL RemediationSource definition with all fields (will replace)",
-          "type": "object"
-        },
-        "remediationsource_id": {
-          "description": "RemediationSource ID to update",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "remediationsource_id",
-        "definition"
       ],
       "type": "object"
     }
@@ -8881,38 +8629,6 @@
       },
       "required": [
         "sdt_id"
-      ],
-      "type": "object"
-    }
-  },
-  "update_topologysource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": false,
-      "openWorldHint": true,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='topologysource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed.",
-    "inputSchema": {
-      "properties": {
-        "confirm": {
-          "default": false,
-          "description": "Must be true to proceed. Defaults to false to prevent accidental field-blanking. Use update_logicmodule for safe partial updates.",
-          "type": "boolean"
-        },
-        "definition": {
-          "description": "FULL TopologySource definition with all fields (will replace)",
-          "type": "object"
-        },
-        "topologysource_id": {
-          "description": "TopologySource ID to update",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "topologysource_id",
-        "definition"
       ],
       "type": "object"
     }

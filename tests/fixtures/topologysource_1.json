@@ -1,0 +1,61 @@
+{
+  "accessGroupIds": [
+    1
+  ],
+  "accessGroups": [
+    {
+      "createdBy": "auto",
+      "createdOn": 1710215158000,
+      "description": "A default access group",
+      "id": 1,
+      "name": "Default Access Group",
+      "tenantId": null,
+      "updatedOn": 1710215158000
+    }
+  ],
+  "appliesTo": "hasCategory(\"TopoSwitch\")",
+  "auditVersion": 0,
+  "checksum": "bf1de7ca2348ba8b3364fdc04cd4a3a5",
+  "collectInterval": 3600,
+  "collectionMethod": "script",
+  "collectorAttribute": {
+    "groovyScript": "/*******************************************************************************\n*  \u00a9 2007-2026 - LogicMonitor, Inc. All rights reserved.\n ******************************************************************************/\n",
+    "linuxCmdline": "",
+    "linuxScript": "",
+    "manualConnections": "",
+    "name": "script",
+    "properties": "",
+    "scriptType": "embed",
+    "windowsCmdline": "",
+    "windowsScript": ""
+  },
+  "description": "Extract layer 2 topologies from SNMP enabled switches.\nRequires collector version 30.000 or greater.",
+  "group": "Link Layer",
+  "id": 1,
+  "installationMetadata": {
+    "auditedRegistryId": null,
+    "auditedVersion": null,
+    "isChangedFromOrigin": false,
+    "isChangedFromTargetLastPublished": false,
+    "localModuleId": 1,
+    "logicModuleType": "TOPOLOGYSOURCE",
+    "originAuthorCompanyUUID": "93a8113d-0a80-11e3-89bb-0050569703a4",
+    "originAuthorNamespace": "core",
+    "originChecksum": "bf1de7ca2348ba8b3364fdc04cd4a3a5",
+    "originLineageId": "Jtc_t1-WTF2OnIFFOWvhmQ",
+    "originLocator": "7MKXMK",
+    "originName": "Networking_L2_snmpSwitch",
+    "originRegistryId": "2ee54b5e-956d-4409-8451-7e7e972fe8a2",
+    "originVersion": "2.53.0",
+    "targetLastPublishedChecksum": null,
+    "targetLastPublishedId": null,
+    "targetLastPublishedVersion": null,
+    "targetLineageId": null
+  },
+  "isInUse": false,
+  "lineageId": "Jtc_t1-WTF2OnIFFOWvhmQ",
+  "name": "Networking_L2_snmpSwitch",
+  "tags": "l2,networking,layer 2,groovy4,switch",
+  "technology": "Configurable custom properties:\n\n\"topo.mapTrunks\" - map trunk interfaces, defaults to false\n\"topo.mapPortChannels\" - map port channel interfaces, defaults to false\n\"topo.mapInterfaceBridges\"- array of interface names to map: [eth0, eth1]\n\"topo.timeout\" - generic SNMP timeout, defaults to 30000 ms\n\"topo.interfacesTimeout\" - interface SNMP walk timeout,  defaults to 10000 ms\n\"topo.dot1dTimeout\" - dot1d SNMP walk timeout, defaults to 2000 ms\n\"topo.dot1dInterfaceIndexMapTimeout\" - dot1d interface to index map SNMP walk timeout, defaults to 2000 ms\n\"topo.bridgeMacsThreshold\" - max number of interface bridge MACs to map\n\"topo.multipleBridgeMacsThreshold\" - max number of duplicate interface bridge MACs to map\n\"topo.blockedmultipliers\" - Multipliers to block when matching unindexed bridge entries to interfaces.\nRequires collector version of 35.003 or greater.",
+  "version": 1779322673
+}

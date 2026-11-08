@@ -69,8 +69,9 @@ generated and must never be hand-edited. A tool also needs an entry in
 `TOOL_CATEGORIES` (`src/lm_mcp/resources/guides.py`) or the categorization test
 will fail.
 
-Write tools must be decorated with `require_write_permission`: they stay disabled
-unless the operator sets `LM_ENABLE_WRITE_OPERATIONS=true`.
+Write tools must be decorated with `require_write_permission` and annotated with
+`readOnlyHint=False` and `openWorldHint=True`: the server leaves them out of `tools/list`
+and refuses calls to them unless the operator sets `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 ## Reporting bugs and vulnerabilities
 

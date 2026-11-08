@@ -1,5 +1,5 @@
 # Description: Universal reference layer for lm-mcp.
-# Description: Exposes Resource and Prompt content as Tools for clients without those primitives.
+# Description: Exposes Resource content as a Tool for clients without the Resource primitive.
 
 from __future__ import annotations
 
@@ -82,67 +82,5 @@ async def get_reference(
             )
         content: Any = json.loads(raw)
         return format_response({"uri": uri, "content": content})
-    except Exception as e:
-        return handle_error(e)
-
-
-async def get_workflow(
-    client: LogicMonitorClient,
-    name: str | None = None,
-    list: bool = False,
-    arguments: dict | None = None,
-) -> list[TextContent]:
-    """Return LogicMonitor workflow guidance text.
-
-    Mirrors MCP Prompt content for clients without Prompt support. Prefer the
-    composite workflow tools (triage, diagnose, health_check, capacity_plan,
-    portal_overview) when they exist -- those execute the procedure rather
-    than returning guidance text. Pass `list=True` to discover available
-    workflows and their arguments.
-
-    Args:
-        client: LogicMonitor API client (unused, required by convention).
-        name: Workflow name (e.g., 'incident_triage', 'rca_workflow').
-        list: If True, return the list of available workflows instead of text.
-        arguments: Optional template arguments passed to the workflow builder.
-
-    Returns:
-        TextContent list with workflow text, discovery listing, or error.
-    """
-    try:
-        from lm_mcp.prompts.registry import _TEMPLATES, PROMPTS
-
-        if list or name is None:
-            items: list[dict] = []
-            for p in PROMPTS:
-                args_out = [
-                    {
-                        "name": a.name,
-                        "description": a.description,
-                        "required": bool(a.required),
-                    }
-                    for a in (p.arguments or [])
-                ]
-                items.append(
-                    {
-                        "name": p.name,
-                        "description": p.description,
-                        "arguments": args_out,
-                    }
-                )
-            return format_response({"available": items, "count": len(items)})
-
-        if name not in _TEMPLATES:
-            return format_response(
-                {
-                    "error": True,
-                    "code": "UNKNOWN_WORKFLOW",
-                    "message": f"unknown workflow '{name}'",
-                    "suggestion": "Call get_workflow(list=true) to see available workflows.",
-                }
-            )
-
-        text = _TEMPLATES[name](arguments or {})
-        return format_response({"name": name, "text": text})
     except Exception as e:
         return handle_error(e)

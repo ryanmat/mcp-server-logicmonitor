@@ -213,18 +213,19 @@ async def update_datasource(
 ) -> list[TextContent]:
     """Update an existing DataSource via REST API (full replace).
 
-    The LM API uses full-replace semantics: every field not included in the
-    definition will be blanked. The name and displayName fields are required
-    even for targeted changes. Two prior production incidents wiped Groovy
-    scripts via this tool. PREFER update_logicmodule for partial updates;
-    it exports, deep-merges, and previews a diff before writing.
+    Internal PUT behind update_logicmodule, which reads the current
+    definition, merges the caller's changes and passes the merged full
+    definition here; the server registers no tool for it. The LM API
+    update is full-replace and can blank any field the definition leaves out,
+    the Groovy script included; the name and displayName fields are required
+    even for targeted changes.
 
     Args:
         client: LogicMonitor API client.
         datasource_id: DataSource ID to update.
         definition: Full DataSource definition dict with all fields.
-        confirm: Must be True to proceed. Defaults to False to prevent
-            accidental field-blanking via partial payloads.
+        confirm: Must be True to proceed; update_logicmodule always passes it.
+            Without it the call returns CONFIRMATION_REQUIRED and writes nothing.
 
     Returns:
         List of TextContent with updated DataSource info or error.

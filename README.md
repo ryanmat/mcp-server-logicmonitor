@@ -6,15 +6,15 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 277 tools, 14 workflow prompts, and 25 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 268 tools, 3 workflow prompts, and 25 resources.
 
 ## Overview
 
 The server runs as a local subprocess of your MCP client and calls your portal with your API token. It works with any MCP client that launches a stdio server, including Claude Desktop, Claude Code, Cursor, Continue, and Cline.
 
-Tools are read-only until you set `LM_ENABLE_WRITE_OPERATIONS=true`. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
+Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 277 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
+The 268 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
-- the `lm://guide/tool-categories` resource: all 277 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 268 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -140,7 +140,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 
 `get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only portal tested, one with no NetFlow-enabled device. Treat both as unverified until you have tried them on a portal with NetFlow data.
 
-`update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it exports the full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff by default, so a partial change cannot blank a script. It does not work on topology sources, which have no export tool.
+`update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it reads the full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff by default, so a partial change cannot blank a script.
 
 ### Analysis tools
 
@@ -294,7 +294,7 @@ Clients read these through the standard MCP resource and prompt calls.
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 277 tools organized by domain category |
+| `lm://guide/tool-categories` | All 268 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
@@ -302,23 +302,12 @@ Clients read these through the standard MCP resource and prompt calls.
 </details>
 
 <details>
-<summary>14 workflow prompts</summary>
+<summary>3 workflow prompts</summary>
 
 | Prompt | Description | Arguments |
 |--------|-------------|-----------|
 | `incident_triage` | Analyze active alerts, identify patterns, suggest root cause | `severity`, `time_window_hours` |
 | `capacity_review` | Review resource utilization and identify capacity concerns | `group_id`, `threshold_percent` |
-| `health_check` | Generate environment health summary with key metrics | `include_collectors` |
-| `alert_summary` | Generate alert digest grouped by severity or resource | `group_by`, `hours_back` |
-| `sdt_planning` | Plan scheduled downtime for maintenance windows | `device_ids`, `group_id` |
-| `cost_optimization` | Analyze cloud costs, find savings opportunities | `provider`, `threshold_percent` |
-| `audit_review` | Review recent changes, logins, and security events | `hours_back`, `username` |
-| `alert_correlation` | Correlate alerts across devices to find common root causes | `severity`, `hours_back`, `device_id`, `group_id` |
-| `collector_health` | Assess collector load balancing, versions, and failover readiness | `group_id` |
-| `troubleshoot_device` | Guided troubleshooting for a specific device | `device_id` |
-| `top_talkers` | Identify noisiest devices and datasources generating the most alerts | `hours_back`, `limit`, `group_by` |
-| `rca_workflow` | Guided root cause analysis combining alerts, topology, and change history | `device_id`, `alert_id`, `hours_back` |
-| `capacity_forecast` | Forecast capacity trends and predict threshold breaches | `device_id`, `group_id`, `datasource`, `hours_back`, `threshold` |
 | `remediation` | Execute a LogicMonitor remediation source with pre-execution safety checks | `host_id`, `remediation_source_id` |
 
 </details>
@@ -344,7 +333,7 @@ claude mcp add logicmonitor \
 
 ### "Write operations are disabled"
 
-Write operations (acknowledge, create SDT, etc.) are disabled by default. Set `LM_ENABLE_WRITE_OPERATIONS=true` in your environment.
+Write operations (acknowledge, create SDT, etc.) are disabled by default: the server does not list those tools, and a call to one by name returns this error. Set `LM_ENABLE_WRITE_OPERATIONS=true` in your environment.
 
 ### "spawn uvx ENOENT" in Claude Desktop
 

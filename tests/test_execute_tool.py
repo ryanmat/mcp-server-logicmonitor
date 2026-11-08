@@ -109,6 +109,7 @@ class TestExecuteToolMiddleware:
         """execute_tool logs successful write operations."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=mock_handler),
@@ -294,15 +295,6 @@ class TestMultiPortalDispatch:
         from lm_mcp.server import execute_tool
 
         result = await execute_tool("get_reference", {"list": True})
-        assert "No portal selected" not in result[0].text
-
-    @pytest.mark.asyncio
-    async def test_get_workflow_works_before_use_portal(self, monkeypatch, tmp_path, reset_portals):
-        self._multi_env(monkeypatch, tmp_path)
-
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("get_workflow", {"list": True})
         assert "No portal selected" not in result[0].text
 
     @pytest.mark.asyncio

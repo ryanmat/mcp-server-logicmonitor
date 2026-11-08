@@ -41,6 +41,15 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 | `terraform_state_list` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_state_show` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_write_config` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `get_workflow` | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
+| `update_datasource` | `update_logicmodule` with `type="datasource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_configsource` | `update_logicmodule` with `type="configsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_eventsource` | `update_logicmodule` with `type="eventsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_propertysource` | `update_logicmodule` with `type="propertysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_logsource` | `update_logicmodule` with `type="logsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_topologysource` | `update_logicmodule` with `type="topologysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_diagnosticsource` | `update_logicmodule` with `type="diagnosticsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_remediationsource` | `update_logicmodule` with `type="remediationsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -103,9 +112,40 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   preflight gets no CORS headers, and with `LM_HTTP_AUTH_TOKEN` set it gets `401`.
 - `LM_API_VERSION`, which the server ignores if set, and the client's `api_version` argument. The
   client sends `X-Version: 3` to the REST API; ingestion requests carry no version header.
+- Eleven workflow prompts: `health_check`, `alert_summary`, `sdt_planning`, `cost_optimization`,
+  `audit_review`, `alert_correlation`, `collector_health`, `troubleshoot_device`, `top_talkers`,
+  `rca_workflow` and `capacity_forecast`. `incident_triage`, `capacity_review` and `remediation`
+  remain. The `get_workflow` tool, which returned prompt text to clients without prompt support,
+  leaves with them, and the `universal_reference` category in `lm://guide/tool-categories` now
+  lists only `get_reference`.
+
+### Fixed
+
+- `update_logicmodule` with `type="topologysource"` reads the TopologySource from
+  `/setting/topologysources/{id}` and writes it back; it failed before, naming an export tool that
+  does not exist.
+- `update_logicmodule` requires `displayName` in the merged definition only for DataSources and
+  ConfigSources, the two types whose definitions have that field. EventSources, LogSources,
+  PropertySources, DiagnosticSources and RemediationSources were refused unless the changes added
+  a `displayName`.
+- `create_logsource`, `create_topologysource` and the LogSource and TopologySource updates that
+  `update_logicmodule` runs send `collectionMethod`, the name those REST models use. They renamed it
+  to the DataSource field `collectMethod`, and the LogSource API answered a PUT carrying that
+  rename with 400, so `update_logicmodule` could not apply a LogSource change.
 
 ### Changed
 
+- With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 101 tools
+  whose annotations say they change the portal (`readOnlyHint` false and `openWorldHint` true),
+  and a call to one by name returns the write-disabled error. That includes `update_logicmodule`,
+  whose preview mode ran with writes off before. The session tools, `use_portal` and
+  `reload_portals` change only server-side state and stay listed. The Write column of
+  `documentation/tools.md` follows the same annotations, so `delete_session_variable`,
+  `use_portal` and `reload_portals` read No.
+- The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
+  `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
+  carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
+  files the repository tracks.
 - `uv.lock` holds 59 packages, down from 142, with the model stack gone.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,

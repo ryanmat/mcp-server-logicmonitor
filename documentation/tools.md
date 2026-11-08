@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 277 tools the LogicMonitor MCP server can advertise. The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -19,18 +19,17 @@ Composite workflow tools -- recommended starting point
 | `capacity_plan` | Composite capacity planning: forecasts metric breach dates, classifies trends, detects seasonality and change points. Returns per-datasource capacity projections. | No |
 | `portal_overview` | Composite portal overview: aggregates alert statistics, collector health, maintenance windows, noise scores, and dead devices into a shift-handoff report. | No |
 | `diagnose` | Composite diagnosis: given an alert or device, gathers alert details, device context, correlated alerts, recent changes, blast radius, and health score. Returns a diagnosis report with probable root cause and recommendations. | No |
-| `update_logicmodule` | Safe partial update for LogicMonitor source types (configsource, datasource, eventsource, logsource, propertysource, topologysource). Exports the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (mode='preview', default) or applies the merged definition (mode='apply'). PREFER this over the raw update_<type> tools for partial updates -- the raw tools are full-replace and will blank any field omitted from the payload (two prior production incidents). | Yes |
+| `update_logicmodule` | Update a LogicModule definition (configsource, datasource, diagnosticsource, eventsource, logsource, propertysource, remediationsource, topologysource). Reads the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (mode='preview', default) or applies the merged definition (mode='apply'). The LogicMonitor update is full-replace, so the merged full definition is sent and fields you do not change are kept. | Yes |
 | `detect_site_outage` | Composite workflow for site outage detection. Chains CollectorDown detection, mass-interface-down burst analysis, UPS on-battery events, and downstream device silence into a single site-outage verdict with confidence score, scope, and affected device list. Designed to catch the class of site-outage that generic AIOps correlation misses. Pass a device group ID representing the site. | No |
 | `audit_network_monitoring_coverage` | Portal audit that counts UPS/PDU devices onboarded, interface DataSources applied, SNMP credentials configured, and NetFlow exporters set up. Returns a prioritized gap list with onboarding recommendations — turns 'you can't detect X' into 'here's how to enable detection of X.' | No |
 
 ## Universal Reference
 
-Resource/Prompt mirrors exposed as Tools for clients without those primitives
+Resource mirror exposed as a Tool for clients without that primitive
 
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_reference` | Get LogicMonitor reference content (schemas, enums, filter syntax, guides). Mirrors content from MCP Resources for clients without full Resource support (Copilot cloud agent, OpenAI Codex, Cline). Categories: schema, enums, filters, syntax, guide. Pass list=true (or omit both category and name) to discover all available (category, name) pairs. | No |
-| `get_workflow` | Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, etc.). Mirrors MCP Prompt content for clients without Prompt support. Prefer the composite workflow tools (triage, diagnose, health_check, capacity_plan, portal_overview) when they exist -- those execute the procedure. Pass list=true to discover available workflows. | No |
 
 ## Discovery
 
@@ -146,7 +145,6 @@ DataSource and instance monitoring
 | `get_datasources` | List datasources from LogicMonitor | No |
 | `get_datasource` | Get details about a specific datasource | No |
 | `create_datasource` | Create a DataSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_datasource output). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_datasource. Script DataSource datapoints require appropriate type values. | Yes |
-| `update_datasource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. Two prior production incidents wiped Groovy scripts via this tool. PREFER update_logicmodule(type='datasource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_datasource` | Delete a DataSource definition (requires write permission). Existing collected data is retained. | Yes |
 
 ## Dashboards
@@ -293,7 +291,6 @@ LogicModule definitions (ConfigSource, EventSource, etc.)
 | `get_configsources` | List ConfigSources | No |
 | `get_configsource` | Get details about a specific ConfigSource | No |
 | `create_configsource` | Create a ConfigSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_configsource output). For LM Exchange format, use import_configsource. | Yes |
-| `update_configsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='configsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_configsource` | Delete a ConfigSource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_configsource_update_reasons` | Get update history and audit trail for a ConfigSource | No |
 | `get_device_config` | List config versions collected for a device instance | No |
@@ -302,24 +299,20 @@ LogicModule definitions (ConfigSource, EventSource, etc.)
 | `get_eventsources` | List EventSources | No |
 | `get_eventsource` | Get details about a specific EventSource | No |
 | `create_eventsource` | Create an EventSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_eventsource output). For LM Exchange format, use import_eventsource. | Yes |
-| `update_eventsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='eventsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_eventsource` | Delete an EventSource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_device_eventsources` | Get EventSources applied to a device (resource). Returns device-level EventSource associations. | No |
 | `update_device_eventsource` | Update a device-level EventSource association (requires write permission). Use to enable or disable alerting for an EventSource on a specific device. | Yes |
 | `get_propertysources` | List PropertySources | No |
 | `get_propertysource` | Get details about a specific PropertySource | No |
 | `create_propertysource` | Create a PropertySource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_propertysource output). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_propertysource. | Yes |
-| `update_propertysource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='propertysource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_propertysource` | Delete a PropertySource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_topologysources` | List TopologySources | No |
 | `get_topologysource` | Get details about a specific TopologySource | No |
 | `create_topologysource` | Create a TopologySource via REST API from a full definition dict (requires write permission). Accepts REST API format. For LM Exchange format, use import_topologysource. | Yes |
-| `update_topologysource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='topologysource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_topologysource` | Delete a TopologySource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_logsources` | List LogSources | No |
 | `get_logsource` | Get details about a specific LogSource | No |
 | `create_logsource` | Create a LogSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_logsource output). For LM Exchange format, use import_logsource. | Yes |
-| `update_logsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server. PREFER update_logicmodule(type='logsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_logsource` | Delete a LogSource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_device_logsources` | Get LogSources applied to a device (resource) | No |
 
@@ -367,16 +360,16 @@ Export LogicModule definitions as JSON
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `export_datasource` | Export a datasource definition (REST API format). Output can be used with create_datasource or update_datasource. | No |
+| `export_datasource` | Export a datasource definition (REST API format). Output can be used with create_datasource. | No |
 | `export_dashboard` | Export a dashboard definition | No |
 | `export_alert_rule` | Export an alert rule definition | No |
 | `export_escalation_chain` | Export an escalation chain definition | No |
-| `export_configsource` | Export a ConfigSource definition (REST API format). Output can be used with create_configsource or update_configsource. | No |
-| `export_eventsource` | Export an EventSource definition (REST API format). Output can be used with create_eventsource or update_eventsource. | No |
-| `export_propertysource` | Export a PropertySource definition (REST API format). Output can be used with create_propertysource or update_propertysource. | No |
-| `export_logsource` | Export a LogSource definition (REST API format). Output can be used with create_logsource or update_logsource. | No |
-| `export_diagnosticsource` | Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource or update_diagnosticsource. | No |
-| `export_remediationsource` | Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource or update_remediationsource. | No |
+| `export_configsource` | Export a ConfigSource definition (REST API format). Output can be used with create_configsource. | No |
+| `export_eventsource` | Export an EventSource definition (REST API format). Output can be used with create_eventsource. | No |
+| `export_propertysource` | Export a PropertySource definition (REST API format). Output can be used with create_propertysource. | No |
+| `export_logsource` | Export a LogSource definition (REST API format). Output can be used with create_logsource. | No |
+| `export_diagnosticsource` | Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource. | No |
+| `export_remediationsource` | Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource. | No |
 
 ## Imports
 
@@ -466,7 +459,7 @@ Session context, variable management, and baselines
 | `get_session_context` | Get current session context (variables and history) | No |
 | `set_session_variable` | Set a user-defined session variable for use across tool calls | No |
 | `get_session_variable` | Get a user-defined session variable | No |
-| `delete_session_variable` | Delete a user-defined session variable | Yes |
+| `delete_session_variable` | Delete a user-defined session variable | No |
 | `clear_session_context` | Clear all session context (variables and history) | No |
 | `list_session_history` | List recent tool call history | No |
 | `save_baseline` | Save a metric baseline from historical data. Computes mean, min, max, stddev per datapoint and stores as a session variable for later comparison. | No |
@@ -479,9 +472,9 @@ Multi-portal switching: one server, many customer portals
 | Tool | Description | Write |
 |------|-------------|-------|
 | `list_portals` | List the customer portals available in this multi-portal server. | No |
-| `use_portal` | Switch the active customer portal for subsequent tool calls. | Yes |
+| `use_portal` | Switch the active customer portal for subsequent tool calls. | No |
 | `current_portal` | Show which customer portal is currently active. | No |
-| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | Yes |
+| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
 
 ## Terraform
 
@@ -506,10 +499,8 @@ Diagnostic sources, remediation sources, and remediation execution.
 | `execute_remediation` | Execute a RemediationSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Requires write permission. | Yes |
 | `execute_diagnostic` | Execute a DiagnosticSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Poll get_diagnostic_remediation_results for status and output. Requires write permission. | Yes |
 | `create_diagnosticsource` | Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource. | Yes |
-| `update_diagnosticsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='diagnosticsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_diagnosticsource` | Delete a DiagnosticSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
 | `create_remediationsource` | Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint. | Yes |
-| `update_remediationsource` | RAW UPDATE -- full-replace semantics. Any field omitted from `definition` is BLANKED on the server, including the script. PREFER update_logicmodule(type='remediationsource', id, changes, mode='preview') for partial updates with diff preview. Requires confirm=true to proceed. | Yes |
 | `delete_remediationsource` | Delete a RemediationSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
 
 ## Actions

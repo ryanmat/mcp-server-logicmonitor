@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
-from lm_mcp.logging import is_write_tool
+from lm_mcp.categories import writes_to_portal
 from lm_mcp.registry import TOOLS
 from lm_mcp.resources.guides import TOOL_CATEGORIES
 
@@ -78,7 +79,8 @@ def render_tools_doc() -> str:
         "Regenerate: uv run python tests/test_tools_doc.py -->",
         "",
         f"Reference for all {total} tools the LogicMonitor MCP server can advertise. "
-        "The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.",
+        "The **Write** column marks the tools that change the portal; the server lists them "
+        "only when `LM_ENABLE_WRITE_OPERATIONS=true`.",
         "",
         "This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain "
         "index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At "
@@ -98,7 +100,7 @@ def render_tools_doc() -> str:
         for name in category["tools"]:
             tool = index.get(name)
             description = _cell(tool.description if tool is not None else "")
-            write = "Yes" if is_write_tool(name) else "No"
+            write = "Yes" if tool is not None and writes_to_portal(tool) else "No"
             lines.append(f"| `{name}` | {description} | {write} |")
         lines.append("")
 
@@ -139,6 +141,23 @@ def test_tools_doc_in_sync() -> None:
         "documentation/tools.md is out of sync with the tool registry. "
         "Regenerate: uv run python tests/test_tools_doc.py"
     )
+
+
+def test_write_column_follows_the_annotations() -> None:
+    """R1.9: a tool's Write cell is Yes exactly when its annotations say it changes the portal."""
+    index = _tool_index()
+    cells: dict[str, str] = {}
+    for line in DOC.read_text(encoding="utf-8").splitlines():
+        parts = [part.strip() for part in re.split(r"(?<!\\)\|", line)]
+        if len(parts) == 5 and parts[1].startswith("`") and parts[1][1:-1] in index:
+            cells[parts[1][1:-1]] = parts[3]
+
+    assert set(cells) == set(index)
+    for name, tool in index.items():
+        changes_portal = (
+            tool.annotations.readOnlyHint is False and tool.annotations.openWorldHint is True
+        )
+        assert cells[name] == ("Yes" if changes_portal else "No"), name
 
 
 if __name__ == "__main__":

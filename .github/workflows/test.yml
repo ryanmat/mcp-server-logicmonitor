@@ -5,7 +5,7 @@ name: Test
 
 on:
   push:
-    branches: [main, build]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 # A newer push to a pull request supersedes its running checks; pushes to main
-# and build always run to completion.
+# always run to completion.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -88,9 +88,3 @@ jobs:
 
       - name: Build package
         run: uv build
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: dist
-          path: dist/

@@ -2621,40 +2621,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="update_datasource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server. Two prior production incidents "
-                "wiped Groovy scripts via this tool. PREFER update_logicmodule"
-                "(type='datasource', id, changes, mode='preview') for partial updates "
-                "with diff preview. Requires confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "datasource_id": {
-                        "type": "integer",
-                        "description": "DataSource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": "FULL DataSource definition with all fields (will replace)",
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe "
-                            "partial updates."
-                        ),
-                    },
-                },
-                "required": ["datasource_id", "definition"],
-            },
-        ),
-        Tool(
             name="delete_datasource",
             description="Delete a DataSource definition "
             "(requires write permission). Existing collected data is retained.",
@@ -3651,7 +3617,7 @@ TOOLS.extend(
         Tool(
             name="export_datasource",
             description="Export a datasource definition (REST API format). "
-            "Output can be used with create_datasource or update_datasource.",
+            "Output can be used with create_datasource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3703,7 +3669,7 @@ TOOLS.extend(
         Tool(
             name="export_configsource",
             description="Export a ConfigSource definition (REST API format). "
-            "Output can be used with create_configsource or update_configsource.",
+            "Output can be used with create_configsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3716,7 +3682,7 @@ TOOLS.extend(
         Tool(
             name="export_eventsource",
             description="Export an EventSource definition (REST API format). "
-            "Output can be used with create_eventsource or update_eventsource.",
+            "Output can be used with create_eventsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3729,7 +3695,7 @@ TOOLS.extend(
         Tool(
             name="export_propertysource",
             description="Export a PropertySource definition (REST API format). "
-            "Output can be used with create_propertysource or update_propertysource.",
+            "Output can be used with create_propertysource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3742,7 +3708,7 @@ TOOLS.extend(
         Tool(
             name="export_logsource",
             description="Export a LogSource definition (REST API format). "
-            "Output can be used with create_logsource or update_logsource.",
+            "Output can be used with create_logsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3755,7 +3721,7 @@ TOOLS.extend(
         Tool(
             name="export_diagnosticsource",
             description="Export a DiagnosticSource definition (REST API format). "
-            "Output can be used with create_diagnosticsource or update_diagnosticsource.",
+            "Output can be used with create_diagnosticsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3771,8 +3737,7 @@ TOOLS.extend(
         Tool(
             name="export_remediationsource",
             description="Export a RemediationSource definition (REST API format). "
-            "Output can be used with create_remediationsource or "
-            "update_remediationsource.",
+            "Output can be used with create_remediationsource.",
             annotations=_EXPORT,
             inputSchema={
                 "type": "object",
@@ -3836,41 +3801,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="update_configsource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server. PREFER update_logicmodule"
-                "(type='configsource', id, changes, mode='preview') for partial updates "
-                "with diff preview. Requires confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "configsource_id": {
-                        "type": "integer",
-                        "description": "ConfigSource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": (
-                            "FULL ConfigSource definition with all fields (will replace)"
-                        ),
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe "
-                            "partial updates."
-                        ),
-                    },
-                },
-                "required": ["configsource_id", "definition"],
-            },
-        ),
-        Tool(
             name="delete_configsource",
             description="Delete a ConfigSource definition "
             "(requires write permission). Existing collected data is retained.",
@@ -3907,39 +3837,6 @@ TOOLS.extend(
                     },
                 },
                 "required": ["definition"],
-            },
-        ),
-        Tool(
-            name="update_eventsource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server. PREFER update_logicmodule"
-                "(type='eventsource', id, changes, mode='preview') for partial updates "
-                "with diff preview. Requires confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "eventsource_id": {
-                        "type": "integer",
-                        "description": "EventSource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": "FULL EventSource definition with all fields (will replace)",
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe "
-                            "partial updates."
-                        ),
-                    },
-                },
-                "required": ["eventsource_id", "definition"],
             },
         ),
         Tool(
@@ -4029,41 +3926,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="update_propertysource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server. PREFER update_logicmodule"
-                "(type='propertysource', id, changes, mode='preview') for partial updates "
-                "with diff preview. Requires confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "propertysource_id": {
-                        "type": "integer",
-                        "description": "PropertySource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": (
-                            "FULL PropertySource definition with all fields (will replace)"
-                        ),
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe "
-                            "partial updates."
-                        ),
-                    },
-                },
-                "required": ["propertysource_id", "definition"],
-            },
-        ),
-        Tool(
             name="delete_propertysource",
             description="Delete a PropertySource definition "
             "(requires write permission). Existing collected data is retained.",
@@ -4126,39 +3988,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="update_logsource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server. PREFER update_logicmodule"
-                "(type='logsource', id, changes, mode='preview') for partial updates "
-                "with diff preview. Requires confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "logsource_id": {
-                        "type": "integer",
-                        "description": "LogSource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": "FULL LogSource definition with all fields (will replace)",
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe "
-                            "partial updates."
-                        ),
-                    },
-                },
-                "required": ["logsource_id", "definition"],
-            },
-        ),
-        Tool(
             name="delete_logsource",
             description="Delete a LogSource definition "
             "(requires write permission). Existing collected data is retained.",
@@ -4218,41 +4047,6 @@ TOOLS.extend(
                     },
                 },
                 "required": ["definition"],
-            },
-        ),
-        Tool(
-            name="update_topologysource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server. PREFER update_logicmodule"
-                "(type='topologysource', id, changes, mode='preview') for partial updates "
-                "with diff preview. Requires confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "topologysource_id": {
-                        "type": "integer",
-                        "description": "TopologySource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": (
-                            "FULL TopologySource definition with all fields (will replace)"
-                        ),
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for safe "
-                            "partial updates."
-                        ),
-                    },
-                },
-                "required": ["topologysource_id", "definition"],
             },
         ),
         Tool(
@@ -5472,42 +5266,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="update_diagnosticsource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server, including the script. "
-                "PREFER update_logicmodule(type='diagnosticsource', id, changes, "
-                "mode='preview') for partial updates with diff preview. Requires "
-                "confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "diagnosticsource_id": {
-                        "type": "integer",
-                        "description": "DiagnosticSource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": (
-                            "FULL DiagnosticSource definition with all fields (will replace)"
-                        ),
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for "
-                            "safe partial updates."
-                        ),
-                    },
-                },
-                "required": ["diagnosticsource_id", "definition"],
-            },
-        ),
-        Tool(
             name="delete_diagnosticsource",
             description=(
                 "Delete a DiagnosticSource definition (requires write permission). "
@@ -5635,42 +5393,6 @@ TOOLS.extend(
                     },
                 },
                 "required": ["definition"],
-            },
-        ),
-        Tool(
-            name="update_remediationsource",
-            description=(
-                "RAW UPDATE -- full-replace semantics. Any field omitted from "
-                "`definition` is BLANKED on the server, including the script. "
-                "PREFER update_logicmodule(type='remediationsource', id, changes, "
-                "mode='preview') for partial updates with diff preview. Requires "
-                "confirm=true to proceed."
-            ),
-            annotations=_WRITE,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "remediationsource_id": {
-                        "type": "integer",
-                        "description": "RemediationSource ID to update",
-                    },
-                    "definition": {
-                        "type": "object",
-                        "description": (
-                            "FULL RemediationSource definition with all fields (will replace)"
-                        ),
-                    },
-                    "confirm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "Must be true to proceed. Defaults to false to prevent "
-                            "accidental field-blanking. Use update_logicmodule for "
-                            "safe partial updates."
-                        ),
-                    },
-                },
-                "required": ["remediationsource_id", "definition"],
             },
         ),
         Tool(
@@ -6284,14 +6006,13 @@ TOOLS.extend(
         Tool(
             name="update_logicmodule",
             description=(
-                "Safe partial update for LogicMonitor source types (configsource, "
-                "datasource, eventsource, logsource, propertysource, topologysource). "
-                "Exports the current full definition, deep-merges your `changes` onto it, "
+                "Update a LogicModule definition (configsource, datasource, diagnosticsource, "
+                "eventsource, logsource, propertysource, remediationsource, topologysource). "
+                "Reads the current full definition, deep-merges your `changes` onto it, "
                 "validates required fields, and either returns a dry-run diff (mode='preview', "
-                "default) or applies the merged definition (mode='apply'). PREFER this over "
-                "the raw update_<type> tools for partial updates -- the raw tools are "
-                "full-replace and will blank any field omitted from the payload (two prior "
-                "production incidents)."
+                "default) or applies the merged definition (mode='apply'). The LogicMonitor "
+                "update is full-replace, so the merged full definition is sent and fields you "
+                "do not change are kept."
             ),
             annotations=_WRITE,
             inputSchema={
@@ -6325,8 +6046,8 @@ TOOLS.extend(
                         "default": "preview",
                         "description": (
                             "'preview' returns a dry-run diff without writing (default). "
-                            "'apply' writes the merged definition via the underlying "
-                            "update_<type> handler."
+                            "'apply' writes the merged definition with a full-replace "
+                            "PUT."
                         ),
                     },
                 },
@@ -6363,39 +6084,6 @@ TOOLS.extend(
                         "description": (
                             "If true, return the available (category, name) pairs "
                             "instead of content"
-                        ),
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="get_workflow",
-            description=(
-                "Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, "
-                "etc.). Mirrors MCP Prompt content for clients without "
-                "Prompt support. Prefer the composite workflow tools (triage, diagnose, "
-                "health_check, capacity_plan, portal_overview) when they exist -- those "
-                "execute the procedure. Pass list=true to discover available workflows."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Workflow name (e.g., 'incident_triage')",
-                    },
-                    "list": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "If true, return the list of available workflows with their arguments"
-                        ),
-                    },
-                    "arguments": {
-                        "type": "object",
-                        "description": (
-                            "Optional template arguments passed to the workflow text builder"
                         ),
                     },
                 },
@@ -6992,14 +6680,12 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_diagnosticsource": diagnosticsources.get_diagnosticsource,
         "execute_diagnostic": diagnosticsources.execute_diagnostic,
         "create_diagnosticsource": diagnosticsources.create_diagnosticsource,
-        "update_diagnosticsource": diagnosticsources.update_diagnosticsource,
         "delete_diagnosticsource": diagnosticsources.delete_diagnosticsource,
         # Remediation Sources
         "get_remediationsources": remediationsources.get_remediationsources,
         "get_remediationsource": remediationsources.get_remediationsource,
         "execute_remediation": remediationsources.execute_remediation,
         "create_remediationsource": remediationsources.create_remediationsource,
-        "update_remediationsource": remediationsources.update_remediationsource,
         "delete_remediationsource": remediationsources.delete_remediationsource,
         "get_diagnostic_remediation_assignments": (
             diagnostic_remediation.get_diagnostic_remediation_assignments
@@ -7040,13 +6726,11 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_datasources": datasources.get_datasources,
         "get_datasource": datasources.get_datasource,
         "create_datasource": datasources.create_datasource,
-        "update_datasource": datasources.update_datasource,
         "delete_datasource": datasources.delete_datasource,
         # ConfigSources
         "get_configsources": configsources.get_configsources,
         "get_configsource": configsources.get_configsource,
         "create_configsource": configsources.create_configsource,
-        "update_configsource": configsources.update_configsource,
         "delete_configsource": configsources.delete_configsource,
         "get_configsource_update_reasons": configsources.get_configsource_update_reasons,
         "get_device_config": configsources.get_device_config,
@@ -7056,7 +6740,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_eventsources": eventsources.get_eventsources,
         "get_eventsource": eventsources.get_eventsource,
         "create_eventsource": eventsources.create_eventsource,
-        "update_eventsource": eventsources.update_eventsource,
         "delete_eventsource": eventsources.delete_eventsource,
         "get_device_eventsources": eventsources.get_device_eventsources,
         "update_device_eventsource": eventsources.update_device_eventsource,
@@ -7064,19 +6747,16 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_propertysources": propertysources.get_propertysources,
         "get_propertysource": propertysources.get_propertysource,
         "create_propertysource": propertysources.create_propertysource,
-        "update_propertysource": propertysources.update_propertysource,
         "delete_propertysource": propertysources.delete_propertysource,
         # TopologySources
         "get_topologysources": topologysources.get_topologysources,
         "get_topologysource": topologysources.get_topologysource,
         "create_topologysource": topologysources.create_topologysource,
-        "update_topologysource": topologysources.update_topologysource,
         "delete_topologysource": topologysources.delete_topologysource,
         # LogSources
         "get_logsources": logsources.get_logsources,
         "get_logsource": logsources.get_logsource,
         "create_logsource": logsources.create_logsource,
-        "update_logsource": logsources.update_logsource,
         "delete_logsource": logsources.delete_logsource,
         "get_device_logsources": logsources.get_device_logsources,
         # Netscans
@@ -7190,9 +6870,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_logicmodule": workflows.update_logicmodule,
         "detect_site_outage": workflows.detect_site_outage,
         "audit_network_monitoring_coverage": workflows.audit_network_monitoring_coverage,
-        # Universal reference layer (Resource/Prompt mirrors for non-Claude clients)
+        # Universal reference layer (Resource mirror for clients without Resource support)
         "get_reference": reference.get_reference,
-        "get_workflow": reference.get_workflow,
         # Terraform IaC
         "terraform_generate": terraform.terraform_generate,
     }

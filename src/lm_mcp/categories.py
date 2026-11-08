@@ -41,6 +41,21 @@ KNOWN_CATEGORIES: frozenset[str] = frozenset(
 )
 
 
+def writes_to_portal(tool: Tool) -> bool:
+    """Return True when the tool's annotations say it changes the LogicMonitor portal.
+
+    That is a tool that is not read-only and reaches the portal (openWorldHint). Tools that
+    change only server-side state, the session tools and portal selection, return False.
+    The server lists these tools only when LM_ENABLE_WRITE_OPERATIONS is true.
+    """
+    annotations = tool.annotations
+    return (
+        annotations is not None
+        and annotations.readOnlyHint is False
+        and annotations.openWorldHint is True
+    )
+
+
 def categorize(tool: Tool) -> set[str]:
     """Return the set of logical categories a tool belongs to.
 

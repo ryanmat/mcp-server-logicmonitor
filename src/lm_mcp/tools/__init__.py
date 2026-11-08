@@ -71,7 +71,7 @@ _FIELD_ALIASES: dict[str, str] = {
 }
 
 
-def normalize_definition_fields(definition: dict) -> dict:
+def normalize_definition_fields(definition: dict, *, keep: frozenset[str] = frozenset()) -> dict:
     """Normalize field names in a LogicModule definition to REST API camelCase.
 
     Recursively walks the definition dict, renaming keys that appear in
@@ -84,28 +84,31 @@ def normalize_definition_fields(definition: dict) -> dict:
     Args:
         definition: LogicModule definition dict (may use LM Exchange,
             snake_case, or REST API field names).
+        keep: Keys the module's REST model uses as they are, left unrenamed
+            although _FIELD_ALIASES maps them (LogSource and TopologySource
+            name their collection method collectionMethod).
 
     Returns:
         New dict with all recognized keys mapped to REST API camelCase names.
     """
     result: dict = {}
     for key, value in definition.items():
-        canonical = _FIELD_ALIASES.get(key, key)
+        canonical = key if key in keep else _FIELD_ALIASES.get(key, key)
         # If this key is an alias but the canonical key already exists
         # in the original dict, skip the alias (canonical wins).
         if canonical != key and canonical in definition:
             continue
-        normalized = _normalize_value(value)
+        normalized = _normalize_value(value, keep)
         result[canonical] = normalized
     return result
 
 
-def _normalize_value(value: Any) -> Any:
+def _normalize_value(value: Any, keep: frozenset[str]) -> Any:
     """Recursively normalize values within a definition structure."""
     if isinstance(value, dict):
-        return normalize_definition_fields(value)
+        return normalize_definition_fields(value, keep=keep)
     if isinstance(value, list):
-        return [_normalize_value(item) for item in value]
+        return [_normalize_value(item, keep) for item in value]
     return value
 
 
@@ -449,6 +452,18 @@ def strip_readonly(payload: dict, fields: tuple[str, ...]) -> dict:
     return {k: v for k, v in payload.items() if k not in fields}
 
 
+def write_disabled_response() -> list[TextContent]:
+    """The error a write tool returns while LM_ENABLE_WRITE_OPERATIONS is false."""
+    return format_response(
+        {
+            "error": True,
+            "code": "WRITE_DISABLED",
+            "message": "Write operations are disabled",
+            "suggestion": "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
+        }
+    )
+
+
 def require_write_permission(func: F) -> F:
     """Decorator to enforce write permission check.
 
@@ -468,14 +483,7 @@ def require_write_permission(func: F) -> F:
 
         config = get_config()
         if not config.enable_write_operations:
-            return format_response(
-                {
-                    "error": True,
-                    "code": "WRITE_DISABLED",
-                    "message": "Write operations are disabled",
-                    "suggestion": "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
-                }
-            )
+            return write_disabled_response()
         if config.multi_portal:
             from lm_mcp import portals
 
