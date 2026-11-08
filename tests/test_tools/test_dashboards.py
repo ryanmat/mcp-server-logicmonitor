@@ -230,13 +230,33 @@ class TestGetDashboardWidgets:
         """get_dashboard_widgets handles 404 error gracefully."""
         from lm_mcp.tools.dashboards import get_dashboard_widgets
 
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999").mock(
+            return_value=httpx.Response(200, json={"id": 999, "widgetsConfig": {}})
+        )
         respx.get(
             "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999/widgets"
         ).mock(return_value=httpx.Response(404, json={"errorMessage": "Dashboard not found"}))
 
         result = await get_dashboard_widgets(client, dashboard_id=999)
 
-        assert "Error:" in result[0].text
+        assert "Error: Dashboard not found" in result[0].text
+
+    @respx.mock
+    async def test_get_dashboard_widgets_reports_a_missing_dashboard(self, client):
+        """A 404 on the dashboard read returns its error before any widget page is read."""
+        from lm_mcp.tools.dashboards import get_dashboard_widgets
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999").mock(
+            return_value=httpx.Response(404, json={"errorMessage": "Dashboard not found"})
+        )
+        widgets = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/999/widgets"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        result = await get_dashboard_widgets(client, dashboard_id=999)
+
+        assert "Error: Dashboard not found" in result[0].text
+        assert not widgets.called
 
 
 class TestCreateDashboard:
