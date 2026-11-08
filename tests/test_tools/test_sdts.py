@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -536,3 +537,29 @@ class TestUpdateSdt:
 
         result = await update_sdt(client, sdt_id="GONE", comment="Won't work")
         assert "Error:" in result[0].text
+
+
+# (handler name, endpoint path, extra required arguments)
+_SDTS_LISTS = [
+    ("list_sdts", "/sdt/sdts", {}),
+    ("get_active_sdts", "/sdt/sdts", {}),
+    ("get_upcoming_sdts", "/sdt/sdts", {}),
+]
+
+
+class TestSdtListPaging:
+    """R2.5: the SDT list tools declare offset, send it, and read a negative total as more."""
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _SDTS_LISTS)
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client, name, path, kwargs):
+        from lm_mcp.tools import sdts
+
+        await assert_offset_declared_and_sent(client, getattr(sdts, name), path, kwargs)
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _SDTS_LISTS)
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client, name, path, kwargs):
+        from lm_mcp.tools import sdts
+
+        await assert_negative_total_reads_as_more(client, getattr(sdts, name), path, kwargs)
