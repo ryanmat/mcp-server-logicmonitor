@@ -9,7 +9,6 @@ import pytest
 import respx
 
 from lm_mcp.registry import TOOLS
-from tests.envelope import envelope
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tool_list.json"
 READONLY_FIXTURE = Path(__file__).parent / "fixtures" / "tool_list_readonly.json"
@@ -195,6 +194,7 @@ async def test_a_hidden_tool_called_by_name_is_refused(single_portal, caplog):
     import logging
 
     from lm_mcp.server import call_tool
+    from tests.envelope import envelope
 
     with caplog.at_level(logging.WARNING, logger="lm_mcp.audit"):
         result = await call_tool("acknowledge_alert", {"alert_id": "LMA1", "comment": "x"})
@@ -214,6 +214,7 @@ async def test_update_logicmodule_is_refused_with_writes_off(single_portal, rese
     from lm_mcp.auth.bearer import BearerAuth
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.server import _set_client, execute_tool
+    from tests.envelope import envelope
 
     _set_client(
         LogicMonitorClient(
