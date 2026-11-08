@@ -195,41 +195,22 @@ def log_api_response(
         )
 
 
-# Prefixes that identify write operations
-WRITE_TOOL_PREFIXES = (
-    "create_",
-    "update_",
-    "delete_",
-    "acknowledge_",
-    "add_",
-    "run_",
-    "bulk_",
-    "import_",
-    "ingest_",
-    "push_",
-    "enable_",
-    "disable_",
-    "restart_",
-    "sync_",
-    "execute_",
-    "recover_",
-    "collect_",
-    "set_action_rule",
-    "use_portal",
-    "reload_portals",
-)
-
-
 def is_write_tool(tool_name: str) -> bool:
-    """Check if a tool name indicates a write operation.
+    """Return True when the named tool's annotations say it is not read-only.
+
+    The audit trail records these calls: every tool that changes state, the
+    portal's or the server's own (session variables, portal selection). A name no
+    registered tool answers to is not a write.
 
     Args:
         tool_name: MCP tool name to check.
-
-    Returns:
-        True if the tool performs write/modify operations.
     """
-    return any(tool_name.startswith(prefix) for prefix in WRITE_TOOL_PREFIXES)
+    from lm_mcp.registry import TOOLS
+
+    tool = next((t for t in TOOLS if t.name == tool_name), None)
+    return (
+        tool is not None and tool.annotations is not None and tool.annotations.readOnlyHint is False
+    )
 
 
 def _portal_marker() -> str:

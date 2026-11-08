@@ -429,7 +429,7 @@ class TestHttpUnauthenticatedBind:
 
 
 def test_config_has_no_has_lmv1_auth():
-    """R1.6: LMConfig has no has_lmv1_auth property; create_auth_provider reads the credentials."""
+    """R1.6: LMConfig has no has_lmv1_auth property; validate_auth reads the credentials."""
     from lm_mcp.config import LMConfig
 
     assert hasattr(LMConfig, "base_url")

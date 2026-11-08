@@ -443,8 +443,8 @@ class TestSetActionRuleStatus:
         assert "Write operations are disabled" in result[0].text
 
     def test_set_action_rule_status_classified_as_write(self):
-        """The precise prefix keeps session tools read-classified."""
+        """Both set_ tools change state, so their annotations make both writes."""
         from lm_mcp.logging import is_write_tool
 
         assert is_write_tool("set_action_rule_status") is True
-        assert is_write_tool("set_session_variable") is False
+        assert is_write_tool("set_session_variable") is True

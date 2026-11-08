@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import random
+from collections.abc import Awaitable, Callable
 
 import httpx
 
@@ -75,3 +77,38 @@ def transport_error(exc: Exception, service: str, method: str, url: str) -> LMCo
     return LMConnectionError(
         f"{service} request {method} {url} {what} ({type(exc).__name__}: {detail})"
     )
+
+
+async def run(
+    send: Callable[[], Awaitable[httpx.Response]],
+    *,
+    method: str,
+    service: str,
+    url: str,
+    max_retries: int,
+    retry_after_cap: int,
+) -> httpx.Response:
+    """Send a request, resending it as the retry policy allows, and return the last response.
+
+    A transport failure raises LMConnectionError and is not resent. A 429, or a 5xx
+    for an idempotent method, is resent up to ``max_retries`` times after
+    :func:`backoff`. The response returned can still be an error; the caller maps it.
+
+    Args:
+        send: Sends the request once and returns its response.
+        method: HTTP method, which decides whether a 5xx is resent.
+        service: Name of the API for the transport error, e.g. "LogicMonitor API".
+        url: Full URL, for the transport error.
+        max_retries: Most resends after the first attempt.
+        retry_after_cap: Ceiling in seconds on any one wait.
+    """
+    attempt = 0
+    while True:
+        try:
+            response = await send()
+        except TRANSPORT_ERRORS as e:
+            raise transport_error(e, service, method, url) from e
+        if not should_retry(method, response.status_code) or attempt >= max_retries:
+            return response
+        await asyncio.sleep(backoff(attempt, retry_after_seconds(response), retry_after_cap))
+        attempt += 1

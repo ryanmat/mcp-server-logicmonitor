@@ -340,7 +340,7 @@ def write_portal(monkeypatch, reset_portals):
     monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
     monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
 
-    from lm_mcp.auth import create_auth_provider
+    from lm_mcp.auth import validate_auth
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.config import get_config
     from lm_mcp.server import _set_client
@@ -349,7 +349,7 @@ def write_portal(monkeypatch, reset_portals):
     _set_client(
         LogicMonitorClient(
             base_url=config.base_url,
-            auth=create_auth_provider(config),
+            auth=validate_auth(config.bearer_token, config.access_id, config.access_key),
             timeout=config.timeout,
             max_retries=config.max_retries,
             ingest_url=config.ingest_url,
@@ -512,7 +512,23 @@ class TestWriteOutcomeFromResult:
         ]
 
     async def test_write_value_error_audits_failure(self, write_portal, caplog):
-        """An unknown write-prefixed tool raises ValueError in lookup; it audits as failed."""
+        """A write tool whose handler rejects its arguments with ValueError audits as failed."""
+        from lm_mcp.server import execute_tool
+
+        handler = AsyncMock(side_effect=ValueError("device_id must be positive"))
+        with (
+            patch("lm_mcp.server.get_tool_handler", return_value=handler),
+            caplog.at_level(logging.INFO, logger="lm_mcp.audit"),
+        ):
+            result = await execute_tool("delete_device", {"device_id": 7})
+
+        assert envelope(result)["code"] == "INVALID_REQUEST"
+        assert _audit_lines(caplog) == [
+            (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
+        ]
+
+    async def test_unregistered_name_leaves_no_audit_line(self, write_portal, caplog):
+        """A name no tool answers to runs nothing, so the audit trail stays quiet."""
         from lm_mcp.server import execute_tool
 
         with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
@@ -520,9 +536,7 @@ class TestWriteOutcomeFromResult:
 
         assert is_error_result(result)
         assert envelope(result)["code"] == "INVALID_REQUEST"
-        assert _audit_lines(caplog) == [
-            (logging.WARNING, "Write operation failed: delete_no_such_resource args={'id': 7}")
-        ]
+        assert _audit_lines(caplog) == []
 
     @respx.mock
     async def test_forbidden_delete_recorded_as_failure_in_session(self, write_portal, monkeypatch):

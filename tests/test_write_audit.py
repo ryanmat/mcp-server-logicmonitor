@@ -6,61 +6,45 @@ import logging
 import pytest
 
 
-class TestWriteToolPrefixDetection:
-    """Tests for identifying write tools by prefix."""
+class TestWriteClassificationFromAnnotations:
+    """A tool is a write for the audit trail when its annotations say readOnlyHint is false."""
 
-    WRITE_PREFIXES = (
-        "create_",
-        "update_",
-        "delete_",
-        "acknowledge_",
-        "add_",
-        "run_",
-        "bulk_",
-        "import_",
-        "ingest_",
-        "push_",
-    )
+    def test_every_tool_follows_its_read_only_hint(self):
+        from lm_mcp.logging import is_write_tool
+        from lm_mcp.registry import TOOLS
 
-    def test_write_tools_match_prefix(self):
-        """Known write tools match at least one write prefix."""
-        write_tools = [
-            "create_device",
-            "update_device",
-            "delete_device",
-            "acknowledge_alert",
-            "add_alert_note",
-            "run_netscan",
-            "bulk_acknowledge_alerts",
-            "import_datasource",
-            "ingest_logs",
-            "push_metrics",
+        wrong = [
+            tool.name
+            for tool in TOOLS
+            if is_write_tool(tool.name) is not (tool.annotations.readOnlyHint is False)
         ]
-        for tool in write_tools:
-            assert any(tool.startswith(p) for p in self.WRITE_PREFIXES), (
-                f"{tool} should match a write prefix"
-            )
+        assert wrong == []
 
-    def test_read_tools_dont_match_prefix(self):
-        """Known read tools do not match any write prefix."""
-        read_tools = [
-            "get_devices",
-            "get_alerts",
-            "list_sdts",
-            "get_audit_logs",
-            "get_session_context",
-            "export_datasource",
-        ]
-        for tool in read_tools:
-            assert not any(tool.startswith(p) for p in self.WRITE_PREFIXES), (
-                f"{tool} should not match a write prefix"
-            )
+    def test_session_writes_are_writes(self):
+        """The session tools that change state are audited like delete_session_variable."""
+        from lm_mcp.logging import is_write_tool
+
+        assert is_write_tool("set_session_variable")
+        assert is_write_tool("clear_session_context")
+        assert is_write_tool("delete_session_variable")
+        assert not is_write_tool("get_session_variable")
+
+    def test_unregistered_name_is_not_a_write(self):
+        """A name no tool answers to runs nothing, whatever its prefix."""
+        from lm_mcp.logging import is_write_tool
+
+        assert not is_write_tool("delete_no_such_resource")
+
+    def test_prefix_list_is_gone(self):
+        import lm_mcp.logging
+
+        assert not hasattr(lm_mcp.logging, "WRITE_TOOL_PREFIXES")
 
     def test_recover_and_collect_are_write_tools(self):
         """recover_device and collect_device_config are detected as write tools.
 
-        Both mutate the portal but lacked a write prefix, so they executed without an
-        audit-log entry until recover_/collect_ were added to WRITE_TOOL_PREFIXES.
+        Both mutate the portal without a create/update/delete name; their annotations
+        mark them read-only false, which is what the audit reads.
         """
         from lm_mcp.logging import is_write_tool
 

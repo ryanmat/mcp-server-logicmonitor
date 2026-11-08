@@ -2,10 +2,6 @@
 # Description: Provides Bearer token and LMv1 HMAC authentication for LogicMonitor API.
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lm_mcp.config import LMConfig
 
 
 class AuthProvider(ABC):
@@ -36,34 +32,36 @@ class AuthProvider(ABC):
         pass
 
 
-def create_auth_provider(config: "LMConfig") -> AuthProvider:
-    """Create auth provider from configuration.
+def validate_auth(
+    bearer_token: str | None, access_id: str | None, access_key: str | None
+) -> AuthProvider:
+    """Turn a portal's credentials into the auth provider its client signs with.
 
-    Prefers Bearer token authentication when available. Falls back to
-    LMv1 HMAC authentication if access_id and access_key are configured.
+    A bearer token wins; otherwise both halves of an LMv1 pair are needed. The
+    single-portal config and each multi-portal vault record both come through here.
 
     Args:
-        config: LMConfig instance with authentication credentials.
+        bearer_token: LM_BEARER_TOKEN or the record's bearer_token.
+        access_id: LM_ACCESS_ID or the record's access_id.
+        access_key: LM_ACCESS_KEY or the record's access_key.
 
     Returns:
         BearerAuth or LMv1Auth instance.
 
     Raises:
-        ConfigurationError: If no valid authentication is configured.
+        ConfigurationError: If neither a bearer token nor a full LMv1 pair is given.
     """
     from lm_mcp.exceptions import ConfigurationError
 
-    # Prefer Bearer token authentication
-    if config.bearer_token:
+    if bearer_token:
         from lm_mcp.auth.bearer import BearerAuth
 
-        return BearerAuth(config.bearer_token)
+        return BearerAuth(bearer_token)
 
-    # Fall back to LMv1 HMAC authentication
-    if config.access_id and config.access_key:
+    if access_id and access_key:
         from lm_mcp.auth.lmv1 import LMv1Auth
 
-        return LMv1Auth(config.access_id, config.access_key)
+        return LMv1Auth(access_id, access_key)
 
     raise ConfigurationError(
         "No authentication configured. Set LM_BEARER_TOKEN or both LM_ACCESS_ID and LM_ACCESS_KEY"
@@ -72,5 +70,5 @@ def create_auth_provider(config: "LMConfig") -> AuthProvider:
 
 __all__ = [
     "AuthProvider",
-    "create_auth_provider",
+    "validate_auth",
 ]

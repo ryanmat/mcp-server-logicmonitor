@@ -299,8 +299,7 @@ async def create_http_server() -> None:
     """
     import uvicorn
 
-    from lm_mcp.auth import create_auth_provider
-    from lm_mcp.client import LogicMonitorClient
+    from lm_mcp.client import build_client
     from lm_mcp.config import get_config
     from lm_mcp.server import _set_client
     from lm_mcp.session import get_session
@@ -308,14 +307,11 @@ async def create_http_server() -> None:
     # Load config. Multi-portal mode is stdio-only and is rejected at config
     # construction, so the HTTP transport always binds a fixed client at startup.
     config = get_config()
-    auth = create_auth_provider(config)
-    client = LogicMonitorClient(
-        base_url=config.base_url,
-        auth=auth,
-        timeout=config.timeout,
-        max_retries=config.max_retries,
-        retry_after_cap=config.retry_after_cap_seconds,
-        ingest_url=config.ingest_url,
+    client = build_client(
+        config.portal,
+        bearer_token=config.bearer_token,
+        access_id=config.access_id,
+        access_key=config.access_key,
     )
     _set_client(client)
 

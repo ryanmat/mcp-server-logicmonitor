@@ -1,7 +1,6 @@
 # Description: LogicMonitor API client for making authenticated requests.
 # Description: Handles HTTP communication, error mapping, and response parsing.
 
-import asyncio
 import json
 import re
 import time
@@ -9,14 +8,8 @@ import time
 import httpx
 
 from lm_mcp.auth import AuthProvider
-from lm_mcp.client._retry import (
-    DEFAULT_RETRY_AFTER_CAP,
-    TRANSPORT_ERRORS,
-    backoff,
-    retry_after_seconds,
-    should_retry,
-    transport_error,
-)
+from lm_mcp.client import _retry
+from lm_mcp.client._retry import DEFAULT_RETRY_AFTER_CAP, retry_after_seconds
 from lm_mcp.exceptions import (
     AuthenticationError,
     LMError,
@@ -356,36 +349,37 @@ class LogicMonitorClient:
 
         log_api_request(method, path, params)
 
-        attempt = 0
-        while True:
+        # Stamped at each attempt, so the logged time is the last attempt's.
+        request_start = time.monotonic()
+
+        async def send() -> httpx.Response:
+            nonlocal request_start
             request_start = time.monotonic()
-            try:
-                response = await self._client.request(
-                    method=method,
-                    url=url,
-                    params=params,
-                    content=content,
-                    headers=headers,
-                )
-            except TRANSPORT_ERRORS as e:
-                raise transport_error(e, "LogicMonitor API", method, url) from e
+            return await self._client.request(
+                method=method,
+                url=url,
+                params=params,
+                content=content,
+                headers=headers,
+            )
 
-            # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry(method, response.status_code) and attempt < self.max_retries:
-                _, retry_after = self._parse_error_response(response)
-                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                attempt += 1
-                continue
+        response = await _retry.run(
+            send,
+            method=method,
+            service="LogicMonitor API",
+            url=url,
+            max_retries=self.max_retries,
+            retry_after_cap=self.retry_after_cap,
+        )
+        if response.status_code >= 400:
+            message, retry_after = self._parse_error_response(response)
+            self._raise_for_status(response, message, retry_after)
 
-            if response.status_code >= 400:
-                message, retry_after = self._parse_error_response(response)
-                self._raise_for_status(response, message, retry_after)
-
-            elapsed = time.monotonic() - request_start
-            log_api_response(response.status_code, elapsed, path)
-            data = response.json()
-            self._check_response_body_errors(data)
-            return data
+        elapsed = time.monotonic() - request_start
+        log_api_response(response.status_code, elapsed, path)
+        data = response.json()
+        self._check_response_body_errors(data)
+        return data
 
     async def get(self, path: str, params: dict | None = None) -> dict:
         """Make a GET request.
@@ -454,36 +448,37 @@ class LogicMonitorClient:
 
         log_api_request("POST", path, None)
 
-        attempt = 0
-        while True:
+        # Stamped at each attempt, so the logged time is the last attempt's.
+        request_start = time.monotonic()
+
+        async def send() -> httpx.Response:
+            nonlocal request_start
             request_start = time.monotonic()
-            try:
-                response = await self._client.request(
-                    method="POST",
-                    url=url,
-                    files=files,
-                    headers=headers,
-                    params=params,
-                )
-            except TRANSPORT_ERRORS as e:
-                raise transport_error(e, "LogicMonitor API", "POST", url) from e
+            return await self._client.request(
+                method="POST",
+                url=url,
+                files=files,
+                headers=headers,
+                params=params,
+            )
 
-            # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry("POST", response.status_code) and attempt < self.max_retries:
-                _, retry_after = self._parse_error_response(response)
-                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                attempt += 1
-                continue
+        response = await _retry.run(
+            send,
+            method="POST",
+            service="LogicMonitor API",
+            url=url,
+            max_retries=self.max_retries,
+            retry_after_cap=self.retry_after_cap,
+        )
+        if response.status_code >= 400:
+            message, retry_after = self._parse_error_response(response)
+            self._raise_for_status(response, message, retry_after)
 
-            if response.status_code >= 400:
-                message, retry_after = self._parse_error_response(response)
-                self._raise_for_status(response, message, retry_after)
-
-            elapsed = time.monotonic() - request_start
-            log_api_response(response.status_code, elapsed, path)
-            data = response.json()
-            self._check_response_body_errors(data)
-            return data
+        elapsed = time.monotonic() - request_start
+        log_api_response(response.status_code, elapsed, path)
+        data = response.json()
+        self._check_response_body_errors(data)
+        return data
 
     async def put(self, path: str, json_body: dict | None = None) -> dict:
         """Make a PUT request.
@@ -565,48 +560,46 @@ class LogicMonitorClient:
         }
         headers.update(self.auth.get_auth_headers("POST", path, body_str))
 
-        attempt = 0
-        while True:
+        async def send() -> httpx.Response:
+            return await self._client.request(
+                method="POST",
+                url=url,
+                params=params,
+                content=content,
+                headers=headers,
+            )
+
+        response = await _retry.run(
+            send,
+            method="POST",
+            service="LogicMonitor ingest",
+            url=url,
+            max_retries=self.max_retries,
+            retry_after_cap=self.retry_after_cap,
+        )
+
+        # Handle 202 Accepted (success for ingestion)
+        if response.status_code == 202:
             try:
-                response = await self._client.request(
-                    method="POST",
-                    url=url,
-                    params=params,
-                    content=content,
-                    headers=headers,
+                data = response.json()
+            except (json.JSONDecodeError, ValueError):
+                return {"success": True, "message": "Accepted"}
+            # A 202 can still carry per-record rejection details in the body;
+            # surface them instead of reporting blanket success (silent data loss).
+            self._check_response_body_errors(data)
+            if isinstance(data, dict) and data.get("success") is False:
+                raise LMError(
+                    message=str(
+                        data.get("message")
+                        or data.get("errorMessage")
+                        or "Ingestion reported failure in a 202 response"
+                    ),
+                    code="INGEST_PARTIAL_FAILURE",
                 )
-            except TRANSPORT_ERRORS as e:
-                raise transport_error(e, "LogicMonitor ingest", "POST", url) from e
+            return data
 
-            # Retry 429 for any method and 5xx only for idempotent ones
-            if should_retry("POST", response.status_code) and attempt < self.max_retries:
-                _, retry_after = self._parse_error_response(response)
-                await asyncio.sleep(backoff(attempt, retry_after, self.retry_after_cap))
-                attempt += 1
-                continue
+        if response.status_code >= 400:
+            message, retry_after = self._parse_error_response(response)
+            self._raise_for_status(response, message, retry_after)
 
-            # Handle 202 Accepted (success for ingestion)
-            if response.status_code == 202:
-                try:
-                    data = response.json()
-                except (json.JSONDecodeError, ValueError):
-                    return {"success": True, "message": "Accepted"}
-                # A 202 can still carry per-record rejection details in the body;
-                # surface them instead of reporting blanket success (silent data loss).
-                self._check_response_body_errors(data)
-                if isinstance(data, dict) and data.get("success") is False:
-                    raise LMError(
-                        message=str(
-                            data.get("message")
-                            or data.get("errorMessage")
-                            or "Ingestion reported failure in a 202 response"
-                        ),
-                        code="INGEST_PARTIAL_FAILURE",
-                    )
-                return data
-
-            if response.status_code >= 400:
-                message, retry_after = self._parse_error_response(response)
-                self._raise_for_status(response, message, retry_after)
-
-            return response.json()
+        return response.json()

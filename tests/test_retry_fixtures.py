@@ -40,7 +40,7 @@ def waits(monkeypatch):
     async def fake_sleep(seconds):
         recorded.append(seconds)
 
-    monkeypatch.setattr("lm_mcp.client.api.asyncio.sleep", fake_sleep)
+    monkeypatch.setattr("lm_mcp.client._retry.asyncio.sleep", fake_sleep)
     return recorded
 
 
