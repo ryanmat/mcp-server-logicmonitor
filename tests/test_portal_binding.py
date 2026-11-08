@@ -199,6 +199,18 @@ class TestNoBinding:
         with pytest.raises(RuntimeError, match="binding"):
             await delete_device(portals._state["clients"]["acme"], device_id=7)
 
+    def test_audit_line_outside_a_call_carries_no_portal(self, two_portals, caplog):
+        """The audit logger never fails its caller: outside a call the line has no portal."""
+        from lm_mcp.logging import log_write_operation
+
+        portals.activate("acme")
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            log_write_operation("delete_device", {"device_id": 7}, success=True)
+
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
+            "Write operation: delete_device args={'device_id': 7}"
+        ]
+
 
 class TestPortalStamp:
     """Every result dict in multi-portal mode carries the portal its call was bound to."""
