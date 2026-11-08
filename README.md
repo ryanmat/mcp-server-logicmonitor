@@ -12,7 +12,7 @@ Model Context Protocol (MCP) server that gives AI assistants structured access t
 
 The server runs as a local subprocess of your MCP client and calls your portal with your API token. It works with any MCP client that launches a stdio server, including Claude Desktop, Claude Code, Cursor, Continue, and Cline.
 
-Tools are read-only until you set `LM_ENABLE_WRITE_OPERATIONS=true`. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
+Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
 The 268 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
 
@@ -333,7 +333,7 @@ claude mcp add logicmonitor \
 
 ### "Write operations are disabled"
 
-Write operations (acknowledge, create SDT, etc.) are disabled by default. Set `LM_ENABLE_WRITE_OPERATIONS=true` in your environment.
+Write operations (acknowledge, create SDT, etc.) are disabled by default: the server does not list those tools, and a call to one by name returns this error. Set `LM_ENABLE_WRITE_OPERATIONS=true` in your environment.
 
 ### "spawn uvx ENOENT" in Claude Desktop
 

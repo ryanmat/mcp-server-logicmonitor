@@ -3,10 +3,25 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+import respx
 
 from lm_mcp.registry import TOOLS
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tool_list.json"
+READONLY_FIXTURE = Path(__file__).parent / "fixtures" / "tool_list_readonly.json"
+
+# The tools that change no portal state but are not read-only: session state and portal
+# selection. They stay listed with writes off.
+_CLOSED_WORLD_WRITES = {
+    "set_session_variable",
+    "delete_session_variable",
+    "clear_session_context",
+    "use_portal",
+    "reload_portals",
+}
 
 
 def _annotations(annotations) -> dict | None:
@@ -100,12 +115,26 @@ def test_server_instructions_point_to_search_tools():
     assert "search_tools" in SERVER_INSTRUCTIONS
 
 
-def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
-    """Write tools stay listed with writes off and are refused, so they are not absent."""
-    from lm_mcp.config import LMConfig
-    from lm_mcp.registry import TOOLS
-    from lm_mcp.server import SERVER_INSTRUCTIONS, _filter_tools
+def readonly_tool_names() -> list[str]:
+    """Every tool name the server can list with writes off, portal tools included."""
+    from lm_mcp.server import _filter_tools
 
+    config = SimpleNamespace(
+        enabled_tools=None,
+        disabled_tools=None,
+        mcp_categories=None,
+        multi_portal=True,
+        enable_write_operations=False,
+    )
+    return sorted(tool.name for tool in _filter_tools(TOOLS, config))
+
+
+def _changes_the_portal(tool) -> bool:
+    return tool.annotations.readOnlyHint is False and tool.annotations.openWorldHint is True
+
+
+@pytest.fixture
+def single_portal(monkeypatch):
     monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
     monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
     for name in (
@@ -113,12 +142,106 @@ def test_server_instructions_describe_the_write_gate_as_it_is(monkeypatch):
         "LM_ENABLED_TOOLS",
         "LM_DISABLED_TOOLS",
         "LM_MCP_CATEGORIES",
+        "LM_MULTI_PORTAL",
     ):
         monkeypatch.delenv(name, raising=False)
 
-    assert "acknowledge_alert" in {tool.name for tool in _filter_tools(TOOLS, LMConfig())}
-    assert "refused" in SERVER_INSTRUCTIONS
-    assert "absent" not in SERVER_INSTRUCTIONS
+
+async def test_writes_off_lists_no_tool_that_changes_the_portal(single_portal):
+    """R1.9: with writes off, tools/list carries no tool annotated as changing the portal."""
+    from lm_mcp.server import PORTAL_TOOLS, list_tools
+
+    listed = await list_tools()
+    names = {tool.name for tool in listed}
+
+    assert [tool.name for tool in listed if _changes_the_portal(tool)] == []
+    assert {t.name for t in listed if t.annotations.readOnlyHint is False} == (
+        _CLOSED_WORLD_WRITES - PORTAL_TOOLS
+    )
+    assert names == {t.name for t in TOOLS if not _changes_the_portal(t)} - PORTAL_TOOLS
+
+
+async def test_writes_off_keeps_portal_selection_in_multi_portal(monkeypatch, tmp_path):
+    """use_portal and reload_portals stay listed with writes off; they change no portal."""
+    from lm_mcp.server import list_tools
+
+    portals = tmp_path / "portals.json"
+    portals.write_text(json.dumps({"acme": {"portal": "acme.example.com", "bearer_token": "t"}}))
+    monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+    monkeypatch.setenv("LM_PORTALS_FILE", str(portals))
+    for name in ("LM_PORTAL", "LM_BEARER_TOKEN", "LM_ENABLE_WRITE_OPERATIONS", "LM_MCP_CATEGORIES"):
+        monkeypatch.delenv(name, raising=False)
+
+    names = {tool.name for tool in await list_tools()}
+
+    assert {"use_portal", "reload_portals", "list_portals", "current_portal"} <= names
+    assert "acknowledge_alert" not in names
+
+
+async def test_writes_on_lists_every_tool(single_portal, monkeypatch):
+    """R1.9: with writes on, tools/list carries every tool the single-portal surface has."""
+    from lm_mcp.server import PORTAL_TOOLS, list_tools
+
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+    names = {tool.name for tool in await list_tools()}
+
+    assert names == {t.name for t in TOOLS} - PORTAL_TOOLS
+
+
+async def test_a_hidden_tool_called_by_name_is_refused(single_portal, caplog):
+    """R1.9: tools/call on a tool hidden by the write gate returns the write-disabled error."""
+    import logging
+
+    from lm_mcp.server import call_tool
+
+    with caplog.at_level(logging.WARNING, logger="lm_mcp.audit"):
+        result = await call_tool("acknowledge_alert", {"alert_id": "LMA1", "comment": "x"})
+
+    assert result.isError is True
+    assert result.content[0].text.startswith("Error: Write operations are disabled")
+    assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
+        "Write operation failed: acknowledge_alert args={'alert_id': 'LMA1', 'comment': 'x'}"
+    ]
+
+
+@respx.mock
+async def test_update_logicmodule_is_refused_with_writes_off(single_portal, reset_portals):
+    """update_logicmodule has no write gate of its own; execute_tool refuses it while hidden."""
+    from lm_mcp.auth.bearer import BearerAuth
+    from lm_mcp.client import LogicMonitorClient
+    from lm_mcp.server import _set_client, execute_tool
+
+    _set_client(
+        LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=BearerAuth("test-token"),
+            timeout=30,
+        )
+    )
+
+    result = await execute_tool(
+        "update_logicmodule", {"type": "datasource", "id": 1, "changes": {"description": "x"}}
+    )
+
+    assert result[0].text.startswith("Error: Write operations are disabled")
+    assert respx.calls.call_count == 0
+
+
+def test_readonly_tool_list_snapshot():
+    """The tools listed with writes off match the committed read-only snapshot.
+
+    Regenerate with: uv run python tests/test_tool_contract.py
+    """
+    assert readonly_tool_names() == json.loads(READONLY_FIXTURE.read_text())
+
+
+def test_server_instructions_describe_the_write_gate_as_it_is():
+    """The instructions say write tools are listed only with writes on."""
+    from lm_mcp.server import SERVER_INSTRUCTIONS
+
+    assert "listed only when" in SERVER_INSTRUCTIONS
+    assert "LM_ENABLE_WRITE_OPERATIONS" in SERVER_INSTRUCTIONS
     assert f"up to {len(TOOLS)} " in SERVER_INSTRUCTIONS
 
 
@@ -127,3 +250,6 @@ if __name__ == "__main__":
     surface = canonical_tool_surface()
     FIXTURE.write_text(json.dumps(surface, indent=2, sort_keys=True) + "\n")
     print(f"wrote {FIXTURE} ({len(surface)} tools)")
+    readonly = readonly_tool_names()
+    READONLY_FIXTURE.write_text(json.dumps(readonly, indent=2) + "\n")
+    print(f"wrote {READONLY_FIXTURE} ({len(readonly)} tools)")

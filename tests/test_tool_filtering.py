@@ -11,12 +11,18 @@ class _MockConfig:
     """Lightweight config mock for tool filtering tests."""
 
     def __init__(
-        self, enabled_tools=None, disabled_tools=None, mcp_categories=None, multi_portal=False
+        self,
+        enabled_tools=None,
+        disabled_tools=None,
+        mcp_categories=None,
+        multi_portal=False,
+        enable_write_operations=True,
     ):
         self.enabled_tools = enabled_tools
         self.disabled_tools = disabled_tools
         self.mcp_categories = mcp_categories
         self.multi_portal = multi_portal
+        self.enable_write_operations = enable_write_operations
 
 
 class TestFilterTools:

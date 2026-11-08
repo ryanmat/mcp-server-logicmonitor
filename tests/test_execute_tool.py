@@ -109,6 +109,7 @@ class TestExecuteToolMiddleware:
         """execute_tool logs successful write operations."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
 
         with (
             patch("lm_mcp.server.get_tool_handler", return_value=mock_handler),

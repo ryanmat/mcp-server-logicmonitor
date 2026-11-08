@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -459,7 +459,7 @@ Session context, variable management, and baselines
 | `get_session_context` | Get current session context (variables and history) | No |
 | `set_session_variable` | Set a user-defined session variable for use across tool calls | No |
 | `get_session_variable` | Get a user-defined session variable | No |
-| `delete_session_variable` | Delete a user-defined session variable | Yes |
+| `delete_session_variable` | Delete a user-defined session variable | No |
 | `clear_session_context` | Clear all session context (variables and history) | No |
 | `list_session_history` | List recent tool call history | No |
 | `save_baseline` | Save a metric baseline from historical data. Computes mean, min, max, stddev per datapoint and stores as a session variable for later comparison. | No |
@@ -472,9 +472,9 @@ Multi-portal switching: one server, many customer portals
 | Tool | Description | Write |
 |------|-------------|-------|
 | `list_portals` | List the customer portals available in this multi-portal server. | No |
-| `use_portal` | Switch the active customer portal for subsequent tool calls. | Yes |
+| `use_portal` | Switch the active customer portal for subsequent tool calls. | No |
 | `current_portal` | Show which customer portal is currently active. | No |
-| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | Yes |
+| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
 
 ## Terraform
 

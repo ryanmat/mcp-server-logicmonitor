@@ -131,6 +131,13 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ### Changed
 
+- With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 101 tools
+  whose annotations say they change the portal (`readOnlyHint` false and `openWorldHint` true),
+  and a call to one by name returns the write-disabled error. That includes `update_logicmodule`,
+  whose preview mode ran with writes off before. The session tools, `use_portal` and
+  `reload_portals` change only server-side state and stay listed. The Write column of
+  `documentation/tools.md` follows the same annotations, so `delete_session_variable`,
+  `use_portal` and `reload_portals` read No.
 - `uv.lock` holds 59 packages, down from 142, with the model stack gone.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,

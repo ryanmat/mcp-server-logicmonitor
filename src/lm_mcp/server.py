@@ -10,6 +10,7 @@ from mcp.server import Server
 from mcp.types import CallToolResult, GetPromptResult, TextContent, Tool
 
 from lm_mcp import __version__
+from lm_mcp.categories import writes_to_portal
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.config import get_config
 from lm_mcp.logging import (
@@ -22,7 +23,7 @@ from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import TOOLS, get_tool_handler
 from lm_mcp.resources import RESOURCES, get_resource_content
 from lm_mcp.session import get_session
-from lm_mcp.tools import ErrorContent, is_error_result
+from lm_mcp.tools import ErrorContent, is_error_result, write_disabled_response
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,8 @@ SERVER_INSTRUCTIONS = (
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
     "`detect_site_outage` -- answer common multi-step investigations in a single call. "
-    "Write operations (create/update/delete/run) are gated behind "
-    "`LM_ENABLE_WRITE_OPERATIONS` and are refused unless the operator enabled them."
+    "Tools that change the portal (create, update, delete, acknowledge, run) are listed "
+    "only when the operator sets `LM_ENABLE_WRITE_OPERATIONS=true`."
 )
 server = Server("logicmonitor-platform", version=__version__, instructions=SERVER_INSTRUCTIONS)
 
@@ -83,7 +84,10 @@ def _set_client(client: LogicMonitorClient) -> None:
 
 
 def _filter_tools(tools: list, config) -> list:
-    """Filter tools based on LM_ENABLED_TOOLS, LM_DISABLED_TOOLS, and LM_MCP_CATEGORIES.
+    """Filter tools on the write gate, LM_ENABLED_TOOLS, LM_DISABLED_TOOLS and LM_MCP_CATEGORIES.
+
+    With LM_ENABLE_WRITE_OPERATIONS false, tools whose annotations say they change the
+    portal are left out.
 
     Supports comma-separated tool names and glob patterns (e.g., "get_*", "delete_*").
     LM_MCP_CATEGORIES composes by intersection — it narrows the result of the
@@ -91,13 +95,17 @@ def _filter_tools(tools: list, config) -> list:
 
     Args:
         tools: Full list of Tool objects.
-        config: LMConfig instance with enabled_tools/disabled_tools/mcp_categories.
+        config: LMConfig instance with enable_write_operations, enabled_tools,
+            disabled_tools and mcp_categories.
 
     Returns:
         Filtered list of Tool objects.
     """
     if not config.multi_portal:
         tools = [t for t in tools if t.name not in PORTAL_TOOLS]
+
+    if not config.enable_write_operations:
+        tools = [t for t in tools if not writes_to_portal(t)]
 
     if config.enabled_tools:
         patterns = [p.strip() for p in config.enabled_tools.split(",") if p.strip()]
@@ -167,9 +175,8 @@ CLIENT_OPTIONAL_TOOLS = {
 async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute a LogicMonitor tool with full middleware chain.
 
-    Applies tool filtering, field validation, write audit logging, and
-    session recording. Used by both the MCP stdio handler and the HTTP
-    transport endpoint to ensure consistent behavior across transports.
+    Applies tool filtering, the write gate, write audit logging and session
+    recording. The MCP call_tool handler delegates to it.
 
     Args:
         name: Tool name to execute.
@@ -227,6 +234,13 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
                         f"(active categories: {config.mcp_categories}).",
                     )
                 ]
+
+        if not config.enable_write_operations:
+            tool = next((t for t in TOOLS if t.name == name), None)
+            if tool is not None and writes_to_portal(tool):
+                if is_write_tool(name):
+                    log_write_operation(name, arguments, success=False)
+                return write_disabled_response()
 
         # Session and portal tools don't need an LM client
         if name in SESSION_TOOLS or name in PORTAL_TOOLS:

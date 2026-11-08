@@ -449,6 +449,18 @@ def strip_readonly(payload: dict, fields: tuple[str, ...]) -> dict:
     return {k: v for k, v in payload.items() if k not in fields}
 
 
+def write_disabled_response() -> list[TextContent]:
+    """The error a write tool returns while LM_ENABLE_WRITE_OPERATIONS is false."""
+    return format_response(
+        {
+            "error": True,
+            "code": "WRITE_DISABLED",
+            "message": "Write operations are disabled",
+            "suggestion": "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
+        }
+    )
+
+
 def require_write_permission(func: F) -> F:
     """Decorator to enforce write permission check.
 
@@ -468,14 +480,7 @@ def require_write_permission(func: F) -> F:
 
         config = get_config()
         if not config.enable_write_operations:
-            return format_response(
-                {
-                    "error": True,
-                    "code": "WRITE_DISABLED",
-                    "message": "Write operations are disabled",
-                    "suggestion": "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
-                }
-            )
+            return write_disabled_response()
         if config.multi_portal:
             from lm_mcp import portals
 
