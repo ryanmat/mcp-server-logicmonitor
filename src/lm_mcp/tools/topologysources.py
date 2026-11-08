@@ -161,16 +161,17 @@ async def update_topologysource(
 ) -> list[TextContent]:
     """Update an existing TopologySource via REST API (full replace).
 
-    The LM API uses full-replace semantics: every field not included in the
-    definition will be blanked. PREFER update_logicmodule for partial updates;
-    it exports, deep-merges, and previews a diff before writing.
+    Internal PUT behind update_logicmodule, which reads the current
+    definition, merges the caller's changes and passes the merged full
+    definition here; the server registers no tool for it. The LM API
+    update is full-replace and can blank any field the definition leaves out.
 
     Args:
         client: LogicMonitor API client.
         topologysource_id: TopologySource ID to update.
         definition: Full TopologySource definition dict with all fields.
-        confirm: Must be True to proceed. Defaults to False to prevent
-            accidental field-blanking via partial payloads.
+        confirm: Must be True to proceed; update_logicmodule always passes it.
+            Without it the call returns CONFIRMATION_REQUIRED and writes nothing.
 
     Returns:
         List of TextContent with updated TopologySource info or error.
