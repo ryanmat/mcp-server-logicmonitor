@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -513,3 +514,28 @@ class TestGetCollectorHealth:
         history = data["collectors"][0]["collector_down_history"]
         assert len(history) == 1
         assert history[0]["alert_type"] == "dataSourceAlert"
+
+
+# (handler name, endpoint path, extra required arguments)
+_COLLECTORS_LISTS = [
+    ("get_collectors", "/setting/collector/collectors", {}),
+    ("get_collector_groups", "/setting/collector/groups", {}),
+]
+
+
+class TestCollectorListPaging:
+    """R2.5: the collector list tools declare offset, send it, and read a negative total as more."""
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _COLLECTORS_LISTS)
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client, name, path, kwargs):
+        from lm_mcp.tools import collectors
+
+        await assert_offset_declared_and_sent(client, getattr(collectors, name), path, kwargs)
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _COLLECTORS_LISTS)
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client, name, path, kwargs):
+        from lm_mcp.tools import collectors
+
+        await assert_negative_total_reads_as_more(client, getattr(collectors, name), path, kwargs)

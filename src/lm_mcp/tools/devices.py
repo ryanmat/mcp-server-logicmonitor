@@ -8,14 +8,11 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    paginated_response,
+    list_tool,
     portal_url,
-    quote_filter_value,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
@@ -34,6 +31,16 @@ DEVICE_STATUS_FILTERS = {
     "unmonitored": 'hostStatus:"unmonitored"',
     "disabled": 'hostStatus:"disabled"',
 }
+
+
+def _device_row(item: dict) -> dict:
+    """Project one /device/devices row onto the get_devices fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("displayName"),
+        "status": item.get("hostStatus"),
+        "collector_id": item.get("currentCollectorId"),
+    }
 
 
 async def get_devices(
@@ -66,58 +73,25 @@ async def get_devices(
     Returns:
         List of TextContent with device data or error.
     """
-    try:
-        params: dict = {"size": min(limit, 1000), "offset": offset}
-        wildcards_stripped = False
+    clauses = []
+    if group_id:
+        # hostGroupIds:N matches membership in the id list; ~N is a
+        # substring match that also returns groups 16, 60 and 160 for 6.
+        clauses.append(f"hostGroupIds:{group_id}")
+    if status and status.lower() in DEVICE_STATUS_FILTERS:
+        clauses.append(DEVICE_STATUS_FILTERS[status.lower()])
 
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if group_id:
-                # hostGroupIds:N matches membership in the id list; ~N is a
-                # substring match that also returns groups 16, 60 and 160 for 6.
-                filters.append(f"hostGroupIds:{group_id}")
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"displayName~{quote_filter_value(clean_name)}")
-            if hostname_filter:
-                clean_host, was_modified = sanitize_filter_value(hostname_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_host)}")
-            if status and status.lower() in DEVICE_STATUS_FILTERS:
-                filters.append(DEVICE_STATUS_FILTERS[status.lower()])
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/device/devices", params=params)
-
-        devices = []
-        for item in result.get("items", []):
-            devices.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("displayName"),
-                    "status": item.get("hostStatus"),
-                    "collector_id": item.get("currentCollectorId"),
-                }
-            )
-
-        response = {
-            **paginated_response(devices, result, offset),
-            "devices": devices,
-        }
-
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/device/devices",
+        key="devices",
+        project=_device_row,
+        limit=min(limit, 1000),
+        offset=offset,
+        filter=filter,
+        named={"displayName~": name_filter, "name~": hostname_filter},
+        clauses=clauses,
+    )
 
 
 async def get_device(
@@ -141,11 +115,26 @@ async def get_device(
         return handle_error(e)
 
 
+def _device_group_row(item: dict) -> dict:
+    """Project one /device/groups row onto the get_device_groups fields."""
+    group = {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "parent_id": item.get("parentId"),
+        "device_count": item.get("numOfHosts"),
+    }
+    applies_to = item.get("appliesTo")
+    if applies_to:
+        group["applies_to"] = applies_to
+    return group
+
+
 async def get_device_groups(
     client: LogicMonitorClient,
     parent_id: int | None = None,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List device groups from LogicMonitor.
 
@@ -154,52 +143,21 @@ async def get_device_groups(
         parent_id: Filter by parent group ID.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with group data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        filters = []
-        if parent_id is not None:
-            filters.append(f"parentId:{parent_id}")
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"name~{quote_filter_value(clean_name)}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/device/groups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            group = {
-                "id": item.get("id"),
-                "name": item.get("name"),
-                "parent_id": item.get("parentId"),
-                "device_count": item.get("numOfHosts"),
-            }
-            applies_to = item.get("appliesTo")
-            if applies_to:
-                group["applies_to"] = applies_to
-            groups.append(group)
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "groups": groups,
-        }
-
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/device/groups",
+        key="groups",
+        project=_device_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+        clauses=[f"parentId:{parent_id}"] if parent_id is not None else [],
+    )
 
 
 async def get_device_group(

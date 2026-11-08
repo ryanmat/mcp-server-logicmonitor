@@ -10,6 +10,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from tests.alert_pages import alert_pages
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -754,3 +755,27 @@ class TestPaginateAlerts:
         assert MAX_ALERTS_PER_WINDOW == 5000
         assert len(alerts) == 5000
         assert truncated is True
+
+
+# (handler name, endpoint path, extra required arguments)
+_ALERTS_LISTS = [
+    ("get_alerts", "/alert/alerts", {}),
+]
+
+
+class TestAlertListPaging:
+    """R2.5: the alert list tools declare offset, send it, and read a negative total as more."""
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _ALERTS_LISTS)
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client, name, path, kwargs):
+        from lm_mcp.tools import alerts
+
+        await assert_offset_declared_and_sent(client, getattr(alerts, name), path, kwargs)
+
+    @pytest.mark.parametrize(("name", "path", "kwargs"), _ALERTS_LISTS)
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client, name, path, kwargs):
+        from lm_mcp.tools import alerts
+
+        await assert_negative_total_reads_as_more(client, getattr(alerts, name), path, kwargs)

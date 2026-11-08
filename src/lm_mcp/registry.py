@@ -102,6 +102,7 @@ TOOLS.extend(
                         "description": "Filter by group name (substring match)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
