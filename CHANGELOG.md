@@ -238,7 +238,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `save_baseline` stores, and history. A variable set under one portal is absent under another,
   and `clear_session_context` clears the session of the portal it runs under. Calls made before
   `use_portal` share one session, as single-portal mode keeps one. A `use_portal` is recorded in
-  the history of the portal it switched from.
+  the history it was called from: the portal it switched away from, or the shared session before
+  any portal was selected.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
