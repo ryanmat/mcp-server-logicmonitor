@@ -459,11 +459,9 @@ class TestTopologysourceArm:
         payload = json.loads(result[0].text)
         assert payload["applied"] is True
         assert put.call_count == 1
-        from lm_mcp.tools import normalize_definition_fields
-
         expected = {k: v for k, v in _TOPOLOGYSOURCE.items() if k != "id"}
         expected["description"] = "probe"
-        assert json.loads(put.calls[0].request.content) == normalize_definition_fields(expected)
+        assert json.loads(put.calls[0].request.content) == expected
 
     @respx.mock
     async def test_preview_reads_and_does_not_write(self, lm_client, writes_on):

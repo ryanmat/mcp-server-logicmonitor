@@ -97,6 +97,23 @@ class TestCreateTopologysource:
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
 
+    @respx.mock
+    async def test_create_topologysource_keeps_collection_method(self, client, enable_writes):
+        """The TopologySource REST model names the field collectionMethod; the POST keeps it."""
+        from lm_mcp.tools.topologysources import create_topologysource
+
+        route = respx.post(
+            "https://test.logicmonitor.com/santaba/rest/setting/topologysources"
+        ).mock(
+            return_value=httpx.Response(200, json={"id": 10003, "name": "TS"}),
+        )
+
+        await create_topologysource(client, definition={"name": "TS", "collectionMethod": "script"})
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["collectionMethod"] == "script"
+        assert "collectMethod" not in request_body
+
 
 class TestUpdateTopologysource:
     """Tests for update_topologysource tool."""
@@ -170,6 +187,28 @@ class TestUpdateTopologysource:
         text = result[0].text
         assert "confirm" in text.lower()
         assert "update_logicmodule" in text
+
+    @respx.mock
+    async def test_update_topologysource_keeps_collection_method(self, client, enable_writes):
+        """The TopologySource REST model names the field collectionMethod; the PUT keeps it."""
+        from lm_mcp.tools.topologysources import update_topologysource
+
+        route = respx.put(
+            "https://test.logicmonitor.com/santaba/rest/setting/topologysources/100"
+        ).mock(
+            return_value=httpx.Response(200, json={"id": 100, "name": "TS"}),
+        )
+
+        await update_topologysource(
+            client,
+            topologysource_id=100,
+            definition={"name": "TS", "collectionMethod": "script"},
+            confirm=True,
+        )
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["collectionMethod"] == "script"
+        assert "collectMethod" not in request_body
 
 
 class TestDeleteTopologysource:

@@ -267,6 +267,23 @@ class TestCreateLogsource:
         request_body = json.loads(route.calls[0].request.content)
         assert "id" not in request_body
 
+    @respx.mock
+    async def test_create_logsource_keeps_collection_method(self, client, enable_writes):
+        """The LogSource REST model names the field collectionMethod; the POST keeps it."""
+        from lm_mcp.tools.logsources import create_logsource
+
+        route = respx.post("https://test.logicmonitor.com/santaba/rest/setting/logsources").mock(
+            return_value=httpx.Response(200, json={"id": 10003, "name": "LS"}),
+        )
+
+        await create_logsource(
+            client, definition={"name": "LS", "collectionMethod": "KUBERNETES_EVENT"}
+        )
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["collectionMethod"] == "KUBERNETES_EVENT"
+        assert "collectMethod" not in request_body
+
 
 class TestUpdateLogsource:
     """Tests for update_logsource tool."""
@@ -326,6 +343,26 @@ class TestUpdateLogsource:
         text = result[0].text
         assert "confirm" in text.lower()
         assert "update_logicmodule" in text
+
+    @respx.mock
+    async def test_update_logsource_keeps_collection_method(self, client, enable_writes):
+        """The LogSource REST model names the field collectionMethod; the PUT keeps it."""
+        from lm_mcp.tools.logsources import update_logsource
+
+        route = respx.put("https://test.logicmonitor.com/santaba/rest/setting/logsources/100").mock(
+            return_value=httpx.Response(200, json={"id": 100, "name": "LS"}),
+        )
+
+        await update_logsource(
+            client,
+            logsource_id=100,
+            definition={"name": "LS", "collectionMethod": "KUBERNETES_EVENT"},
+            confirm=True,
+        )
+
+        request_body = json.loads(route.calls[0].request.content)
+        assert request_body["collectionMethod"] == "KUBERNETES_EVENT"
+        assert "collectMethod" not in request_body
 
 
 class TestDeleteLogsource:

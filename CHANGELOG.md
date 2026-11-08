@@ -128,6 +128,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   ConfigSources, the two types whose definitions have that field. EventSources, LogSources,
   PropertySources, DiagnosticSources and RemediationSources were refused unless the changes added
   a `displayName`.
+- `create_logsource`, `create_topologysource` and the LogSource and TopologySource updates that
+  `update_logicmodule` runs send `collectionMethod`, the name those REST models use. They renamed it
+  to the DataSource field `collectMethod`, and the LogSource API answered a PUT carrying that
+  rename with 400, so `update_logicmodule` could not apply a LogSource change.
 
 ### Changed
 

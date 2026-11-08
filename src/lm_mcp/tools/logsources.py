@@ -21,6 +21,10 @@ from lm_mcp.tools import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
+# The LogSource REST model names its collection method collectionMethod, which
+# normalize_definition_fields would otherwise rename to the DataSource field collectMethod.
+_REST_FIELDS = frozenset({"collectionMethod"})
+
 
 async def get_logsources(
     client: LogicMonitorClient,
@@ -121,7 +125,7 @@ async def create_logsource(
         List of TextContent with created LogSource info or error.
     """
     try:
-        payload = normalize_definition_fields(definition)
+        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -186,7 +190,7 @@ async def update_logsource(
             }
         )
     try:
-        payload = normalize_definition_fields(definition)
+        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
         payload.pop("id", None)
 
         result = await client.put(f"/setting/logsources/{logsource_id}", json_body=payload)

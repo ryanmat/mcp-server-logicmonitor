@@ -21,6 +21,10 @@ from lm_mcp.tools import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
+# The TopologySource REST model names its collection method collectionMethod, which
+# normalize_definition_fields would otherwise rename to the DataSource field collectMethod.
+_REST_FIELDS = frozenset({"collectionMethod"})
+
 
 async def get_topologysources(
     client: LogicMonitorClient,
@@ -119,7 +123,7 @@ async def create_topologysource(
         List of TextContent with created TopologySource info or error.
     """
     try:
-        payload = normalize_definition_fields(definition)
+        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
         payload.pop("id", None)
 
         if overwrite and payload.get("name"):
@@ -185,7 +189,7 @@ async def update_topologysource(
             }
         )
     try:
-        payload = normalize_definition_fields(definition)
+        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
         payload.pop("id", None)
 
         result = await client.put(
