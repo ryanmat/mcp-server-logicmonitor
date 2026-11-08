@@ -13,6 +13,7 @@ import respx
 from mcp.types import CallToolRequest, CallToolRequestParams, CallToolResult, TextContent
 
 from lm_mcp.tools import ErrorContent, is_error_result
+from tests.envelope import envelope
 
 
 class TestExecuteToolMiddleware:
@@ -460,7 +461,7 @@ class TestWriteOutcomeFromResult:
             result = await execute_tool("delete_device", {"device_id": 7})
 
         assert isinstance(result[0], ErrorContent)
-        assert result[0].text.startswith("Error: Permission denied")
+        assert envelope(result)["message"].startswith("Permission denied")
         assert _audit_lines(caplog) == [
             (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
         ]
@@ -476,7 +477,7 @@ class TestWriteOutcomeFromResult:
             result = await execute_tool("delete_device", {"device_id": 7})
 
         assert isinstance(result[0], ErrorContent)
-        assert result[0].text.startswith("Error: Write operations are disabled")
+        assert envelope(result)["message"].startswith("Write operations are disabled")
         assert not respx.calls
         assert _audit_lines(caplog) == [
             (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
@@ -505,7 +506,7 @@ class TestWriteOutcomeFromResult:
         with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
             result = await execute_tool("delete_device", {"device_id": 7})
 
-        assert result[0].text == "Error executing delete_device: Client not initialized"
+        assert envelope(result)["message"] == "Client not initialized"
         assert _audit_lines(caplog) == [
             (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
         ]
@@ -518,7 +519,7 @@ class TestWriteOutcomeFromResult:
             result = await execute_tool("delete_no_such_resource", {"id": 7})
 
         assert is_error_result(result)
-        assert result[0].text.startswith("Error: ")
+        assert envelope(result)["code"] == "INVALID_REQUEST"
         assert _audit_lines(caplog) == [
             (logging.WARNING, "Write operation failed: delete_no_such_resource args={'id': 7}")
         ]
@@ -578,7 +579,9 @@ class TestWriteOutcomeFromResult:
 
         assert isinstance(result, CallToolResult)
         assert result.isError is True
-        assert result.content[0].text.startswith("Error: Permission denied")
+        error = envelope(result.content)
+        assert error["code"] == "AUTH_FAILED"
+        assert error["message"].startswith("Permission denied")
 
     @respx.mock
     async def test_call_tool_success_is_plain_content(self, write_portal):
@@ -608,7 +611,9 @@ class TestWriteOutcomeFromResult:
 
         wire = response.model_dump(by_alias=True, exclude_none=True)
         assert wire["isError"] is True
-        assert wire["content"][0]["text"].startswith("Error: Permission denied")
+        error = json.loads(wire["content"][0]["text"])["error"]
+        assert error["code"] == "AUTH_FAILED"
+        assert error["message"].startswith("Permission denied")
 
     def test_mcp_floor_admits_only_call_tool_result_passthrough(self):
         """The mcp requirement excludes every release that cannot pass a CallToolResult.

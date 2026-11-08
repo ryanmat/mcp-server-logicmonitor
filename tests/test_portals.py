@@ -6,6 +6,7 @@ import pytest
 
 from lm_mcp import portals, server
 from lm_mcp.tools import format_response, require_write_permission
+from tests.envelope import envelope
 
 
 def _vault(tmp_path, data: dict) -> str:
@@ -211,9 +212,9 @@ async def test_use_portal_tool_errors_in_single_portal_mode(tmp_path, monkeypatc
     monkeypatch.setenv("LM_PORTALS_FILE", vault)
     monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
 
-    text = (await portal_tools.use_portal("acme"))[0].text
-    assert text.startswith("Error:")
-    assert "LM_MULTI_PORTAL" in text
+    error = envelope(await portal_tools.use_portal("acme"))
+    assert error["code"] == "FEATURE_DISABLED"
+    assert "LM_MULTI_PORTAL" in error["message"]
 
 
 @pytest.mark.asyncio

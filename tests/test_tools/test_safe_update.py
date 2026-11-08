@@ -21,6 +21,7 @@ from lm_mcp.tools.workflows import (
     _diff,
     update_logicmodule,
 )
+from tests.envelope import envelope
 
 
 class TestDeepMerge:
@@ -376,7 +377,7 @@ class TestApplyPassesConfirm:
     """Regression: apply mode must satisfy the update tools' confirm guard.
 
     Every update_<type> tool requires confirm=True; without it the sub-tool
-    returns CONFIRMATION_REQUIRED, call_sub_tool raises, and apply mode can
+    returns INVALID_REQUEST, call_sub_tool raises, and apply mode can
     never apply. The handler-level mocks in the other tests cannot catch
     this, so assert on the forwarded kwargs explicitly.
     """
@@ -543,4 +544,6 @@ class TestRawUpdatesLeaveTheSurface:
             "update_datasource", {"datasource_id": 1, "definition": {}, "confirm": True}
         )
 
-        assert result[0].text == "Error: Unknown tool: update_datasource"
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["message"] == "Unknown tool: update_datasource"

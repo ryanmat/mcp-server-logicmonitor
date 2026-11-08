@@ -13,6 +13,7 @@ from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.session import get_session
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
 
 
 @pytest.fixture
@@ -336,12 +337,7 @@ class TestCompareToBaseline:
 
         result = await compare_to_baseline(client, baseline_name="nonexistent")
 
-        text = result[0].text
-        try:
-            data = json.loads(text)
-            assert data.get("error") is True
-        except json.JSONDecodeError:
-            assert is_error_result(result)
+        assert envelope(result)["code"] == "NOT_FOUND"
 
     @respx.mock
     async def test_inherits_ids_from_baseline(self, client):
@@ -525,7 +521,7 @@ class TestBaselineErrorEnvelopeShape:
 
     @respx.mock
     async def test_save_baseline_4xx_goes_through_handle_error(self, client):
-        """save_baseline 4xx now returns LMError envelope with HTTP_<status> code."""
+        """save_baseline 4xx returns the envelope handle_error builds (a 403 is AUTH_FAILED)."""
         from lm_mcp.tools.baselines import save_baseline
 
         respx.get(
@@ -546,10 +542,11 @@ class TestBaselineErrorEnvelopeShape:
             baseline_name="test",
         )
 
-        text = result[0].text
-        assert text.startswith("Error: Forbidden")
-        # handle_error attaches a Suggestion line for LMError responses.
-        assert "Suggestion:" in text
+        error = envelope(result)
+        assert error["code"] == "AUTH_FAILED"
+        assert error["message"].startswith("Forbidden")
+        # handle_error joins the exception's suggestion onto the message.
+        assert "Your API token may lack required permissions" in error["message"]
 
     @respx.mock
     async def test_compare_to_baseline_unexpected_exception_envelope(self, client):
@@ -588,12 +585,12 @@ class TestBaselineErrorEnvelopeShape:
 
         result = await compare_to_baseline(client, baseline_name="malformed")
 
-        # Either we get the (legitimate, empty-values) success path or we get
-        # the new structured envelope -- both must NOT be a naked
-        # "Error: <ClassName>" string the old code produced.
-        text = result[0].text
-        if text.startswith("Error:"):
-            assert "Suggestion:" in text or "code" in text.lower()
+        # Either we get the (legitimate, empty-values) success path or the
+        # error envelope; never unstructured text.
+        if is_error_result(result):
+            envelope(result)
+        else:
+            json.loads(result[0].text)
 
 
 class TestErrorMessageWithoutErrorCode:

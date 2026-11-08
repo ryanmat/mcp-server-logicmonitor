@@ -10,6 +10,7 @@ import respx
 from httpx import Response
 
 from lm_mcp.tools.ingestion import ingest_logs, push_metrics
+from tests.envelope import envelope
 
 
 class TestIngestLogs:
@@ -300,23 +301,30 @@ class TestIngestionValidationErrors:
     @pytest.mark.asyncio
     async def test_empty_logs_returns_structured_envelope(self, lmv1_client):
         result = await ingest_logs(lmv1_client, logs=[])
-        text = result[0].text
-        assert text.startswith("Error: logs list cannot be empty")
-        assert "Suggestion:" in text
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["message"] == (
+            "logs list cannot be empty. Pass at least one log entry with message + _lm.resourceId."
+        )
 
     @pytest.mark.asyncio
     async def test_empty_metrics_returns_structured_envelope(self, lmv1_client):
         result = await push_metrics(lmv1_client, metrics={})
-        text = result[0].text
-        assert text.startswith("Error: metrics payload cannot be empty")
-        assert "Suggestion:" in text
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["message"] == (
+            "metrics payload cannot be empty. "
+            "Provide resourceIds, dataSource, and instances at minimum."
+        )
 
     @pytest.mark.asyncio
     async def test_missing_resource_ids_returns_structured_envelope(self, lmv1_client):
         result = await push_metrics(lmv1_client, metrics={"dataSource": "X"})
-        text = result[0].text
-        assert "resourceIds is required" in text
-        assert "Suggestion:" in text
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["message"] == (
+            'metrics.resourceIds is required. Add resourceIds, e.g. {"system.hostname": "server1"}.'
+        )
 
     @pytest.mark.asyncio
     async def test_missing_data_source_returns_structured_envelope(self, lmv1_client):
@@ -324,9 +332,9 @@ class TestIngestionValidationErrors:
             lmv1_client,
             metrics={"resourceIds": {"system.hostname": "h"}},
         )
-        text = result[0].text
-        assert "dataSource is required" in text
-        assert "Suggestion:" in text
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["message"] == "metrics.dataSource is required. Add a dataSource name string."
 
 
 class TestIngestionToolRegistration:

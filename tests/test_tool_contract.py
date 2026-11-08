@@ -194,12 +194,15 @@ async def test_a_hidden_tool_called_by_name_is_refused(single_portal, caplog):
     import logging
 
     from lm_mcp.server import call_tool
+    from tests.envelope import envelope
 
     with caplog.at_level(logging.WARNING, logger="lm_mcp.audit"):
         result = await call_tool("acknowledge_alert", {"alert_id": "LMA1", "comment": "x"})
 
     assert result.isError is True
-    assert result.content[0].text.startswith("Error: Write operations are disabled")
+    error = envelope(result.content)
+    assert error["code"] == "WRITE_DISABLED"
+    assert error["message"].startswith("Write operations are disabled")
     assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
         "Write operation failed: acknowledge_alert args={'alert_id': 'LMA1', 'comment': 'x'}"
     ]
@@ -211,6 +214,7 @@ async def test_update_logicmodule_is_refused_with_writes_off(single_portal, rese
     from lm_mcp.auth.bearer import BearerAuth
     from lm_mcp.client import LogicMonitorClient
     from lm_mcp.server import _set_client, execute_tool
+    from tests.envelope import envelope
 
     _set_client(
         LogicMonitorClient(
@@ -224,7 +228,7 @@ async def test_update_logicmodule_is_refused_with_writes_off(single_portal, rese
         "update_logicmodule", {"type": "datasource", "id": 1, "changes": {"description": "x"}}
     )
 
-    assert result[0].text.startswith("Error: Write operations are disabled")
+    assert envelope(result)["message"].startswith("Write operations are disabled")
     assert respx.calls.call_count == 0
 
 

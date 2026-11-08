@@ -23,6 +23,7 @@ __all__ = [
     "SEVERITY_NAMES",
     "ErrorContent",
     "call_sub_tool",
+    "error_content",
     "format_response",
     "handle_error",
     "is_error_result",
@@ -376,8 +377,8 @@ async def resolve_group_filter(client: Any, group_id: int) -> str:
 class ErrorContent(TextContent):
     """TextContent that carries a tool error.
 
-    The text keeps the ``Error: ...`` form callers read; the type is what lets the
-    dispatcher recognize a failure without parsing the text.
+    The text is the JSON error envelope :func:`error_content` builds; the type is
+    what lets the dispatcher recognize a failure without parsing the text.
     """
 
     is_error: ClassVar[bool] = True
@@ -410,6 +411,49 @@ _LM_ERROR_CODES: dict[str, str] = {
     "CONFIG_ERROR": "FEATURE_DISABLED",
 }
 
+# Keys of a handler's error dict that the envelope reads; any other key is detail.
+_ERROR_DICT_KEYS = frozenset({"error", "code", "message", "suggestion", "details", "retry_after"})
+
+
+def _with_suggestion(message: str, suggestion: str | None) -> str:
+    """Join a remediation hint onto the message, so the message states the next step."""
+    if not suggestion:
+        return message
+    separator = " " if message.endswith((".", "!", "?")) else ". "
+    return f"{message}{separator}{suggestion}"
+
+
+def error_content(
+    code: str,
+    message: str,
+    *,
+    details: Mapping[str, Any] | None = None,
+    retry_after: int | None = None,
+) -> list[TextContent]:
+    """Build the one error envelope every tool failure returns.
+
+    Args:
+        code: One of :data:`ERROR_CODES`; any other code raises KeyError.
+        message: Human-readable failure; a fix or next step, when known, ends it.
+        details: Structured context, such as LogicMonitor's own code and words.
+        retry_after: Seconds the caller should wait before retrying, when known.
+
+    Returns:
+        List with a single ErrorContent whose text is the JSON envelope.
+    """
+    category, retryable = ERROR_CODES[code]
+    body = {
+        "error": {
+            "code": code,
+            "message": message,
+            "details": dict(details) if details else None,
+            "retry_after": retry_after,
+            "errorCategory": category,
+            "isRetryable": retryable,
+        }
+    }
+    return [ErrorContent(type="text", text=json.dumps(body, default=str))]
+
 
 def lm_error_code(error: LMError) -> str:
     """Map a client exception onto the documented code set."""
@@ -422,6 +466,33 @@ def lm_error_code(error: LMError) -> str:
     if error.code.startswith(("HTTP_", "API_ERROR")):
         return "INVALID_REQUEST"
     return "UPSTREAM_ERROR"
+
+
+def error_from_exception(error: Exception) -> list[TextContent]:
+    """Map an exception onto the error envelope without logging it.
+
+    :func:`handle_error` logs and then calls this; the dispatcher calls it
+    directly after logging with the tool's name.
+    """
+    if isinstance(error, LMError):
+        code = lm_error_code(error)
+        details: dict[str, Any] = {}
+        if code != error.code:
+            details["lm_code"] = error.code
+        if error.details:
+            details["lm_message"] = error.details
+        return error_content(
+            code,
+            _with_suggestion(error.message, error.suggestion),
+            details=details,
+            retry_after=getattr(error, "retry_after", None),
+        )
+    code = "TIMEOUT" if isinstance(error, httpx.TimeoutException) else "UPSTREAM_ERROR"
+    return error_content(
+        code,
+        str(error) or type(error).__name__,
+        details={"exception": type(error).__name__},
+    )
 
 
 def is_error_result(result: list) -> bool:
@@ -444,14 +515,19 @@ def format_response(data: Any) -> list[TextContent]:
 
     Returns:
         List containing a single TextContent with the formatted data; an
-        ErrorContent when the data is an error dict.
+        ErrorContent carrying the error envelope when the data is a handler's
+        error dict (``error``, ``code``, ``message``, optional ``suggestion``,
+        ``details`` and ``retry_after``; any other key goes into ``details``).
     """
     if isinstance(data, dict) and data.get("error"):
-        # Error response - format for readability
-        text = f"Error: {data['message']}"
-        if data.get("suggestion"):
-            text += f"\nSuggestion: {data['suggestion']}"
-        return [ErrorContent(type="text", text=text)]
+        details = dict(data.get("details") or {})
+        details.update({k: v for k, v in data.items() if k not in _ERROR_DICT_KEYS})
+        return error_content(
+            data["code"],
+            _with_suggestion(data["message"], data.get("suggestion")),
+            details=details,
+            retry_after=data.get("retry_after"),
+        )
 
     # Success response
     text = json.dumps(data, indent=2, default=str) if isinstance(data, (dict, list)) else str(data)
@@ -460,13 +536,13 @@ def format_response(data: Any) -> list[TextContent]:
 
 
 def handle_error(error: Exception) -> list[TextContent]:
-    """Convert exception to MCP response.
+    """Log an exception and convert it to the error envelope.
 
     Args:
         error: The exception to handle.
 
     Returns:
-        List containing a single ErrorContent with the error details.
+        List containing a single ErrorContent with the error envelope.
     """
     if isinstance(error, LMError):
         # An API refusal is a WARNING with the server's own words attached, so a
@@ -477,28 +553,21 @@ def handle_error(error: Exception) -> list[TextContent]:
             error.message,
             f" (details: {error.details})" if error.details else "",
         )
-        return format_response(error.to_dict())
+        return error_from_exception(error)
 
     # Log unexpected exceptions with stack trace before returning sanitized response.
     # Without this, JSONDecodeError, KeyError, ValueError, etc. are silently swallowed.
     logger.exception("unhandled error in tool handler")
-    return format_response(
-        {
-            "error": True,
-            "code": "UNEXPECTED_ERROR",
-            "message": str(error),
-        }
-    )
+    return error_from_exception(error)
 
 
 async def call_sub_tool(handler: Callable[..., Any], client: Any, **kwargs: Any) -> Any:
     """Call a sub-handler, parse JSON response, raise RuntimeError on error.
 
-    Handles both structured JSON responses and the human-readable error
-    format ``format_response`` produces for error dicts
-    ("Error: <message>\\nSuggestion: <suggestion>"). Converts either shape
-    into a clean RuntimeError for the composite caller instead of a
-    cryptic JSONDecodeError ("Expecting value: line 1 column 1 (char 0)").
+    Converts the error envelope into a clean RuntimeError carrying its message
+    for the composite caller, and non-JSON text into one naming the text,
+    instead of a cryptic JSONDecodeError ("Expecting value: line 1 column 1
+    (char 0)").
 
     Args:
         handler: Async tool function. Must accept ``client`` as first arg.
@@ -510,8 +579,7 @@ async def call_sub_tool(handler: Callable[..., Any], client: Any, **kwargs: Any)
         parsed structure is returned directly.
 
     Raises:
-        RuntimeError: When the sub-tool returns an error envelope, a
-            human-readable "Error: ..." line, or non-JSON text.
+        RuntimeError: When the sub-tool returns an error envelope or non-JSON text.
     """
     result = await handler(client, **kwargs)
     text = result[0].text
@@ -519,15 +587,13 @@ async def call_sub_tool(handler: Callable[..., Any], client: Any, **kwargs: Any)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        if text.startswith("Error:"):
-            first_line = text.split("\n", 1)[0]
-            message = first_line[len("Error:") :].strip() or "Sub-tool returned an error"
-            raise RuntimeError(message) from None
         snippet = text[:200]
         raise RuntimeError(f"Sub-tool returned non-JSON response: {snippet}") from None
 
     if isinstance(data, dict) and data.get("error"):
-        raise RuntimeError(data.get("message", "Sub-tool returned an error"))
+        error = data["error"]
+        message = error.get("message") if isinstance(error, dict) else None
+        raise RuntimeError(message or "Sub-tool returned an error")
     return data
 
 
@@ -539,25 +605,18 @@ def validation_error(
     """Return a canonical input-validation error response.
 
     Use for argument validation that fails before any API call. Produces
-    the same envelope shape as :func:`handle_error` so callers see a
-    consistent structure regardless of where the error originated.
+    the same envelope as :func:`handle_error` so callers see a consistent
+    structure regardless of where the error originated.
 
     Args:
         code: One of :data:`ERROR_CODES`, usually ``INVALID_REQUEST``.
         message: Human-readable description of the failure.
-        suggestion: Optional remediation hint shown to the caller.
+        suggestion: Optional remediation hint, joined onto the message.
 
     Returns:
-        List with a single TextContent carrying the formatted error envelope.
+        List with a single ErrorContent carrying the error envelope.
     """
-    payload: dict[str, Any] = {
-        "error": True,
-        "code": code,
-        "message": message,
-    }
-    if suggestion:
-        payload["suggestion"] = suggestion
-    return format_response(payload)
+    return error_content(code, _with_suggestion(message, suggestion))
 
 
 def strip_readonly(payload: dict, fields: tuple[str, ...]) -> dict:
@@ -572,13 +631,10 @@ def strip_readonly(payload: dict, fields: tuple[str, ...]) -> dict:
 
 def write_disabled_response() -> list[TextContent]:
     """The error a write tool returns while LM_ENABLE_WRITE_OPERATIONS is false."""
-    return format_response(
-        {
-            "error": True,
-            "code": "WRITE_DISABLED",
-            "message": "Write operations are disabled",
-            "suggestion": "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
-        }
+    return validation_error(
+        "WRITE_DISABLED",
+        "Write operations are disabled",
+        "Set LM_ENABLE_WRITE_OPERATIONS=true to enable write operations",
     )
 
 

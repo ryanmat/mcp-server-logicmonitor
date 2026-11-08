@@ -13,7 +13,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
-from lm_mcp.tools import call_sub_tool
+from lm_mcp.tools import call_sub_tool, validation_error
 from lm_mcp.tools.workflows import (
     _resolve_device,
     _trim_detail,
@@ -1182,27 +1182,19 @@ class TestCallSubTool:
         assert data == {"ok": True, "n": 42}
 
     async def test_error_formatted_text_raises_runtime_error(self, client):
-        """format_response renders errors as 'Error: ...' text, not JSON.
+        """A sub-tool's error envelope raises a clean RuntimeError with its message.
 
-        `call_sub_tool` must detect that shape and raise a clean
-        RuntimeError with the underlying message rather than leaking a
-        JSONDecodeError from json.loads.
+        `call_sub_tool` must not hand the composite the envelope as data.
         """
-        from mcp.types import TextContent
 
         async def handler(_client):
-            return [
-                TextContent(
-                    type="text",
-                    text="Error: collector 999 not found\nSuggestion: Verify the ID.",
-                )
-            ]
+            return validation_error("NOT_FOUND", "collector 999 not found", "Verify the ID.")
 
-        with pytest.raises(RuntimeError, match="collector 999 not found"):
+        with pytest.raises(RuntimeError, match=r"^collector 999 not found\. Verify the ID\.$"):
             await call_sub_tool(handler, client)
 
     async def test_non_json_non_error_text_raises_with_snippet(self, client):
-        """Truly unexpected text (neither JSON nor 'Error:') surfaces a snippet."""
+        """Text that is not JSON surfaces a snippet."""
         from mcp.types import TextContent
 
         async def handler(_client):
@@ -1212,14 +1204,14 @@ class TestCallSubTool:
             await call_sub_tool(handler, client)
 
     async def test_dict_with_error_field_raises(self, client):
-        """A parsed dict carrying {'error': True} still triggers RuntimeError."""
+        """A parsed error envelope triggers RuntimeError with its message."""
         from mcp.types import TextContent
 
         async def handler(_client):
             return [
                 TextContent(
                     type="text",
-                    text=json.dumps({"error": True, "code": "SOMETHING", "message": "nope"}),
+                    text=json.dumps({"error": {"code": "NOT_FOUND", "message": "nope"}}),
                 )
             ]
 
@@ -1487,12 +1479,7 @@ class TestDetectSiteOutage:
         async def selective_health(_client, collector_id, **_kwargs):
             # Collector 20 fails; 10 and 30 succeed.
             if collector_id == 20:
-                return [
-                    TextContent(
-                        type="text",
-                        text="Error: collector 20 not found\nSuggestion: Verify ID.",
-                    )
-                ]
+                return validation_error("NOT_FOUND", "collector 20 not found", "Verify ID.")
             return [
                 TextContent(
                     type="text",

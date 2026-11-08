@@ -8,6 +8,7 @@ import logging
 
 from lm_mcp.exceptions import AuthenticationError, LMError, NotFoundError
 from lm_mcp.tools import handle_error, is_error_result
+from tests.envelope import envelope
 
 
 class TestHandleError:
@@ -18,9 +19,7 @@ class TestHandleError:
         result = handle_error(error)
 
         assert len(result) == 1
-        text = result[0].text
-        assert text.startswith("Error: Boom")
-        assert "Suggestion: Try again" in text
+        assert envelope(result)["message"] == "Boom. Try again"
 
     def test_lmerror_subclass_preserves_message(self):
         error = NotFoundError("device 42 not found")
@@ -39,7 +38,7 @@ class TestHandleError:
         error = ValueError("not a string")
         result = handle_error(error)
 
-        assert result[0].text.startswith("Error: not a string")
+        assert envelope(result)["message"].startswith("not a string")
 
     def test_unexpected_error_logged_via_logger_exception(self, caplog):
         """JSONDecodeError, KeyError, ValueError etc. must leave a stack trace."""
