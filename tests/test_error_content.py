@@ -96,6 +96,7 @@ class TestExecuteToolInlineErrors:
 
         result = await execute_tool("no_such_tool", {})
         assert is_error_result(result)
+        assert result[0].text.startswith("Error: ")
 
     async def test_exception_path(self, single_portal, reset_portals):
         """No client bound: get_client raises and the dispatcher's except path answers."""

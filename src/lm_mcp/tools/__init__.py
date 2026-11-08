@@ -543,7 +543,7 @@ def validation_error(
     consistent structure regardless of where the error originated.
 
     Args:
-        code: UPPER_SNAKE_CASE machine-readable code, e.g. ``VALIDATION_ERROR``.
+        code: One of :data:`ERROR_CODES`, usually ``INVALID_REQUEST``.
         message: Human-readable description of the failure.
         suggestion: Optional remediation hint shown to the caller.
 
