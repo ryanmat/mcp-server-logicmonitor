@@ -3558,6 +3558,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -3644,6 +3649,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },
@@ -4218,6 +4228,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "required": [
@@ -4545,6 +4560,16 @@
       "properties": {
         "device_id": {
           "description": "Device ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 100,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },
@@ -5411,6 +5436,11 @@
           "description": "Max results",
           "type": "integer"
         },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        },
         "source_ip": {
           "description": "Filter by source IP",
           "type": "string"
@@ -6060,6 +6090,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -6141,6 +6176,11 @@
         "name_filter": {
           "description": "Filter by group name (substring match)",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -6165,6 +6205,11 @@
         "name_filter": {
           "description": "Filter by service name (substring match)",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -6274,6 +6319,11 @@
         "limit": {
           "default": 100,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },

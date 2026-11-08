@@ -8,16 +8,36 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
-    safe_total,
-    sanitize_filter_value,
+    list_tool,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+
+# Batch jobs whose name or description holds one of maintenance, downtime, backup or
+# scheduled; /setting/batchjobs matches ~ case-insensitively, | between values as OR and
+# || between clauses as OR.
+_DOWNTIME_JOB_CLAUSE = (
+    'name~"maintenance"|"downtime"|"backup"|"scheduled"'
+    '||description~"maintenance"|"downtime"|"backup"|"scheduled"'
+)
+
+
+def _batchjob_row(item: dict) -> dict:
+    """Project one /setting/batchjobs row onto the get_batchjobs fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "group": item.get("group"),
+        "schedule": item.get("schedule"),
+        "timeout": item.get("timeout"),
+        "status": item.get("status"),
+        "last_run": item.get("lastRunTime"),
+    }
 
 
 async def get_batchjobs(
@@ -25,6 +45,7 @@ async def get_batchjobs(
     name_filter: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List batch job monitors from LogicMonitor.
 
@@ -33,54 +54,20 @@ async def get_batchjobs(
         name_filter: Filter by job name (supports wildcards).
         status: Filter by status (active, inactive).
         limit: Maximum number of batch jobs to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with batch job data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        filters = []
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"name~{quote_filter_value(clean_name)}")
-        if status:
-            clean_status, was_modified = sanitize_filter_value(status)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"status:{quote_filter_value(clean_status)}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/batchjobs", params=params)
-
-        jobs = []
-        for item in result.get("items", []):
-            jobs.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "group": item.get("group"),
-                    "schedule": item.get("schedule"),
-                    "timeout": item.get("timeout"),
-                    "status": item.get("status"),
-                    "last_run": item.get("lastRunTime"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(jobs),
-            "batchjobs": jobs,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/batchjobs",
+        key="batchjobs",
+        project=_batchjob_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter, "status:": status},
+    )
 
 
 async def get_batchjob(
@@ -118,10 +105,24 @@ async def get_batchjob(
         return handle_error(e)
 
 
+def _device_batchjob_row(item: dict) -> dict:
+    """Project one BatchJob devicedatasources row onto the get_device_batchjobs fields."""
+    return {
+        "id": item.get("id"),
+        "datasource_id": item.get("dataSourceId"),
+        "name": item.get("dataSourceName"),
+        "display_name": item.get("dataSourceDisplayName"),
+        "instance_count": item.get("instanceNumber"),
+        "monitoring_instance_count": item.get("monitoringInstanceNumber"),
+        "stop_monitoring": item.get("stopMonitoring"),
+    }
+
+
 async def get_device_batchjobs(
     client: LogicMonitorClient,
     device_id: int,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List BatchJob datasources applied to a specific device.
 
@@ -133,93 +134,68 @@ async def get_device_batchjobs(
         client: LogicMonitor API client.
         device_id: Device ID.
         limit: Maximum number of batch job datasources to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with device batch job data or error.
     """
-    try:
-        params: dict = {"size": limit, "filter": 'dataSourceType:"BJ"'}
-        result = await client.get(f"/device/devices/{device_id}/devicedatasources", params=params)
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/devicedatasources",
+        key="batchjobs",
+        project=_device_batchjob_row,
+        limit=limit,
+        offset=offset,
+        clauses=['dataSourceType:"BJ"'],
+        extra={
+            "device_id": device_id,
+            "note": (
+                "Per-run output, exit codes, and timing are datapoints on the "
+                "BatchJob instance; use get_device_data with the id above as "
+                "device_datasource_id."
+            ),
+        },
+    )
 
-        jobs = []
-        for item in result.get("items", []):
-            jobs.append(
-                {
-                    "id": item.get("id"),
-                    "datasource_id": item.get("dataSourceId"),
-                    "name": item.get("dataSourceName"),
-                    "display_name": item.get("dataSourceDisplayName"),
-                    "instance_count": item.get("instanceNumber"),
-                    "monitoring_instance_count": item.get("monitoringInstanceNumber"),
-                    "stop_monitoring": item.get("stopMonitoring"),
-                }
-            )
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "total": safe_total(result),
-                "count": len(jobs),
-                "batchjobs": jobs,
-                "note": (
-                    "Per-run output, exit codes, and timing are datapoints on the "
-                    "BatchJob instance; use get_device_data with the id above as "
-                    "device_datasource_id."
-                ),
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+def _scheduled_job_row(item: dict) -> dict:
+    """Project one /setting/batchjobs row onto the get_scheduled_downtime_jobs fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "schedule": item.get("schedule"),
+        "timeout": item.get("timeout"),
+        "status": item.get("status"),
+    }
 
 
 async def get_scheduled_downtime_jobs(
     client: LogicMonitorClient,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """Get scheduled downtime (maintenance window) configurations.
 
     Note: This provides visibility into scheduled batch jobs that may affect
-    monitoring during maintenance windows.
+    monitoring during maintenance windows. The portal returns the batch jobs
+    whose name or description contains maintenance, downtime, backup or
+    scheduled, so limit and offset page through those jobs only.
 
     Args:
         client: LogicMonitor API client.
         limit: Maximum number of jobs to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with scheduled downtime data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        result = await client.get("/setting/batchjobs", params=params)
-
-        # Filter to jobs that appear to be maintenance/downtime related
-        jobs = []
-        for item in result.get("items", []):
-            name = item.get("name", "").lower()
-            desc = item.get("description", "").lower()
-
-            # Include if name or description suggests maintenance/downtime
-            if any(
-                keyword in name or keyword in desc
-                for keyword in ["maintenance", "downtime", "backup", "scheduled"]
-            ):
-                jobs.append(
-                    {
-                        "id": item.get("id"),
-                        "name": item.get("name"),
-                        "description": item.get("description"),
-                        "schedule": item.get("schedule"),
-                        "timeout": item.get("timeout"),
-                        "status": item.get("status"),
-                    }
-                )
-
-        return format_response(
-            {
-                "total": len(jobs),
-                "count": len(jobs),
-                "scheduled_jobs": jobs,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/batchjobs",
+        key="scheduled_jobs",
+        project=_scheduled_job_row,
+        limit=limit,
+        offset=offset,
+        clauses=[_DOWNTIME_JOB_CLAUSE],
+    )

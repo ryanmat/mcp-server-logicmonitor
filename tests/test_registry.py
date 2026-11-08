@@ -8,29 +8,20 @@ import pytest
 
 from lm_mcp.registry import TOOLS, get_tool_handler
 
-# List tool handlers that still format their own size or offset query, each mapped to
-# the plan step that moves it onto list_tool or removes it. The guard below fails on an
-# entry whose handler no longer exists or no longer formats its own query, so an entry
+# List tool handlers that format their own size or offset query, each mapped to the
+# plan step that moves it onto list_tool or removes it. The guard below fails on an
+# entry whose handler does not exist or does not format its own query, so an entry
 # leaves when its handler moves.
 _LIST_TOOL_PENDING: dict[str, int] = {
     "get_access_groups": 25,
     "get_alert_rules": 25,
-    "get_api_tokens": 25,
-    "get_batchjobs": 25,
     "get_cost_recommendations": 25,
     "get_dashboard_groups": 25,
-    "get_device_batchjobs": 25,
-    "get_device_interfaces": 25,
     "get_device_properties": 25,
     "get_idle_resources": 25,
     "get_netscans": 25,
-    "get_network_flows": 25,
     "get_oids": 25,
     "get_ops_notes": 25,
-    "get_scheduled_downtime_jobs": 25,
-    "get_service_groups": 25,
-    "get_services": 25,
-    "get_topology_map": 25,
     "get_trace_operations": 37,
     "get_trace_service_alerts": 37,
     "get_trace_service_datasources": 37,
@@ -303,6 +294,28 @@ class TestListToolGuard:
                 if param not in schemas[name]:
                     missing.append(f"{name} schema declares no {param}")
         assert not missing, missing
+
+    def test_list_tool_calls_forward_limit_and_offset(self):
+        """Each list_tool call passes the handler's own offset, and a limit read from its limit."""
+        unforwarded = []
+        for name, (_sig, tree) in _handler_sources().items():
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and (getattr(node.func, "id", None) or getattr(node.func, "attr", None))
+                    == "list_tool"
+                ):
+                    continue
+                keywords = {kw.arg: kw.value for kw in node.keywords}
+                offset = keywords.get("offset")
+                if not (isinstance(offset, ast.Name) and offset.id == "offset"):
+                    unforwarded.append(f"{name} offset")
+                limit = keywords.get("limit")
+                if limit is None or not any(
+                    isinstance(n, ast.Name) and n.id == "limit" for n in ast.walk(limit)
+                ):
+                    unforwarded.append(f"{name} limit")
+        assert not unforwarded, unforwarded
 
     def test_handlers_that_format_their_own_page_query_are_pending(self):
         unlisted = sorted(
