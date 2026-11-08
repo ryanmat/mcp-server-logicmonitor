@@ -8,22 +8,35 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _dashboard_group_row(item: dict) -> dict:
+    """Project one /dashboard/groups row onto the get_dashboard_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "parent_id": item.get("parentId"),
+        "full_path": item.get("fullPath"),
+        "num_of_dashboards": item.get("numOfDashboards"),
+        "num_of_direct_dashboards": item.get("numOfDirectDashboards"),
+        "num_of_direct_sub_groups": item.get("numOfDirectSubGroups"),
+    }
+
+
 async def get_dashboard_groups(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List dashboard groups from LogicMonitor.
 
@@ -31,46 +44,20 @@ async def get_dashboard_groups(
         client: LogicMonitor API client.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with dashboard group data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/dashboard/groups", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "parent_id": item.get("parentId"),
-                    "full_path": item.get("fullPath"),
-                    "num_of_dashboards": item.get("numOfDashboards"),
-                    "num_of_direct_dashboards": item.get("numOfDirectDashboards"),
-                    "num_of_direct_sub_groups": item.get("numOfDirectSubGroups"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "dashboard_groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/dashboard/groups",
+        key="dashboard_groups",
+        project=_dashboard_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 async def get_dashboard_group(

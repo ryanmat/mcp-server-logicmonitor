@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals below take the server from 306 tools to 268: 264 with one portal,
+Against 4.3.0, the removals below take the server from 306 tools to 267: 263 with one portal,
 plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in multi-portal mode.
-With writes off, the default, `tools/list` shows 163 of them, or 167 in multi-portal mode. Prompts
+With writes off, the default, `tools/list` shows 162 of them, or 166 in multi-portal mode. Prompts
 go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -66,6 +66,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `update_topologysource` | `update_logicmodule` with `type="topologysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 | `update_diagnosticsource` | `update_logicmodule` with `type="diagnosticsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 | `update_remediationsource` | `update_logicmodule` with `type="remediationsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `get_idle_resources` | `get_cost_recommendations`, with `category` set to one description from `get_cost_recommendation_categories`. The portal applied only the first category of the tool's OR filter, so it returned one category's rows, and it rejects `cloudProvider` as a filter field. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -184,7 +185,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - When the API reports a page with a negative total, its sign that more rows exist than it
   counted, a list tool leaves `total` out of the response rather than reporting that number as a
   lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
-  exact. This covers the 46 list tools on the shared pagination helper, `get_devices`,
+  exact. This covers the 54 list tools on the shared pagination helper, `get_devices`,
   `get_alerts` and `get_audit_logs` among them.
 - `get_device_groups`, `get_collector_groups`, `get_website_groups`, `get_dashboard_widgets`,
   `list_sdts`, `get_active_sdts`, `get_upcoming_sdts`, `get_roles`, `get_report_groups`,
@@ -192,9 +193,12 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `get_action_chains`, `get_action_rules`, `get_device_datasources`, `get_device_instances`,
   `get_device_eventsources`, `get_device_logsources`, `get_batchjobs`, `get_device_batchjobs`,
   `get_scheduled_downtime_jobs`, `get_topology_map`, `get_device_interfaces`, `get_network_flows`,
-  `get_services`, `get_service_groups` and `get_api_tokens` return `offset` and `has_more` beside
-  `count`, the envelope the shared pagination helper builds, and all but `get_collector_groups`,
-  `get_roles`, `get_action_chains` and `get_action_rules`, which had it, take an `offset` argument.
+  `get_services`, `get_service_groups`, `get_api_tokens`, `get_cost_recommendations`,
+  `get_device_properties`, `get_ops_notes`, `get_oids`, `get_netscans`, `get_dashboard_groups`,
+  `get_alert_rules` and `get_access_groups` return `offset` and `has_more` beside `count`, the
+  envelope the shared pagination helper builds, and all but `get_collector_groups`, `get_roles`,
+  `get_action_chains`, `get_action_rules` and `get_cost_recommendations`, which had it, take an
+  `offset` argument.
   `get_dashboard_widgets` and `get_device_interfaces` list their `limit` argument in their
   schemas.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,

@@ -13,7 +13,7 @@ the interpolated expression is a ``quote_filter_value(...)`` call or is listed i
 ``tests/fixtures/filter_interpolation_allowlist.txt`` as ``module.py: expression``.
 
 The allowlist holds the integer, boolean and constant-map interpolations that cannot
-carry a quote, and a value already built from ``quote_filter_value`` output. Run this
+carry a quote; a value already built from ``quote_filter_value`` output may go there too. Run this
 file directly to print the current hits in allowlist form.
 """
 

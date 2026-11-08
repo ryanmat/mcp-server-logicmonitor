@@ -8,21 +8,30 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
-    sanitize_filter_value,
+    list_tool,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _access_group_row(item: dict) -> dict:
+    """Project one /setting/accessgroup row onto the get_access_groups fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "tenant_id": item.get("tenantId"),
+    }
+
+
 async def get_access_groups(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List access groups from LogicMonitor.
 
@@ -30,42 +39,20 @@ async def get_access_groups(
         client: LogicMonitor API client.
         name_filter: Filter by group name (supports wildcards).
         limit: Maximum number of groups to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with access group data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/setting/accessgroup", params=params)
-
-        groups = []
-        for item in result.get("items", []):
-            groups.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "tenant_id": item.get("tenantId"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(groups),
-            "access_groups": groups,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/accessgroup",
+        key="access_groups",
+        project=_access_group_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 async def get_access_group(

@@ -8,22 +8,36 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _netscan_row(item: dict) -> dict:
+    """Project one /setting/netscans row onto the get_netscans fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "method": item.get("method"),
+        "collector_id": item.get("collectorId"),
+        "collector_group_id": item.get("collectorGroupId"),
+        "group_id": item.get("groupId"),
+        "next_start": item.get("nextStart"),
+        "schedule": item.get("schedule"),
+    }
+
+
 async def get_netscans(
     client: LogicMonitorClient,
     name_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List netscans from LogicMonitor.
 
@@ -31,47 +45,20 @@ async def get_netscans(
         client: LogicMonitor API client.
         name_filter: Filter by netscan name (supports wildcards).
         limit: Maximum number of netscans to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with netscan data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"name~{quote_filter_value(clean_name)}"
-
-        result = await client.get("/setting/netscans", params=params)
-
-        netscans = []
-        for item in result.get("items", []):
-            netscans.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "method": item.get("method"),
-                    "collector_id": item.get("collectorId"),
-                    "collector_group_id": item.get("collectorGroupId"),
-                    "group_id": item.get("groupId"),
-                    "next_start": item.get("nextStart"),
-                    "schedule": item.get("schedule"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(netscans),
-            "netscans": netscans,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/netscans",
+        key="netscans",
+        project=_netscan_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+    )
 
 
 async def get_netscan(

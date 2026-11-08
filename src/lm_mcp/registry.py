@@ -1283,6 +1283,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -2204,6 +2205,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -2463,6 +2465,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -2539,6 +2542,7 @@ TOOLS.extend(
                         "default": 100,
                         "description": "Max results",
                     },
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
                 "required": ["device_id"],
             },
@@ -2982,6 +2986,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -3024,6 +3029,7 @@ TOOLS.extend(
                 "properties": {
                     "oid_filter": {"type": "string", "description": "Filter by OID (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -3109,6 +3115,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -3449,24 +3456,6 @@ TOOLS.extend(
                         "default": 0,
                         "description": "Results to skip for pagination",
                     },
-                },
-            },
-        ),
-        Tool(
-            name="get_idle_resources",
-            description=(
-                "Get idle/underutilized cloud resources (resolved from idle-type "
-                "cost recommendation categories)"
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "provider": {
-                        "type": "string",
-                        "description": "Narrow to one cloud provider (aws, azure, gcp)",
-                    },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
         ),
@@ -6816,7 +6805,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_scheduled_downtime_jobs": batchjobs.get_scheduled_downtime_jobs,
         # Cost
         "get_cost_recommendations": cost.get_cost_recommendations,
-        "get_idle_resources": cost.get_idle_resources,
         "get_cost_recommendation_categories": cost.get_cost_recommendation_categories,
         "get_cost_recommendation": cost.get_cost_recommendation,
         # OTLP Metrics

@@ -99,7 +99,7 @@ For surgical control, combine with `LM_ENABLED_TOOLS`:
 }
 ```
 
-The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. With the env var unset, no category filter applies, and the server lists every tool its configuration enables, up to 268 tools.
+The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. With the env var unset, no category filter applies, and the server lists every tool its configuration enables, up to 267 tools.
 
 ### Claude Desktop
 

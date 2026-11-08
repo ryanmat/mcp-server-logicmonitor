@@ -245,7 +245,6 @@ TOOL_CATEGORIES = {
             "description": "Cloud cost analysis and optimization",
             "tools": [
                 "get_cost_recommendations",
-                "get_idle_resources",
                 "get_cost_recommendation_categories",
                 "get_cost_recommendation",
             ],
@@ -547,12 +546,6 @@ COMMON_QUERY_EXAMPLES = {
             "tool": "get_login_audit",
             "args": {"failed_only": True},
             "notes": "Use failed_only=True for security review.",
-        },
-        {
-            "description": "Get idle cloud resources",
-            "tool": "get_idle_resources",
-            "args": {"provider": "aws"},
-            "notes": "Narrow by cloud provider for targeted cost review.",
         },
         {
             "description": "Check device neighbors for topology context",
