@@ -1,9 +1,14 @@
 # Description: In-memory session state: user variables and recent tool call history.
-# Description: Held by the process alone and lost when it exits.
+# Description: One session per portal, held by the process alone and lost when it exits.
 
+import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+
+from lm_mcp.context import current_binding
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -153,17 +158,54 @@ class SessionContext:
         }
 
 
-# The process's one session context, used by both transports
-_session: SessionContext | None = None
+# The process's session contexts, one per portal name (spec R2.12). The key None is
+# the one session of single-portal mode, and in multi-portal mode the session of the
+# calls made before use_portal.
+_sessions: dict[str | None, SessionContext] = {}
+
+# History length for every session, set from LM_SESSION_HISTORY_SIZE at startup
+_history_size: int = SessionContext.max_history_size
+
+
+def set_history_size(size: int) -> None:
+    """Set the history length each session takes when it is created.
+
+    The transports call it at startup, before any tool call creates a session.
+    """
+    global _history_size
+    _history_size = size
 
 
 def get_session() -> SessionContext:
-    """Get the global session context, creating it if needed.
+    """Get the session of the running call's portal, creating it if needed.
+
+    In single-portal mode every caller shares one session, inside a tool call or not.
 
     Returns:
-        The global SessionContext instance
+        The SessionContext for the bound portal.
+
+    Raises:
+        RuntimeError: In multi-portal mode, outside a tool call.
     """
-    global _session
-    if _session is None:
-        _session = SessionContext()
-    return _session
+    key = _session_key()
+    session = _sessions.get(key)
+    if session is None:
+        session = _sessions[key] = SessionContext(max_history_size=_history_size)
+    return session
+
+
+def _session_key() -> str | None:
+    """The bound portal's name; outside a call, the single-portal key None."""
+    try:
+        return current_binding().portal
+    except RuntimeError:
+        multi = False
+        try:
+            from lm_mcp.config import get_config
+
+            multi = get_config().multi_portal
+        except Exception:
+            logger.debug("config unavailable; using the single-portal session", exc_info=True)
+        if multi:
+            raise
+        return None

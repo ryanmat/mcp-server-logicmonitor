@@ -267,10 +267,10 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
         if is_write_tool(name):
             log_write_operation(name, arguments, success=not failed)
 
-        # Record the result in session history. Portal tools are recorded too:
-        # a portal switch is the marker that scopes every entry around it. History
-        # is shown back to clients, so it holds the same redacted arguments the
-        # audit line shows.
+        # Record the result in the history of the call's portal. Portal tools are
+        # recorded too, in the history of the portal the call started on, so a
+        # portal's history shows when it was left. History is shown back to
+        # clients, so it holds the same redacted arguments the audit line shows.
         if name not in SESSION_TOOLS:
             session = get_session()
             recorded_arguments = redact_arguments(arguments)

@@ -21,7 +21,7 @@ from lm_mcp.tools.session import (
 @pytest.fixture(autouse=True)
 def fresh_session(monkeypatch):
     """Give each test a new session; the module's own comes back afterwards."""
-    monkeypatch.setattr(session_module, "_session", None)
+    monkeypatch.setattr(session_module, "_sessions", {})
 
 
 class TestGetSessionContext:

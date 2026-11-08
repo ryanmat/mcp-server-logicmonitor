@@ -2,12 +2,16 @@
 # Description: Covers variables, history, the module's session, and the names R1.6 removed.
 
 import dataclasses
+import json
 
 import pytest
+import respx
 
 from lm_mcp import session as session_module
 from lm_mcp.config import LMConfig
 from lm_mcp.session import HistoryEntry, SessionContext, get_session
+from tests.envelope import envelope
+from tests.portal_env import two_portal_vault
 
 
 class TestHistoryEntry:
@@ -136,7 +140,7 @@ class TestGlobalSession:
 
     def test_get_session_creates_if_missing(self, monkeypatch):
         """get_session creates a new session if none exists."""
-        monkeypatch.setattr(session_module, "_session", None)
+        monkeypatch.setattr(session_module, "_sessions", {})
 
         session = get_session()
 
@@ -145,7 +149,7 @@ class TestGlobalSession:
 
     def test_get_session_returns_same_instance(self, monkeypatch):
         """get_session returns the same instance on subsequent calls."""
-        monkeypatch.setattr(session_module, "_session", None)
+        monkeypatch.setattr(session_module, "_sessions", {})
 
         session1 = get_session()
         session2 = get_session()
@@ -243,3 +247,101 @@ class TestRemovedSessionNames:
         """LM_SESSION_ENABLED and LM_SESSION_PERSIST_PATH are not settings."""
         assert "session_history_size" in LMConfig.model_fields
         assert field not in LMConfig.model_fields
+
+
+@pytest.fixture
+def two_portals(tmp_path, monkeypatch, reset_portals):
+    """Multi-portal mode over a vault with a writable acme and a read-only globex."""
+    two_portal_vault(tmp_path, monkeypatch)
+
+
+class TestSessionKeyedByPortal:
+    """Session variables, baselines and history are kept per portal (spec R2.12)."""
+
+    @pytest.fixture(autouse=True)
+    def _fresh_sessions(self, monkeypatch):
+        monkeypatch.setattr(session_module, "_sessions", {})
+
+    @staticmethod
+    async def _call(tool: str, **arguments) -> list:
+        from lm_mcp.server import execute_tool
+
+        return await execute_tool(tool, arguments)
+
+    async def test_variable_set_under_one_portal_is_absent_under_another(self, two_portals):
+        from lm_mcp import portals
+
+        portals.activate("acme")
+        await self._call("set_session_variable", name="target", value="acme-web")
+        await self._call("use_portal", customer="globex")
+        under_globex = await self._call("get_session_variable", name="target")
+        await self._call("use_portal", customer="acme")
+        under_acme = await self._call("get_session_variable", name="target")
+
+        assert envelope(under_globex)["code"] == "NOT_FOUND"
+        assert json.loads(under_acme[0].text)["value"] == "acme-web"
+
+    @respx.mock
+    async def test_baseline_saved_under_one_portal_is_absent_under_another(self, two_portals):
+        from lm_mcp import portals
+
+        portals.activate("acme")
+        await self._call("set_session_variable", name="baseline_cpu", value={"datapoints": {}})
+        await self._call("use_portal", customer="globex")
+
+        error = envelope(await self._call("compare_to_baseline", baseline_name="cpu"))
+
+        assert error["code"] == "NOT_FOUND"
+        assert "Baseline 'cpu' not found" in error["message"]
+
+    async def test_history_is_per_portal(self, two_portals):
+        from lm_mcp import portals
+
+        portals.activate("acme")
+        await self._call("search_tools", query="device")
+        await self._call("use_portal", customer="globex")
+        globex = json.loads((await self._call("list_session_history"))[0].text)
+        await self._call("use_portal", customer="acme")
+        acme = json.loads((await self._call("list_session_history"))[0].text)
+
+        assert "search_tools" not in [entry["tool"] for entry in globex["history"]]
+        assert "search_tools" in [entry["tool"] for entry in acme["history"]]
+
+    async def test_clear_session_context_clears_one_portal(self, two_portals):
+        from lm_mcp import portals
+
+        portals.activate("acme")
+        await self._call("set_session_variable", name="kept", value=1)
+        await self._call("use_portal", customer="globex")
+        await self._call("set_session_variable", name="cleared", value=2)
+        await self._call("clear_session_context")
+        cleared = await self._call("get_session_variable", name="cleared")
+        await self._call("use_portal", customer="acme")
+        kept = await self._call("get_session_variable", name="kept")
+
+        assert envelope(cleared)["code"] == "NOT_FOUND"
+        assert json.loads(kept[0].text)["value"] == 1
+
+    async def test_single_portal_uses_one_implicit_key(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+
+        await self._call("set_session_variable", name="target", value=7)
+
+        assert list(session_module._sessions) == [None]
+        assert get_session().get_variable("target") == 7
+
+    def test_get_session_outside_a_call_raises_in_multi_portal(self, two_portals):
+        from lm_mcp import portals
+
+        portals.activate("acme")
+        with pytest.raises(RuntimeError, match="binding"):
+            get_session()
+
+    def test_session_created_after_takes_the_history_size(self, monkeypatch):
+        monkeypatch.setattr(session_module, "_history_size", session_module._history_size)
+
+        session_module.set_history_size(3)
+
+        assert get_session().max_history_size == 3

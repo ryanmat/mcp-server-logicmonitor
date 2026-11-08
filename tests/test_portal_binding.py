@@ -15,6 +15,7 @@ from mcp.types import TextContent
 
 from lm_mcp import portals
 from lm_mcp.tools import ErrorContent, format_response, require_write_permission
+from tests.portal_env import two_portal_vault
 
 ACME = "https://acme.example.com/santaba/rest"
 GLOBEX = "https://globex.example.com/santaba/rest"
@@ -22,21 +23,8 @@ GLOBEX = "https://globex.example.com/santaba/rest"
 
 @pytest.fixture
 def two_portals(tmp_path, monkeypatch, reset_portals):
-    """Multi-portal mode over a plaintext vault with a writable acme and a read-only globex."""
-    vault = tmp_path / "portals.json"
-    vault.write_text(
-        json.dumps(
-            {
-                "acme": {"portal": "acme.example.com", "bearer_token": "t1", "writable": True},
-                "globex": {"portal": "globex.example.com", "bearer_token": "t2"},
-            }
-        )
-    )
-    monkeypatch.setenv("LM_MULTI_PORTAL", "true")
-    monkeypatch.setenv("LM_PORTALS_FILE", str(vault))
-    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
-    monkeypatch.delenv("LM_PORTAL", raising=False)
-    monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+    """Multi-portal mode over a vault with a writable acme and a read-only globex."""
+    two_portal_vault(tmp_path, monkeypatch)
 
 
 def _device(device_id: int, name: str) -> httpx.Response:

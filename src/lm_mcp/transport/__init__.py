@@ -23,7 +23,7 @@ async def run_stdio() -> None:
     from lm_mcp.client import build_client
     from lm_mcp.config import get_config
     from lm_mcp.server import _set_client, server
-    from lm_mcp.session import get_session
+    from lm_mcp.session import set_history_size
 
     # Load config. In multi-portal mode client creation is deferred to use_portal.
     config = get_config()
@@ -46,7 +46,7 @@ async def run_stdio() -> None:
     backends = bootstrap.bootstrap_backends(config)
 
     # Initialize session with config settings
-    get_session().max_history_size = config.session_history_size
+    set_history_size(config.session_history_size)
 
     try:
         async with stdio_server() as (read_stream, write_stream):
