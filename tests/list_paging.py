@@ -1,6 +1,8 @@
 # Description: Shared assertions for list tools that page through list_tool.
 # Description: Offset declared in the schema and sent; a negative API total read as more rows.
 
+from __future__ import annotations
+
 import json
 from collections.abc import Awaitable, Callable
 from typing import Any
