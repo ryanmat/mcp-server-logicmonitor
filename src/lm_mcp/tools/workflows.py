@@ -1069,15 +1069,12 @@ _WORKFLOW_ALIASES: dict[str, list[str]] = {
     "root cause": ["diagnose"],
     "diagnos": ["diagnose"],
     "troubleshoot": ["diagnose"],
-    # Reference-layer aliases (map schema/filter/syntax lookups to get_reference,
-    # prompt/workflow lookups to get_workflow)
+    # Reference-layer aliases (map schema/filter/syntax lookups to get_reference)
     "schema": ["get_reference"],
     "filter": ["get_reference"],
     "syntax": ["get_reference"],
     "reference": ["get_reference"],
     "guide": ["get_reference"],
-    "workflow": ["get_workflow"],
-    "prompt": ["get_workflow"],
 }
 
 

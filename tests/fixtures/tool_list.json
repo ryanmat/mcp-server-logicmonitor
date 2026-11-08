@@ -6772,34 +6772,6 @@
       "type": "object"
     }
   },
-  "get_workflow": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, etc.). Mirrors MCP Prompt content for clients without Prompt support. Prefer the composite workflow tools (triage, diagnose, health_check, capacity_plan, portal_overview) when they exist -- those execute the procedure. Pass list=true to discover available workflows.",
-    "inputSchema": {
-      "properties": {
-        "arguments": {
-          "description": "Optional template arguments passed to the workflow text builder",
-          "type": "object"
-        },
-        "list": {
-          "default": false,
-          "description": "If true, return the list of available workflows with their arguments",
-          "type": "boolean"
-        },
-        "name": {
-          "description": "Workflow name (e.g., 'incident_triage')",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
   "health_check": {
     "annotations": {
       "destructiveHint": false,

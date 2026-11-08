@@ -23,10 +23,8 @@ TOOL_CATEGORIES = {
             ],
         },
         "universal_reference": {
-            "description": (
-                "Resource/Prompt mirrors exposed as Tools for clients without those primitives"
-            ),
-            "tools": ["get_reference", "get_workflow"],
+            "description": "Resource mirror exposed as a Tool for clients without that primitive",
+            "tools": ["get_reference"],
         },
         "discovery": {
             "description": "Tool search and discovery",

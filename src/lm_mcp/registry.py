@@ -6368,39 +6368,6 @@ TOOLS.extend(
                 },
             },
         ),
-        Tool(
-            name="get_workflow",
-            description=(
-                "Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, "
-                "etc.). Mirrors MCP Prompt content for clients without "
-                "Prompt support. Prefer the composite workflow tools (triage, diagnose, "
-                "health_check, capacity_plan, portal_overview) when they exist -- those "
-                "execute the procedure. Pass list=true to discover available workflows."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Workflow name (e.g., 'incident_triage')",
-                    },
-                    "list": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": (
-                            "If true, return the list of available workflows with their arguments"
-                        ),
-                    },
-                    "arguments": {
-                        "type": "object",
-                        "description": (
-                            "Optional template arguments passed to the workflow text builder"
-                        ),
-                    },
-                },
-            },
-        ),
     ]
 )
 
@@ -7190,9 +7157,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_logicmodule": workflows.update_logicmodule,
         "detect_site_outage": workflows.detect_site_outage,
         "audit_network_monitoring_coverage": workflows.audit_network_monitoring_coverage,
-        # Universal reference layer (Resource/Prompt mirrors for non-Claude clients)
+        # Universal reference layer (Resource mirror for clients without Resource support)
         "get_reference": reference.get_reference,
-        "get_workflow": reference.get_workflow,
         # Terraform IaC
         "terraform_generate": terraform.terraform_generate,
     }

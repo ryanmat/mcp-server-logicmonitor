@@ -297,15 +297,6 @@ class TestMultiPortalDispatch:
         assert "No portal selected" not in result[0].text
 
     @pytest.mark.asyncio
-    async def test_get_workflow_works_before_use_portal(self, monkeypatch, tmp_path, reset_portals):
-        self._multi_env(monkeypatch, tmp_path)
-
-        from lm_mcp.server import execute_tool
-
-        result = await execute_tool("get_workflow", {"list": True})
-        assert "No portal selected" not in result[0].text
-
-    @pytest.mark.asyncio
     async def test_use_portal_recorded_in_session_history(
         self, monkeypatch, tmp_path, reset_portals
     ):

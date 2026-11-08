@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 277 tools the LogicMonitor MCP server can advertise. The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 276 tools the LogicMonitor MCP server can advertise. The **Write** column shows whether a tool requires `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -25,12 +25,11 @@ Composite workflow tools -- recommended starting point
 
 ## Universal Reference
 
-Resource/Prompt mirrors exposed as Tools for clients without those primitives
+Resource mirror exposed as a Tool for clients without that primitive
 
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_reference` | Get LogicMonitor reference content (schemas, enums, filter syntax, guides). Mirrors content from MCP Resources for clients without full Resource support (Copilot cloud agent, OpenAI Codex, Cline). Categories: schema, enums, filters, syntax, guide. Pass list=true (or omit both category and name) to discover all available (category, name) pairs. | No |
-| `get_workflow` | Get LogicMonitor workflow guidance text (incident_triage, rca_workflow, etc.). Mirrors MCP Prompt content for clients without Prompt support. Prefer the composite workflow tools (triage, diagnose, health_check, capacity_plan, portal_overview) when they exist -- those execute the procedure. Pass list=true to discover available workflows. | No |
 
 ## Discovery
 

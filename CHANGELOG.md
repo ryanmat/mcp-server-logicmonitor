@@ -41,6 +41,7 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 | `terraform_state_list` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_state_show` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_write_config` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `get_workflow` | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -103,6 +104,12 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   preflight gets no CORS headers, and with `LM_HTTP_AUTH_TOKEN` set it gets `401`.
 - `LM_API_VERSION`, which the server ignores if set, and the client's `api_version` argument. The
   client sends `X-Version: 3` to the REST API; ingestion requests carry no version header.
+- Eleven workflow prompts: `health_check`, `alert_summary`, `sdt_planning`, `cost_optimization`,
+  `audit_review`, `alert_correlation`, `collector_health`, `troubleshoot_device`, `top_talkers`,
+  `rca_workflow` and `capacity_forecast`. `incident_triage`, `capacity_review` and `remediation`
+  remain. The `get_workflow` tool, which returned prompt text to clients without prompt support,
+  leaves with them, and the `universal_reference` category in `lm://guide/tool-categories` now
+  lists only `get_reference`.
 
 ### Changed
 

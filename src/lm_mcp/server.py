@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes up to 277 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes up to 276 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
     "`category`) first instead of enumerating the full list. Composite workflow tools -- "
     "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
@@ -161,7 +161,6 @@ PORTAL_TOOLS = {
 CLIENT_OPTIONAL_TOOLS = {
     "search_tools",
     "get_reference",
-    "get_workflow",
 }
 
 
@@ -328,8 +327,8 @@ async def read_resource(uri) -> str:
 async def list_prompts():
     """Return all available LogicMonitor workflow prompts.
 
-    Prompts provide pre-built templates for common monitoring operations
-    like incident triage, capacity review, and health checks.
+    Prompts provide pre-built templates for incident triage, capacity review
+    and remediation.
     """
     return PROMPTS
 
@@ -339,7 +338,7 @@ async def get_prompt(name: str, arguments: dict | None = None) -> GetPromptResul
     """Get the messages for a LogicMonitor workflow prompt.
 
     Args:
-        name: Prompt name (e.g., 'incident_triage', 'health_check').
+        name: Prompt name (e.g., 'incident_triage', 'remediation').
         arguments: Optional prompt arguments.
 
     Returns:
