@@ -434,7 +434,7 @@ def error_content(
 
     Args:
         code: One of :data:`ERROR_CODES`; any other code raises KeyError.
-        message: Human-readable failure, ending in the fix or next step.
+        message: Human-readable failure; a fix or next step, when known, ends it.
         details: Structured context, such as LogicMonitor's own code and words.
         retry_after: Seconds the caller should wait before retrying, when known.
 
