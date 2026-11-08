@@ -170,8 +170,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
   exact. This covers the 20 list tools on the shared pagination helper, `get_devices`,
   `get_alerts` and `get_audit_logs` among them.
-- `get_device_groups` and `get_collector_groups` return `offset` and `has_more` beside `count`, as
-  the other list tools do, and `get_device_groups` takes an `offset` argument.
+- `get_device_groups` and `get_collector_groups` return `offset` and `has_more` beside `count`, the
+  envelope the shared pagination helper builds, and `get_device_groups` takes an `offset` argument.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
