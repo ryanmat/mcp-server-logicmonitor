@@ -211,11 +211,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `errorCategory` is `transient`, `validation`, `business` or `permission`, and `isRetryable` is
   true only for a transient error. When the API refused a call, `details.lm_code` keeps the
   client's own code (`HTTP_400`, `API_ERROR_1007`, `PERMISSION_DENIED`) wherever it differs from
-  `code`, and `details.lm_message` the server's own words where the message rewrote them; a 429
+  `code`, and `details.lm_message` the server's own words where the client translated them; a 429
   carries its `Retry-After` header, in seconds, as `retry_after`. A tool turned off by `LM_ENABLED_TOOLS`, `LM_DISABLED_TOOLS`,
   `LM_MCP_CATEGORIES` or single-portal mode answers `FEATURE_DISABLED`, an unknown tool name
-  `INVALID_REQUEST`, and an exception no handler expected `UPSTREAM_ERROR` with its class name in
-  `details.exception`.
+  `INVALID_REQUEST`, and an exception no handler expected `UPSTREAM_ERROR` (`TIMEOUT` for a raw
+  timeout) with its class name in `details.exception`.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other

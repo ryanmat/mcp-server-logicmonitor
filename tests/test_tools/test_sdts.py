@@ -223,6 +223,35 @@ class TestCreateSdt:
         assert error["details"] == {"lm_code": "API_ERROR_1400"}
 
     @respx.mock
+    async def test_create_sdt_body_error_code_alone_names_it_as_the_client_does(
+        self, client, monkeypatch
+    ):
+        """A 200 body with errorCode alone reports it in the client's API_ERROR_<n> form."""
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+        from importlib import reload
+
+        import lm_mcp.config
+
+        reload(lm_mcp.config)
+
+        from lm_mcp.tools.sdts import create_sdt
+
+        respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
+            return_value=httpx.Response(200, json={"errorCode": 1400})
+        )
+
+        result = await create_sdt(
+            client, sdt_type="InvalidType", device_id=123, duration_minutes=60
+        )
+
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert error["details"] == {"lm_code": "API_ERROR_1400"}
+
+    @respx.mock
     async def test_create_sdt_body_error_without_code_has_no_lm_code(self, client, monkeypatch):
         """A 200 body with errorMessage alone is refused with no lm_code to report."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")

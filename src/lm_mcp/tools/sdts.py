@@ -155,7 +155,9 @@ async def create_sdt(
                     "message": error_msg,
                     "suggestion": suggestion,
                     "details": (
-                        {"lm_code": result["errorCode"]} if "errorCode" in result else None
+                        {"lm_code": f"API_ERROR_{result['errorCode']}"}
+                        if "errorCode" in result
+                        else None
                     ),
                 }
             )
