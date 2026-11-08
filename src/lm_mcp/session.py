@@ -168,11 +168,12 @@ _history_size: int = SessionContext.max_history_size
 
 
 def set_history_size(size: int) -> None:
-    """Set the history length of every session, those that exist and those to come."""
+    """Set the history length each session takes when it is created.
+
+    The transports call it at startup, before any tool call creates a session.
+    """
     global _history_size
     _history_size = size
-    for session in _sessions.values():
-        session.max_history_size = size
 
 
 def get_session() -> SessionContext:

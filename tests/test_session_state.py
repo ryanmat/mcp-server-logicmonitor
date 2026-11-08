@@ -339,7 +339,7 @@ class TestSessionKeyedByPortal:
         with pytest.raises(RuntimeError, match="binding"):
             get_session()
 
-    def test_history_size_applies_to_every_portal_session(self, monkeypatch):
+    def test_session_created_after_takes_the_history_size(self, monkeypatch):
         monkeypatch.setattr(session_module, "_history_size", session_module._history_size)
 
         session_module.set_history_size(3)
