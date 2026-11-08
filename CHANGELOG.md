@@ -165,6 +165,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `reload_portals` change only server-side state and stay listed. The Write column of
   `documentation/tools.md` follows the same annotations, so `delete_session_variable`,
   `use_portal` and `reload_portals` read No.
+- When the API reports a page with a negative total, its sign that more rows exist than it
+  counted, a list tool leaves `total` out of the response rather than reporting that number as a
+  lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
+  exact. This covers the 18 list tools on the shared pagination helper, `get_devices`,
+  `get_alerts` and `get_audit_logs` among them.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other

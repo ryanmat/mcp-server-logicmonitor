@@ -199,7 +199,7 @@ class TestGetDevices:
 
     @respx.mock
     async def test_get_devices_negative_total_sanitized(self, client):
-        """get_devices converts negative API total to positive."""
+        """get_devices reads a negative API total as more results, never as a count."""
         from lm_mcp.tools.devices import get_devices
 
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
@@ -221,7 +221,8 @@ class TestGetDevices:
 
         result = await get_devices(client, limit=50)
         data = json.loads(result[0].text)
-        assert data["total"] == 51
+        assert "total" not in data
+        assert data["has_more"] is True
 
     @respx.mock
     async def test_get_devices_combined_filters(self, client):

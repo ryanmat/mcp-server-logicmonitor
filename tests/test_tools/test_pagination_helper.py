@@ -1,5 +1,5 @@
 # Description: Tests for the shared list pagination response helper and its call sites.
-# Description: A negative API total (a lower bound) must read as more results, with a note.
+# Description: A negative API total (a lower bound) gets a note and means more if the page has rows.
 
 import json
 
@@ -24,7 +24,7 @@ def client():
 
 
 class TestPaginatedResponse:
-    """R4.2: paginated_response builds total, count, offset and has_more."""
+    """R4.2, R2.5: paginated_response builds count, offset, has_more, and total when it is >= 0."""
 
     def test_positive_total_with_more_pages(self):
         from lm_mcp.tools import paginated_response
@@ -48,24 +48,35 @@ class TestPaginatedResponse:
         assert response == {"total": 0, "count": 0, "offset": 0, "has_more": False}
 
     @pytest.mark.parametrize(
-        ("api_total", "offset", "expected_total"),
+        ("api_total", "offset"),
         [
             # The portal's form: -(offset + size + 1) when rows exist past the page.
-            (-16, 10, 16),
+            (-16, 10),
             # Any negative total is a lower bound, whatever its magnitude.
-            (-1, 0, 1),
+            (-1, 0),
         ],
     )
-    def test_negative_total_means_more_and_carries_a_note(self, api_total, offset, expected_total):
+    def test_negative_total_means_more_and_carries_a_note(self, api_total, offset):
+        """R2.5: a negative total is no count, so the response carries no total."""
         from lm_mcp.tools import paginated_response
 
         response = paginated_response([{}] * 5, {"total": api_total}, offset=offset)
 
-        assert response["total"] == expected_total
+        assert "total" not in response
         assert response["count"] == 5
         assert response["offset"] == offset
         assert response["has_more"] is True
         assert "exact count" in response["total_note"]
+
+    @pytest.mark.parametrize("api_total", [-16, 10])
+    def test_empty_page_past_the_end_has_no_more(self, api_total):
+        """R2.5: an empty page past the end ends the list, under a negative total too."""
+        from lm_mcp.tools import paginated_response
+
+        response = paginated_response([], {"total": api_total}, offset=50)
+
+        assert response["count"] == 0
+        assert response["has_more"] is False
 
 
 # (module, function, endpoint path, extra required arguments)
@@ -121,6 +132,6 @@ async def test_list_tool_reports_more_on_negative_total(client, module, function
 
     data = json.loads(result[0].text)
     assert data["count"] == 1000
-    assert data["total"] == 1001
+    assert "total" not in data
     assert data["has_more"] is True
     assert "exact count" in data["total_note"]
