@@ -24,7 +24,7 @@ def client():
 
 
 class TestPaginatedResponse:
-    """R4.2, R2.5: paginated_response builds count, offset, has_more and a non-negative total."""
+    """R4.2, R2.5: paginated_response builds count, offset, has_more, and total when it is >= 0."""
 
     def test_positive_total_with_more_pages(self):
         from lm_mcp.tools import paginated_response

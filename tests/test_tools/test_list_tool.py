@@ -1,4 +1,4 @@
-# Description: Tests for list_tool, the one helper every LogicMonitor list tool pages through.
+# Description: Tests for list_tool, the shared helper that builds a list tool's query and response.
 # Description: Covers the query it builds, the projection callback, totals and errors.
 
 import json
