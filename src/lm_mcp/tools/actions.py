@@ -124,7 +124,7 @@ async def create_action_chain(
     """
     stage_error = _validate_stages(stages)
     if stage_error:
-        return format_response({"error": True, "code": "VALIDATION_ERROR", "message": stage_error})
+        return format_response({"error": True, "code": "INVALID_REQUEST", "message": stage_error})
     try:
         payload: dict = {"name": name, "stages": stages}
         if description is not None:
@@ -171,7 +171,7 @@ async def update_action_chain(
         stage_error = _validate_stages(stages)
         if stage_error:
             return format_response(
-                {"error": True, "code": "VALIDATION_ERROR", "message": stage_error}
+                {"error": True, "code": "INVALID_REQUEST", "message": stage_error}
             )
         body["stages"] = stages
     if description is not None:
@@ -181,7 +181,7 @@ async def update_action_chain(
         return format_response(
             {
                 "error": True,
-                "code": "NO_CHANGES",
+                "code": "INVALID_REQUEST",
                 "message": "Provide at least one of name, stages, or description.",
             }
         )
@@ -451,7 +451,7 @@ async def update_action_rule(
         return format_response(
             {
                 "error": True,
-                "code": "NO_CHANGES",
+                "code": "INVALID_REQUEST",
                 "message": "Provide at least one field to update.",
             }
         )

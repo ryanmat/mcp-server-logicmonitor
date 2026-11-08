@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -237,7 +238,7 @@ class TestGetEscalationChain:
 
         result = await get_escalation_chain(client, chain_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetRecipientGroups:
@@ -346,7 +347,7 @@ class TestGetRecipientGroup:
 
         result = await get_recipient_group(client, group_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_get_recipient_groups_falls_back_to_name_key(self, client):

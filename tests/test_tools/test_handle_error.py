@@ -7,7 +7,7 @@ import json
 import logging
 
 from lm_mcp.exceptions import AuthenticationError, LMError, NotFoundError
-from lm_mcp.tools import handle_error
+from lm_mcp.tools import handle_error, is_error_result
 
 
 class TestHandleError:
@@ -27,7 +27,7 @@ class TestHandleError:
         result = handle_error(error)
 
         assert "device 42" in result[0].text
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
 
     def test_authentication_error_propagates(self):
         error = AuthenticationError("token expired")

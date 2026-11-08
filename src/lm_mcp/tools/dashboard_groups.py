@@ -194,7 +194,7 @@ async def update_dashboard_group(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )

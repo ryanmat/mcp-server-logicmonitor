@@ -252,7 +252,7 @@ async def terraform_generate(
             return format_response(
                 {
                     "error": True,
-                    "code": "UNSUPPORTED_RESOURCE_TYPE",
+                    "code": "INVALID_REQUEST",
                     "message": f"Unsupported resource type: '{resource_type}'",
                     "supported_types": supported,
                 }
@@ -266,7 +266,7 @@ async def terraform_generate(
             return format_response(
                 {
                     "error": True,
-                    "code": "RESOURCE_NOT_FOUND",
+                    "code": "NOT_FOUND",
                     "message": f"{resource_type} with ID {resource_id} not found",
                 }
             )

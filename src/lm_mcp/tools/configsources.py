@@ -169,7 +169,7 @@ async def update_configsource(
         configsource_id: ConfigSource ID to update.
         definition: Full ConfigSource definition dict with all fields.
         confirm: Must be True to proceed; update_logicmodule always passes it.
-            Without it the call returns CONFIRMATION_REQUIRED and writes nothing.
+            Without it the call returns INVALID_REQUEST and writes nothing.
 
     Returns:
         List of TextContent with updated ConfigSource info or error.
@@ -178,7 +178,7 @@ async def update_configsource(
         return format_response(
             {
                 "error": True,
-                "code": "CONFIRMATION_REQUIRED",
+                "code": "INVALID_REQUEST",
                 "message": (
                     "update_configsource is full-replace -- any field omitted from "
                     "`definition` will be BLANKED. Set confirm=true to proceed, OR "

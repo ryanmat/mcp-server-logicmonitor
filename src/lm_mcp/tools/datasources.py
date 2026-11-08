@@ -225,7 +225,7 @@ async def update_datasource(
         datasource_id: DataSource ID to update.
         definition: Full DataSource definition dict with all fields.
         confirm: Must be True to proceed; update_logicmodule always passes it.
-            Without it the call returns CONFIRMATION_REQUIRED and writes nothing.
+            Without it the call returns INVALID_REQUEST and writes nothing.
 
     Returns:
         List of TextContent with updated DataSource info or error.
@@ -234,7 +234,7 @@ async def update_datasource(
         return format_response(
             {
                 "error": True,
-                "code": "CONFIRMATION_REQUIRED",
+                "code": "INVALID_REQUEST",
                 "message": (
                     "update_datasource is full-replace -- any field omitted from "
                     "`definition` will be BLANKED. Set confirm=true to proceed, OR "

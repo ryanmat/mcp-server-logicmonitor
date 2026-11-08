@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -248,7 +249,7 @@ class TestCreateUser:
             last_name="User",
             roles=[1],
         )
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "disabled" in result[0].text.lower()
 
     @respx.mock
@@ -313,7 +314,7 @@ class TestCreateUser:
             last_name="User",
             roles=[1],
         )
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestUpdateUser:
@@ -328,7 +329,7 @@ class TestUpdateUser:
         from lm_mcp.tools.users import update_user
 
         result = await update_user(client, user_id=1, email="updated@example.com")
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_update_user_no_changes(self, client, monkeypatch):
@@ -378,7 +379,7 @@ class TestDeleteUser:
         from lm_mcp.tools.users import delete_user
 
         result = await delete_user(client, user_id=1)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_delete_user_success(self, client, monkeypatch):
@@ -413,4 +414,4 @@ class TestDeleteUser:
         )
 
         result = await delete_user(client, user_id=999)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)

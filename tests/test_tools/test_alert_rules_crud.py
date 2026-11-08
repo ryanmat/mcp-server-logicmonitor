@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -52,7 +53,7 @@ class TestCreateAlertRule:
             escalation_chain_id=1,
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -89,7 +90,7 @@ class TestCreateAlertRule:
             escalation_chain_id=1,
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["rule_id"] == 50
@@ -219,7 +220,7 @@ class TestUpdateAlertRule:
             name="Updated Rule",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -254,7 +255,7 @@ class TestUpdateAlertRule:
             name="Updated Rule",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -351,7 +352,7 @@ class TestDeleteAlertRule:
 
         result = await delete_alert_rule(client, rule_id=50)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -375,7 +376,7 @@ class TestDeleteAlertRule:
 
         result = await delete_alert_rule(client, rule_id=50)
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 

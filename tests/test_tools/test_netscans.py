@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -95,7 +96,7 @@ class TestRunNetscan:
         monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
 
         result = await run_netscan(client, netscan_id=1)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_run_netscan_succeeds_when_enabled(self, client, monkeypatch):

@@ -666,6 +666,7 @@ async def correlate_metrics(
             return format_response(
                 {
                     "error": True,
+                    "code": "INVALID_REQUEST",
                     "message": "Maximum 10 sources allowed for correlation.",
                     "suggestion": "Reduce the number of sources to 10 or fewer.",
                 }
@@ -675,6 +676,7 @@ async def correlate_metrics(
             return format_response(
                 {
                     "error": True,
+                    "code": "INVALID_REQUEST",
                     "message": "At least 2 sources required for correlation.",
                 }
             )
@@ -719,6 +721,7 @@ async def correlate_metrics(
             return format_response(
                 {
                     "error": True,
+                    "code": "INVALID_REQUEST",
                     "message": "Insufficient overlapping data for correlation.",
                     "suggestion": "Ensure sources have at least 2 data points in the time window.",
                 }

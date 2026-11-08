@@ -247,7 +247,7 @@ class TestPortalToolGating:
 
         for name, args in (("use_portal", {"customer": "x"}), ("list_portals", {})):
             result = await execute_tool(name, args)
-            assert result[0].text.startswith("Error:")
+            assert is_error_result(result)
             assert "multi-portal" in result[0].text
 
 
@@ -518,7 +518,6 @@ class TestWriteOutcomeFromResult:
             result = await execute_tool("delete_no_such_resource", {"id": 7})
 
         assert is_error_result(result)
-        assert result[0].text.startswith("Error: ")
         assert _audit_lines(caplog) == [
             (logging.WARNING, "Write operation failed: delete_no_such_resource args={'id': 7}")
         ]

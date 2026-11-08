@@ -7,7 +7,7 @@ from __future__ import annotations
 from mcp.types import TextContent
 
 from lm_mcp import portals
-from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools import format_response, handle_error, validation_error
 
 
 async def list_portals() -> list[TextContent]:
@@ -23,8 +23,10 @@ async def use_portal(customer: str) -> list[TextContent]:
     """Switch the active customer portal for subsequent tool calls."""
     try:
         return format_response(portals.activate(customer))
-    except (ValueError, RuntimeError) as e:
-        return format_response({"error": True, "message": str(e)})
+    except ValueError as e:
+        return validation_error("INVALID_REQUEST", str(e))
+    except RuntimeError as e:
+        return validation_error("FEATURE_DISABLED", str(e))
     except Exception as e:
         return handle_error(e)
 
@@ -42,6 +44,6 @@ async def reload_portals() -> list[TextContent]:
     try:
         return format_response(await portals.reload())
     except (ValueError, RuntimeError) as e:
-        return format_response({"error": True, "message": str(e)})
+        return validation_error("FEATURE_DISABLED", str(e))
     except Exception as e:
         return handle_error(e)

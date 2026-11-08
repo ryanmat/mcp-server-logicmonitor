@@ -383,7 +383,7 @@ async def update_collector(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )
@@ -432,7 +432,7 @@ async def delete_collector(
             return format_response(
                 {
                     "error": True,
-                    "code": "COLLECTOR_HAS_DEVICES",
+                    "code": "REJECTED_BY_TOOL",
                     "message": f"Collector '{hostname}' has {device_count} devices assigned. "
                     "Move or delete devices before removing the collector.",
                     "collector_id": collector_id,
@@ -548,7 +548,7 @@ async def update_collector_group(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )
@@ -591,7 +591,7 @@ async def delete_collector_group(
             return format_response(
                 {
                     "error": True,
-                    "code": "GROUP_HAS_COLLECTORS",
+                    "code": "REJECTED_BY_TOOL",
                     "message": (
                         f"Collector group '{group_name}' has {collector_count} "
                         "collectors assigned. Move collectors before deleting the group."

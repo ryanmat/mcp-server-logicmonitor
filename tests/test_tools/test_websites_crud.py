@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -52,7 +53,7 @@ class TestCreateWebsite:
             domain="www.example.com",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -90,7 +91,7 @@ class TestCreateWebsite:
             domain="www.example.com",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["website_id"] == 100
@@ -158,7 +159,7 @@ class TestUpdateWebsite:
             name="Updated Website",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -194,7 +195,7 @@ class TestUpdateWebsite:
             name="Updated Website",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -253,7 +254,7 @@ class TestDeleteWebsite:
 
         result = await delete_website(client, website_id=100)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -277,7 +278,7 @@ class TestDeleteWebsite:
 
         result = await delete_website(client, website_id=100)
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -302,7 +303,7 @@ class TestCreateWebsiteGroup:
 
         result = await create_website_group(client, name="Test Group")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -333,7 +334,7 @@ class TestCreateWebsiteGroup:
             parent_id=1,
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["group_id"] == 10
@@ -359,7 +360,7 @@ class TestDeleteWebsiteGroup:
 
         result = await delete_website_group(client, group_id=10)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -383,7 +384,7 @@ class TestDeleteWebsiteGroup:
 
         result = await delete_website_group(client, group_id=10)
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 

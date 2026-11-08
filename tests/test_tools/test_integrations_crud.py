@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -131,7 +132,7 @@ class TestGetIntegration:
         )
 
         result = await get_integration(client, integration_id=999)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestCreateHttpIntegration:
@@ -145,7 +146,7 @@ class TestCreateHttpIntegration:
             name="Test",
             url="https://example/ingest",
         )
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -350,7 +351,7 @@ class TestUpdateHttpIntegration:
         from lm_mcp.tools.integrations import update_http_integration
 
         result = await update_http_integration(client, integration_id=3, description="x")
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_empty_body_rejected(self, client, monkeypatch):
@@ -358,7 +359,7 @@ class TestUpdateHttpIntegration:
         from lm_mcp.tools.integrations import update_http_integration
 
         result = await update_http_integration(client, integration_id=3)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "No fields provided to update" in result[0].text
 
     @respx.mock
@@ -391,7 +392,7 @@ class TestDeleteIntegration:
         from lm_mcp.tools.integrations import delete_integration
 
         result = await delete_integration(client, integration_id=3)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_deletes_by_id(self, client, monkeypatch):

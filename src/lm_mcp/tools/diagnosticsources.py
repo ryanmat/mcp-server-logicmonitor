@@ -281,7 +281,7 @@ async def update_diagnosticsource(
         diagnosticsource_id: DiagnosticSource ID to update.
         definition: Full DiagnosticSource definition dict with all fields.
         confirm: Must be True to proceed; update_logicmodule always passes it.
-            Without it the call returns CONFIRMATION_REQUIRED and writes nothing.
+            Without it the call returns INVALID_REQUEST and writes nothing.
 
     Returns:
         List of TextContent with updated DiagnosticSource info or error.
@@ -290,7 +290,7 @@ async def update_diagnosticsource(
         return format_response(
             {
                 "error": True,
-                "code": "CONFIRMATION_REQUIRED",
+                "code": "INVALID_REQUEST",
                 "message": (
                     "update_diagnosticsource is full-replace -- any field omitted "
                     "from `definition` will be BLANKED, including the script. Set "

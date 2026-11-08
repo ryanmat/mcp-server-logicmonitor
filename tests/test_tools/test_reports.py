@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -115,7 +116,7 @@ class TestGetReports:
 
         result = await get_reports(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetReport:
@@ -171,7 +172,7 @@ class TestGetReport:
 
         result = await get_report(client, report_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetReportGroups:

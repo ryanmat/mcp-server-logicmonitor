@@ -299,7 +299,7 @@ async def update_remediationsource(
         remediationsource_id: RemediationSource ID to update.
         definition: Full RemediationSource definition dict with all fields.
         confirm: Must be True to proceed; update_logicmodule always passes it.
-            Without it the call returns CONFIRMATION_REQUIRED and writes nothing.
+            Without it the call returns INVALID_REQUEST and writes nothing.
 
     Returns:
         List of TextContent with updated RemediationSource info or error.
@@ -308,7 +308,7 @@ async def update_remediationsource(
         return format_response(
             {
                 "error": True,
-                "code": "CONFIRMATION_REQUIRED",
+                "code": "INVALID_REQUEST",
                 "message": (
                     "update_remediationsource is full-replace -- any field omitted "
                     "from `definition` will be BLANKED, including the script. Set "

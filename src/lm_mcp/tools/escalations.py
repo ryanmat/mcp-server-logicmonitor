@@ -424,7 +424,7 @@ async def update_escalation_chain(
             return format_response(
                 {
                     "error": True,
-                    "code": "VALIDATION_ERROR",
+                    "code": "INVALID_REQUEST",
                     "message": "No fields provided to update",
                 }
             )
@@ -551,7 +551,7 @@ async def update_recipient_group(
             return format_response(
                 {
                     "error": True,
-                    "code": "VALIDATION_ERROR",
+                    "code": "INVALID_REQUEST",
                     "message": "No fields provided to update",
                 }
             )

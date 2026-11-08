@@ -85,7 +85,7 @@ async def run_pre_execution_checks(
         return (
             {
                 "error": True,
-                "code": "DEVICE_UNREACHABLE",
+                "code": "REJECTED_BY_TOOL",
                 "message": (
                     f"Device {host_id} is dead (hostStatus=dead). Cannot execute {source_kind}."
                 ),
@@ -107,7 +107,7 @@ async def run_pre_execution_checks(
                     return (
                         {
                             "error": True,
-                            "code": "COLLECTOR_VERSION_LOW",
+                            "code": "FEATURE_DISABLED",
                             "message": (
                                 f"Collector {collector_id} build {build} is below "
                                 f"minimum {_MIN_COLLECTOR_BUILD:.3f} required for "
@@ -187,7 +187,7 @@ async def get_diagnostic_remediation_assignments(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "Provide resource_id or alert_id (or both).",
             }
         )
@@ -274,7 +274,7 @@ async def get_diagnostic_remediation_results(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "Provide exactly one of alert_id or host_id.",
             }
         )
@@ -282,7 +282,7 @@ async def get_diagnostic_remediation_results(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": (
                     'Cursors are not supported when module_type is "both"; '
                     "set module_type to diagnostic or remediation to use cursors."

@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -148,7 +149,7 @@ class TestConfigSourceUpdateReasons:
         )
 
         result = await get_configsource_update_reasons(client, configsource_id=999)
-        assert "Error" in result[0].text
+        assert is_error_result(result)
 
 
 class TestDeviceConfig:
@@ -241,7 +242,7 @@ class TestDeviceConfig:
         result = await get_device_config(
             client, device_id=999, device_datasource_id=100, instance_id=200
         )
-        assert "Error" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_get_device_config_version_returns_content(self, client):
@@ -352,7 +353,7 @@ class TestDeviceConfig:
             instance_id=200,
             config_id="bad-id",
         )
-        assert "Error" in result[0].text
+        assert is_error_result(result)
 
 
 class TestCollectDeviceConfig:
@@ -423,7 +424,7 @@ class TestCollectDeviceConfig:
         result = await collect_device_config(
             client, device_id=42, device_datasource_id=100, instance_id=200
         )
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         config_mod._config = None
 
     @respx.mock

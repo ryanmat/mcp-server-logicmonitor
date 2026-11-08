@@ -7,6 +7,7 @@ import pytest
 
 from lm_mcp import session as session_module
 from lm_mcp.session import get_session
+from lm_mcp.tools import is_error_result
 from lm_mcp.tools.session import (
     clear_session_context,
     delete_session_variable,
@@ -107,7 +108,7 @@ class TestSetSessionVariable:
         result = await set_session_variable(name="", value="test")
 
         # Error responses are formatted as plain text
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "non-empty string" in result[0].text
 
 
@@ -130,7 +131,7 @@ class TestGetSessionVariable:
         result = await get_session_variable(name="nonexistent")
 
         # Error responses are formatted as plain text
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "not found" in result[0].text
 
     async def test_gets_none_value_if_explicitly_set(self):
@@ -165,7 +166,7 @@ class TestDeleteSessionVariable:
         result = await delete_session_variable(name="nonexistent")
 
         # Error responses are formatted as plain text
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "not found" in result[0].text
 
 

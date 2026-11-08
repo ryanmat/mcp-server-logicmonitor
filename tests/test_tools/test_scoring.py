@@ -11,6 +11,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from tests.alert_pages import alert_lists
 
 
@@ -241,7 +242,7 @@ class TestScoreAlertNoise:
 
         result = await score_alert_noise(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_noise_score_bounded(self, client):
@@ -538,7 +539,7 @@ class TestCalculateAvailability:
 
         result = await calculate_availability(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_device_id_reads_the_device_alerts(self, client):
@@ -806,7 +807,7 @@ class TestScoreDeviceHealth:
             instance_id=100,
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestScoringGuardrails:
@@ -1070,8 +1071,8 @@ class TestCalculateAvailabilityDeviceLookup:
     Prior behavior: a 404/403 on the device lookup proceeded with
     unfiltered alerts, producing availability numbers for a different
     device set than the caller asked for. Now a device that does not exist
-    returns DEVICE_NOT_FOUND and any other lookup failure returns
-    DEVICE_LOOKUP_FAILED, both before any alert is read.
+    returns NOT_FOUND and any other lookup failure returns
+    UPSTREAM_ERROR, both before any alert is read.
     """
 
     @respx.mock
@@ -1085,7 +1086,7 @@ class TestCalculateAvailabilityDeviceLookup:
         result = await calculate_availability(client, device_id=99999, hours_back=24)
 
         text = result[0].text
-        assert "Error:" in text
+        assert is_error_result(result)
         assert "device 99999" in text.lower() or "99999" in text
 
     @respx.mock
@@ -1098,7 +1099,7 @@ class TestCalculateAvailabilityDeviceLookup:
 
         result = await calculate_availability(client, device_id=42, hours_back=24)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_successful_device_lookup_reads_device_alerts(self, client):
@@ -1152,7 +1153,7 @@ class TestCalculateErrorBudgetSubToolHardening:
         )
 
         text = result[0].text
-        assert "Error:" in text
+        assert is_error_result(result)
         # The JSONDecodeError message ("Expecting value: line 1 column 1")
         # must NOT appear -- that was the v3.8.2-pattern regression signal.
         assert "Expecting value" not in text
@@ -1346,7 +1347,7 @@ class TestResolveDevice:
             return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
         )
 
-        assert (await _resolve_device(client, 99999, None))["code"] == "DEVICE_NOT_FOUND"
+        assert (await _resolve_device(client, 99999, None))["code"] == "NOT_FOUND"
 
     @respx.mock
     async def test_missing_device_name_is_device_not_found(self, client):
@@ -1356,17 +1357,17 @@ class TestResolveDevice:
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        assert (await _resolve_device(client, None, "nope"))["code"] == "DEVICE_NOT_FOUND"
+        assert (await _resolve_device(client, None, "nope"))["code"] == "NOT_FOUND"
 
     @respx.mock
-    async def test_forbidden_lookup_is_device_lookup_failed(self, client):
+    async def test_forbidden_lookup_is_auth_failed(self, client):
         from lm_mcp.tools.scoring import _resolve_device
 
         respx.get(DEVICE_URL_TEMPLATE.format(id=42)).mock(
             return_value=httpx.Response(403, json={"errorMessage": "Forbidden"})
         )
 
-        assert (await _resolve_device(client, 42, None))["code"] == "DEVICE_LOOKUP_FAILED"
+        assert (await _resolve_device(client, 42, None))["code"] == "AUTH_FAILED"
 
     @respx.mock
     async def test_resolved_device_carries_id_and_name(self, client):
@@ -1601,7 +1602,7 @@ class TestClearedAlerts:
         with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.scoring"):
             result = await _resolve_device(client, 42, None)
 
-        assert result["code"] == "DEVICE_LOOKUP_FAILED"
+        assert result["code"] == "AUTH_FAILED"
         records = [r for r in caplog.records if r.name == "lm_mcp.tools.scoring"]
         assert len(records) == 1
         assert records[0].levelno == logging.WARNING

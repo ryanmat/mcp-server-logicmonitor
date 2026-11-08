@@ -7,6 +7,7 @@ import pytest
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -73,7 +74,7 @@ class TestGetReference:
         result = await get_reference(client, category="schema")
         text = result[0].text
 
-        assert "Error:" in text
+        assert is_error_result(result)
         assert "category" in text and "name" in text
         assert "list=true" in text
 
@@ -83,5 +84,5 @@ class TestGetReference:
         result = await get_reference(client, category="schema", name="bogus_name")
         text = result[0].text
 
-        assert "Error:" in text
+        assert is_error_result(result)
         assert "list=true" in text

@@ -10,6 +10,7 @@ import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, TypeVar, overload
 
+import httpx
 from mcp.types import TextContent
 
 from lm_mcp.exceptions import LMError
@@ -17,6 +18,7 @@ from lm_mcp.exceptions import LMError
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "ERROR_CODES",
     "SEVERITY_MAP",
     "SEVERITY_NAMES",
     "ErrorContent",
@@ -25,6 +27,7 @@ __all__ = [
     "handle_error",
     "is_error_result",
     "list_tool",
+    "lm_error_code",
     "normalize_definition_fields",
     "portal_url",
     "quote_filter_value",
@@ -380,6 +383,47 @@ class ErrorContent(TextContent):
     is_error: ClassVar[bool] = True
 
 
+# The documented error codes (spec R2.7), each with its house-rule category and
+# whether the same call, sent again unchanged, can succeed.
+ERROR_CODES: dict[str, tuple[str, bool]] = {
+    "NOT_FOUND": ("validation", False),
+    "INVALID_REQUEST": ("validation", False),
+    "WRITE_DISABLED": ("permission", False),
+    "RATE_LIMITED": ("transient", True),
+    "UPSTREAM_ERROR": ("transient", True),
+    "TIMEOUT": ("transient", True),
+    "AUTH_FAILED": ("permission", False),
+    "SCOPE_MISSING": ("permission", False),
+    "FEATURE_DISABLED": ("permission", False),
+    "REJECTED_BY_TOOL": ("business", False),
+}
+
+# Client exception codes outside the documented set, mapped onto it. Any other
+# HTTP_<status> is a 4xx the API refused, and API_ERROR or API_ERROR_<errorCode>
+# a request the API refused in a 200 body; any other code is a failure the portal
+# or the client reported.
+_LM_ERROR_CODES: dict[str, str] = {
+    "PERMISSION_DENIED": "AUTH_FAILED",
+    "VALIDATION_ERROR": "INVALID_REQUEST",
+    "SERVER_ERROR": "UPSTREAM_ERROR",
+    "CONNECTION_FAILED": "UPSTREAM_ERROR",
+    "CONFIG_ERROR": "FEATURE_DISABLED",
+}
+
+
+def lm_error_code(error: LMError) -> str:
+    """Map a client exception onto the documented code set."""
+    if isinstance(error.__cause__, httpx.TimeoutException):
+        return "TIMEOUT"
+    if error.code in ERROR_CODES:
+        return error.code
+    if error.code in _LM_ERROR_CODES:
+        return _LM_ERROR_CODES[error.code]
+    if error.code.startswith(("HTTP_", "API_ERROR")):
+        return "INVALID_REQUEST"
+    return "UPSTREAM_ERROR"
+
+
 def is_error_result(result: list) -> bool:
     """Return True when a tool result carries an ErrorContent item.
 
@@ -565,7 +609,7 @@ def require_write_permission(func: F) -> F:
                 return format_response(
                     {
                         "error": True,
-                        "code": "NO_PORTAL_SELECTED",
+                        "code": "INVALID_REQUEST",
                         "message": "No portal selected",
                         "suggestion": "Call use_portal(<customer>) first (see list_portals)",
                     }
@@ -574,7 +618,7 @@ def require_write_permission(func: F) -> F:
                 return format_response(
                     {
                         "error": True,
-                        "code": "PORTAL_READ_ONLY",
+                        "code": "WRITE_DISABLED",
                         "message": "The active portal is read-only",
                         "suggestion": (
                             'Set "writable": true on this portal\'s vault record to allow writes'

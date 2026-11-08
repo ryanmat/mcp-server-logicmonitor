@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -70,7 +71,7 @@ class TestExportDatasource:
 
         result = await export_datasource(client, datasource_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestExportDashboard:
@@ -334,7 +335,7 @@ class TestImportEventsource:
         result = await import_eventsource(client, definition={"name": "Bad"})
 
         text = result[0].text
-        assert "Error:" in text
+        assert is_error_result(result)
         assert "silently failed" in text.lower()
 
 
@@ -638,7 +639,7 @@ class TestImportDatasourceErrorHandling:
         result = await import_datasource(client, definition={"type": "script"})
 
         assert len(result) == 1
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_import_datasource_rest_format_redirects_to_create(self, client, monkeypatch):
@@ -672,7 +673,7 @@ class TestImportDatasourceErrorHandling:
         )
 
         text = result[0].text
-        assert "Error:" in text
+        assert is_error_result(result)
         assert "create_datasource" in text
         assert "LM Exchange" in text
 

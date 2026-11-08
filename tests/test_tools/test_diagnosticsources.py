@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -211,7 +212,7 @@ class TestGetDiagnosticSources:
 
         result = await get_diagnosticsources(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetDiagnosticSource:
@@ -264,7 +265,7 @@ class TestGetDiagnosticSource:
 
         result = await get_diagnosticsource(client, source_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestDiagnosticSourceToolRegistration:
@@ -506,7 +507,7 @@ class TestUpdateDiagnosticSource:
     """Tests for update_diagnosticsource tool."""
 
     async def test_update_without_confirm_is_guarded(self, client, enable_writes):
-        """update_diagnosticsource without confirm=True returns CONFIRMATION_REQUIRED."""
+        """update_diagnosticsource without confirm=True returns INVALID_REQUEST."""
         from lm_mcp.tools.diagnosticsources import update_diagnosticsource
 
         result = await update_diagnosticsource(

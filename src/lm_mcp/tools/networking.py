@@ -89,7 +89,7 @@ async def get_interface_metrics(
             return format_response(
                 {
                     "error": True,
-                    "code": "INTERFACE_DATASOURCE_NOT_FOUND",
+                    "code": "NOT_FOUND",
                     "message": (f"No Interface-family DataSource found on device {device_id}"),
                     "suggestion": (
                         "Verify SNMP monitoring is configured and that "
@@ -112,7 +112,7 @@ async def get_interface_metrics(
             return format_response(
                 {
                     "error": True,
-                    "code": "INTERFACE_NOT_FOUND",
+                    "code": "NOT_FOUND",
                     "message": (
                         f"Interface '{interface}' not found among instances on device "
                         f"{device_id} (DataSource: {ds_name})"
@@ -213,7 +213,7 @@ async def get_top_talkers(
         return format_response(
             {
                 "error": True,
-                "code": "INVALID_PARAMETER",
+                "code": "INVALID_REQUEST",
                 "message": f"group_by must be one of {sorted(_TOP_TALKERS_GROUP_BY)}",
                 "suggestion": "Use src_ip, dst_ip, application, protocol, or src_dst_pair.",
             }
