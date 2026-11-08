@@ -445,8 +445,8 @@ async def _resolve_device(
         device_name: Exact device display name.
 
     Returns:
-        The device with id and displayName, or an error dict with code
-        NOT_FOUND or UPSTREAM_ERROR.
+        The device with id and displayName, or an error dict: NOT_FOUND when
+        it does not exist, else the code lm_error_code gives the failed lookup.
     """
     target = f"device {device_id}" if device_id is not None else f"device named '{device_name}'"
     try:
@@ -685,7 +685,7 @@ async def calculate_error_budget(
     """
     try:
         # Route through call_sub_tool so an upstream error from
-        # calculate_availability (e.g. the UPSTREAM_ERROR above) surfaces
+        # calculate_availability (e.g. the failed device lookup above) surfaces
         # as a clean RuntimeError rather than a JSONDecodeError -- this is
         # the same hardening v3.8.2 added to workflow composites.
         avail_data = await call_sub_tool(

@@ -11,6 +11,7 @@ import pytest
 
 from lm_mcp.exceptions import (
     AuthenticationError,
+    ConfigurationError,
     LMError,
     LMPermissionError,
     NotFoundError,
@@ -44,6 +45,7 @@ LM_ERROR_CODES = [
     ),
     pytest.param(AuthenticationError("Invalid token"), "AUTH_FAILED", id="401"),
     pytest.param(LMPermissionError("Permission denied"), "AUTH_FAILED", id="403"),
+    pytest.param(ConfigurationError("ingest needs LMv1 keys"), "FEATURE_DISABLED", id="config"),
 ]
 
 
