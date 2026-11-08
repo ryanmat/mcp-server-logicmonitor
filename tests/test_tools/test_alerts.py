@@ -64,7 +64,7 @@ class TestGetAlerts:
 
     @respx.mock
     async def test_get_alerts_negative_total_sanitized(self, client):
-        """get_alerts converts negative API total sentinel to positive."""
+        """get_alerts reads a negative API total sentinel as more results, never as a count."""
         from lm_mcp.tools.alerts import get_alerts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
@@ -87,7 +87,8 @@ class TestGetAlerts:
 
         result = await get_alerts(client, limit=500)
         data = json.loads(result[0].text)
-        assert data["total"] == 501
+        assert "total" not in data
+        assert data["has_more"] is True
 
     @respx.mock
     async def test_get_alerts_with_severity_filter(self, client):

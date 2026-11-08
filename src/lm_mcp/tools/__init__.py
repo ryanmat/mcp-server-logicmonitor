@@ -6,7 +6,7 @@ from __future__ import annotations
 import functools
 import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, ClassVar, TypeVar, overload
 
 from mcp.types import TextContent
@@ -23,6 +23,7 @@ __all__ = [
     "format_response",
     "handle_error",
     "is_error_result",
+    "list_tool",
     "normalize_definition_fields",
     "portal_url",
     "quote_filter_value",
@@ -136,8 +137,8 @@ def safe_total(result: dict) -> int:
 
 # Note added to a list response when the API total is a negative lower bound
 INEXACT_TOTAL_NOTE = (
-    "The API did not report an exact count; total is a lower bound and more "
-    "results exist past this page."
+    "The API did not report an exact count, so the response carries no total; "
+    "page on with offset while has_more is true."
 )
 
 
@@ -145,8 +146,10 @@ def paginated_response(items: list[Any], result: dict, offset: int) -> dict[str,
     """Build the pagination fields of a list tool response.
 
     The API reports a negative total, -(offset + size + 1), when more results
-    exist than it counted. That reads as has_more with total as the lower
-    bound and a total_note, never as the end of the list.
+    exist than it counted. That is no count, so the response leaves total out
+    and carries a total_note. has_more is read from the total when it is
+    non-negative and from the page when it is negative: a page with rows under a
+    negative total has more past it, and an empty one ends the list.
 
     Args:
         items: The items returned on this page.
@@ -154,20 +157,86 @@ def paginated_response(items: list[Any], result: dict, offset: int) -> dict[str,
         offset: The offset the page was requested at.
 
     Returns:
-        Dict with total, count, offset and has_more, plus total_note when
-        the API total was negative.
+        Dict with count, offset and has_more, plus total when the API total
+        was non-negative and total_note when it was negative.
     """
-    total = safe_total(result)
-    inexact = result.get("total", 0) < 0
-    response: dict[str, Any] = {
-        "total": total,
-        "count": len(items),
-        "offset": offset,
-        "has_more": inexact or offset + len(items) < total,
-    }
+    api_total = result.get("total", 0)
+    inexact = api_total < 0
+    response: dict[str, Any] = {} if inexact else {"total": api_total}
+    response["count"] = len(items)
+    response["offset"] = offset
+    response["has_more"] = bool(items) if inexact else offset + len(items) < api_total
     if inexact:
         response["total_note"] = INEXACT_TOTAL_NOTE
     return response
+
+
+async def list_tool(
+    client: Any,
+    path: str,
+    *,
+    key: str,
+    project: Callable[[dict[str, Any]], Any],
+    limit: int,
+    offset: int = 0,
+    filter: str | None = None,
+    named: Mapping[str, str | None] | None = None,
+    clauses: Sequence[str] = (),
+    params: Mapping[str, Any] | None = None,
+    extra: Mapping[str, Any] | None = None,
+) -> list[TextContent]:
+    """Fetch one page of a LogicMonitor collection as a list tool response.
+
+    The helper builds the size, offset and filter query, projects each row and
+    returns the paginated_response envelope, so the list tools that call it share
+    one query shape and one envelope.
+
+    Args:
+        client: LogicMonitor API client.
+        path: Collection endpoint, such as /device/devices.
+        key: Response key the projected rows go under, such as devices.
+        project: Callback that maps one API row onto the tool's fields.
+        limit: Page size, sent as size.
+        offset: Rows to skip, sent as offset.
+        filter: Raw filter expression. When given it is sent as written, and
+            the named filters and clauses are not sent.
+        named: Clause prefix (a field and its operator, such as displayName~)
+            to value. Each value is stripped of wildcards and quoted; a None or
+            empty value is left out.
+        clauses: Clauses sent as written ahead of the named ones: fixed
+            filters, numeric ids and enum clauses.
+        params: Other query parameters the endpoint takes.
+        extra: Fields added to the response beside the page.
+
+    Returns:
+        List of TextContent with the page, or an ErrorContent from
+        handle_error when the call or the projection fails.
+    """
+    try:
+        query: dict[str, Any] = {**(params or {}), "size": limit, "offset": offset}
+        wildcards_stripped = False
+        if filter:
+            query["filter"] = filter
+        else:
+            parts = list(clauses)
+            for prefix, value in (named or {}).items():
+                if not value:
+                    continue
+                clean, was_modified = sanitize_filter_value(value)
+                wildcards_stripped = wildcards_stripped or was_modified
+                parts.append(f"{prefix}{quote_filter_value(clean)}")
+            if parts:
+                query["filter"] = ",".join(parts)
+
+        result = await client.get(path, params=query)
+        rows = [project(item) for item in result.get("items", [])]
+
+        response = {**paginated_response(rows, result, offset), key: rows, **(extra or {})}
+        if wildcards_stripped:
+            response["note"] = WILDCARD_STRIP_NOTE
+        return format_response(response)
+    except Exception as e:
+        return handle_error(e)
 
 
 def quote_filter_value(value: str) -> str:
