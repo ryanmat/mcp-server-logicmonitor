@@ -1566,6 +1566,7 @@ TOOLS.extend(
                 "properties": {
                     "name_filter": {"type": "string", "description": "Filter by name (substring)"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1587,6 +1588,7 @@ TOOLS.extend(
                         "description": "Include NextGen reports",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1697,6 +1699,7 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),
@@ -1724,6 +1727,7 @@ TOOLS.extend(
                         "description": "Filter by group name (supports wildcards)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                     "detail": {
                         "type": "boolean",
                         "default": False,
@@ -2007,6 +2011,7 @@ TOOLS.extend(
                         ),
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
             },
         ),

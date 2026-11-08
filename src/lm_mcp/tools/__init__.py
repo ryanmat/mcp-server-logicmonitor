@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import json
 import logging
 from collections.abc import Callable, Mapping, Sequence
@@ -195,7 +196,8 @@ async def list_tool(
         client: LogicMonitor API client.
         path: Collection endpoint, such as /device/devices.
         key: Response key the projected rows go under, such as devices.
-        project: Callback that maps one API row onto the tool's fields.
+        project: Callback that maps one API row onto the tool's fields. A
+            coroutine function is awaited row by row.
         limit: Page size, sent as size.
         offset: Rows to skip, sent as offset.
         filter: Raw filter expression. When given it is sent as written, and
@@ -229,7 +231,10 @@ async def list_tool(
                 query["filter"] = ",".join(parts)
 
         result = await client.get(path, params=query)
-        rows = [project(item) for item in result.get("items", [])]
+        rows = []
+        for item in result.get("items", []):
+            row = project(item)
+            rows.append(await row if inspect.isawaitable(row) else row)
 
         response = {**paginated_response(rows, result, offset), key: rows, **(extra or {})}
         if wildcards_stripped:

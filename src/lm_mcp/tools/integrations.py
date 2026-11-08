@@ -8,12 +8,11 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
+    list_tool,
     quote_filter_value,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
@@ -74,6 +73,7 @@ async def get_integrations(
     name_filter: str | None = None,
     type_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List LogicMonitor integrations.
 
@@ -91,38 +91,21 @@ async def get_integrations(
             requires exact type values here; wildcards are not
             supported.
         limit: Maximum number of integrations to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with integration summaries or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-        filter_parts: list[str] = []
-
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filter_parts.append(f"name~{quote_filter_value(clean_name)}")
-        if type_filter:
-            filter_parts.append(f"type:{quote_filter_value(type_filter)}")
-        if filter_parts:
-            params["filter"] = ",".join(filter_parts)
-
-        result = await client.get("/setting/integrations", params=params)
-
-        integrations = [_summarize_integration(item) for item in result.get("items", [])]
-
-        response: dict[str, Any] = {
-            "total": result.get("total", 0),
-            "count": len(integrations),
-            "integrations": integrations,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/integrations",
+        key="integrations",
+        project=_summarize_integration,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+        clauses=[f"type:{quote_filter_value(type_filter)}"] if type_filter else [],
+    )
 
 
 async def get_integration(

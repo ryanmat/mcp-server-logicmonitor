@@ -147,6 +147,25 @@ class TestListToolResponse:
         assert "note" not in data
 
     @respx.mock
+    async def test_async_projection_is_awaited_per_row(self, client):
+        respx.get(f"{BASE_URL}/setting/recipientgroups").mock(
+            return_value=httpx.Response(200, json={"total": 2, "items": _rows(2)})
+        )
+        seen: list[int] = []
+
+        async def project(item: dict) -> dict:
+            seen.append(item["id"])
+            return _project(item)
+
+        result = await list_tool(
+            client, "/setting/recipientgroups", key="groups", project=project, limit=2
+        )
+
+        data = json.loads(result[0].text)
+        assert data["groups"] == [{"id": 0, "name": "row0"}, {"id": 1, "name": "row1"}]
+        assert seen == [0, 1]
+
+    @respx.mock
     async def test_wildcard_strip_adds_the_note(self, client):
         respx.get(f"{BASE_URL}/device/devices").mock(
             return_value=httpx.Response(200, json={"total": 0, "items": []})
