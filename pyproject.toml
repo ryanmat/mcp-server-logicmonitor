@@ -62,6 +62,11 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/lm_mcp"]
 
+# The sdist ships the package source and its metadata files only; hatchling adds
+# pyproject.toml and PKG-INFO itself.
+[tool.hatch.build.targets.sdist]
+only-include = ["src", "README.md", "LICENSE", "CHANGELOG.md"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

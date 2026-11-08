@@ -138,6 +138,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   `reload_portals` change only server-side state and stay listed. The Write column of
   `documentation/tools.md` follows the same annotations, so `delete_session_variable`,
   `use_portal` and `reload_portals` read No.
+- The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
+  `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
+  carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
+  files the repository tracks.
 - `uv.lock` holds 59 packages, down from 142, with the model stack gone.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
