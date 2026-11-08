@@ -8,6 +8,22 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
+Against 4.3.0, the removals below take the server from 306 tools to 268: 264 with one portal,
+plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in multi-portal mode.
+With writes off, the default, `tools/list` shows 163 of them, or 167 in multi-portal mode. Prompts
+go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
+model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
+on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
+31 s on each CI leg, against 2,959 passing and 8 skipped in 179 to 191 s for 4.3.0, and the
+Python under `src/` is 33,992 lines, down from 40,839.
+
+The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
+`WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`, `HF_DEVICE`,
+`HF_CACHE_DIR`, `AWX_URL`, `AWX_TOKEN`, `AWX_VERIFY_SSL`, `AWX_TIMEOUT`, `AWX_MAX_RETRIES`,
+`TF_WORKSPACE_DIR`, `TF_TERRAFORM_BINARY`, `TF_TIMEOUT`, `TF_AUTO_APPROVE_ENABLED`,
+`LM_ANALYSIS_MAX_CONCURRENCY`, `LM_API_VERSION`, `LM_CORS_ORIGINS`, `LM_FIELD_VALIDATION`,
+`LM_SESSION_ENABLED` and `LM_SESSION_PERSIST_PATH`.
+
 ### Removed
 
 | Tool | Replacement |
@@ -118,6 +134,13 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   remain. The `get_workflow` tool, which returned prompt text to clients without prompt support,
   leaves with them, and the `universal_reference` category in `lm://guide/tool-categories` now
   lists only `get_reference`.
+- Python modules and names that code importing `lm_mcp` could reach: `lm_mcp.analysis`,
+  `lm_mcp.awx_config`, `lm_mcp.client.awx`, `lm_mcp.client.huggingface`,
+  `lm_mcp.client.terraform`, `lm_mcp.client.watsonx`, `lm_mcp.config_warnings`,
+  `lm_mcp.hf_config`, `lm_mcp.ibm_config`, `lm_mcp.terraform_config`, `lm_mcp.tools.ansible` and
+  `lm_mcp.tools.watsonx`; the `AWX_TOOLS`, `WATSONX_TOOLS` and `TF_TOOLS` manifests in
+  `lm_mcp.registry`; `AWX_TOOL_NAMES`, `WATSONX_TOOL_NAMES`, `TF_TOOL_NAMES`, `get_awx_client`,
+  `get_watsonx_client` and `get_tf_runner` in `lm_mcp.server`.
 
 ### Fixed
 
@@ -146,7 +169,6 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
   files the repository tracks.
-- `uv.lock` holds 59 packages, down from 142, with the model stack gone.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
   pyjwt 2.15.1 and websockets 17.4.
