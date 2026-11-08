@@ -48,7 +48,7 @@ async def ingest_logs(
     try:
         if not logs:
             return validation_error(
-                "VALIDATION_ERROR",
+                "INVALID_REQUEST",
                 "logs list cannot be empty",
                 suggestion="Pass at least one log entry with message + _lm.resourceId.",
             )
@@ -98,20 +98,20 @@ async def push_metrics(
     try:
         if not metrics:
             return validation_error(
-                "VALIDATION_ERROR",
+                "INVALID_REQUEST",
                 "metrics payload cannot be empty",
                 suggestion="Provide resourceIds, dataSource, and instances at minimum.",
             )
 
         if "resourceIds" not in metrics:
             return validation_error(
-                "VALIDATION_ERROR",
+                "INVALID_REQUEST",
                 "metrics.resourceIds is required",
                 suggestion='Add resourceIds, e.g. {"system.hostname": "server1"}.',
             )
         if "dataSource" not in metrics:
             return validation_error(
-                "VALIDATION_ERROR",
+                "INVALID_REQUEST",
                 "metrics.dataSource is required",
                 suggestion="Add a dataSource name string.",
             )

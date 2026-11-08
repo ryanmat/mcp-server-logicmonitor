@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 BASE = "https://test.logicmonitor.com/santaba/rest"
 
@@ -165,7 +166,7 @@ class TestCreateActionChain:
             client, name="X", stages=[{"id": 1, "type": "bogusSource"}]
         )
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         assert "diagnosticSource" in result[0].text
 
     async def test_create_validates_empty_stages(self, client, enable_writes):
@@ -173,7 +174,7 @@ class TestCreateActionChain:
 
         result = await create_action_chain(client, name="X", stages=[])
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         assert "non-empty" in result[0].text
 
 
@@ -198,7 +199,7 @@ class TestUpdateActionChain:
 
         result = await update_action_chain(client, chain_id=1)
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         assert "at least one" in result[0].text
 
     async def test_update_validates_stages(self, client, enable_writes):
@@ -208,7 +209,7 @@ class TestUpdateActionChain:
             client, chain_id=1, stages=[{"id": "not-int", "type": "diagnosticSource"}]
         )
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         assert "integer" in result[0].text
 
 
@@ -386,7 +387,7 @@ class TestUpdateActionRule:
 
         result = await update_action_rule(client, rule_id=1)
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
 
 
 class TestDeleteActionRule:

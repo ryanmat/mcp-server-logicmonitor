@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -50,7 +51,7 @@ class TestCreateEscalationChain:
             name="Test Chain",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -85,7 +86,7 @@ class TestCreateEscalationChain:
             description="Test escalation chain",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["chain_id"] == 10
@@ -328,7 +329,7 @@ class TestDestinationsShorthand:
             ],
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         sent_body = json.loads(route.calls[0].request.content)
         recip = sent_body["destinations"][0]["stages"][0][0]
         assert recip == {
@@ -362,7 +363,7 @@ class TestUpdateEscalationChain:
             name="Updated Chain",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -393,7 +394,7 @@ class TestUpdateEscalationChain:
             name="Updated Chain",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -461,7 +462,7 @@ class TestDeleteEscalationChain:
 
         result = await delete_escalation_chain(client, chain_id=10)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -485,7 +486,7 @@ class TestDeleteEscalationChain:
 
         result = await delete_escalation_chain(client, chain_id=10)
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -513,7 +514,7 @@ class TestCreateRecipientGroup:
             name="Test Group",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -545,7 +546,7 @@ class TestCreateRecipientGroup:
             name="Test Group",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
         assert data["group_id"] == 20
@@ -619,7 +620,7 @@ class TestUpdateRecipientGroup:
             name="Updated Group",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -647,7 +648,7 @@ class TestUpdateRecipientGroup:
             name="Updated Group",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
         sent_body = json.loads(route.calls[0].request.content)
@@ -700,7 +701,7 @@ class TestDeleteRecipientGroup:
 
         result = await delete_recipient_group(client, group_id=20)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -724,7 +725,7 @@ class TestDeleteRecipientGroup:
 
         result = await delete_recipient_group(client, group_id=20)
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 

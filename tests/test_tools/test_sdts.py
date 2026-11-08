@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
@@ -147,7 +148,7 @@ class TestCreateSdt:
             comment="Test",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -180,7 +181,7 @@ class TestCreateSdt:
             comment="Maintenance",
         )
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -214,7 +215,7 @@ class TestCreateSdt:
         )
 
         # Error responses are formatted as text, not JSON
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Invalid type" in result[0].text
 
     @respx.mock
@@ -387,7 +388,7 @@ class TestDeleteSdt:
 
         result = await delete_sdt(client, sdt_id="SDT_123")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -411,7 +412,7 @@ class TestDeleteSdt:
 
         result = await delete_sdt(client, sdt_id="SDT_123")
 
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
         data = json.loads(result[0].text)
         assert data["success"] is True
 
@@ -435,7 +436,7 @@ class TestUpdateSdt:
         from lm_mcp.tools.sdts import update_sdt
 
         result = await update_sdt(client, sdt_id="SDT_1", comment="Updated")
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "write" in result[0].text.lower()
 
     @respx.mock
@@ -536,7 +537,7 @@ class TestUpdateSdt:
         )
 
         result = await update_sdt(client, sdt_id="GONE", comment="Won't work")
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # (handler name, endpoint path, extra required arguments)

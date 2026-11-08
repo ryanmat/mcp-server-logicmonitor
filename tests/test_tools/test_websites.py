@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
@@ -166,7 +167,7 @@ class TestGetWebsite:
 
         result = await get_website(client, website_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetWebsiteGroups:
@@ -293,7 +294,7 @@ class TestGetWebsiteData:
 
         result = await get_website_data(client, website_id=999, checkpoint_id=1)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # (handler name, endpoint path, extra required arguments)

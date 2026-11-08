@@ -17,6 +17,7 @@ from lm_mcp.tools import (
     call_sub_tool,
     format_response,
     handle_error,
+    lm_error_code,
     quote_filter_value,
     resolve_group_filter,
     sanitize_filter_value,
@@ -245,7 +246,7 @@ async def calculate_availability(
             return format_response(
                 {
                     "error": True,
-                    "code": "INVALID_PARAMETER",
+                    "code": "INVALID_REQUEST",
                     "message": (
                         "Pass a device (device_id or device_name) or group_id, not both: "
                         "a device's alert list cannot be filtered by group."
@@ -444,8 +445,8 @@ async def _resolve_device(
         device_name: Exact device display name.
 
     Returns:
-        The device with id and displayName, or an error dict with code
-        DEVICE_NOT_FOUND or DEVICE_LOOKUP_FAILED.
+        The device with id and displayName, or an error dict: NOT_FOUND when
+        it does not exist, else the code lm_error_code gives the failed lookup.
     """
     target = f"device {device_id}" if device_id is not None else f"device named '{device_name}'"
     try:
@@ -468,7 +469,7 @@ async def _resolve_device(
         logger.warning("Could not look up %s for availability", target, exc_info=True)
         return {
             "error": True,
-            "code": "DEVICE_LOOKUP_FAILED",
+            "code": lm_error_code(exc),
             "message": (
                 f"Could not look up {target}: {exc}. "
                 "Availability cannot be computed without confirming the device."
@@ -478,7 +479,7 @@ async def _resolve_device(
     if not found:
         return {
             "error": True,
-            "code": "DEVICE_NOT_FOUND",
+            "code": "NOT_FOUND",
             "message": f"{target.capitalize()} not found, so its availability is unknown.",
             "suggestion": (
                 "Check the device_id, or pass the exact display name; get_devices lists both."
@@ -684,7 +685,7 @@ async def calculate_error_budget(
     """
     try:
         # Route through call_sub_tool so an upstream error from
-        # calculate_availability (e.g. DEVICE_LOOKUP_FAILED above) surfaces
+        # calculate_availability (e.g. the failed device lookup above) surfaces
         # as a clean RuntimeError rather than a JSONDecodeError -- this is
         # the same hardening v3.8.2 added to workflow composites.
         avail_data = await call_sub_tool(

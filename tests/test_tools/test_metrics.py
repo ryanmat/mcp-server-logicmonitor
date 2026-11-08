@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -96,7 +97,7 @@ class TestGetDeviceDatasources:
 
         result = await get_device_datasources(client, device_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetDeviceInstances:
@@ -307,7 +308,7 @@ class TestGetGraphData:
             graph_id=999,
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # -- Instance management tools (write) ----------------------------------------
@@ -424,7 +425,7 @@ class TestAddDeviceInstance:
             display_name="nginx",
             wild_value="nginx.service",
         )
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestUpdateDeviceInstance:

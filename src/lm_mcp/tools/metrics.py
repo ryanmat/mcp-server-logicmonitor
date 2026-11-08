@@ -307,7 +307,7 @@ async def update_device_instance(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )

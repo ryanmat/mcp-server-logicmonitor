@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -102,7 +103,7 @@ class TestGetLogsources:
         result = await get_logsources(client)
 
         assert len(result) == 1
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetLogsource:
@@ -151,7 +152,7 @@ class TestGetLogsource:
 
         result = await get_logsource(client, logsource_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetDeviceLogsources:
@@ -204,7 +205,7 @@ class TestGetDeviceLogsources:
 
         result = await get_device_logsources(client, device_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 @pytest.fixture
@@ -408,4 +409,4 @@ class TestDeleteLogsource:
         )
 
         result = await delete_logsource(client, logsource_id=999)
-        assert "Error" in result[0].text
+        assert is_error_result(result)

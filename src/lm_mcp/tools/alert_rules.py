@@ -224,7 +224,7 @@ async def update_alert_rule(
             return format_response(
                 {
                     "error": True,
-                    "code": "VALIDATION_ERROR",
+                    "code": "INVALID_REQUEST",
                     "message": "No fields provided to update",
                 }
             )

@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -135,7 +136,7 @@ class TestGetBatchjob:
 
         result = await get_batchjob(client, batchjob_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetDeviceBatchjobs:

@@ -150,6 +150,7 @@ async def compare_to_baseline(
             return format_response(
                 {
                     "error": True,
+                    "code": "NOT_FOUND",
                     "message": (
                         f"Baseline '{baseline_name}' not found. "
                         "Use save_baseline to create one first."

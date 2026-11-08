@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from tests.alert_pages import alert_pages
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
@@ -130,7 +131,7 @@ class TestGetAlerts:
         result = await get_alerts(client)
 
         assert len(result) == 1
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_get_alerts_with_raw_filter(self, client):
@@ -380,7 +381,7 @@ class TestGetAlertDetails:
 
         result = await get_alert_details(client, alert_id="999")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestAcknowledgeAlert:
@@ -403,7 +404,7 @@ class TestAcknowledgeAlert:
 
         result = await acknowledge_alert(client, alert_id="123")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -428,7 +429,7 @@ class TestAcknowledgeAlert:
         result = await acknowledge_alert(client, alert_id="123", note="Investigating")
 
         assert len(result) == 1
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
 
 
 class TestAddAlertNote:
@@ -451,7 +452,7 @@ class TestAddAlertNote:
 
         result = await add_alert_note(client, alert_id="123", note="Test note")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -476,7 +477,7 @@ class TestAddAlertNote:
         result = await add_alert_note(client, alert_id="123", note="Test note")
 
         assert len(result) == 1
-        assert "Error:" not in result[0].text
+        assert not is_error_result(result)
 
     @respx.mock
     async def test_add_alert_note_requires_note(self, client, monkeypatch):
@@ -495,7 +496,7 @@ class TestAddAlertNote:
 
         result = await add_alert_note(client, alert_id="123", note="")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Note cannot be empty" in result[0].text
 
 
@@ -519,7 +520,7 @@ class TestBulkAcknowledgeAlerts:
 
         result = await bulk_acknowledge_alerts(client, alert_ids=["123", "456"])
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
 
     @respx.mock
@@ -599,7 +600,7 @@ class TestBulkAcknowledgeAlerts:
 
         result = await bulk_acknowledge_alerts(client, alert_ids=[])
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "No alert IDs provided" in result[0].text
 
     @respx.mock

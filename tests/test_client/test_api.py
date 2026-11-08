@@ -6,6 +6,8 @@ import pytest
 import respx
 from httpx import Response
 
+from lm_mcp.tools import is_error_result
+
 
 class TestLogicMonitorClientInit:
     """Tests for client initialization."""
@@ -875,7 +877,7 @@ class TestPathSegmentGuard:
         assert not route.called
         assert len(result) == 1
         assert isinstance(result[0], ErrorContent)
-        assert result[0].text.startswith("Error: ")
+        assert is_error_result(result)
         assert "'..'" in result[0].text
         assert "unhandled error in tool handler" not in caplog.text
 

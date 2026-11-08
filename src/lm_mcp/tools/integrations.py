@@ -378,7 +378,7 @@ async def update_http_integration(
             return format_response(
                 {
                     "error": True,
-                    "code": "VALIDATION_ERROR",
+                    "code": "INVALID_REQUEST",
                     "message": "No fields provided to update",
                 }
             )

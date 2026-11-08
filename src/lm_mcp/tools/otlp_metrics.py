@@ -61,7 +61,7 @@ def _body_errors(result: dict) -> list[TextContent] | None:
     return format_response(
         {
             "error": True,
-            "code": "OTLP_QUERY_ERROR",
+            "code": "UPSTREAM_ERROR",
             "message": messages,
             "suggestion": "Retry; if it persists, narrow the time window or simplify the query.",
         }
@@ -198,7 +198,7 @@ async def get_otlp_label_values(
     """
     if not key:
         return validation_error(
-            "VALIDATION_ERROR",
+            "INVALID_REQUEST",
             "key is required",
             "Pass a label name, e.g. service_name; discover names with get_otlp_metric_labels.",
         )
@@ -237,13 +237,13 @@ async def query_otlp_metrics(
     """
     if not query:
         return validation_error(
-            "VALIDATION_ERROR",
+            "INVALID_REQUEST",
             "query is required",
             "Pass a PromQL expression, e.g. avg(container_cpu_usage_seconds_total).",
         )
     if start >= end:
         return validation_error(
-            "VALIDATION_ERROR",
+            "INVALID_REQUEST",
             "start must be before end (unix epoch seconds)",
             "Swap the values or widen the window.",
         )

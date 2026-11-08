@@ -41,7 +41,7 @@ def _import_result_response(result: dict, *, extra: dict | None = None) -> list[
         return format_response(
             {
                 "error": True,
-                "code": "IMPORT_SILENT_FAILURE",
+                "code": "INVALID_REQUEST",
                 "message": "Import may have silently failed: the API returned no ID and "
                 "no error. Verify the definition is in LM Exchange format (not REST API "
                 "format); for REST API format use the matching create_* tool.",
@@ -94,7 +94,7 @@ def _import_error_response(error: Exception, module_type: str) -> list[TextConte
         return format_response(
             {
                 "error": True,
-                "code": "IMPORT_FORMAT_MISMATCH",
+                "code": "INVALID_REQUEST",
                 "message": f"The definition is not a valid LM Exchange {module_type} module.",
                 "suggestion": suggestion,
             }

@@ -48,7 +48,7 @@ async def set_session_variable(
             return format_response(
                 {
                     "error": True,
-                    "code": "INVALID_ARGUMENT",
+                    "code": "INVALID_REQUEST",
                     "message": "Variable name must be a non-empty string",
                 }
             )
@@ -87,7 +87,7 @@ async def get_session_variable(
             return format_response(
                 {
                     "error": True,
-                    "code": "VARIABLE_NOT_FOUND",
+                    "code": "NOT_FOUND",
                     "message": f"Variable '{name}' not found in session",
                     "suggestion": "Use get_session_context to see all available variables",
                 }
@@ -122,7 +122,7 @@ async def delete_session_variable(
             return format_response(
                 {
                     "error": True,
-                    "code": "VARIABLE_NOT_FOUND",
+                    "code": "NOT_FOUND",
                     "message": f"Variable '{name}' not found in session",
                 }
             )

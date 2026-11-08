@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -105,7 +106,7 @@ class TestCreateCollectorGroup:
         from lm_mcp.tools.collectors import create_collector_group
 
         result = await create_collector_group(client, name="New Group")
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "disabled" in result[0].text.lower()
 
     @respx.mock
@@ -168,7 +169,7 @@ class TestUpdateCollectorGroup:
         from lm_mcp.tools.collectors import update_collector_group
 
         result = await update_collector_group(client, group_id=1, name="Updated")
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_update_collector_group_no_changes(self, client, monkeypatch):
@@ -242,7 +243,7 @@ class TestDeleteCollectorGroup:
         from lm_mcp.tools.collectors import delete_collector_group
 
         result = await delete_collector_group(client, group_id=1)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_delete_collector_group_blocked_with_collectors(self, client, monkeypatch):

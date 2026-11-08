@@ -1,5 +1,6 @@
 # Description: Tests for write permission decorator.
 # Description: Validates read-only mode enforcement.
+from lm_mcp.tools import is_error_result
 
 
 class TestWritePermissionConfig:
@@ -64,7 +65,7 @@ class TestRequireWritePermission:
         result = asyncio.run(write_something())
 
         assert len(result) == 1
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
         assert "Write operations are disabled" in result[0].text
         assert "LM_ENABLE_WRITE_OPERATIONS" in result[0].text
 

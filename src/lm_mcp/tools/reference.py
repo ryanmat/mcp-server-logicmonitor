@@ -58,7 +58,7 @@ async def get_reference(
             return format_response(
                 {
                     "error": True,
-                    "code": "MISSING_ARGS",
+                    "code": "INVALID_REQUEST",
                     "message": (
                         "Both 'category' and 'name' are required unless list=true. "
                         "Call with list=true to discover available pairs."
@@ -73,7 +73,7 @@ async def get_reference(
             return format_response(
                 {
                     "error": True,
-                    "code": "UNKNOWN_REFERENCE",
+                    "code": "NOT_FOUND",
                     "message": str(e),
                     "suggestion": (
                         "Call get_reference(list=true) to see available (category, name) pairs."

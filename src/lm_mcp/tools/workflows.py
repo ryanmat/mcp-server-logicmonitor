@@ -63,7 +63,7 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
             return format_response(
                 {
                     "error": True,
-                    "code": "REQUIRED_TOOLS_FILTERED_BY_CATEGORY",
+                    "code": "FEATURE_DISABLED",
                     "message": (
                         f"Composite tool requires tools excluded by LM_MCP_CATEGORIES="
                         f"{config.mcp_categories}: {', '.join(blocked)}"
@@ -79,7 +79,7 @@ def check_required_tools(required: list[str]) -> list[TextContent] | None:
         return format_response(
             {
                 "error": True,
-                "code": "REQUIRED_TOOLS_DISABLED",
+                "code": "FEATURE_DISABLED",
                 "message": f"Composite tool requires disabled tools: {', '.join(blocked)}",
                 "suggestion": "Enable these tools or use individual tools instead",
             }
@@ -985,7 +985,7 @@ async def diagnose(
             return format_response(
                 {
                     "error": True,
-                    "code": "MISSING_PARAMS",
+                    "code": "INVALID_REQUEST",
                     "message": "Either alert_id or device_name is required",
                 }
             )
@@ -1357,7 +1357,7 @@ async def update_logicmodule(
             return format_response(
                 {
                     "error": True,
-                    "code": "UNKNOWN_TYPE",
+                    "code": "INVALID_REQUEST",
                     "message": f"type must be one of {sorted(_LM_TYPES)}",
                 }
             )
@@ -1365,7 +1365,7 @@ async def update_logicmodule(
             return format_response(
                 {
                     "error": True,
-                    "code": "INVALID_MODE",
+                    "code": "INVALID_REQUEST",
                     "message": "mode must be 'preview' or 'apply'",
                 }
             )
@@ -1373,7 +1373,7 @@ async def update_logicmodule(
             return format_response(
                 {
                     "error": True,
-                    "code": "INVALID_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "changes must be a dict (partial update with field overrides)",
                 }
             )
@@ -1403,7 +1403,7 @@ async def update_logicmodule(
                 return format_response(
                     {
                         "error": True,
-                        "code": "MISSING_REQUIRED_FIELD",
+                        "code": "INVALID_REQUEST",
                         "message": (
                             f"merged definition missing required field '{required}'. "
                             "LM API will reject the update. Either keep it from the "

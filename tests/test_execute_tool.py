@@ -247,7 +247,7 @@ class TestPortalToolGating:
 
         for name, args in (("use_portal", {"customer": "x"}), ("list_portals", {})):
             result = await execute_tool(name, args)
-            assert result[0].text.startswith("Error:")
+            assert is_error_result(result)
             assert "multi-portal" in result[0].text
 
 

@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -126,7 +127,7 @@ class TestGetTraceServices:
 
         result = await get_trace_services(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_service ---
@@ -171,7 +172,7 @@ class TestGetTraceService:
 
         result = await get_trace_service(client, service_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_service_alerts ---
@@ -252,7 +253,7 @@ class TestGetTraceServiceAlerts:
 
         result = await get_trace_service_alerts(client, service_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_service_datasources ---
@@ -342,7 +343,7 @@ class TestGetTraceServiceDatasources:
 
         result = await get_trace_service_datasources(client, service_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_operations ---
@@ -440,7 +441,7 @@ class TestGetTraceOperations:
 
         result = await get_trace_operations(client, service_id=999, device_datasource_id=9999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_service_metrics ---
@@ -556,7 +557,7 @@ class TestGetTraceServiceMetrics:
             instance_id=8888,
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_operation_metrics ---
@@ -667,7 +668,7 @@ class TestGetTraceOperationMetrics:
             instance_id=8888,
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 # --- get_trace_service_properties ---
@@ -751,4 +752,4 @@ class TestGetTraceServiceProperties:
 
         result = await get_trace_service_properties(client, service_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)

@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 BASE = "https://test.logicmonitor.com/santaba/rest"
 
@@ -228,7 +229,7 @@ class TestGetOtlpLabelValues:
 
         result = await get_otlp_label_values(client, key="")
 
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
         assert "key is required" in result[0].text
         assert not route.called
 
@@ -303,7 +304,7 @@ class TestQueryOtlpMetrics:
 
         result = await query_otlp_metrics(client, query="", start=1, end=2)
 
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
         assert "query is required" in result[0].text
         assert not route.called
 
@@ -318,7 +319,7 @@ class TestQueryOtlpMetrics:
 
         result = await query_otlp_metrics(client, query="nginx_up", start=200, end=100)
 
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
         assert "start must be before end" in result[0].text
         assert not route.called
 
@@ -415,7 +416,7 @@ class TestGracefulDegrade:
 
         result = await query_otlp_metrics(client, query="up", start=1, end=2)
 
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
         assert "query execution failed in storage" in result[0].text
 
 
@@ -431,7 +432,7 @@ class TestErrorsArrayIn200:
 
         result = await get_otlp_metric_labels(client)
 
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
         assert "Unexpected error fetching labels" in result[0].text
 
     @respx.mock
@@ -443,5 +444,5 @@ class TestErrorsArrayIn200:
 
         result = await query_otlp_metrics(client, query="up", start=1, end=2)
 
-        assert result[0].text.startswith("Error:")
+        assert is_error_result(result)
         assert "Unexpected error fetching labels" in result[0].text

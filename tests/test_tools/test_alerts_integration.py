@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -109,7 +110,7 @@ class TestAlertWorkflow:
         ack_result = await acknowledge_alert(
             client, alert_id=critical_alert_id, note="Investigating disk space issue"
         )
-        assert "Error:" not in ack_result[0].text
+        assert not is_error_result(ack_result)
         ack_data = json.loads(ack_result[0].text)
         assert ack_data["success"] is True
 
@@ -138,7 +139,7 @@ class TestAlertWorkflow:
 
         # Read operation should succeed
         alerts_result = await get_alerts(client)
-        assert "Error:" not in alerts_result[0].text
+        assert not is_error_result(alerts_result)
 
         # Write operations should be blocked
         ack_result = await acknowledge_alert(client, alert_id="100")
@@ -158,7 +159,7 @@ class TestAlertWorkflow:
         )
 
         alerts_result = await get_alerts(client)
-        assert "Error:" in alerts_result[0].text
+        assert is_error_result(alerts_result)
         assert "Invalid token" in alerts_result[0].text
 
         # Mock: Alert not found
@@ -167,5 +168,5 @@ class TestAlertWorkflow:
         )
 
         details_result = await get_alert_details(client, alert_id="999")
-        assert "Error:" in details_result[0].text
+        assert is_error_result(details_result)
         assert "not found" in details_result[0].text.lower()

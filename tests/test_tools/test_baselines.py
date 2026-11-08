@@ -158,7 +158,7 @@ class TestSaveBaseline:
             baseline_name="test",
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_multiple_datapoints(self, client):
@@ -341,7 +341,7 @@ class TestCompareToBaseline:
             data = json.loads(text)
             assert data.get("error") is True
         except json.JSONDecodeError:
-            assert "Error" in text
+            assert is_error_result(result)
 
     @respx.mock
     async def test_inherits_ids_from_baseline(self, client):
@@ -464,7 +464,7 @@ class TestCompareToBaseline:
 
         result = await compare_to_baseline(client, baseline_name="err")
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_deviation_percent_calculated(self, client):

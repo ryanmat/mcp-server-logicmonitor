@@ -291,7 +291,7 @@ async def update_device(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )
@@ -454,7 +454,7 @@ async def bulk_delete_devices(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "No device IDs provided",
                 "suggestion": "Provide at least one device ID",
             }
@@ -464,7 +464,7 @@ async def bulk_delete_devices(
         return format_response(
             {
                 "error": True,
-                "code": "BULK_LIMIT_EXCEEDED",
+                "code": "INVALID_REQUEST",
                 "message": f"Too many devices ({len(device_ids)}). Max {BULK_OPERATION_LIMIT}.",
                 "suggestion": "Split into smaller batches",
             }
@@ -610,7 +610,7 @@ async def update_device_group(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )

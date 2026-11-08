@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from tests.list_paging import (
     BASE_URL,
     assert_negative_total_reads_as_more,
@@ -160,7 +161,7 @@ class TestGetDashboard:
 
         result = await get_dashboard(client, dashboard_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetDashboardWidgets:
@@ -679,7 +680,7 @@ class TestGetWidget:
 
         result = await get_widget(client, dashboard_id=123, widget_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestAddWidget:

@@ -274,7 +274,7 @@ async def add_alert_note(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "Note cannot be empty",
                 "suggestion": "Provide a non-empty note text",
             }
@@ -321,7 +321,7 @@ async def bulk_acknowledge_alerts(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "No alert IDs provided",
                 "suggestion": "Provide at least one alert ID",
             }
@@ -331,7 +331,7 @@ async def bulk_acknowledge_alerts(
         return format_response(
             {
                 "error": True,
-                "code": "BULK_LIMIT_EXCEEDED",
+                "code": "INVALID_REQUEST",
                 "message": f"Too many items ({len(alert_ids)}). Max {BULK_OPERATION_LIMIT}.",
                 "suggestion": "Split into smaller batches",
             }

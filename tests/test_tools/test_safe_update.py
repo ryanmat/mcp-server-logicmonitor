@@ -14,6 +14,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from lm_mcp.tools.workflows import (
     _LM_TYPES,
     _deep_merge,
@@ -154,7 +155,7 @@ class TestUpdateLogicmodule:
     async def test_unknown_type_rejected(self):
         result = await update_logicmodule(client=None, type="bogussource", id=1, changes={})
         text = result[0].text
-        assert "Error" in text
+        assert is_error_result(result)
         assert "type must be one of" in text
 
     async def test_invalid_mode_rejected(self):
@@ -162,7 +163,7 @@ class TestUpdateLogicmodule:
             client=None, type="datasource", id=1, changes={}, mode="commit"
         )
         text = result[0].text
-        assert "Error" in text
+        assert is_error_result(result)
         assert "mode must be 'preview' or 'apply'" in text
 
     async def test_invalid_changes_rejected(self):
@@ -173,7 +174,7 @@ class TestUpdateLogicmodule:
             changes="not a dict",  # type: ignore[arg-type]
         )
         text = result[0].text
-        assert "Error" in text
+        assert is_error_result(result)
         assert "changes must be a dict" in text
 
     async def test_preview_returns_diff_no_update_call(self, patched_handlers):
@@ -252,7 +253,7 @@ class TestUpdateLogicmodule:
             client=None, type="datasource", id=1, changes={}, mode="preview"
         )
         text = result[0].text
-        assert "Error" in text
+        assert is_error_result(result)
         assert "missing required field 'name'" in text
 
     async def test_missing_display_name_field_rejected(self, patched_handlers):
@@ -270,7 +271,7 @@ class TestUpdateLogicmodule:
             client=None, type="datasource", id=1, changes={}, mode="preview"
         )
         text = result[0].text
-        assert "Error" in text
+        assert is_error_result(result)
         assert "missing required field 'displayName'" in text
 
     async def test_falsy_definition_unwrap_handled(self, patched_handlers):

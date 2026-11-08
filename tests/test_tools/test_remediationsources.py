@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -211,7 +212,7 @@ class TestGetRemediationSources:
 
         result = await get_remediationsources(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetRemediationSource:
@@ -263,7 +264,7 @@ class TestGetRemediationSource:
 
         result = await get_remediationsource(client, source_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestRemediationSourceToolRegistration:
@@ -517,7 +518,7 @@ class TestExecuteRemediation:
         )
 
         result = await execute_remediation(client, host_id=1, remediation_source_id=100)
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestCreateRemediationSource:
@@ -586,7 +587,7 @@ class TestUpdateRemediationSource:
     """Tests for update_remediationsource tool."""
 
     async def test_update_without_confirm_is_guarded(self, client, enable_writes):
-        """update_remediationsource without confirm=True returns CONFIRMATION_REQUIRED."""
+        """update_remediationsource without confirm=True returns INVALID_REQUEST."""
         from lm_mcp.tools.remediationsources import update_remediationsource
 
         result = await update_remediationsource(

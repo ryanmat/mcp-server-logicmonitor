@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 
 @pytest.fixture
@@ -112,7 +113,7 @@ class TestGetDatasources:
 
         result = await get_datasources(client)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestGetDatasource:
@@ -201,7 +202,7 @@ class TestGetDatasource:
 
         result = await get_datasource(client, datasource_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_get_datasource_empty_datapoints(self, client):
@@ -413,7 +414,7 @@ class TestCreateDatasource:
 
         result = await create_datasource(client, definition={"name": "Bad"})
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_create_normalizes_snake_case_fields(self, client, enable_writes):
@@ -614,7 +615,7 @@ class TestUpdateDatasource:
     async def test_update_datasource_without_confirm_errors_with_pointer(
         self, client, enable_writes
     ):
-        """update_datasource without confirm=True returns CONFIRMATION_REQUIRED."""
+        """update_datasource without confirm=True returns INVALID_REQUEST."""
         from lm_mcp.tools.datasources import update_datasource
 
         result = await update_datasource(client, datasource_id=100, definition={"name": "X"})
@@ -636,7 +637,7 @@ class TestUpdateDatasource:
             client, datasource_id=999, definition={"name": "Missing"}, confirm=True
         )
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)
 
 
 class TestDeleteDatasource:
@@ -693,4 +694,4 @@ class TestDeleteDatasource:
 
         result = await delete_datasource(client, datasource_id=999)
 
-        assert "Error:" in result[0].text
+        assert is_error_result(result)

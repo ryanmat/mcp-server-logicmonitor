@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 
 BASE = "https://test.logicmonitor.com/santaba/rest"
 
@@ -107,7 +108,7 @@ class TestGetDiagnosticRemediationAssignments:
 
         result = await get_diagnostic_remediation_assignments(client)
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         assert "resource_id or alert_id" in result[0].text
 
     @respx.mock
@@ -201,7 +202,7 @@ class TestGetDiagnosticRemediationResults:
         both = await get_diagnostic_remediation_results(client, alert_id="DS1", host_id=1)
 
         for result in (neither, both):
-            assert "Error" in result[0].text
+            assert is_error_result(result)
             assert "exactly one of alert_id or host_id" in result[0].text
 
     async def test_results_rejects_cursor_with_module_type_both(self, client):
@@ -211,7 +212,7 @@ class TestGetDiagnosticRemediationResults:
 
         result = await get_diagnostic_remediation_results(client, host_id=1, cursor="abc")
 
-        assert "Error" in result[0].text
+        assert is_error_result(result)
         assert "Cursors are not supported" in result[0].text
 
     @respx.mock

@@ -152,7 +152,7 @@ async def create_sdt(
                 {
                     "success": False,
                     "error": True,
-                    "code": result.get("errorCode", "API_ERROR"),
+                    "code": "INVALID_REQUEST",
                     "message": error_msg,
                     "suggestion": suggestion,
                 }
@@ -225,7 +225,7 @@ async def update_sdt(
             return format_response(
                 {
                     "error": True,
-                    "code": "NO_CHANGES",
+                    "code": "INVALID_REQUEST",
                     "message": "No updates provided",
                 }
             )
@@ -287,7 +287,7 @@ async def bulk_create_device_sdt(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "No device IDs provided",
                 "suggestion": "Provide at least one device ID",
             }
@@ -297,7 +297,7 @@ async def bulk_create_device_sdt(
         return format_response(
             {
                 "error": True,
-                "code": "BULK_LIMIT_EXCEEDED",
+                "code": "INVALID_REQUEST",
                 "message": f"Too many devices ({len(device_ids)}). Max {BULK_OPERATION_LIMIT}.",
                 "suggestion": "Split into smaller batches",
             }
@@ -307,7 +307,7 @@ async def bulk_create_device_sdt(
         return format_response(
             {
                 "error": True,
-                "code": "DURATION_EXCEEDED",
+                "code": "INVALID_REQUEST",
                 "message": f"Duration {duration_minutes}m exceeds max {MAX_SDT_DURATION_MINUTES}m",
                 "suggestion": "Use shorter duration or schedule recurring SDT",
             }
@@ -366,7 +366,7 @@ async def bulk_delete_sdt(
         return format_response(
             {
                 "error": True,
-                "code": "VALIDATION_ERROR",
+                "code": "INVALID_REQUEST",
                 "message": "No SDT IDs provided",
                 "suggestion": "Provide at least one SDT ID",
             }
@@ -376,7 +376,7 @@ async def bulk_delete_sdt(
         return format_response(
             {
                 "error": True,
-                "code": "BULK_LIMIT_EXCEEDED",
+                "code": "INVALID_REQUEST",
                 "message": f"Too many SDTs ({len(sdt_ids)}). Max {BULK_OPERATION_LIMIT}.",
                 "suggestion": "Split into smaller batches",
             }

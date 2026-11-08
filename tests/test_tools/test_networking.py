@@ -10,6 +10,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from lm_mcp.tools import is_error_result
 from tests.alert_pages import alert_pages
 
 
@@ -470,7 +471,7 @@ class TestNetworkingErrorHandling:
 
         result = await get_interface_metrics(client, device_id=111, interface="eth0")
         # handle_error produces a readable error string.
-        assert "Error" in result[0].text
+        assert is_error_result(result)
 
     @respx.mock
     async def test_burst_tolerates_empty_alert_list(self, client):
