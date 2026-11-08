@@ -241,8 +241,24 @@ class TestPortalStamp:
 
         error = envelope(await execute_tool("get_device", {"device_id": 1}))
 
+        assert (error["code"], error["isRetryable"]) == ("INVALID_REQUEST", False)
         assert "No portal selected" in error["message"]
         assert error["details"]["portal"] is None
+
+    @pytest.mark.asyncio
+    async def test_write_before_use_portal_is_refused_and_audited(self, two_portals, caplog):
+        from lm_mcp.server import execute_tool
+        from tests.envelope import envelope
+
+        with caplog.at_level(logging.INFO):
+            error = envelope(await execute_tool("delete_device", {"device_id": 7}))
+
+        assert (error["code"], error["isRetryable"]) == ("INVALID_REQUEST", False)
+        assert "use_portal" in error["message"]
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
+            "Write operation failed: delete_device args={'device_id': 7}"
+        ]
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
 
     @pytest.mark.asyncio
     async def test_session_result_carries_portal(self, two_portals):

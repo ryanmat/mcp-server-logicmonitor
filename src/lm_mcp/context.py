@@ -68,14 +68,12 @@ def current_client() -> LogicMonitorClient:
     if client is None:
         from lm_mcp.config import get_config
 
-        raise missing_client_error(get_config().multi_portal)
+        raise RuntimeError(missing_client_message(get_config().multi_portal))
     return client
 
 
-def missing_client_error(multi_portal: bool) -> RuntimeError:
-    """The error for a caller that needs a client and has none."""
+def missing_client_message(multi_portal: bool) -> str:
+    """The message for a caller that needs a client and has none."""
     if multi_portal:
-        return RuntimeError(
-            "No portal selected. Call use_portal(<customer>) first (see list_portals)."
-        )
-    return RuntimeError("Client not initialized")
+        return "No portal selected. Call use_portal(<customer>) first (see list_portals)."
+    return "Client not initialized"

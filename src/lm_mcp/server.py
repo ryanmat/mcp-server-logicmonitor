@@ -12,7 +12,7 @@ from lm_mcp import __version__, portals
 from lm_mcp.categories import passes_name_filter, writes_to_portal
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.config import LMConfig, get_config
-from lm_mcp.context import CallBinding, bind, current_binding, current_client, missing_client_error
+from lm_mcp.context import CallBinding, bind, current_binding, missing_client_message
 from lm_mcp.logging import (
     configure_logging,
     is_write_tool,
@@ -74,7 +74,7 @@ def get_client() -> LogicMonitorClient:
         logger.debug("config unavailable; reporting the client as not initialized", exc_info=True)
     client = portals.call_binding(writes_enabled=False).client if multi else None
     if client is None:
-        raise missing_client_error(multi)
+        raise RuntimeError(missing_client_message(multi))
     return client
 
 
@@ -251,7 +251,14 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
             # None before use_portal) so discovery works portal-free.
             result = await handler(current_binding().client, **arguments)
         else:
-            result = await handler(current_client(), **arguments)
+            client = current_binding().client
+            if client is None:
+                # No portal selected yet, or no startup client: the caller fixes that
+                # first, so this is a refusal, not an upstream failure worth retrying.
+                if is_write_tool(name):
+                    log_write_operation(name, arguments, success=False)
+                return error_content("INVALID_REQUEST", missing_client_message(config.multi_portal))
+            result = await handler(client, **arguments)
 
         # Handlers return errors rather than raise, so the outcome comes from the result
         failed = is_error_result(result)

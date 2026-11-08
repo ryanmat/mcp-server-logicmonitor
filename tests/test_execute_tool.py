@@ -499,7 +499,7 @@ class TestWriteOutcomeFromResult:
         ]
 
     async def test_write_raising_before_handler_audits_failure(self, write_portal, caplog):
-        """No client bound: current_client raises and the except path audits the write as failed."""
+        """No client bound: the dispatcher refuses the call and audits the write as failed."""
         from lm_mcp.server import _set_client, execute_tool
 
         _set_client(None)

@@ -107,15 +107,34 @@ class TestExecuteToolInlineErrors:
         assert is_error_result(result)
         assert envelope(result)["code"] == "INVALID_REQUEST"
 
-    async def test_exception_path(self, single_portal, reset_portals):
-        """No client bound: get_client raises and the dispatcher's except path answers."""
+    async def test_missing_client(self, single_portal, reset_portals, caplog):
+        """No client bound: the dispatcher refuses the call, not retryable, with no traceback."""
         from lm_mcp.server import execute_tool
 
-        result = await execute_tool("get_devices", {})
+        with caplog.at_level(logging.ERROR, logger="lm_mcp.server"):
+            result = await execute_tool("get_devices", {})
+        assert is_error_result(result)
+        error = envelope(result)
+        assert (error["code"], error["isRetryable"]) == ("INVALID_REQUEST", False)
+        assert error["message"] == "Client not initialized"
+        assert caplog.records == []
+
+    async def test_exception_path(self, single_portal):
+        """A handler that raises: the dispatcher's except path answers."""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from lm_mcp.server import execute_tool
+
+        handler = AsyncMock(side_effect=RuntimeError("boom"))
+        with (
+            patch("lm_mcp.server._client", MagicMock()),
+            patch("lm_mcp.server.get_tool_handler", return_value=handler),
+        ):
+            result = await execute_tool("get_devices", {})
         assert is_error_result(result)
         error = envelope(result)
         assert error["code"] == "UPSTREAM_ERROR"
-        assert error["message"] == "Client not initialized"
+        assert error["message"] == "boom"
         assert error["details"] == {"exception": "RuntimeError"}
 
     async def test_success_is_not_an_error(self, single_portal):
