@@ -8,22 +8,33 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _ops_note_row(item: dict) -> dict:
+    """Project one /setting/opsnotes row onto the get_ops_notes fields."""
+    return {
+        "id": item.get("id"),
+        "note": item.get("note"),
+        "tags": item.get("tags", []),
+        "happened_on": item.get("happenedOnInSec"),
+        "created_by": item.get("createdBy"),
+        "scopes": item.get("scopes", []),
+    }
+
+
 async def get_ops_notes(
     client: LogicMonitorClient,
     tag_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List ops notes from LogicMonitor.
 
@@ -31,44 +42,20 @@ async def get_ops_notes(
         client: LogicMonitor API client.
         tag_filter: Filter by tag (supports wildcards).
         limit: Maximum number of notes to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with ops notes data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if tag_filter:
-            clean_tag, was_modified = sanitize_filter_value(tag_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"tags~{quote_filter_value(clean_tag)}"
-
-        result = await client.get("/setting/opsnotes", params=params)
-
-        notes = []
-        for item in result.get("items", []):
-            notes.append(
-                {
-                    "id": item.get("id"),
-                    "note": item.get("note"),
-                    "tags": item.get("tags", []),
-                    "happened_on": item.get("happenedOnInSec"),
-                    "created_by": item.get("createdBy"),
-                    "scopes": item.get("scopes", []),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(notes),
-            "ops_notes": notes,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/opsnotes",
+        key="ops_notes",
+        project=_ops_note_row,
+        limit=limit,
+        offset=offset,
+        named={"tags~": tag_filter},
+    )
 
 
 async def get_ops_note(

@@ -8,16 +8,31 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+
+
+def _alert_rule_row(item: dict) -> dict:
+    """Project one /setting/alert/rules row onto the get_alert_rules fields."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "priority": item.get("priority"),
+        "escalation_chain_id": item.get("escalatingChainId"),
+        "escalation_chain_name": item.get("escalatingChain", {}).get("name"),
+        "level_str": item.get("levelStr"),
+        "devices": item.get("devices", []),
+        "device_groups": item.get("deviceGroups", []),
+        "datasource": item.get("datasource"),
+        "suppress_alert_clear": item.get("suppressAlertClear"),
+        "suppress_alert_ack_sdt": item.get("suppressAlertAckSdt"),
+    }
 
 
 async def get_alert_rules(
@@ -25,6 +40,7 @@ async def get_alert_rules(
     name_filter: str | None = None,
     priority_filter: int | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List alert rules from LogicMonitor.
 
@@ -33,55 +49,21 @@ async def get_alert_rules(
         name_filter: Filter by rule name (supports wildcards).
         priority_filter: Filter by priority level.
         limit: Maximum number of rules to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with alert rule data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        filters = []
-        if name_filter:
-            clean_name, was_modified = sanitize_filter_value(name_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"name~{quote_filter_value(clean_name)}")
-        if priority_filter is not None:
-            filters.append(f"priority:{priority_filter}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/alert/rules", params=params)
-
-        rules = []
-        for item in result.get("items", []):
-            rules.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "priority": item.get("priority"),
-                    "escalation_chain_id": item.get("escalatingChainId"),
-                    "escalation_chain_name": item.get("escalatingChain", {}).get("name"),
-                    "level_str": item.get("levelStr"),
-                    "devices": item.get("devices", []),
-                    "device_groups": item.get("deviceGroups", []),
-                    "datasource": item.get("datasource"),
-                    "suppress_alert_clear": item.get("suppressAlertClear"),
-                    "suppress_alert_ack_sdt": item.get("suppressAlertAckSdt"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(rules),
-            "alert_rules": rules,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/alert/rules",
+        key="alert_rules",
+        project=_alert_rule_row,
+        limit=limit,
+        offset=offset,
+        named={"name~": name_filter},
+        clauses=[f"priority:{priority_filter}"] if priority_filter is not None else [],
+    )
 
 
 async def get_alert_rule(

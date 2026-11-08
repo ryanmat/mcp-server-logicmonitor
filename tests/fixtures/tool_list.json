@@ -3155,6 +3155,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -3354,6 +3359,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },
@@ -4054,6 +4064,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -4661,6 +4676,11 @@
         "name_filter": {
           "description": "Filter by property name (substring match)",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "required": [
@@ -5067,30 +5087,6 @@
       "type": "object"
     }
   },
-  "get_idle_resources": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get idle/underutilized cloud resources (resolved from idle-type cost recommendation categories)",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "provider": {
-          "description": "Narrow to one cloud provider (aws, azure, gcp)",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
   "get_integration": {
     "annotations": {
       "destructiveHint": false,
@@ -5407,6 +5403,11 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
@@ -5487,6 +5488,11 @@
           "description": "Max results",
           "type": "integer"
         },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        },
         "oid_filter": {
           "description": "Filter by OID (substring)",
           "type": "string"
@@ -5531,6 +5537,11 @@
         "limit": {
           "default": 50,
           "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
           "type": "integer"
         }
       },

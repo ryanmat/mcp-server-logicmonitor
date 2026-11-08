@@ -8,12 +8,9 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
-    safe_total,
-    sanitize_filter_value,
+    list_tool,
 )
 
 if TYPE_CHECKING:
@@ -62,113 +59,18 @@ async def get_cost_recommendations(
     Returns:
         List of TextContent with recommendations or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        filters = []
-        if category:
-            clean_category, was_modified = sanitize_filter_value(category)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"recommendationCategory:{quote_filter_value(clean_category)}")
-        if status:
-            clean_status, was_modified = sanitize_filter_value(status)
-            wildcards_stripped = wildcards_stripped or was_modified
-            filters.append(f"recommendationStatus:{quote_filter_value(clean_status.upper())}")
-
-        if filters:
-            params["filter"] = ",".join(filters)
-
-        result = await client.get("/cost-optimization/recommendations", params=params)
-
-        recommendations = [_project_recommendation(item) for item in result.get("items", [])]
-
-        response = {
-            "total": safe_total(result),
-            "count": len(recommendations),
-            "recommendations": recommendations,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
-
-
-# Category enum-name markers that identify idle/waste recommendation types
-# (e.g. EC2_IDLE, AZURE_VM_UNDERUTILIZED, EBS_UNATTACHED, AZURE_VM_STOPPED).
-_IDLE_CATEGORY_MARKERS = ("_IDLE", "_UNDERUTILIZED", "_UNATTACHED", "_STOPPED")
-
-
-async def get_idle_resources(
-    client: LogicMonitorClient,
-    provider: str | None = None,
-    limit: int = 50,
-) -> list[TextContent]:
-    """Get idle/underutilized cloud resources from cost recommendations.
-
-    Resolves idle-type categories dynamically from the Cost Optimization
-    categories endpoint (enum names containing _IDLE, _UNDERUTILIZED,
-    _UNATTACHED, _STOPPED), then queries recommendations with an OR
-    filter on their description strings. The recommendation filter
-    matches descriptions, not enum names.
-
-    Args:
-        client: LogicMonitor API client.
-        provider: Narrow to one cloud provider (aws, azure, gcp).
-        limit: Maximum number of recommendations to fetch.
-
-    Returns:
-        List of TextContent with idle resources or error.
-    """
-    try:
-        categories = await client.get("/cost-optimization/recommendations/categories")
-        idle_descriptions = [
-            item.get("description")
-            for item in categories.get("items", [])
-            if item.get("description")
-            and any(marker in str(item.get("name", "")) for marker in _IDLE_CATEGORY_MARKERS)
-        ]
-
-        if not idle_descriptions:
-            return format_response(
-                {
-                    "total": 0,
-                    "count": 0,
-                    "idle_resources": [],
-                    "note": "No idle-type recommendation categories available on this portal.",
-                }
-            )
-
-        or_values = "|".join(quote_filter_value(desc) for desc in idle_descriptions)
-        params: dict = {"size": limit, "filter": f"recommendationCategory:{or_values}"}
-
-        result = await client.get("/cost-optimization/recommendations", params=params)
-
-        resources = []
-        for item in result.get("items", []):
-            if provider and str(item.get("cloudProvider", "")).lower() != provider.lower():
-                continue
-            # Defensive re-filter: the API matches description strings, so keep
-            # only items whose category resolved from the idle-type enum names.
-            if item.get("recommendationCategory") not in idle_descriptions:
-                continue
-            resources.append(_project_recommendation(item))
-
-        response: dict = {
-            "total": safe_total(result),
-            "count": len(resources),
-            "idle_resources": resources,
-        }
-        if provider:
-            response["provider"] = provider.lower()
-            response["note"] = (
-                "Provider filtering is applied client-side after fetching; "
-                "increase limit if results appear truncated."
-            )
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/cost-optimization/recommendations",
+        key="recommendations",
+        project=_project_recommendation,
+        limit=limit,
+        offset=offset,
+        named={
+            "recommendationCategory:": category,
+            "recommendationStatus:": status.upper() if status else None,
+        },
+    )
 
 
 async def get_cost_recommendation_categories(

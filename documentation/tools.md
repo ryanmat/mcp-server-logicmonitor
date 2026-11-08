@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 267 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -278,7 +278,6 @@ Cloud cost analysis and optimization
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_cost_recommendations` | Get cost optimization recommendations. Category filter takes the category description string from get_cost_recommendation_categories | No |
-| `get_idle_resources` | Get idle/underutilized cloud resources (resolved from idle-type cost recommendation categories) | No |
 | `get_cost_recommendation_categories` | Get cost recommendation categories with counts and savings | No |
 | `get_cost_recommendation` | Get a specific cost recommendation by ID (v224 API) | No |
 

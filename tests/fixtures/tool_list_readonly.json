@@ -91,7 +91,6 @@
   "get_eventsource",
   "get_eventsources",
   "get_graph_data",
-  "get_idle_resources",
   "get_integration",
   "get_integrations",
   "get_interface_metrics",

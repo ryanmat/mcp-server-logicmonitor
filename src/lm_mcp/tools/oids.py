@@ -8,21 +8,32 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    quote_filter_value,
-    sanitize_filter_value,
+    list_tool,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
+def _oid_row(item: dict) -> dict:
+    """Project one /setting/oids row onto the get_oids fields."""
+    return {
+        "id": item.get("id"),
+        "oid": item.get("oid"),
+        "name": item.get("name"),
+        "category": item.get("category"),
+        "description": item.get("description"),
+        "datapoint_type": item.get("datapointType"),
+    }
+
+
 async def get_oids(
     client: LogicMonitorClient,
     oid_filter: str | None = None,
     limit: int = 50,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List OIDs from LogicMonitor.
 
@@ -30,44 +41,20 @@ async def get_oids(
         client: LogicMonitor API client.
         oid_filter: Filter by OID value (supports wildcards).
         limit: Maximum number of OIDs to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
         List of TextContent with OID data or error.
     """
-    try:
-        params: dict = {"size": limit}
-        wildcards_stripped = False
-
-        if oid_filter:
-            clean_oid, was_modified = sanitize_filter_value(oid_filter)
-            wildcards_stripped = wildcards_stripped or was_modified
-            params["filter"] = f"oid~{quote_filter_value(clean_oid)}"
-
-        result = await client.get("/setting/oids", params=params)
-
-        oids = []
-        for item in result.get("items", []):
-            oids.append(
-                {
-                    "id": item.get("id"),
-                    "oid": item.get("oid"),
-                    "name": item.get("name"),
-                    "category": item.get("category"),
-                    "description": item.get("description"),
-                    "datapoint_type": item.get("datapointType"),
-                }
-            )
-
-        response = {
-            "total": result.get("total", 0),
-            "count": len(oids),
-            "oids": oids,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    return await list_tool(
+        client,
+        "/setting/oids",
+        key="oids",
+        project=_oid_row,
+        limit=limit,
+        offset=offset,
+        named={"oid~": oid_filter},
+    )
 
 
 async def get_oid(
