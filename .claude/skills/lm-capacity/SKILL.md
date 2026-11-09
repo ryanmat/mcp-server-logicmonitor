@@ -117,9 +117,10 @@ For resources classified as volatile or increasing:
 1. Read the `seasonality` section of the Step 4 analysis to identify periodic patterns.
 
 Report findings:
-- Period detected (hourly, daily, weekly)
-- Peak and trough times
-- Amplitude of seasonal variation
+- Dominant period (`dominant_period`) and whether it is seasonal (`is_seasonal`, its
+  autocorrelation above 0.5)
+- Autocorrelation at each tested period (1, 4, 12, 24 and 168 hours)
+- Peak hours (`peak_hours_utc`, in UTC)
 
 Seasonal patterns affect forecast accuracy. If strong seasonality is present,
 note that linear forecasts may overestimate or underestimate depending on
@@ -151,21 +152,22 @@ For resources with increasing trends:
    - Disk: threshold = 95 (%)
    - Or use user-specified thresholds
 
-Present forecast results:
+Present forecast results, in days (`hours_until_breach` divided by 24):
 
 ```
-| Resource    | Current | Threshold | Days to Breach | Confidence |
-|------------|---------|-----------|----------------|------------|
-| CPU        | 65%     | 90%       | 45 days        | medium     |
-| Memory     | 72%     | 90%       | 120 days       | high       |
-| Disk (C:)  | 83%     | 95%       | 12 days        | high       |
+| Resource    | Current | Threshold | Linear          | Holt-Winters    |
+|------------|---------|-----------|-----------------|-----------------|
+| CPU        | 65%     | 90%       | 21 days         | 19 days         |
+| Memory     | 72%     | 90%       | none in 30 days | none in 30 days |
+| Disk (C:)  | 83%     | 95%       | 12 days         | 11 days         |
 ```
 
-Classify urgency:
+Where a method reports no crossing, give its `reason`.
+
+Classify urgency by the earlier of the two crossings:
 - **< 7 days** — Immediate action required.
 - **7-30 days** — Plan remediation within the current sprint.
-- **30-90 days** — Schedule for next planning cycle.
-- **> 90 days or no breach** — No immediate concern. Monitor trends.
+- **No crossing within 30 days** — No immediate concern. Monitor trends.
 
 ### Step 8: Baseline Comparison
 

@@ -99,7 +99,7 @@ List each anomaly with:
 - Datasource and datapoint name
 - Current value vs. expected range
 - Z-score magnitude
-- Duration of anomalous state
+- Timestamp of each hit (each hit is one sample)
 
 If no anomalies are detected, note the device metrics are within expected ranges.
 

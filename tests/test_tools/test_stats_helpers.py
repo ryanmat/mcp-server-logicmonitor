@@ -1,5 +1,5 @@
 # Description: Tests for shared statistical utility functions.
-# Description: Validates linear_regression, pearson_correlation, autocorrelation, entropy, paging.
+# Description: Validates the shared statistics and paged reads, and the tools' use of them.
 
 import importlib
 import json

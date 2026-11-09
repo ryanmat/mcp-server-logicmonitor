@@ -87,7 +87,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `classify_trend` | `analyze_metric` with `analyses=["trend"]`: the label, least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation and the detrended 24-hour autocorrelation. |
 | `detect_seasonality` | `analyze_metric` with `analyses=["seasonality"]`. |
 | `detect_change_points` | `analyze_metric` with `analyses=["change_points"]`, which compares the mean of the 30 samples after each sample with the 30 before it, where the tool summed deviations from the series mean. |
-| `get_metric_anomalies` | `analyze_metric` with `analyses=["anomalies"]`, which runs z-score, IQR and MAD together at fixed fences (3, 1.5 IQR and 3.5), where the tool ran one method at a threshold you set. |
+| `get_metric_anomalies` | `analyze_metric` with `analyses=["anomalies"]`, which runs z-score, IQR and MAD together at fixed fences (3, 1.5 IQR and 3.5), where the tool ran one method per datapoint, named by `method` or chosen from the data, with `threshold` setting the z-score and MAD fences. |
 | `score_device_health` | `analyze_metric` with `analyses=["summary"]`. Each datapoint's signed `z_score` takes the place of the 0 to 100 score, which no tool computes now. |
 | `save_baseline` | `analyze_metric` with `baseline_hours_ago`, which reads the earlier window when asked. Nothing is stored in the session, and the `baseline_` session variables are no longer read. |
 | `compare_to_baseline` | `analyze_metric` with `analyses=["baseline"]` and `baseline_hours_ago`. |
