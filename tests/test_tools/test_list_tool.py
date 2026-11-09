@@ -246,3 +246,66 @@ class TestListToolResponse:
         )
 
         assert isinstance(result[0], ErrorContent)
+
+
+class TestListToolKeep:
+    """list_tool's keep predicate drops rows after the fetch; paging follows the fetched page."""
+
+    @pytest.mark.parametrize(("total", "has_more"), [(3, False), (10, True), (-4, True)])
+    @respx.mock
+    async def test_dropped_rows_leave_the_page_but_not_the_paging(self, client, total, has_more):
+        respx.get(f"{BASE_URL}/device/devices").mock(
+            return_value=httpx.Response(200, json={"total": total, "items": _rows(3)})
+        )
+
+        result = await list_tool(
+            client,
+            "/device/devices",
+            key="devices",
+            project=_project,
+            limit=3,
+            offset=0,
+            keep=lambda item: item["id"] != 1,
+        )
+
+        data = json.loads(result[0].text)
+        assert [row["id"] for row in data["devices"]] == [0, 2]
+        assert data["count"] == 2
+        assert data["dropped"] == 1
+        assert data["next_offset"] == 3
+        assert data["has_more"] is has_more
+
+    @respx.mock
+    async def test_a_page_whose_rows_are_all_dropped_still_reads_more(self, client):
+        respx.get(f"{BASE_URL}/device/devices").mock(
+            return_value=httpx.Response(200, json={"total": -7, "items": _rows(3)})
+        )
+
+        result = await list_tool(
+            client,
+            "/device/devices",
+            key="devices",
+            project=_project,
+            limit=3,
+            keep=lambda _: False,
+        )
+
+        data = json.loads(result[0].text)
+        assert data["devices"] == []
+        assert data["count"] == 0
+        assert data["dropped"] == 3
+        assert data["has_more"] is True
+
+    @respx.mock
+    async def test_without_keep_the_response_carries_no_drop_fields(self, client):
+        respx.get(f"{BASE_URL}/device/devices").mock(
+            return_value=httpx.Response(200, json={"total": 3, "items": _rows(3)})
+        )
+
+        result = await list_tool(
+            client, "/device/devices", key="devices", project=_project, limit=3
+        )
+
+        data = json.loads(result[0].text)
+        assert "dropped" not in data
+        assert "next_offset" not in data

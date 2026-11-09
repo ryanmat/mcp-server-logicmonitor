@@ -200,7 +200,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Analyze one alert window: call this for how many alerts fired and when, which alerts belong together, how noisy alerting is, which datasources burst, or which portal changes preceded a spike over the last hours. One read of the window's active and cleared alerts, under the severity, device, group and datasource filters, feeds every section; 'statistics' gives active and cleared totals, counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included; 'clusters' groups two or more alerts by device, by datasource and by signature (datasource and datapoint), with their alert ids and first and last start times; 'noise' gives a 0 to 100 score from the entropy of alerts over datasource and datapoint (weight 40), flaps, an alert on the same device and datapoint that re-fires within 30 minutes of clearing (30), and repeats, a combination with three or more alerts (30), with the first ten flap pairs and tuning recommendations; 'bursts' gives the windows of window_seconds on one datasource that hold at least min_alerts alerts on min_devices devices; 'changes' reads the audit log once and pairs each write action (create, add, update, delete, remove or modify) with the first 5-minute alert spike, a bucket above the mean by one standard deviation, within correlation_window_minutes after it, with a confidence from 1.0 to 0.5. truncated says when the 5000-alert cap cut either read short. Use get_alerts to list or page through the alerts themselves.",
+    "description": "Analyze one alert window: call this for how many alerts fired and when, which alerts belong together, how noisy alerting is, which datasources burst, or which portal changes preceded a spike over the last hours. One read of the window's active and cleared alerts, under the severity, device, group and datasource filters, feeds every section; 'statistics' gives active and cleared totals, counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included; 'clusters' groups two or more alerts by device, by datasource and by signature (datasource and datapoint), with their alert ids and first and last start times; 'noise' gives a 0 to 100 score from the entropy of alerts over datasource and datapoint (weight 40), flaps, an alert on the same device and datapoint that re-fires within 30 minutes of clearing (30), and repeats, a combination with three or more alerts (30), with the first ten flap pairs and tuning recommendations; 'bursts' gives the windows of window_seconds on one datasource that hold at least min_alerts alerts on min_devices devices; 'changes' reads the audit log once and pairs each change (a create, update, delete or import, read from the entry's description) with the first 5-minute alert spike, a bucket above the mean by one standard deviation, within correlation_window_minutes after it, with a confidence from 1.0 to 0.5. truncated says when the 5000-alert cap cut either read short. Use get_alerts to list or page through the alerts themselves.",
     "inputSchema": {
       "properties": {
         "analyses": {
@@ -3392,16 +3392,40 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get audit logs from LogicMonitor",
+    "description": "Read the portal audit log: call this for who did what and when. kind='all' returns one page of entries, newest first; kind='change' returns the configuration changes (create, update, delete or import, read from each entry's description) found in a pool of the newest entries, with scanned and has_more. username is an exact name or a comma-separated list; action and resource_type are text the description must contain (the portal applies one, the second is matched on the fetched page); start_time and end_time bound the entry time in epoch seconds. System and automation actors (System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the fetch unless exclude_system is false or a username is given; dropped counts them and paging follows the rows the portal returned. offset plus the rows read must stay within 10,000, and the filter within about 900 characters.",
     "inputSchema": {
       "properties": {
         "action": {
-          "description": "Filter by action type",
+          "description": "Text the description contains, e.g. Action=Delete",
+          "type": "string"
+        },
+        "change_type": {
+          "description": "With kind change: the change type to keep",
+          "enum": [
+            "create",
+            "update",
+            "delete",
+            "import"
+          ],
           "type": "string"
         },
         "end_time": {
-          "description": "End time in epoch seconds (optional)",
+          "description": "Only entries at or before this epoch second",
           "type": "integer"
+        },
+        "exclude_system": {
+          "default": true,
+          "description": "Drop system and automation actors (default true)",
+          "type": "boolean"
+        },
+        "kind": {
+          "default": "all",
+          "description": "all: every entry; change: configuration changes only",
+          "enum": [
+            "all",
+            "change"
+          ],
+          "type": "string"
         },
         "limit": {
           "default": 50,
@@ -3414,15 +3438,15 @@
           "type": "integer"
         },
         "resource_type": {
-          "description": "Filter by resource type",
+          "description": "Text the description contains, e.g. Type=Device",
           "type": "string"
         },
         "start_time": {
-          "description": "Start time in epoch seconds (optional)",
+          "description": "Only entries at or after this epoch second",
           "type": "integer"
         },
         "username": {
-          "description": "Filter by username",
+          "description": "Exact username, or a comma-separated list",
           "type": "string"
         }
       },

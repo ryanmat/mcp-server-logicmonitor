@@ -13,7 +13,6 @@ from lm_mcp.registry import TOOLS, get_tool_handler
 # entry whose handler does not exist or does not format its own query, so an entry
 # leaves when its handler moves.
 _LIST_TOOL_PENDING: dict[str, int] = {
-    "get_audit_logs": 38,
     "get_api_token_audit": 39,
     "get_change_audit": 39,
     "get_login_audit": 39,
@@ -65,7 +64,7 @@ _ALERT_WINDOW_TOOLS_REPLACED = (
 
 
 class TestAlertWindowToolsReplaced:
-    """analyze_alerts is registered and the five alert-window tools it replaces are not (R2.2)."""
+    """analyze_alerts is registered; the five tools it replaces are not (R2.2, R2.13)."""
 
     def test_analyze_alerts_is_registered(self):
         assert "analyze_alerts" in {tool.name for tool in TOOLS}

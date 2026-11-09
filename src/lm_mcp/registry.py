@@ -3210,24 +3210,59 @@ TOOLS.extend(
     [
         Tool(
             name="get_audit_logs",
-            description="Get audit logs from LogicMonitor",
+            description=(
+                "Read the portal audit log: call this for who did what and when. kind='all' "
+                "returns one page of entries, newest first; kind='change' returns the "
+                "configuration changes (create, update, delete or import, read from each "
+                "entry's description) found in a pool of the newest entries, with scanned "
+                "and has_more. username is an exact name or a comma-separated list; action "
+                "and resource_type are text the description must contain (the portal applies "
+                "one, the second is matched on the fetched page); start_time and end_time "
+                "bound the entry time in epoch seconds. System and automation actors "
+                "(System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the "
+                "fetch unless exclude_system is false or a username is given; dropped counts "
+                "them and paging follows the rows the portal returned. offset plus the rows "
+                "read must stay within 10,000, and the filter within about 900 characters."
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "username": {"type": "string", "description": "Filter by username"},
-                    "action": {"type": "string", "description": "Filter by action type"},
+                    "kind": {
+                        "type": "string",
+                        "enum": ["all", "change"],
+                        "default": "all",
+                        "description": "all: every entry; change: configuration changes only",
+                    },
+                    "username": {
+                        "type": "string",
+                        "description": "Exact username, or a comma-separated list",
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": "Text the description contains, e.g. Action=Delete",
+                    },
                     "resource_type": {
                         "type": "string",
-                        "description": "Filter by resource type",
+                        "description": "Text the description contains, e.g. Type=Device",
+                    },
+                    "change_type": {
+                        "type": "string",
+                        "enum": ["create", "update", "delete", "import"],
+                        "description": "With kind change: the change type to keep",
                     },
                     "start_time": {
                         "type": "integer",
-                        "description": "Start time in epoch seconds (optional)",
+                        "description": "Only entries at or after this epoch second",
                     },
                     "end_time": {
                         "type": "integer",
-                        "description": "End time in epoch seconds (optional)",
+                        "description": "Only entries at or before this epoch second",
+                    },
+                    "exclude_system": {
+                        "type": "boolean",
+                        "default": True,
+                        "description": "Drop system and automation actors (default true)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
@@ -4267,8 +4302,9 @@ TOOLS.extend(
                 "(30), with the first ten flap pairs and tuning recommendations; 'bursts' "
                 "gives the windows of window_seconds on one datasource that hold at least "
                 "min_alerts alerts on min_devices devices; 'changes' reads the audit log "
-                "once and pairs each write action (create, add, update, delete, remove or "
-                "modify) with the first 5-minute alert spike, a bucket above the mean by "
+                "once and pairs each change (a create, update, delete or import, read from "
+                "the entry's description) with the first 5-minute alert spike, a bucket above "
+                "the mean by "
                 "one standard deviation, within correlation_window_minutes after it, with "
                 "a confidence from 1.0 to 0.5. truncated says when the 5000-alert cap cut "
                 "either read short. Use get_alerts to list or page through the alerts "

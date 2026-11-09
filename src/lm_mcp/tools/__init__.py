@@ -189,6 +189,7 @@ async def list_tool(
     clauses: Sequence[str] = (),
     params: Mapping[str, Any] | None = None,
     extra: Mapping[str, Any] | None = None,
+    keep: Callable[[dict[str, Any]], bool] | None = None,
 ) -> list[TextContent]:
     """Fetch one page of a LogicMonitor collection as a list tool response.
 
@@ -213,6 +214,9 @@ async def list_tool(
             filters, numeric ids and enum clauses.
         params: Other query parameters the endpoint takes.
         extra: Fields added to the response beside the page.
+        keep: Predicate over each API row; a row it rejects is dropped after the
+            fetch. Paging still follows the fetched page, count is the rows kept,
+            and the response adds dropped and next_offset.
 
     Returns:
         List of TextContent with the page, or an ErrorContent from
@@ -235,12 +239,18 @@ async def list_tool(
                 query["filter"] = ",".join(parts)
 
         result = await client.get(path, params=query)
+        items = result.get("items", [])
+        kept = items if keep is None else [item for item in items if keep(item)]
         rows = []
-        for item in result.get("items", []):
+        for item in kept:
             row = project(item)
             rows.append(await row if inspect.isawaitable(row) else row)
 
-        response = {**paginated_response(rows, result, offset), key: rows, **(extra or {})}
+        response = {**paginated_response(items, result, offset), key: rows, **(extra or {})}
+        if keep is not None:
+            response["count"] = len(rows)
+            response["dropped"] = len(items) - len(kept)
+            response["next_offset"] = offset + len(items)
         if wildcards_stripped:
             response["note"] = WILDCARD_STRIP_NOTE
         return format_response(response)
