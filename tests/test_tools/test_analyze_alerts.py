@@ -1,7 +1,8 @@
 # Description: Tests for analyze_alerts, the one-read analysis of an alert window.
-# Description: Covers the active-plus-cleared read, statistics, clusters, noise and selection.
+# Description: Covers the window read, statistics, clusters, noise, bursts, changes and selection.
 
 import json
+import logging
 import time
 from unittest.mock import patch
 
@@ -18,6 +19,7 @@ from tests.envelope import envelope
 BASE_EPOCH = 1705276800
 ALERT_URL = "https://test.logicmonitor.com/santaba/rest/alert/alerts"
 GROUP_URL = "https://test.logicmonitor.com/santaba/rest/device/groups/5"
+AUDIT_URL = "https://test.logicmonitor.com/santaba/rest/setting/accesslogs"
 
 
 @pytest.fixture
@@ -100,6 +102,7 @@ class TestOneRead:
         from lm_mcp.tools.analyze_alerts import SECTIONS
 
         respx.get(ALERT_URL).mock(side_effect=alert_lists([_make_alert(1, "s1", "CPU")]))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": []}))
 
         body = _body(await _analyze(client))
 
@@ -124,12 +127,26 @@ class TestOneRead:
             {"analyses": []},
             {"severity": "fatal"},
             {"hours": 0},
+            {"window_seconds": 0},
+            {"min_alerts": 0},
+            {"min_devices": 0},
+            {"correlation_window_minutes": 0},
         ],
-        ids=["unknown-section", "wrong-case", "empty", "unknown-severity", "no-hours"],
+        ids=[
+            "unknown-section",
+            "wrong-case",
+            "empty",
+            "unknown-severity",
+            "no-hours",
+            "no-window",
+            "no-min-alerts",
+            "no-min-devices",
+            "no-correlation-window",
+        ],
     )
     @respx.mock
     async def test_bad_argument_is_invalid_request_before_any_read(self, client, kwargs):
-        """A section or severity the tool does not offer, or an empty window, is refused."""
+        """An unknown section or severity, or a window or threshold under 1, is refused."""
         route = respx.get(ALERT_URL).mock(side_effect=alert_lists([]))
 
         error = envelope(await _analyze(client, **kwargs))
@@ -139,14 +156,18 @@ class TestOneRead:
 
     @respx.mock
     async def test_filters_reach_both_reads(self, client):
-        """Severity, device and group narrow the active read; the cleared read repeats them."""
+        """Severity, device, group and datasource narrow the active read; the cleared read
+        repeats them, and the audit read opens at the same second."""
         respx.get(GROUP_URL).mock(
             return_value=httpx.Response(200, json={"id": 5, "fullPath": "Sites/East"})
         )
         route = respx.get(ALERT_URL).mock(side_effect=alert_lists([]))
+        audit = respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": []}))
 
         before = int(time.time())
-        await _analyze(client, hours=6, severity="error", device="web", group_id=5)
+        await _analyze(
+            client, hours=6, severity="error", device="web", group_id=5, datasource="interface"
+        )
 
         filters = [c.request.url.params["filter"].split(",") for c in route.calls]
         assert len(filters) == 2
@@ -154,10 +175,13 @@ class TestOneRead:
         assert "severity:3" in active
         assert 'monitorObjectName~"web"' in active
         assert 'monitorObjectGroups~"Sites/East"' in active
+        assert 'resourceTemplateName~"interface"' in active
         start = int(next(c for c in active if c.startswith("startEpoch>:")).split(":")[1])
         assert before - 6 * 3600 <= start <= int(time.time()) - 6 * 3600
         assert "cleared:true" not in active
         assert cleared == [*active, "cleared:true"]
+        assert audit.call_count == 1
+        assert audit.calls[0].request.url.params["filter"] == f"happenedOn>:{start}"
 
     @respx.mock
     async def test_alert_in_both_lists_counts_once_as_cleared(self, client):
@@ -166,7 +190,7 @@ class TestOneRead:
         cleared = [_cleared(1, "s1", "CPU", end_epoch=BASE_EPOCH + 600)]
         respx.get(ALERT_URL).mock(side_effect=alert_lists(active, cleared))
 
-        body = _body(await _analyze(client))
+        body = _body(await _analyze(client, analyses=["statistics"]))
 
         assert body["total_alerts"] == 1
         assert body["statistics"]["active"] == 0
@@ -205,7 +229,7 @@ class TestOneRead:
             return_value=httpx.Response(500, json={"errorMessage": "Server error"})
         )
 
-        error = envelope(await _analyze(client))
+        error = envelope(await _analyze(client, analyses=["statistics"]))
 
         assert error["code"] == "UPSTREAM_ERROR"
 
@@ -422,6 +446,257 @@ class TestNoise:
         assert "anti_patterns" not in noise
 
 
+def _burst(n, datasource, devices, start, spacing=3, first_id=0):
+    """n alerts on one datasource, spacing seconds apart, cycling over the device count."""
+    return [
+        _make_alert(
+            first_id + i, f"switch-{i % devices}", datasource, start_epoch=start + i * spacing
+        )
+        for i in range(n)
+    ]
+
+
+class TestBursts:
+    """R2.2 bursts: per-datasource windows holding enough alerts on enough devices."""
+
+    @respx.mock
+    async def test_detects_a_burst_on_one_datasource(self, client):
+        """Twelve alerts on four switches within 36 seconds are one burst."""
+        now = int(time.time())
+        respx.get(ALERT_URL).mock(
+            side_effect=alert_lists(_burst(12, "SNMP_Network_Interfaces", 4, now - 60))
+        )
+
+        bursts = _body(
+            await _analyze(
+                client, analyses=["bursts"], window_seconds=60, min_alerts=10, min_devices=3
+            )
+        )["bursts"]
+
+        assert bursts["bursts_detected"] == 1
+        burst = bursts["bursts"][0]
+        assert burst["datasource"] == "SNMP_Network_Interfaces"
+        assert burst["alert_count"] == 12
+        assert burst["device_count"] == 4
+        assert burst["window_start"] == now - 60
+        assert burst["window_end"] == now
+        assert {d["device"] for d in burst["top_devices"]} == {f"switch-{i}" for i in range(4)}
+
+    @respx.mock
+    async def test_too_few_alerts_or_devices_is_no_burst(self, client):
+        now = int(time.time())
+        alerts = _burst(9, "CPU", 9, now - 60) + _burst(12, "Disk", 2, now - 60, first_id=100)
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
+
+        bursts = _body(await _analyze(client, analyses=["bursts"]))["bursts"]
+
+        assert bursts["bursts_detected"] == 0
+        assert bursts["bursts"] == []
+
+    @respx.mock
+    async def test_alerts_further_apart_than_the_window_are_no_burst(self, client):
+        """Ten alerts 10 seconds apart span 90 seconds: a burst in 90, not in 60."""
+        now = int(time.time())
+        respx.get(ALERT_URL).mock(
+            side_effect=alert_lists(_burst(10, "CPU", 5, now - 600, spacing=10))
+        )
+
+        narrow = _body(await _analyze(client, analyses=["bursts"], window_seconds=60))
+        wide = _body(await _analyze(client, analyses=["bursts"], window_seconds=90))
+
+        assert narrow["bursts"]["bursts_detected"] == 0
+        assert wide["bursts"]["bursts_detected"] == 1
+
+    @respx.mock
+    async def test_datasources_burst_separately_and_cleared_alerts_count(self, client):
+        """Each datasource's alerts form their own windows, cleared alerts included."""
+        now = int(time.time())
+        active = _burst(10, "Ping", 5, now - 300)
+        cleared = [
+            _cleared(200 + i, f"host-{i % 3}", "HTTPS", start_epoch=now - 900 + i)
+            for i in range(10)
+        ]
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(active, cleared))
+
+        bursts = _body(await _analyze(client, analyses=["bursts"]))["bursts"]
+
+        assert [b["datasource"] for b in bursts["bursts"]] == ["HTTPS", "Ping"]
+        assert bursts["window_seconds"] == 60
+        assert bursts["min_alerts"] == 10
+        assert bursts["min_devices"] == 3
+
+    @respx.mock
+    async def test_empty_window_has_no_bursts(self, client):
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([]))
+
+        bursts = _body(await _analyze(client, analyses=["bursts"]))["bursts"]
+
+        assert bursts["bursts_detected"] == 0
+
+
+def _aligned_spike_time(now):
+    """A five-minute bucket boundary an hour back, so a spike's bucket starts on it."""
+    return (now // 300) * 300 - 3600
+
+
+def _spike_with_background(spike_ts, now):
+    """Ten alerts in one bucket and five single alerts in earlier buckets."""
+    alerts = [_make_alert(i, f"server{i}", "Ping", start_epoch=spike_ts) for i in range(10)]
+    alerts += [
+        _make_alert(100 + i, f"bg{i}", "Ping", start_epoch=now - 7200 + i * 600) for i in range(5)
+    ]
+    return alerts
+
+
+class TestChanges:
+    """R2.2 changes: audit write actions in the window paired to alert spikes."""
+
+    @respx.mock
+    async def test_write_action_before_a_spike_is_paired(self, client):
+        now = int(time.time())
+        spike_ts = _aligned_spike_time(now)
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(_spike_with_background(spike_ts, now)))
+        audit = respx.get(AUDIT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "happenedOn": spike_ts - 600,
+                            "username": "admin",
+                            "description": '"Action=Update"; "Type=Device"; "Device=web-01"',
+                        }
+                    ]
+                },
+            )
+        )
+
+        changes = _body(await _analyze(client, analyses=["changes"]))["changes"]
+
+        assert audit.call_count == 1
+        assert changes["total_changes"] == 1
+        assert changes["total_spikes"] == 1
+        event = changes["correlated_events"][0]
+        assert event["change"]["user"] == "admin"
+        assert event["spike"] == {"timestamp": spike_ts, "alert_count": 10}
+        assert event["time_gap_minutes"] == 10.0
+        assert event["confidence"] == 0.83
+        assert changes["uncorrelated_changes"] == []
+
+    @respx.mock
+    async def test_a_read_or_login_entry_is_not_a_change(self, client):
+        now = int(time.time())
+        spike_ts = _aligned_spike_time(now)
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(_spike_with_background(spike_ts, now)))
+        respx.get(AUDIT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "happenedOn": spike_ts - 60,
+                            "username": "admin",
+                            "description": "admin signs in (adminLogin)",
+                        }
+                    ]
+                },
+            )
+        )
+
+        changes = _body(await _analyze(client, analyses=["changes"]))["changes"]
+
+        assert changes["total_changes"] == 0
+        assert changes["correlated_events"] == []
+        assert changes["uncorrelated_spikes"] == [{"timestamp": spike_ts, "alert_count": 10}]
+
+    @pytest.mark.parametrize(("window", "paired"), [(30, 0), (60, 1)])
+    @respx.mock
+    async def test_the_correlation_window_bounds_the_pairing(self, client, window, paired):
+        """A change 40 minutes before the spike pairs in a 60-minute window, not a 30."""
+        now = int(time.time())
+        spike_ts = _aligned_spike_time(now)
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(_spike_with_background(spike_ts, now)))
+        respx.get(AUDIT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "happenedOn": spike_ts - 2400,
+                            "username": "admin",
+                            "description": "Updated firewall rule",
+                        }
+                    ]
+                },
+            )
+        )
+
+        changes = _body(
+            await _analyze(client, analyses=["changes"], correlation_window_minutes=window)
+        )["changes"]
+
+        assert len(changes["correlated_events"]) == paired
+        assert changes["correlation_window_minutes"] == window
+
+    @respx.mock
+    async def test_unpaired_change_reports_its_time_in_seconds(self, client):
+        """An audit time in milliseconds is read as seconds, paired or not."""
+        now = int(time.time())
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([_make_alert(1, "s1", "CPU")]))
+        respx.get(AUDIT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "items": [
+                        {
+                            "id": 1,
+                            "happenedOn": (now - 36000) * 1000,
+                            "username": "admin",
+                            "description": "Updated config",
+                        }
+                    ]
+                },
+            )
+        )
+
+        changes = _body(await _analyze(client, analyses=["changes"]))["changes"]
+
+        assert changes["total_changes"] == 1
+        assert changes["uncorrelated_changes"] == [
+            {"timestamp": now - 36000, "user": "admin", "description": "Updated config"}
+        ]
+
+    @respx.mock
+    async def test_failed_audit_read_is_flagged_not_silent(self, client, caplog):
+        """A failed audit read leaves the other sections whole and says changes are unknown."""
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([_make_alert(1, "s1", "CPU")]))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(403, json={"errorMessage": "no"}))
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.analyze_alerts"):
+            body = _body(await _analyze(client, analyses=["statistics", "changes"]))
+
+        assert body["statistics"]["active"] == 1
+        changes = body["changes"]
+        assert changes["audit_read_failed"] is True
+        assert "unavailable" in changes["warning"]
+        assert changes["total_changes"] == 0
+        records = [r for r in caplog.records if r.name == "lm_mcp.tools.analyze_alerts"]
+        assert len(records) == 1
+        assert records[0].exc_info is not None
+
+    @respx.mock
+    async def test_no_audit_read_without_the_changes_section(self, client):
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([]))
+        audit = respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": []}))
+
+        await _analyze(client, analyses=["statistics", "clusters", "noise", "bursts"])
+
+        assert audit.call_count == 0
+
+
 class TestRegistration:
     """analyze_alerts is a registered, read-only tool dispatched through execute_tool."""
 
@@ -435,7 +710,18 @@ class TestRegistration:
 
         assert props["analyses"]["items"]["enum"] == list(SECTIONS)
         assert props["severity"]["enum"] == list(SEVERITY_MAP)
-        assert set(props) == {"hours", "severity", "device", "group_id", "analyses"}
+        assert set(props) == {
+            "hours",
+            "severity",
+            "device",
+            "group_id",
+            "datasource",
+            "analyses",
+            "window_seconds",
+            "min_alerts",
+            "min_devices",
+            "correlation_window_minutes",
+        }
         assert "required" not in tool.inputSchema
         assert tool.annotations.readOnlyHint is True
 

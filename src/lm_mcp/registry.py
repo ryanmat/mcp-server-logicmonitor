@@ -4324,9 +4324,10 @@ TOOLS.extend(
             name="analyze_alerts",
             description=(
                 "Analyze one alert window: call this for how many alerts fired and when, "
-                "which alerts belong together, or how noisy alerting is over the last "
-                "hours. One read of the window's active and cleared alerts, under the "
-                "severity, device and group filters, feeds every section; 'statistics' "
+                "which alerts belong together, how noisy alerting is, which datasources "
+                "burst, or which portal changes preceded a spike over the last hours. One "
+                "read of the window's active and cleared alerts, under the severity, "
+                "device, group and datasource filters, feeds every section; 'statistics' "
                 "gives active and cleared totals, counts by severity, the ten busiest "
                 "devices and datasources, and the volume of each hour, cleared alerts "
                 "included; 'clusters' groups two or more alerts by device, by datasource "
@@ -4335,9 +4336,15 @@ TOOLS.extend(
                 "entropy of alerts over datasource and datapoint (weight 40), flaps, an "
                 "alert on the same device and datapoint that re-fires within 30 minutes "
                 "of clearing (30), and repeats, a combination with three or more alerts "
-                "(30), with the first ten flap pairs and tuning recommendations. "
-                "truncated says when the 5000-alert cap cut either read short. Use "
-                "get_alerts to list or page through the alerts themselves."
+                "(30), with the first ten flap pairs and tuning recommendations; 'bursts' "
+                "gives the windows of window_seconds on one datasource that hold at least "
+                "min_alerts alerts on min_devices devices; 'changes' reads the audit log "
+                "once and pairs each write action (create, add, update, delete, remove or "
+                "modify) with the first 5-minute alert spike, a bucket above the mean by "
+                "one standard deviation, within correlation_window_minutes after it, with "
+                "a confidence from 1.0 to 0.5. truncated says when the 5000-alert cap cut "
+                "either read short. Use get_alerts to list or page through the alerts "
+                "themselves."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4362,13 +4369,46 @@ TOOLS.extend(
                         "type": "integer",
                         "description": "Only alerts on devices in this device group",
                     },
+                    "datasource": {
+                        "type": "string",
+                        "description": (
+                            "Only alerts from datasources whose name contains this, "
+                            "regardless of case"
+                        ),
+                    },
                     "analyses": {
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "enum": ["statistics", "clusters", "noise"],
+                            "enum": ["statistics", "clusters", "noise", "bursts", "changes"],
                         },
                         "description": "Sections to compute (all if omitted)",
+                    },
+                    "window_seconds": {
+                        "type": "integer",
+                        "default": 60,
+                        "minimum": 1,
+                        "description": "Burst window length in seconds (default: 60)",
+                    },
+                    "min_alerts": {
+                        "type": "integer",
+                        "default": 10,
+                        "minimum": 1,
+                        "description": "Fewest alerts a burst holds (default: 10)",
+                    },
+                    "min_devices": {
+                        "type": "integer",
+                        "default": 3,
+                        "minimum": 1,
+                        "description": "Fewest distinct devices a burst holds (default: 3)",
+                    },
+                    "correlation_window_minutes": {
+                        "type": "integer",
+                        "default": 30,
+                        "minimum": 1,
+                        "description": (
+                            "Longest gap from a change to the spike it pairs with (default: 30)"
+                        ),
                     },
                 },
             },

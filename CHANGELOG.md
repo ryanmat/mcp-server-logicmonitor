@@ -40,11 +40,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   as long ending `baseline_hours_ago` hours ago, read with one more paged read). `analyses`
   selects sections; `hours` defaults to 168, which holds the 24-hour lag.
 - `analyze_alerts` reads one alert window, active and cleared alerts both, under `severity`,
-  `device` and `group_id` filters, and reports it by section: `statistics` (active and cleared
-  totals, counts by severity, the ten busiest devices and datasources, the volume of each hour),
-  `clusters` (two or more alerts on one device, one datasource, or one signature, the datasource
-  and datapoint) and `noise` (the 0 to 100 score from entropy, flaps and repeats, with the first ten
-  flap pairs and recommendations). `analyses` selects sections; `hours` defaults to 24.
+  `device`, `group_id` and `datasource` filters, and reports it by section: `statistics` (active
+  and cleared totals, counts by severity, the ten busiest devices and datasources, the volume of
+  each hour), `clusters` (two or more alerts on one device, one datasource, or one signature, the
+  datasource and datapoint), `noise` (the 0 to 100 score from entropy, flaps and repeats, with the
+  first ten flap pairs and recommendations), `bursts` (windows of `window_seconds` on one
+  datasource holding `min_alerts` alerts on `min_devices` devices) and `changes` (one audit read;
+  each write action paired with the first 5-minute alert spike within
+  `correlation_window_minutes` after it). `analyses` selects sections; `hours` defaults to 24.
 
 ### Removed
 
@@ -284,6 +287,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   the instance's `analysis`, where it read the series three or four times. A
   `forecast_summary` row carries the trend label and each method's `hours_until_breach`, and an
   instance whose read fails carries one `analysis_error`.
+- `triage` reads its alert window once through `analyze_alerts`, where it read it four times:
+  `statistics`, `clusters`, `noise` and `changes` carry that tool's sections, and a failed read
+  is one `analyze_alerts failed` warning. `portal_overview` reads its window once for
+  `alert_statistics`, `alert_clusters` and `noise`, and `diagnose` reads the last four hours once
+  for `correlated_alerts` and `changes`. Each window now holds cleared alerts beside the active
+  ones, and a window the 5000-alert cap cut short adds a warning.
+- `detect_site_outage` finds the interface burst through `analyze_alerts`, reading only interface
+  datasources' alerts for the group. It matched the datasource on `dataSourceName`, which alert
+  rows do not carry, so the interface burst signal never fired on a live portal.
 - The `lm-capacity`, `lm-health` and `lm-remediate` skills call `analyze_metric` in place of the
   tools it replaces. `lm-health` grades the mean of |`z_score`| across a device's datapoints at
   1.33 and 3.33, the points where the removed health score crossed 80 and 50.

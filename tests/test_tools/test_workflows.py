@@ -15,6 +15,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import call_sub_tool, validation_error
+from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
 from lm_mcp.tools.workflows import (
     _resolve_device,
     _trim_detail,
@@ -26,6 +27,7 @@ from lm_mcp.tools.workflows import (
     search_tools,
     triage,
 )
+from tests.alert_pages import alert_lists
 
 
 @pytest.fixture
@@ -61,11 +63,47 @@ def _patch_sub(module_path: str, data: dict) -> patch:
     return patch(module_path, new_callable=AsyncMock, return_value=_mock_text(data))
 
 
+def _patch_window(**sections: dict) -> patch:
+    """Patch analyze_alerts to return a complete window holding the given sections."""
+    return _patch_sub(
+        "lm_mcp.tools.analyze_alerts.analyze_alerts",
+        {"total_alerts": 0, "truncated": False, "api_total": 0, **sections},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Helpers for driving detect_site_outage through respx
 # ---------------------------------------------------------------------------
 
 _BASE = "https://test.logicmonitor.com/santaba/rest"
+_ALERTS_URL = f"{_BASE}/alert/alerts"
+_AUDIT_URL = f"{_BASE}/setting/accesslogs"
+
+
+def _window_reads(route) -> list[list[str]]:
+    """The filter clauses of each alert-window read a route served."""
+    return [
+        c.request.url.params["filter"].split(",")
+        for c in route.calls
+        if "startEpoch>:" in c.request.url.params.get("filter", "")
+    ]
+
+
+def _one_alert_per_device(n: int) -> list[dict]:
+    now = int(time.time())
+    return [
+        {
+            "id": f"LMA{i}",
+            "severity": 4,
+            "monitorObjectName": f"dev-{i % 2}",
+            "resourceTemplateName": "Ping",
+            "dataPointName": "PingLossPercent",
+            "startEpoch": now - 600 - i,
+            "endEpoch": 0,
+            "cleared": False,
+        }
+        for i in range(n)
+    ]
 
 
 def _ok(payload: dict) -> httpx.Response:
@@ -99,8 +137,9 @@ def _mock_site_portal(
 ) -> None:
     """Route one detect_site_outage run on group 42, served by collector 1.
 
-    Burst detection and power events read the same alert window with the same
-    filter, burst first, so the window reads are served in that order.
+    The burst read is analyze_alerts on interface datasources: its active read gets
+    burst and its cleared read an empty page. The power read carries no datasource
+    clause and gets power.
     """
 
     def device_route(request: httpx.Request) -> httpx.Response:
@@ -113,7 +152,14 @@ def _mock_site_portal(
     respx.get(f"{_BASE}/device/groups/42").mock(
         return_value=_ok({"id": 42, "fullPath": "Sites/HQ"})
     )
-    respx.get(f"{_BASE}/alert/alerts").mock(side_effect=[burst, power])
+
+    def alert_route(request: httpx.Request) -> httpx.Response:
+        clauses = request.url.params.get("filter", "").split(",")
+        if 'resourceTemplateName~"interface"' not in clauses:
+            return power
+        return _alert_window() if "cleared:true" in clauses else burst
+
+    respx.get(f"{_BASE}/alert/alerts").mock(side_effect=alert_route)
 
 
 def _collector_record(is_down: bool) -> httpx.Response:
@@ -272,7 +318,7 @@ class TestCheckRequiredTools:
 
         reset_config()
 
-        result = check_required_tools(["get_alerts", "correlate_alerts"])
+        result = check_required_tools(["get_alerts", "analyze_alerts"])
         assert result is None
         reset_config()
 
@@ -286,26 +332,26 @@ class TestCheckRequiredTools:
 
         reset_config()
 
-        result = check_required_tools(["get_alerts", "correlate_alerts"])
+        result = check_required_tools(["get_alerts", "analyze_alerts"])
         assert result is not None
         text = result[0].text
-        assert "correlate_alerts" in text
+        assert "analyze_alerts" in text
         reset_config()
 
     def test_blocked_with_disabled_tools(self, monkeypatch):
         """Tools matching LM_DISABLED_TOOLS are blocked."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.setenv("LM_DISABLED_TOOLS", "correlate_*")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "analyze_*")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
 
         reset_config()
 
-        result = check_required_tools(["get_alerts", "correlate_alerts"])
+        result = check_required_tools(["get_alerts", "analyze_alerts"])
         assert result is not None
         text = result[0].text
-        assert "correlate_alerts" in text
+        assert "analyze_alerts" in text
         reset_config()
 
 
@@ -384,22 +430,19 @@ class TestTriage:
 
         reset_config()
 
-        stats_data = {"summary": {"total": 5}, "time_buckets": []}
-        clusters_data = {"total_alerts": 5, "clusters": [], "cluster_count": 0}
+        stats_data = {"active": 5, "cleared": 0, "hourly": []}
+        clusters_data = {"clusters": [], "cluster_count": 0}
         noise_data = {"noise_score": 10, "total_alerts": 5}
-        changes_data = {"correlated_events": [], "total_alerts": 5}
+        changes_data = {"correlated_events": [], "total_changes": 0}
 
-        with (
-            _patch_sub("lm_mcp.tools.correlation.get_alert_statistics", stats_data),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", clusters_data),
-            _patch_sub("lm_mcp.tools.scoring.score_alert_noise", noise_data),
-            _patch_sub("lm_mcp.tools.event_correlation.correlate_changes", changes_data),
+        with _patch_window(
+            statistics=stats_data, clusters=clusters_data, noise=noise_data, changes=changes_data
         ):
             result = await triage(client, detail_level="summary")
 
         data = json.loads(result[0].text)
-        assert "statistics" in data
-        assert "noise" in data
+        assert data["statistics"] == stats_data
+        assert data["noise"] == noise_data
         # blast_radius stripped in summary mode
         assert "blast_radius" not in data
         reset_config()
@@ -414,16 +457,13 @@ class TestTriage:
 
         reset_config()
 
-        stats_data = {"summary": {"total": 0}, "time_buckets": []}
-        clusters_data = {"total_alerts": 0, "clusters": [], "cluster_count": 0}
+        stats_data = {"active": 0, "cleared": 0, "hourly": []}
+        clusters_data = {"clusters": [], "cluster_count": 0}
         noise_data = {"noise_score": 0, "total_alerts": 0}
-        changes_data = {"correlated_events": [], "total_alerts": 0}
+        changes_data = {"correlated_events": [], "total_changes": 0}
 
-        with (
-            _patch_sub("lm_mcp.tools.correlation.get_alert_statistics", stats_data),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", clusters_data),
-            _patch_sub("lm_mcp.tools.scoring.score_alert_noise", noise_data),
-            _patch_sub("lm_mcp.tools.event_correlation.correlate_changes", changes_data),
+        with _patch_window(
+            statistics=stats_data, clusters=clusters_data, noise=noise_data, changes=changes_data
         ):
             result = await triage(client, detail_level="full")
 
@@ -435,7 +475,7 @@ class TestTriage:
         """Triage returns error when a required tool is disabled."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.setenv("LM_DISABLED_TOOLS", "correlate_alerts")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "analyze_alerts")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
 
@@ -443,11 +483,12 @@ class TestTriage:
 
         result = await triage(client)
         text = result[0].text
-        assert "REQUIRED_TOOLS_DISABLED" in text or "correlate_alerts" in text
+        assert "requires disabled tools" in text
+        assert "analyze_alerts" in text
         reset_config()
 
     async def test_sub_tool_failure_partial_results(self, client, monkeypatch):
-        """Triage returns partial results with warnings when a sub-tool fails."""
+        """Triage returns partial results with warnings when the window read fails."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
@@ -456,26 +497,56 @@ class TestTriage:
 
         reset_config()
 
-        clusters_data = {"total_alerts": 0, "clusters": [], "cluster_count": 0}
-        noise_data = {"noise_score": 0, "total_alerts": 0}
-        changes_data = {"correlated_events": [], "total_alerts": 0}
-
-        with (
-            patch(
-                "lm_mcp.tools.correlation.get_alert_statistics",
-                new_callable=AsyncMock,
-                side_effect=RuntimeError("API timeout"),
-            ),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", clusters_data),
-            _patch_sub("lm_mcp.tools.scoring.score_alert_noise", noise_data),
-            _patch_sub("lm_mcp.tools.event_correlation.correlate_changes", changes_data),
+        with patch(
+            "lm_mcp.tools.analyze_alerts.analyze_alerts",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("API timeout"),
         ):
             result = await triage(client, detail_level="full")
 
         data = json.loads(result[0].text)
-        assert data["statistics"] is None
-        assert "warnings" in data
+        for key in ("statistics", "clusters", "noise", "changes"):
+            assert data[key] is None
+        assert data["blast_radius"] == []
+        assert data["warnings"] == ["analyze_alerts failed: API timeout"]
         reset_config()
+
+    @respx.mock
+    async def test_reads_the_alert_window_once(self, auth, lm_env):
+        """R2.2: one active read and one cleared read feed statistics, clusters, noise and
+        changes, and the audit log is read once."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        alerts = respx.get(_ALERTS_URL).mock(side_effect=alert_lists(_one_alert_per_device(3)))
+        audit = respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+
+        with _patch_sub("lm_mcp.tools.devices.get_devices", {"devices": []}):
+            result = await triage(client, severity="critical", hours_back=2, detail_level="full")
+
+        data = json.loads(result[0].text)
+        reads = _window_reads(alerts)
+        assert len(reads) == 2
+        assert alerts.call_count == 2
+        assert all("severity:4" in clauses for clauses in reads)
+        assert audit.call_count == 1
+        assert data["statistics"]["active"] == 3
+        assert data["clusters"]["clusters"][0]["key"] == "dev-0"
+        assert data["noise"]["total_alerts"] == 3
+        assert data["changes"]["total_changes"] == 0
+        assert "warnings" not in data
+
+    @respx.mock
+    async def test_a_capped_window_is_a_warning(self, auth, lm_env):
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        respx.get(_ALERTS_URL).mock(
+            side_effect=alert_lists(_one_alert_per_device(6000), lower_bound=True)
+        )
+        respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+
+        with _patch_sub("lm_mcp.tools.devices.get_devices", {"devices": []}):
+            result = await triage(client, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert data["warnings"] == [ALERT_WINDOW_TRUNCATED_WARNING]
 
 
 # ---------------------------------------------------------------------------
@@ -887,28 +958,27 @@ class TestPortalOverview:
 
         reset_config()
 
-        stats_data = {"summary": {"total": 10}}
+        stats_data = {"active": 10, "cleared": 0}
         alert_data = {"total": 2, "alerts": []}
         coll_data = {"total": 3, "collectors": []}
         sdt_data = {"active_sdts": []}
-        cluster_data = {"clusters": [], "total_alerts": 0}
+        cluster_data = {"clusters": [], "cluster_count": 0}
         noise_data = {"noise_score": 5}
         dead_data = {"devices": [], "total": 0}
 
         with (
-            _patch_sub("lm_mcp.tools.correlation.get_alert_statistics", stats_data),
+            _patch_window(statistics=stats_data, clusters=cluster_data, noise=noise_data),
             _patch_sub("lm_mcp.tools.alerts.get_alerts", alert_data),
             _patch_sub("lm_mcp.tools.collectors.get_collectors", coll_data),
             _patch_sub("lm_mcp.tools.sdts.get_active_sdts", sdt_data),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", cluster_data),
-            _patch_sub("lm_mcp.tools.scoring.score_alert_noise", noise_data),
             _patch_sub("lm_mcp.tools.devices.get_devices", dead_data),
         ):
             result = await portal_overview(client, detail_level="summary")
 
         data = json.loads(result[0].text)
-        assert "alert_statistics" in data
-        assert "noise" in data
+        assert data["alert_statistics"] == stats_data
+        assert data["alert_clusters"] == cluster_data
+        assert data["noise"] == noise_data
         # summary strips detail lists
         assert "critical_alerts" not in data
         assert "dead_devices" not in data
@@ -924,21 +994,19 @@ class TestPortalOverview:
 
         reset_config()
 
-        stats_data = {"summary": {"total": 10}}
+        stats_data = {"active": 10, "cleared": 0}
         alert_data = {"total": 2, "alerts": []}
         coll_data = {"total": 3, "collectors": []}
         sdt_data = {"active_sdts": []}
-        cluster_data = {"clusters": [], "total_alerts": 0}
+        cluster_data = {"clusters": [], "cluster_count": 0}
         noise_data = {"noise_score": 5}
         dead_data = {"devices": [], "total": 0}
 
         with (
-            _patch_sub("lm_mcp.tools.correlation.get_alert_statistics", stats_data),
+            _patch_window(statistics=stats_data, clusters=cluster_data, noise=noise_data),
             _patch_sub("lm_mcp.tools.alerts.get_alerts", alert_data),
             _patch_sub("lm_mcp.tools.collectors.get_collectors", coll_data),
             _patch_sub("lm_mcp.tools.sdts.get_active_sdts", sdt_data),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", cluster_data),
-            _patch_sub("lm_mcp.tools.scoring.score_alert_noise", noise_data),
             _patch_sub("lm_mcp.tools.devices.get_devices", dead_data),
         ):
             result = await portal_overview(client, detail_level="full")
@@ -962,6 +1030,30 @@ class TestPortalOverview:
         text = result[0].text
         assert "REQUIRED_TOOLS_DISABLED" in text or "get_collectors" in text
         reset_config()
+
+    @respx.mock
+    async def test_reads_the_alert_window_once(self, auth, lm_env):
+        """R2.2: one active read and one cleared read feed statistics, clusters and noise;
+        no audit read."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        alerts = respx.get(_ALERTS_URL).mock(side_effect=alert_lists(_one_alert_per_device(2)))
+        audit = respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+
+        with (
+            _patch_sub("lm_mcp.tools.alerts.get_alerts", {"total": 0, "alerts": []}),
+            _patch_sub("lm_mcp.tools.collectors.get_collectors", {"collectors": []}),
+            _patch_sub("lm_mcp.tools.sdts.get_active_sdts", {"active_sdts": []}),
+            _patch_sub("lm_mcp.tools.devices.get_devices", {"devices": []}),
+        ):
+            result = await portal_overview(client, hours_back=8)
+
+        data = json.loads(result[0].text)
+        assert len(_window_reads(alerts)) == 2
+        assert alerts.call_count == 2
+        assert audit.call_count == 0
+        assert data["alert_statistics"]["active"] == 2
+        assert data["alert_clusters"]["cluster_count"] == 2
+        assert data["noise"]["total_alerts"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -990,7 +1082,7 @@ class TestDiagnose:
         }
         device_data = {"id": 42, "displayName": "server-01"}
         props_data = {"properties": [{"name": "os", "value": "linux"}]}
-        corr_data = {"clusters": [], "total_alerts": 1}
+        corr_data = {"clusters": [], "cluster_count": 0}
         changes_data = {"correlated_events": []}
         blast_data = {"blast_radius_score": 10, "affected_devices": []}
 
@@ -998,8 +1090,7 @@ class TestDiagnose:
             _patch_sub("lm_mcp.tools.alerts.get_alert_details", alert_detail),
             _patch_sub("lm_mcp.tools.devices.get_device", device_data),
             _patch_sub("lm_mcp.tools.resources.get_device_properties", props_data),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", corr_data),
-            _patch_sub("lm_mcp.tools.event_correlation.correlate_changes", changes_data),
+            _patch_window(clusters=corr_data, changes=changes_data),
             _patch_sub("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast_data),
         ):
             result = await diagnose(client, alert_id="LMA123", detail_level="full")
@@ -1008,6 +1099,8 @@ class TestDiagnose:
         assert data.get("alert", {}).get("id") == "LMA123"
         assert "device" in data
         assert "blast_radius" in data
+        assert data["correlated_alerts"] == corr_data
+        assert data["changes"] == changes_data
         reset_config()
 
     async def test_happy_path_with_device_name(self, client, monkeypatch):
@@ -1028,7 +1121,7 @@ class TestDiagnose:
         }
         device_data = {"id": 55, "displayName": "db-01"}
         props_data = {"properties": []}
-        corr_data = {"clusters": []}
+        corr_data = {"clusters": [], "cluster_count": 0}
         changes_data = {"correlated_events": []}
         blast_data = {"blast_radius_score": 0, "affected_devices": []}
 
@@ -1037,8 +1130,7 @@ class TestDiagnose:
             _patch_sub("lm_mcp.tools.alerts.get_alert_details", alert_detail),
             _patch_sub("lm_mcp.tools.devices.get_device", device_data),
             _patch_sub("lm_mcp.tools.resources.get_device_properties", props_data),
-            _patch_sub("lm_mcp.tools.correlation.correlate_alerts", corr_data),
-            _patch_sub("lm_mcp.tools.event_correlation.correlate_changes", changes_data),
+            _patch_window(clusters=corr_data, changes=changes_data),
             _patch_sub("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast_data),
         ):
             result = await diagnose(client, device_name="db-01", detail_level="full")
@@ -1076,6 +1168,27 @@ class TestDiagnose:
         text = result[0].text
         assert "REQUIRED_TOOLS_DISABLED" in text or "analyze_blast_radius" in text
         reset_config()
+
+    @respx.mock
+    async def test_reads_the_alert_window_once(self, auth, lm_env):
+        """R2.2: the last four hours are read once for clusters and changes."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        alerts = respx.get(_ALERTS_URL).mock(side_effect=alert_lists(_one_alert_per_device(2)))
+        audit = respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+
+        before = int(time.time())
+        with _patch_sub("lm_mcp.tools.alerts.get_alert_details", {"id": "LMA1"}):
+            result = await diagnose(client, alert_id="LMA1", detail_level="full")
+
+        data = json.loads(result[0].text)
+        reads = _window_reads(alerts)
+        assert len(reads) == 2
+        assert alerts.call_count == 2
+        start = int(next(c for c in reads[0] if c.startswith("startEpoch>:")).split(":")[1])
+        assert before - 4 * 3600 <= start <= int(time.time()) - 4 * 3600
+        assert audit.call_count == 1
+        assert data["correlated_alerts"]["cluster_count"] == 2
+        assert data["changes"]["total_changes"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -1346,7 +1459,7 @@ class TestDetectSiteOutage:
         with (
             _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
             _patch_sub("lm_mcp.tools.collectors.get_collector_health", collector_data),
-            _patch_sub("lm_mcp.tools.networking.detect_alert_burst", burst_data),
+            _patch_window(bursts=burst_data),
             _patch_sub("lm_mcp.tools.networking.get_power_events", power_data),
         ):
             result = await detect_site_outage(client, group_id=42)
@@ -1374,7 +1487,7 @@ class TestDetectSiteOutage:
         with (
             _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
             _patch_sub("lm_mcp.tools.collectors.get_collector_health", collector_data),
-            _patch_sub("lm_mcp.tools.networking.detect_alert_burst", burst_data),
+            _patch_window(bursts=burst_data),
             _patch_sub("lm_mcp.tools.networking.get_power_events", power_data),
         ):
             result = await detect_site_outage(client, group_id=42)
@@ -1399,7 +1512,7 @@ class TestDetectSiteOutage:
         with (
             _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
             _patch_sub("lm_mcp.tools.collectors.get_collector_health", collector_data),
-            _patch_sub("lm_mcp.tools.networking.detect_alert_burst", burst_data),
+            _patch_window(bursts=burst_data),
             _patch_sub("lm_mcp.tools.networking.get_power_events", power_data),
         ):
             result = await detect_site_outage(client, group_id=42)
@@ -1424,10 +1537,7 @@ class TestDetectSiteOutage:
                 new_callable=AsyncMock,
                 side_effect=failing_mock,
             ),
-            _patch_sub(
-                "lm_mcp.tools.networking.detect_alert_burst",
-                {"bursts_detected": 0, "bursts": []},
-            ),
+            _patch_window(bursts={"bursts_detected": 0, "bursts": []}),
             _patch_sub(
                 "lm_mcp.tools.networking.get_power_events",
                 {"total_power_events": 0, "events": []},
@@ -1492,10 +1602,7 @@ class TestDetectSiteOutage:
                 new_callable=AsyncMock,
                 side_effect=selective_health,
             ),
-            _patch_sub(
-                "lm_mcp.tools.networking.detect_alert_burst",
-                {"bursts_detected": 0, "bursts": []},
-            ),
+            _patch_window(bursts={"bursts_detected": 0, "bursts": []}),
             _patch_sub(
                 "lm_mcp.tools.networking.get_power_events",
                 {"total_power_events": 0, "events": []},
@@ -1725,17 +1832,54 @@ class TestDetectSiteOutage:
             "warnings": [],
         }
 
+    @respx.mock
+    async def test_interface_burst_in_the_live_alert_shape_trips_the_signal(self, auth):
+        """Five interface alerts on three switches inside the window, keyed on
+        resourceTemplateName as live rows carry it, trip the burst signal."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        now = int(time.time())
+        burst_alerts = [
+            {
+                "id": f"LMA{i}",
+                "severity": 4,
+                "monitorObjectName": f"sw-{i % 3}",
+                "resourceTemplateName": "SNMP_Network_Interfaces",
+                "dataPointName": "OperStatus",
+                "startEpoch": now - 600 + i * 30,
+                "endEpoch": 0,
+                "cleared": False,
+            }
+            for i in range(5)
+        ]
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(1, "normal"),
+            collector=_collector_record(False),
+            burst=_alert_window(*burst_alerts),
+            power=_alert_window(),
+        )
+
+        result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        assert data["signals"]["interface_burst"] == {
+            "triggered": True,
+            "burst_count": 1,
+            "weight": 25,
+        }
+
     async def test_required_tools_disabled_blocks_composite(self, client, monkeypatch):
         """LM_DISABLED_TOOLS matching a required sub-tool blocks execution."""
         from lm_mcp.config import reset_config
         from lm_mcp.tools.workflows import detect_site_outage
 
-        monkeypatch.setenv("LM_DISABLED_TOOLS", "detect_alert_burst")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "analyze_alerts")
         reset_config()
 
         result = await detect_site_outage(client, group_id=42)
         assert "requires disabled tools" in result[0].text
-        assert "detect_alert_burst" in result[0].text
+        assert "analyze_alerts" in result[0].text
         reset_config()
 
 

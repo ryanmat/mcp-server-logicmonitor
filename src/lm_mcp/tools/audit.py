@@ -215,6 +215,16 @@ async def get_login_audit(
         return handle_error(e)
 
 
+# Words in an audit entry's description that mark it as a change to the portal.
+CHANGE_KEYWORDS = ("create", "add", "update", "delete", "remove", "modify")
+
+
+def is_change_action(description: str) -> bool:
+    """Whether an audit entry's description names a change, by CHANGE_KEYWORDS."""
+    desc = description.lower()
+    return any(kw in desc for kw in CHANGE_KEYWORDS)
+
+
 async def get_change_audit(
     client: LogicMonitorClient,
     resource_type: str | None = None,
@@ -251,14 +261,9 @@ async def get_change_audit(
 
         result = await client.get("/setting/accesslogs", params=params)
 
-        # Change action keywords to match in the description field
-        change_keywords = ["create", "add", "update", "delete", "remove", "modify"]
-
         logs = []
         for item in result.get("items", []):
-            desc = str(item.get("description", "")).lower()
-            # Filter to actual changes by checking description for action keywords
-            if any(kw in desc for kw in change_keywords):
+            if is_change_action(str(item.get("description", ""))):
                 logs.append(
                     {
                         "id": item.get("id"),
