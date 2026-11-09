@@ -8,23 +8,19 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
-    format_response,
-    handle_error,
-    normalize_definition_fields,
-    paginated_response,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
-from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
+from lm_mcp.tools.logicmodules import (
+    MODULES,
+    create_module,
+    delete_module,
+    get_module,
+    update_module,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
-
-# The TopologySource REST model names its collection method collectionMethod, which
-# normalize_definition_fields would otherwise rename to the DataSource field collectMethod.
-_REST_FIELDS = frozenset({"collectionMethod"})
 
 
 async def get_topologysources(
@@ -52,54 +48,17 @@ async def get_topologysources(
     Returns:
         List of TextContent with TopologySource data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if applies_to_filter:
-                clean_val, was_modified = sanitize_filter_value(applies_to_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"appliesTo~{quote_filter_value(clean_val)}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/topologysources", params=params)
-
-        sources = []
-        for item in result.get("items", []):
-            sources.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "display_name": item.get("displayName"),
-                    "description": item.get("description"),
-                    "applies_to": item.get("appliesTo"),
-                    "technology": item.get("technology"),
-                    "group": item.get("group"),
-                    "version": item.get("version"),
-                }
-            )
-
-        response = {
-            **paginated_response(sources, result, offset),
-            "topologysources": sources,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    module = MODULES["topologysource"]
+    return await list_tool(
+        client,
+        f"/setting/{module.path}",
+        key="topologysources",
+        project=module.list_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter, "appliesTo~": applies_to_filter},
+    )
 
 
 @require_write_permission
@@ -150,40 +109,7 @@ async def update_topologysource(
     Returns:
         List of TextContent with updated TopologySource info or error.
     """
-    if not confirm:
-        return format_response(
-            {
-                "error": True,
-                "code": "INVALID_REQUEST",
-                "message": (
-                    "update_topologysource is full-replace -- any field omitted from "
-                    "`definition` will be BLANKED. Set confirm=true to proceed, OR "
-                    "use update_logicmodule(type='topologysource', id, changes, mode='preview') "
-                    "for a safe partial update with diff preview."
-                ),
-            }
-        )
-    try:
-        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
-        payload.pop("id", None)
-
-        result = await client.put(
-            f"/setting/topologysources/{topologysource_id}", json_body=payload
-        )
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"TopologySource '{result.get('name')}' updated successfully",
-                "topologysource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await update_module(client, "topologysource", topologysource_id, definition, confirm)
 
 
 @require_write_permission

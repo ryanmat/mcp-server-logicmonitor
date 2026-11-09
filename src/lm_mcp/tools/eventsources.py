@@ -8,17 +8,18 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
     list_tool,
-    normalize_definition_fields,
-    paginated_response,
-    quote_filter_value,
     require_write_permission,
-    sanitize_filter_value,
 )
-from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
+from lm_mcp.tools.logicmodules import (
+    MODULES,
+    create_module,
+    delete_module,
+    get_module,
+    update_module,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -49,54 +50,17 @@ async def get_eventsources(
     Returns:
         List of TextContent with EventSource data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if applies_to_filter:
-                clean_val, was_modified = sanitize_filter_value(applies_to_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"appliesTo~{quote_filter_value(clean_val)}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/eventsources", params=params)
-
-        sources = []
-        for item in result.get("items", []):
-            sources.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "display_name": item.get("displayName"),
-                    "description": item.get("description"),
-                    "applies_to": item.get("appliesTo"),
-                    "technology": item.get("technology"),
-                    "group": item.get("group"),
-                    "version": item.get("version"),
-                }
-            )
-
-        response = {
-            **paginated_response(sources, result, offset),
-            "eventsources": sources,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    module = MODULES["eventsource"]
+    return await list_tool(
+        client,
+        f"/setting/{module.path}",
+        key="eventsources",
+        project=module.list_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter, "appliesTo~": applies_to_filter},
+    )
 
 
 @require_write_permission
@@ -147,38 +111,7 @@ async def update_eventsource(
     Returns:
         List of TextContent with updated EventSource info or error.
     """
-    if not confirm:
-        return format_response(
-            {
-                "error": True,
-                "code": "INVALID_REQUEST",
-                "message": (
-                    "update_eventsource is full-replace -- any field omitted from "
-                    "`definition` will be BLANKED. Set confirm=true to proceed, OR "
-                    "use update_logicmodule(type='eventsource', id, changes, mode='preview') "
-                    "for a safe partial update with diff preview."
-                ),
-            }
-        )
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        result = await client.put(f"/setting/eventsources/{eventsource_id}", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"EventSource '{result.get('name')}' updated successfully",
-                "eventsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await update_module(client, "eventsource", eventsource_id, definition, confirm)
 
 
 async def get_eventsource(

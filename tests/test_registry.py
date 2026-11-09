@@ -8,21 +8,6 @@ import pytest
 
 from lm_mcp.registry import TOOLS, get_tool_handler
 
-# List tool handlers that format their own size or offset query, each mapped to the
-# plan step that moves it onto list_tool or removes it. The guard below fails on an
-# entry whose handler does not exist or does not format its own query, so an entry
-# leaves when its handler moves.
-_LIST_TOOL_PENDING: dict[str, int] = {
-    "get_configsources": 42,
-    "get_datasources": 42,
-    "get_diagnosticsources": 42,
-    "get_eventsources": 42,
-    "get_logsources": 42,
-    "get_propertysources": 42,
-    "get_remediationsources": 42,
-    "get_topologysources": 42,
-}
-
 # The eight per-series tools analyze_metric replaces (spec R2.1).
 _SERIES_TOOLS_REPLACED = (
     "forecast_metric",
@@ -308,9 +293,9 @@ def _formats_own_page_query(tree: ast.Module) -> bool:
 class TestListToolGuard:
     """R2.5: a list tool pages through list_tool and takes and declares limit and offset.
 
-    The guard covers the registered handlers that take ``limit``, and a handler that
-    formats its own page query passes only while _LIST_TOOL_PENDING names it. A handler
-    that takes no ``limit``, such as a size=1 lookup by name or id, stays outside it.
+    The guard covers the registered handlers that take ``limit``; none may format its
+    own page query. A handler that takes no ``limit``, such as a size=1 lookup by name or
+    id, stays outside it.
     """
 
     def test_list_tool_handlers_take_and_declare_limit_and_offset(self):
@@ -349,23 +334,10 @@ class TestListToolGuard:
                     unforwarded.append(f"{name} limit")
         assert not unforwarded, unforwarded
 
-    def test_handlers_that_format_their_own_page_query_are_pending(self):
-        unlisted = sorted(
+    def test_no_list_handler_formats_its_own_page_query(self):
+        own = sorted(
             name
             for name, (sig, tree) in _handler_sources().items()
-            if "limit" in sig.parameters
-            and _formats_own_page_query(tree)
-            and name not in _LIST_TOOL_PENDING
+            if "limit" in sig.parameters and _formats_own_page_query(tree)
         )
-        assert not unlisted, f"move these onto list_tool or into _LIST_TOOL_PENDING: {unlisted}"
-
-    def test_pending_entries_still_format_their_own_page_query(self):
-        sources = _handler_sources()
-        stale = sorted(
-            name
-            for name in _LIST_TOOL_PENDING
-            if name not in sources
-            or "limit" not in sources[name][0].parameters
-            or not _formats_own_page_query(sources[name][1])
-        )
-        assert not stale, f"remove these from _LIST_TOOL_PENDING: {stale}"
+        assert not own, f"move these onto list_tool: {own}"

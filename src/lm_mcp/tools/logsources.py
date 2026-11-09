@@ -8,24 +8,19 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
-    format_response,
-    handle_error,
     list_tool,
-    normalize_definition_fields,
-    paginated_response,
-    quote_filter_value,
     require_write_permission,
-    sanitize_filter_value,
 )
-from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
+from lm_mcp.tools.logicmodules import (
+    MODULES,
+    create_module,
+    delete_module,
+    get_module,
+    update_module,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
-
-# The LogSource REST model names its collection method collectionMethod, which
-# normalize_definition_fields would otherwise rename to the DataSource field collectMethod.
-_REST_FIELDS = frozenset({"collectionMethod"})
 
 
 async def get_logsources(
@@ -55,54 +50,17 @@ async def get_logsources(
     Returns:
         List of TextContent with LogSource data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        # If raw filter is provided, use it directly (power user mode)
-        if filter:
-            params["filter"] = filter
-        else:
-            # Build filter from named parameters
-            filters = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if applies_to_filter:
-                clean_val, was_modified = sanitize_filter_value(applies_to_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"appliesTo~{quote_filter_value(clean_val)}")
-
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/logsources", params=params)
-
-        logsources = []
-        for item in result.get("items", []):
-            logsources.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "description": item.get("description"),
-                    "applies_to": item.get("appliesTo"),
-                    "group": item.get("group"),
-                    "log_type": item.get("logType"),
-                    "collect_method": item.get("collectMethod"),
-                    "version": item.get("version"),
-                }
-            )
-
-        response = {
-            **paginated_response(logsources, result, offset),
-            "logsources": logsources,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    module = MODULES["logsource"]
+    return await list_tool(
+        client,
+        f"/setting/{module.path}",
+        key="logsources",
+        project=module.list_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter, "appliesTo~": applies_to_filter},
+    )
 
 
 @require_write_permission
@@ -153,37 +111,7 @@ async def update_logsource(
     Returns:
         List of TextContent with updated LogSource info or error.
     """
-    if not confirm:
-        return format_response(
-            {
-                "error": True,
-                "code": "INVALID_REQUEST",
-                "message": (
-                    "update_logsource is full-replace -- any field omitted from "
-                    "`definition` will be BLANKED. Set confirm=true to proceed, OR "
-                    "use update_logicmodule(type='logsource', id, changes, mode='preview') "
-                    "for a safe partial update with diff preview."
-                ),
-            }
-        )
-    try:
-        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
-        payload.pop("id", None)
-
-        result = await client.put(f"/setting/logsources/{logsource_id}", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"LogSource '{result.get('name')}' updated successfully",
-                "logsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await update_module(client, "logsource", logsource_id, definition, confirm)
 
 
 async def get_logsource(

@@ -9,17 +9,19 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
-    WILDCARD_STRIP_NOTE,
     format_response,
     handle_error,
-    normalize_definition_fields,
-    paginated_response,
-    quote_filter_value,
+    list_tool,
     require_write_permission,
-    sanitize_filter_value,
 )
 from lm_mcp.tools.diagnostic_remediation import run_pre_execution_checks
-from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
+from lm_mcp.tools.logicmodules import (
+    MODULES,
+    create_module,
+    delete_module,
+    get_module,
+    update_module,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -52,52 +54,17 @@ async def get_remediationsources(
     Returns:
         List of TextContent with RemediationSource data or error.
     """
-    try:
-        params: dict = {"size": limit, "offset": offset}
-        wildcards_stripped = False
-
-        if filter:
-            params["filter"] = filter
-        else:
-            filters: list[str] = []
-            if name_filter:
-                clean_name, was_modified = sanitize_filter_value(name_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"name~{quote_filter_value(clean_name)}")
-            if group_filter:
-                clean_group, was_modified = sanitize_filter_value(group_filter)
-                wildcards_stripped = wildcards_stripped or was_modified
-                filters.append(f"group~{quote_filter_value(clean_group)}")
-            if filters:
-                params["filter"] = ",".join(filters)
-
-        result = await client.get("/setting/remediationsources", params=params)
-
-        sources = []
-        for item in result.get("items", []):
-            sources.append(
-                {
-                    "id": item.get("id"),
-                    "name": item.get("name"),
-                    "display_name": item.get("displayName"),
-                    "description": item.get("description"),
-                    "applies_to": item.get("appliesTo"),
-                    "group": item.get("group"),
-                    "collect_method": item.get("collectMethod"),
-                    "tags": item.get("tags", []),
-                    "technical_notes": item.get("technicalNotes"),
-                }
-            )
-
-        response = {
-            **paginated_response(sources, result, offset),
-            "remediationsources": sources,
-        }
-        if wildcards_stripped:
-            response["note"] = WILDCARD_STRIP_NOTE
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
+    module = MODULES["remediationsource"]
+    return await list_tool(
+        client,
+        f"/setting/{module.path}",
+        key="remediationsources",
+        project=module.list_row,
+        limit=limit,
+        offset=offset,
+        filter=filter,
+        named={"name~": name_filter, "group~": group_filter},
+    )
 
 
 async def get_remediationsource(
@@ -252,41 +219,9 @@ async def update_remediationsource(
     Returns:
         List of TextContent with updated RemediationSource info or error.
     """
-    if not confirm:
-        return format_response(
-            {
-                "error": True,
-                "code": "INVALID_REQUEST",
-                "message": (
-                    "update_remediationsource is full-replace -- any field omitted "
-                    "from `definition` will be BLANKED, including the script. Set "
-                    "confirm=true to proceed, OR use update_logicmodule"
-                    "(type='remediationsource', id, changes, mode='preview') for a "
-                    "safe partial update with diff preview."
-                ),
-            }
-        )
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        result = await client.put(
-            f"/setting/remediationsources/{remediationsource_id}", json_body=payload
-        )
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"RemediationSource '{result.get('name')}' updated successfully",
-                "remediationsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await update_module(
+        client, "remediationsource", remediationsource_id, definition, confirm
+    )
 
 
 @require_write_permission
