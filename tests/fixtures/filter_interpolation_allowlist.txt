@@ -16,8 +16,8 @@ alerts.py: str(sdted).lower()
 analyze_alerts.py: SEVERITY_MAP[severity]
 analyze_alerts.py: start_epoch
 api_tokens.py: token_id
-audit.py: end_time
-audit.py: start_time
+audit.py: int(end_time)
+audit.py: int(start_time)
 audit.py: token_id
 collectors.py: cid
 collectors.py: collector_group_id

@@ -48,6 +48,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   datasource holding `min_alerts` alerts on `min_devices` devices) and `changes` (one audit read;
   each write action paired with the first 5-minute alert spike within
   `correlation_window_minutes` after it). `analyses` selects sections; `hours` defaults to 24.
+- `get_audit_logs` takes `kind`: `all` pages through every entry, and `change` returns the
+  create, update, delete and import entries found in a pool of the newest entries, with
+  `scanned`, `has_more` and a note on how to reach older changes whenever more may exist.
+  `change_type` picks one type and an unknown one is refused. System and automation actors are
+  dropped after the fetch by default, never when a `username` is given, and `dropped` counts
+  them; `username` takes a comma-separated list and is refused when wildcard stripping leaves
+  nothing. A request past the 10,000-row offset or a filter over 900 characters is refused as
+  `INVALID_REQUEST` before it is sent. The filter semantics come from #63.
 
 ### Removed
 
@@ -198,6 +206,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - `get_link_flaps` and `get_power_events` read an alert's datasource from `resourceTemplateName`.
   They read `dataSourceName`, which alert rows do not carry, so on a live portal link flaps matched
   no interface and power events matched no datasource.
+- `get_audit_logs` bounds `start_time` and `end_time` on `happenedOn`, the epoch time; it sent
+  them on `happenedOnLocal`, a display string the portal ignores in a filter, so the window
+  returned every entry. `action` is a description match; it was sent as `happenedOn:<action>`,
+  which matched nothing.
 - `update_logicmodule` with `type="topologysource"` reads the TopologySource from
   `/setting/topologysources/{id}` and writes it back; it failed before, naming an export tool that
   does not exist.
