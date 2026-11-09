@@ -30,9 +30,13 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   (latest, mean, standard deviation, min, max, signed z-score of the latest sample), `trend`
   (least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, detrended
   24-hour autocorrelation, label), `seasonality` (detrended autocorrelation at 1, 4, 12, 24 and
-  168 hours, dominant period, peak hours in UTC) and `anomalies` (z-score above 3, outside 1.5
-  IQR, modified z-score above 3.5; each method's 20 most extreme hits and its count). `analyses`
-  selects sections; `hours` defaults to 168, which holds the 24-hour lag.
+  168 hours, dominant period, peak hours in UTC), `change_points` (level shifts where the mean of
+  the next 30 samples leaves the previous 30 by five times the noise in that comparison, which
+  follows a steady trend and autocorrelated noise; the daily cycle removed first on a window of
+  three days or more when that leaves less noise; with the levels before and after) and
+  `anomalies` (z-score above 3, outside 1.5 IQR, modified z-score above 3.5; each method's 20 most
+  extreme hits and its count). `analyses` selects sections; `hours` defaults to 168, which holds
+  the 24-hour lag.
 
 ### Removed
 

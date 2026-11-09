@@ -17,20 +17,25 @@ from lm_mcp.tools.stats_helpers import (
     iqr_anomalies,
     linear_regression,
     mad_anomalies,
+    remove_daily_cycle,
     theil_sen_slope,
     truncation_warnings,
+    window_shifts,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 # The sections analyze_metric offers, in the order it reports them.
-SECTIONS = ("summary", "trend", "seasonality", "anomalies")
+SECTIONS = ("summary", "trend", "seasonality", "change_points", "anomalies")
 
 DEFAULT_HOURS = 168
 
 # Seasonality tests these periods where the lag fits inside half the series.
 SEASONAL_PERIOD_HOURS = (1, 4, 12, 24, 168)
+
+# Samples on each side of the change-point section's window comparison.
+CHANGE_POINT_WINDOW = 30
 
 # Anomaly fences: |z| above 3, outside 1.5 IQR of the quartiles, |modified z| above 3.5.
 ZSCORE_THRESHOLD = 3.0
@@ -197,6 +202,71 @@ def _seasonality_section(values: list[float], timestamps: list[int]) -> dict[str
     return seasonality_stats(values, timestamps)
 
 
+def change_point_stats(values: list[float], timestamps: list[int]) -> dict[str, Any]:
+    """Level shifts: where the mean of the next 30 samples leaves the mean of the previous 30.
+
+    The series is read as it is and, with three days or more of samples, less its daily
+    profile; whichever leaves the smaller noise scale is analyzed. Changes found in the
+    series less its profile are found again with the profile rebuilt without the day
+    around each; when no day is clear enough to rebuild it, the cycle cannot be told
+    from the changes and the series is analyzed as it is. A change in the last 30
+    samples has no window after it and is not reported.
+
+    Args:
+        values: At least two samples, oldest first.
+        timestamps: Epoch seconds of the samples.
+
+    Returns:
+        window, deseasonalized, and points: each with timestamp, direction, and the
+        mean level of the window before and after it, with the daily cycle removed
+        when it was.
+    """
+    series = values
+    found, scale = window_shifts(values, CHANGE_POINT_WINDOW)
+    deseasonalized = False
+    seasonal, has_profile = remove_daily_cycle(values, timestamps)
+    if has_profile:
+        seasonal_found, seasonal_scale = window_shifts(seasonal, CHANGE_POINT_WINDOW)
+        if seasonal_scale < scale:
+            if not seasonal_found:
+                series, found, deseasonalized = seasonal, seasonal_found, True
+            else:
+                # A change bends the 24-hour level of the samples around it; rebuild the
+                # daily profile without them so the bend does not repeat on other days.
+                changes = [timestamps[p["index"]] for p in seasonal_found]
+                rebuilt, rebuilt_ok = remove_daily_cycle(values, timestamps, exclude_near=changes)
+                if rebuilt_ok:
+                    series, deseasonalized = rebuilt, True
+                    found, _ = window_shifts(rebuilt, CHANGE_POINT_WINDOW)
+    points = []
+    for p in found:
+        onset = p["index"]
+        before = series[onset - CHANGE_POINT_WINDOW : onset]
+        after = series[onset : onset + CHANGE_POINT_WINDOW]
+        points.append(
+            {
+                "timestamp": timestamps[onset],
+                "direction": p["direction"],
+                "before": sum(before) / len(before),
+                "after": sum(after) / len(after),
+            }
+        )
+    return {
+        "window": CHANGE_POINT_WINDOW,
+        "deseasonalized": deseasonalized,
+        "points": points,
+    }
+
+
+def _change_points_section(values: list[float], timestamps: list[int]) -> dict[str, Any]:
+    stats = change_point_stats(values, timestamps)
+    stats["points"] = [
+        {**p, "before": round(p["before"], 4), "after": round(p["after"], 4)}
+        for p in stats["points"]
+    ]
+    return stats
+
+
 def _keep_extreme(scored: list[tuple[float, dict[str, Any]]]) -> list[dict[str, Any]]:
     """The MAX_ANOMALY_HITS hits with the highest score, oldest first."""
     top = sorted(scored, key=lambda pair: pair[0], reverse=True)[:MAX_ANOMALY_HITS]
@@ -263,6 +333,7 @@ _SECTION_BUILDERS = {
     "summary": _summary_section,
     "trend": _trend_section,
     "seasonality": _seasonality_section,
+    "change_points": _change_points_section,
     "anomalies": _anomalies_section,
 }
 
