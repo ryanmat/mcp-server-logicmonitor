@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import ExitStack
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -146,7 +147,7 @@ def _mock_capacity_portal(
     """Route capacity_plan for device 1, datasource CPU (10).
 
     An instance given one response serves it to every data read; one given a list
-    serves the reads in order (forecast, trend, seasonality, then change points).
+    serves its pages in order.
     """
     respx.get(f"{_BASE}/device/devices/1").mock(
         return_value=_ok({"id": 1, "displayName": "server-01"})
@@ -226,7 +227,7 @@ def _capped_read() -> list[httpx.Response]:
 
 
 def _swinging_cpu() -> httpx.Response:
-    """cpu swings between 5 and 95 every 5 minutes, which classify_trend calls volatile."""
+    """cpu swings between 5 and 95 every 5 minutes, which the trend section labels volatile."""
     rows = [[5.0], [95.0], [5.0], [95.0], [5.0], [95.0]]
     start = int(time.time()) - 3600
     return _ok(
@@ -245,6 +246,21 @@ def _swinging_cpu() -> httpx.Response:
 
 class TestCheckRequiredTools:
     """Tests for check_required_tools utility."""
+
+    def test_every_composite_requires_only_registered_tools(self):
+        """A composite's required list names registered tools, so none waits on a removed one."""
+        from lm_mcp.registry import TOOLS
+        from lm_mcp.tools import workflows
+
+        registered = {tool.name for tool in TOOLS}
+        lists = {
+            name: value
+            for name, value in vars(workflows).items()
+            if name.startswith("_") and name.endswith("_REQUIRED")
+        }
+        assert len(lists) == 7
+        for name, required in lists.items():
+            assert set(required) <= registered, f"{name}: {sorted(set(required) - registered)}"
 
     def test_all_tools_pass_returns_none(self, monkeypatch):
         """When no filtering is configured, all tools pass."""
@@ -470,82 +486,118 @@ class TestTriage:
 class TestHealthCheck:
     """Tests for the health_check composite tool."""
 
-    async def test_happy_path_summary(self, client, monkeypatch):
-        """Health check returns expected keys in summary mode."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
-        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
-        from lm_mcp.config import reset_config
+    @staticmethod
+    def _subs(*datasources: dict) -> ExitStack:
+        """Patch every sub-tool but analyze_metric, which reads the series through respx.
 
-        reset_config()
-
-        device_data = {"id": 1, "displayName": "server-01"}
-        ds_data = {"datasources": [{"id": 10, "name": "CPU"}]}
-        inst_data = {"instances": [{"id": 100, "name": "main"}]}
-        score_data = {"health_score": 85, "status": "healthy"}
-        anomaly_data = {"anomaly_count": 0, "anomalies": []}
-        alert_data = {"total": 0, "alerts": []}
-        avail_data = {"availability_percent": 99.99}
-
-        with (
-            _patch_sub("lm_mcp.tools.devices.get_device", device_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_instances", inst_data),
-            _patch_sub("lm_mcp.tools.scoring.score_device_health", score_data),
-            _patch_sub("lm_mcp.tools.correlation.get_metric_anomalies", anomaly_data),
-            _patch_sub("lm_mcp.tools.alerts.get_alerts", alert_data),
-            _patch_sub("lm_mcp.tools.scoring.calculate_availability", avail_data),
+        Each datasource's one instance is cpu100 (id 100).
+        """
+        stack = ExitStack()
+        for path, data in (
+            ("lm_mcp.tools.devices.get_device", {"id": 1, "displayName": "server-01"}),
+            ("lm_mcp.tools.metrics.get_device_datasources", {"datasources": list(datasources)}),
+            (
+                "lm_mcp.tools.metrics.get_device_instances",
+                {"instances": [{"id": 100, "name": "cpu100"}]},
+            ),
+            ("lm_mcp.tools.alerts.get_alerts", {"total": 0, "alerts": []}),
+            ("lm_mcp.tools.scoring.calculate_availability", {"availability_percent": 99.99}),
         ):
+            stack.enter_context(_patch_sub(path, data))
+        return stack
+
+    @respx.mock
+    async def test_summary_trims_the_metrics_block(self, auth, lm_env):
+        """The summary level keeps the device and its counts and trims metrics."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        respx.get(f"{_DS_URL}/10/instances/100/data").mock(return_value=_steady_cpu_and_mem())
+
+        with self._subs({"id": 10, "name": "CPU"}):
             result = await health_check(client, device_id=1, detail_level="summary")
 
         data = json.loads(result[0].text)
         assert data["device_id"] == 1
-        assert "datasource_count" in data
-        # anomalies and health_scores stripped in summary
-        assert "anomalies" not in data
+        assert data["datasource_count"] == 1
+        assert "metrics" not in data
+
+    @respx.mock
+    async def test_full_reads_each_datasource_once_for_summary_and_anomalies(self, auth, lm_env):
+        """R2.1: one analyze_metric read per datasource, summary and anomalies over 24 hours."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        cpu_read = respx.get(f"{_DS_URL}/10/instances/100/data").mock(
+            return_value=_steady_cpu_and_mem()
+        )
+        mem_read = respx.get(f"{_DS_URL}/11/instances/100/data").mock(
+            return_value=_steady_cpu_and_mem()
+        )
+
+        with self._subs({"id": 10, "name": "CPU"}, {"id": 11, "name": "Memory"}):
+            result = await health_check(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert cpu_read.call_count == 1
+        assert mem_read.call_count == 1
+        assert [(row["datasource"], row["instance"]) for row in data["metrics"]] == [
+            ("CPU", "cpu100"),
+            ("Memory", "cpu100"),
+        ]
+        analysis = data["metrics"][0]["analysis"]
+        assert analysis["hours"] == 24
+        assert analysis["analyses"] == ["summary", "anomalies"]
+        cpu = analysis["datapoints"]["cpu"]
+        assert cpu["summary"]["latest"] == 51.0
+        assert set(cpu["anomalies"]) == {"zscore", "iqr", "mad"}
         assert "health_scores" not in data
-        reset_config()
+        assert "anomalies" not in data
 
-    async def test_happy_path_full(self, client, monkeypatch):
-        """Health check full mode includes anomalies and health_scores."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
-        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
-        from lm_mcp.config import reset_config
+    @respx.mock
+    async def test_a_failed_read_is_a_warning(self, auth, lm_env):
+        """A datasource whose read fails leaves metrics and names itself in warnings."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        respx.get(f"{_DS_URL}/10/instances/100/data").mock(return_value=_portal_error())
 
-        reset_config()
+        with self._subs({"id": 10, "name": "CPU"}):
+            result = await health_check(client, device_id=1, detail_level="full")
 
-        device_data = {"id": 1, "displayName": "server-01"}
-        ds_data = {"datasources": [{"id": 10, "name": "CPU"}]}
-        inst_data = {"instances": [{"id": 100, "name": "main"}]}
-        score_data = {"health_score": 85, "status": "healthy"}
-        anomaly_data = {"anomaly_count": 0, "anomalies": []}
-        alert_data = {"total": 0, "alerts": []}
-        avail_data = {"availability_percent": 99.99}
+        data = json.loads(result[0].text)
+        assert data["metrics"] == []
+        (warning,) = data["warnings"]
+        assert warning.startswith("analyze_metric for CPU failed:")
+        assert "portal unavailable" in warning
 
+    @respx.mock
+    async def test_an_instance_fetch_failure_is_a_warning(self, auth, lm_env):
+        """A datasource whose instance list fails is skipped with a warning naming the fetch."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         with (
-            _patch_sub("lm_mcp.tools.devices.get_device", device_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_instances", inst_data),
-            _patch_sub("lm_mcp.tools.scoring.score_device_health", score_data),
-            _patch_sub("lm_mcp.tools.correlation.get_metric_anomalies", anomaly_data),
-            _patch_sub("lm_mcp.tools.alerts.get_alerts", alert_data),
-            _patch_sub("lm_mcp.tools.scoring.calculate_availability", avail_data),
+            _patch_sub("lm_mcp.tools.devices.get_device", {"id": 1, "displayName": "server-01"}),
+            _patch_sub(
+                "lm_mcp.tools.metrics.get_device_datasources",
+                {"datasources": [{"id": 10, "name": "CPU"}]},
+            ),
+            patch(
+                "lm_mcp.tools.metrics.get_device_instances",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("instances down"),
+            ),
+            _patch_sub("lm_mcp.tools.alerts.get_alerts", {"total": 0, "alerts": []}),
+            _patch_sub(
+                "lm_mcp.tools.scoring.calculate_availability", {"availability_percent": 99.99}
+            ),
         ):
             result = await health_check(client, device_id=1, detail_level="full")
 
         data = json.loads(result[0].text)
-        assert "anomalies" in data
-        assert "health_scores" in data
-        reset_config()
+        assert data["metrics"] == []
+        assert data["warnings"] == ["instance fetch for CPU failed: instances down"]
 
-    async def test_required_tool_blocked(self, client, monkeypatch):
+    @respx.mock
+    @pytest.mark.parametrize("disabled", ["get_device_datasources", "analyze_metric"])
+    async def test_required_tool_blocked(self, client, monkeypatch, disabled):
         """Health check returns error when a required tool is disabled."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.setenv("LM_DISABLED_TOOLS", "get_device_datasources")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", disabled)
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
 
@@ -553,7 +605,7 @@ class TestHealthCheck:
 
         result = await health_check(client, device_id=1)
         text = result[0].text
-        assert "REQUIRED_TOOLS_DISABLED" in text or "get_device_datasources" in text
+        assert "REQUIRED_TOOLS_DISABLED" in text or disabled in text
         reset_config()
 
     async def test_sub_tool_failure(self, client, monkeypatch):
@@ -596,85 +648,67 @@ class TestHealthCheck:
 class TestCapacityPlan:
     """Tests for the capacity_plan composite tool."""
 
-    async def test_happy_path_summary(self, client, monkeypatch):
-        """Capacity plan returns expected keys in summary mode."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
-        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
-        from lm_mcp.config import reset_config
+    @respx.mock
+    async def test_summary_trims_the_datasources_block(self, auth, lm_env):
+        """The summary level keeps the device and the forecast headlines and trims datasources."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _steady_cpu_and_mem()})
 
-        reset_config()
-
-        device_data = {"id": 1, "displayName": "server-01"}
-        ds_data = {"datasources": [{"id": 10, "name": "CPU"}]}
-        inst_data = {"instances": [{"id": 100, "name": "main"}]}
-        forecast_data = {"forecasts": {"cpu": {"trend": "increasing"}}}
-        trend_data = {"classifications": {"cpu": {"classification": "stable"}}}
-        season_data = {"seasonality": {"cpu": {"is_seasonal": False}}}
-
-        with (
-            _patch_sub("lm_mcp.tools.devices.get_device", device_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_instances", inst_data),
-            _patch_sub("lm_mcp.tools.forecasting.forecast_metric", forecast_data),
-            _patch_sub("lm_mcp.tools.forecasting.classify_trend", trend_data),
-            _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
-        ):
-            result = await capacity_plan(
-                client,
-                device_id=1,
-                detail_level="summary",
-            )
+        result = await capacity_plan(client, device_id=1, detail_level="summary")
 
         data = json.loads(result[0].text)
         assert data["device_id"] == 1
-        # datasources stripped in summary mode
+        assert data["forecast_summary"]
         assert "datasources" not in data
-        reset_config()
 
-    async def test_happy_path_full(self, client, monkeypatch):
-        """Capacity plan full mode includes datasources."""
-        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
-        monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
-        monkeypatch.delenv("LM_DISABLED_TOOLS", raising=False)
-        from lm_mcp.config import reset_config
+    @respx.mock
+    async def test_full_reads_each_instance_once_for_every_section(self, auth, lm_env):
+        """R2.1: one analyze_metric read per instance carries trend, seasonality, change
+        points and the forecast against 90 over hours_back."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _steady_cpu_and_mem(), 101: _steady_cpu_and_mem()})
 
-        reset_config()
-
-        device_data = {"id": 1, "displayName": "server-01"}
-        ds_data = {"datasources": [{"id": 10, "name": "CPU"}]}
-        inst_data = {"instances": [{"id": 100, "name": "main"}]}
-        forecast_data = {"forecasts": {"cpu": {"trend": "increasing"}}}
-        trend_data = {"classifications": {"cpu": {"classification": "stable"}}}
-        season_data = {"seasonality": {"cpu": {"is_seasonal": False}}}
-
-        with (
-            _patch_sub("lm_mcp.tools.devices.get_device", device_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
-            _patch_sub("lm_mcp.tools.metrics.get_device_instances", inst_data),
-            _patch_sub("lm_mcp.tools.forecasting.forecast_metric", forecast_data),
-            _patch_sub("lm_mcp.tools.forecasting.classify_trend", trend_data),
-            _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
-        ):
-            result = await capacity_plan(
-                client,
-                device_id=1,
-                detail_level="full",
-            )
+        result = await capacity_plan(client, device_id=1, hours_back=72, detail_level="full")
 
         data = json.loads(result[0].text)
-        assert "datasources" in data
-        assert len(data["datasources"]) == 1
-        reset_config()
+        reads = [
+            call.request.url.path for call in respx.calls if call.request.url.path.endswith("/data")
+        ]
+        assert sorted(reads) == [
+            "/santaba/rest/device/devices/1/devicedatasources/10/instances/100/data",
+            "/santaba/rest/device/devices/1/devicedatasources/10/instances/101/data",
+        ]
+        (ds,) = data["datasources"]
+        assert ds["datasource"] == "CPU"
+        analysis = ds["instances"][0]["analysis"]
+        assert analysis["hours"] == 72
+        assert analysis["analyses"] == ["trend", "seasonality", "change_points", "forecast"]
+        cpu = analysis["datapoints"]["cpu"]
+        assert set(cpu) >= {"trend", "seasonality", "change_points", "forecast"}
+        assert cpu["forecast"]["threshold"] == 90.0
+
+    @respx.mock
+    async def test_a_volatile_instance_is_read_once(self, auth, lm_env):
+        """Change points come from the one read, where a volatile trend once cost a second."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({102: _swinging_cpu()})
+
+        result = await capacity_plan(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        (read,) = [call for call in respx.calls if call.request.url.path.endswith("/data")]
+        cpu = data["datasources"][0]["instances"][0]["analysis"]["datapoints"]["cpu"]
+        assert cpu["trend"]["label"] == "volatile"
+        assert "change_points" in cpu
+        assert read.request.url.path.endswith("/instances/102/data")
 
     @respx.mock
     async def test_summary_carries_forecast_headlines_and_instance_errors(self, auth, lm_env):
         """R4.4: the summary keeps each forecast's headline and every per-instance error.
 
-        cpu100 forecasts; cpu101's data read fails, so its forecast, trend and
-        seasonality each fail. The raw datasources block is still trimmed.
+        cpu100 climbs 120 an hour to 50, a third of an hour short of the 90 threshold, and
+        varies by more than half its mean, so the trend section labels it volatile;
+        cpu101's data read fails. The raw datasources block is still trimmed.
         """
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         _mock_capacity_portal({100: _rising_cpu_and_sparse_mem(), 101: _portal_error()})
@@ -687,44 +721,26 @@ class TestCapacityPlan:
         assert cpu["datasource"] == "CPU"
         assert cpu["instance"] == "cpu100"
         assert cpu["datapoint"] == "cpu"
-        assert cpu["method"] == "linear"
-        assert cpu["trend"] == "increasing"
-        assert cpu["days_until_breach"] > 0
+        assert cpu["trend"] == "volatile"
+        assert cpu["hours_until_breach"]["linear"] == pytest.approx(1 / 3, abs=1e-3)
+        assert cpu["hours_until_breach"]["holt_winters"] is None
         assert mem == {
             "datasource": "CPU",
             "instance": "cpu100",
             "datapoint": "mem",
             "status": "insufficient_data",
         }
-        failed = [w for w in data["warnings"] if "CPU/cpu101" in w]
-        assert [w.split(" for ")[0] for w in failed] == ["forecast", "trend", "seasonality"]
-        assert all("portal unavailable" in w for w in failed)
-
-    @respx.mock
-    async def test_summary_carries_a_change_point_failure(self, auth, lm_env):
-        """R4.4: a failed change-point read on a volatile instance reaches the summary warnings.
-
-        cpu102's trend is volatile, so capacity_plan reads its series a fourth time
-        for change points, and that read fails.
-        """
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        reads = [_swinging_cpu(), _swinging_cpu(), _swinging_cpu(), _portal_error()]
-        _mock_capacity_portal({102: reads})
-
-        result = await capacity_plan(client, device_id=1)
-
-        data = json.loads(result[0].text)
-        (warning,) = data["warnings"]
-        assert warning.startswith("change_points for CPU/cpu102 failed:")
-        assert "portal unavailable" in warning
+        (failed,) = data["warnings"]
+        assert failed.startswith("analyze_metric for CPU/cpu101 failed:")
+        assert "portal unavailable" in failed
 
     @respx.mock
     async def test_summary_carries_truncation_warnings_once_per_datapoint(self, auth, lm_env):
-        """R5: a capped series reaches the summary, once though three analyses read it."""
+        """R5: a capped series reaches the summary, one line per datapoint."""
         from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
 
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        _mock_capacity_portal({100: _capped_read() * 3, 101: _steady_cpu_and_mem()})
+        _mock_capacity_portal({100: _capped_read(), 101: _steady_cpu_and_mem()})
 
         result = await capacity_plan(client, device_id=1)
 
@@ -734,34 +750,6 @@ class TestCapacityPlan:
         assert cpu.startswith("CPU/cpu100: cpu: ")
         assert mem.startswith("CPU/cpu100: mem: ")
         assert f"{MAX_SERIES_PAGES}-page cap" in cpu
-
-    @respx.mock
-    @pytest.mark.parametrize("capped_read", [0, 1, 2], ids=["forecast", "trend", "seasonality"])
-    async def test_summary_carries_a_warning_only_one_analysis_saw(self, auth, lm_env, capped_read):
-        """R5: a read capped for one analysis alone still reaches the summary."""
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        reads = [[_steady_cpu_and_mem()], [_steady_cpu_and_mem()], [_steady_cpu_and_mem()]]
-        reads[capped_read] = _capped_read()
-        _mock_capacity_portal({100: [page for read in reads for page in read]})
-
-        result = await capacity_plan(client, device_id=1)
-
-        cpu, mem = json.loads(result[0].text)["warnings"]
-        assert cpu.startswith("CPU/cpu100: cpu: ")
-        assert mem.startswith("CPU/cpu100: mem: ")
-
-    @respx.mock
-    async def test_summary_carries_a_warning_from_change_points(self, auth, lm_env):
-        """R5: the change-point read on a volatile instance carries its warning up too."""
-        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        reads = [_swinging_cpu(), _swinging_cpu(), _swinging_cpu(), *_capped_read()]
-        _mock_capacity_portal({102: reads})
-
-        result = await capacity_plan(client, device_id=1)
-
-        cpu, mem = json.loads(result[0].text)["warnings"]
-        assert cpu.startswith("CPU/cpu102: cpu: ")
-        assert mem.startswith("CPU/cpu102: mem: ")
 
     @respx.mock
     async def test_summary_of_complete_reads_has_no_warnings(self, auth, lm_env):
@@ -779,17 +767,17 @@ class TestCapacityPlan:
     async def test_full_detail_keeps_truncation_warnings_on_the_instance(self, auth, lm_env):
         """R5: detail_level=full leaves the warning under datasources and copies nothing up."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        _mock_capacity_portal({100: _capped_read() * 3})
+        _mock_capacity_portal({100: _capped_read()})
 
         result = await capacity_plan(client, device_id=1, detail_level="full")
 
         data = json.loads(result[0].text)
         assert "warnings" not in data
         instance = data["datasources"][0]["instances"][0]
-        assert len(instance["forecast"]["warnings"]) == 2
+        assert len(instance["analysis"]["warnings"]) == 2
 
     @respx.mock
-    async def test_full_detail_is_unchanged(self, auth, lm_env):
+    async def test_full_detail_adds_no_summary_or_copied_errors(self, auth, lm_env):
         """R4.4: detail_level=full keeps the raw block and adds no summary or copied errors."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         _mock_capacity_portal({100: _rising_cpu_and_sparse_mem(), 101: _portal_error()})
@@ -801,11 +789,12 @@ class TestCapacityPlan:
         assert "warnings" not in data
         failed = data["datasources"][0]["instances"][1]
         assert failed["instance"] == "cpu101"
-        assert "portal unavailable" in failed["forecast_error"]
-        assert "portal unavailable" in failed["trend_error"]
+        assert failed["analysis"] is None
+        assert "portal unavailable" in failed["analysis_error"]
 
-    async def test_surfaces_forecast_failure(self, client, monkeypatch):
-        """A failing forecast sub-tool is surfaced as forecast_error, not a silent None."""
+    @respx.mock
+    async def test_surfaces_an_analysis_failure(self, client, monkeypatch):
+        """A failing analyze_metric is surfaced as analysis_error, not a silent None."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
@@ -817,34 +806,31 @@ class TestCapacityPlan:
         device_data = {"id": 1, "displayName": "server-01"}
         ds_data = {"datasources": [{"id": 10, "name": "CPU"}]}
         inst_data = {"instances": [{"id": 100, "name": "main"}]}
-        trend_data = {"classifications": {"cpu": {"classification": "stable"}}}
-        season_data = {"seasonality": {"cpu": {"is_seasonal": False}}}
 
         with (
             _patch_sub("lm_mcp.tools.devices.get_device", device_data),
             _patch_sub("lm_mcp.tools.metrics.get_device_datasources", ds_data),
             _patch_sub("lm_mcp.tools.metrics.get_device_instances", inst_data),
             patch(
-                "lm_mcp.tools.forecasting.forecast_metric",
+                "lm_mcp.tools.analyze_metric.analyze_metric",
                 new_callable=AsyncMock,
-                side_effect=RuntimeError("forecast down"),
+                side_effect=RuntimeError("analysis down"),
             ),
-            _patch_sub("lm_mcp.tools.forecasting.classify_trend", trend_data),
-            _patch_sub("lm_mcp.tools.forecasting.detect_seasonality", season_data),
         ):
             result = await capacity_plan(client, device_id=1, detail_level="full")
 
         data = json.loads(result[0].text)
         inst0 = data["datasources"][0]["instances"][0]
-        assert inst0["forecast"] is None
-        assert "forecast down" in inst0["forecast_error"]
+        assert inst0["analysis"] is None
+        assert "analysis down" in inst0["analysis_error"]
         reset_config()
 
+    @respx.mock
     async def test_required_tool_blocked(self, client, monkeypatch):
         """Capacity plan returns error when a required tool is disabled."""
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
         monkeypatch.setenv("LM_BEARER_TOKEN", "test-bearer-token-value")
-        monkeypatch.setenv("LM_DISABLED_TOOLS", "forecast_metric")
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "analyze_metric")
         monkeypatch.delenv("LM_ENABLED_TOOLS", raising=False)
         from lm_mcp.config import reset_config
 
@@ -852,7 +838,7 @@ class TestCapacityPlan:
 
         result = await capacity_plan(client, device_id=1)
         text = result[0].text
-        assert "REQUIRED_TOOLS_DISABLED" in text or "forecast_metric" in text
+        assert "REQUIRED_TOOLS_DISABLED" in text or "analyze_metric" in text
         reset_config()
 
     async def test_empty_datasources(self, client, monkeypatch):
@@ -1115,7 +1101,7 @@ class TestSearchTools:
         data = json.loads(result[0].text)
         assert data["total"] > 0
         tool_names = [m["name"] for m in data["matches"]]
-        assert "forecast_metric" in tool_names
+        assert "analyze_metric" in tool_names
 
     async def test_category_filter(self, client):
         """Category filter restricts results to that category's tools."""

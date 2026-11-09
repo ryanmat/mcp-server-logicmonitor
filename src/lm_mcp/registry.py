@@ -5969,8 +5969,9 @@ TOOLS.extend(
         Tool(
             name="health_check",
             description=(
-                "Composite health check: resolves a device, scores health across "
-                "datasources, detects anomalies, checks alerts, and calculates "
+                "Composite health check: resolves a device, reads the first instance "
+                "of up to five datasources through analyze_metric (summary and "
+                "anomalies over 24 hours), checks alerts, and calculates "
                 "availability. Returns a single device health report."
             ),
             annotations=_READ_ONLY,
@@ -5994,9 +5995,10 @@ TOOLS.extend(
         Tool(
             name="capacity_plan",
             description=(
-                "Composite capacity planning: forecasts metric breach dates, "
-                "classifies trends, detects seasonality and change points. "
-                "Returns per-datasource capacity projections."
+                "Composite capacity planning: reads each instance once through "
+                "analyze_metric to classify its trend, detect seasonality and change "
+                "points, and forecast when it crosses 90. Returns per-datasource "
+                "capacity projections."
             ),
             annotations=_READ_ONLY,
             inputSchema={

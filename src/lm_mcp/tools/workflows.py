@@ -280,11 +280,15 @@ _HEALTH_CHECK_REQUIRED = [
     "get_device",
     "get_device_datasources",
     "get_device_instances",
-    "score_device_health",
-    "get_metric_anomalies",
+    "analyze_metric",
     "get_alerts",
     "calculate_availability",
 ]
+
+# health_check reads each datasource's series over this window, for the latest
+# sample's z-score and the anomaly fences.
+_HEALTH_CHECK_HOURS = 24
+_HEALTH_CHECK_ANALYSES = ["summary", "anomalies"]
 
 
 async def health_check(
@@ -295,8 +299,9 @@ async def health_check(
 ) -> list[TextContent]:
     """Composite health check for a single device.
 
-    Resolves the device, gathers datasource coverage, scores health,
-    detects anomalies, checks active alerts, and calculates availability.
+    Resolves the device, gathers datasource coverage, analyzes the first
+    instance of up to five datasources (summary and anomalies over 24 hours,
+    one read each), checks active alerts, and calculates availability.
 
     Args:
         client: LogicMonitor API client.
@@ -313,9 +318,9 @@ async def health_check(
 
     try:
         from lm_mcp.tools.alerts import get_alerts
-        from lm_mcp.tools.correlation import get_metric_anomalies
+        from lm_mcp.tools.analyze_metric import analyze_metric
         from lm_mcp.tools.metrics import get_device_datasources, get_device_instances
-        from lm_mcp.tools.scoring import calculate_availability, score_device_health
+        from lm_mcp.tools.scoring import calculate_availability
 
         warnings: list[str] = []
 
@@ -345,15 +350,13 @@ async def health_check(
             warnings.append(f"get_device_datasources failed: {exc}")
             report["datasource_count"] = 0
 
-        # 3. Score health for first 5 datasources (skip those with no instances)
-        health_scores: list[dict] = []
-        primary_ds_id: int | None = None
-        primary_instance_id: int | None = None
-
+        # 3. Analyze the first instance of the first 5 datasources that have one
+        metrics: list[dict] = []
         for ds in ds_list[:5]:
             ds_id = ds.get("id")
             if ds_id is None:
                 continue
+            ds_name = ds.get("name", ds_id)
             try:
                 inst_data = await call_sub_tool(
                     get_device_instances,
@@ -361,63 +364,45 @@ async def health_check(
                     device_id=resolved_id,
                     device_datasource_id=ds_id,
                 )
-                instances = inst_data.get("instances", [])
-                if not instances:
-                    continue
-
-                inst_id = instances[0].get("id")
-                if primary_ds_id is None and inst_id is not None:
-                    primary_ds_id = ds_id
-                    primary_instance_id = inst_id
-
-                try:
-                    score = await call_sub_tool(
-                        score_device_health,
-                        client,
-                        device_id=resolved_id,
-                        device_datasource_id=ds_id,
-                        instance_id=inst_id,
-                    )
-                    health_scores.append(
-                        {
-                            "datasource": ds.get("name", ""),
-                            "score": score,
-                        }
-                    )
-                except Exception as exc:
-                    _AUDIT.warning(
-                        "health: score failed for datasource %s: %s",
-                        ds.get("name", ds_id),
-                        exc,
-                        exc_info=True,
-                    )
-                    warnings.append(
-                        f"score_device_health for {ds.get('name', ds_id)} failed: {exc}"
-                    )
             except Exception as exc:
-                _AUDIT.warning("health: datasource processing failed: %s", exc, exc_info=True)
-                warnings.append(f"datasource processing failed: {exc}")
+                _AUDIT.warning(
+                    "health: instance fetch failed for datasource %s: %s",
+                    ds_name,
+                    exc,
+                    exc_info=True,
+                )
+                warnings.append(f"instance fetch for {ds_name} failed: {exc}")
                 continue
-
-        report["health_scores"] = health_scores
-
-        # 4. Metric anomalies for primary datasource
-        if primary_ds_id is not None and primary_instance_id is not None:
+            instances = inst_data.get("instances", [])
+            if not instances or instances[0].get("id") is None:
+                continue
+            instance = instances[0]
             try:
-                anomalies = await call_sub_tool(
-                    get_metric_anomalies,
+                analysis = await call_sub_tool(
+                    analyze_metric,
                     client,
                     device_id=resolved_id,
-                    device_datasource_id=primary_ds_id,
-                    instance_id=primary_instance_id,
+                    device_datasource_id=ds_id,
+                    instance_id=instance["id"],
+                    hours=_HEALTH_CHECK_HOURS,
+                    analyses=_HEALTH_CHECK_ANALYSES,
                 )
-                report["anomalies"] = anomalies
+                metrics.append(
+                    {
+                        "datasource": ds.get("name", ""),
+                        "instance": instance.get("name", ""),
+                        "analysis": analysis,
+                    }
+                )
             except Exception as exc:
-                warnings.append(f"get_metric_anomalies failed: {exc}")
-        else:
-            report["anomalies"] = None
+                _AUDIT.warning(
+                    "health: analysis failed for datasource %s: %s", ds_name, exc, exc_info=True
+                )
+                warnings.append(f"analyze_metric for {ds_name} failed: {exc}")
 
-        # 5. Active alerts for the device
+        report["metrics"] = metrics
+
+        # 4. Active alerts for the device
         try:
             device_display = report["device_name"]
             alert_data = await call_sub_tool(
@@ -431,7 +416,7 @@ async def health_check(
             warnings.append(f"get_alerts failed: {exc}")
             report["active_alerts"] = None
 
-        # 6. Availability (30-day)
+        # 5. Availability (30-day)
         try:
             avail = await call_sub_tool(
                 calculate_availability,
@@ -446,7 +431,7 @@ async def health_check(
         if warnings:
             report["warnings"] = warnings
 
-        full_keys = {"anomalies", "health_scores"}
+        full_keys = {"metrics"}
         report = _trim_detail(report, detail_level, full_keys)
 
         return format_response(report)
@@ -462,11 +447,13 @@ _CAPACITY_PLAN_REQUIRED = [
     "get_devices",
     "get_device",
     "get_device_datasources",
-    "forecast_metric",
-    "classify_trend",
-    "detect_seasonality",
-    "detect_change_points",
+    "analyze_metric",
 ]
+
+# capacity_plan reads each instance once for these sections, forecasting the
+# crossing of this level.
+_CAPACITY_PLAN_ANALYSES = ["trend", "seasonality", "change_points", "forecast"]
+_CAPACITY_THRESHOLD = 90.0
 
 
 async def capacity_plan(
@@ -479,8 +466,9 @@ async def capacity_plan(
 ) -> list[TextContent]:
     """Composite capacity planning for a device.
 
-    Forecasts metric breach dates, classifies trends, detects seasonality
-    and change points across datasources and instances.
+    Reads each instance's series once through analyze_metric for its trend,
+    seasonality, change points and forecast against 90, across up to five
+    datasources and three instances each.
 
     Args:
         client: LogicMonitor API client.
@@ -498,12 +486,7 @@ async def capacity_plan(
         return blocked
 
     try:
-        from lm_mcp.tools.forecasting import (
-            classify_trend,
-            detect_change_points,
-            detect_seasonality,
-            forecast_metric,
-        )
+        from lm_mcp.tools.analyze_metric import analyze_metric
         from lm_mcp.tools.metrics import get_device_datasources, get_device_instances
 
         warnings: list[str] = []
@@ -534,7 +517,7 @@ async def capacity_plan(
             warnings.append(f"get_device_datasources failed: {exc}")
             ds_list = []
 
-        # 3. Per datasource (up to 5), per instance (up to 3): forecast + trend
+        # 3. Per datasource (up to 5), per instance (up to 3): one analysis
         ds_reports: list[dict] = []
         for ds in ds_list[:5]:
             ds_id = ds.get("id")
@@ -567,94 +550,26 @@ async def capacity_plan(
                     continue
 
                 inst_report: dict = {"instance": inst.get("name", "")}
-                common_kwargs = {
-                    "device_id": resolved_id,
-                    "device_datasource_id": ds_id,
-                    "instance_id": inst_id,
-                    "hours_back": hours_back,
-                }
-
-                # Forecast (use threshold=90 as default capacity threshold)
                 try:
-                    fc = await call_sub_tool(
-                        forecast_metric,
+                    inst_report["analysis"] = await call_sub_tool(
+                        analyze_metric,
                         client,
-                        threshold=90.0,
-                        **common_kwargs,
+                        device_id=resolved_id,
+                        device_datasource_id=ds_id,
+                        instance_id=inst_id,
+                        hours=hours_back,
+                        analyses=_CAPACITY_PLAN_ANALYSES,
+                        threshold=_CAPACITY_THRESHOLD,
                     )
-                    inst_report["forecast"] = fc
                 except Exception as exc:
                     _AUDIT.warning(
-                        "capacity_plan: forecast failed for instance %s: %s",
+                        "capacity_plan: analysis failed for instance %s: %s",
                         inst_id,
                         exc,
                         exc_info=True,
                     )
-                    inst_report["forecast"] = None
-                    inst_report["forecast_error"] = str(exc)
-
-                # Classify trend
-                try:
-                    trend = await call_sub_tool(
-                        classify_trend,
-                        client,
-                        **common_kwargs,
-                    )
-                    inst_report["trend"] = trend
-                except Exception as exc:
-                    _AUDIT.warning(
-                        "capacity_plan: trend failed for instance %s: %s",
-                        inst_id,
-                        exc,
-                        exc_info=True,
-                    )
-                    inst_report["trend"] = None
-                    inst_report["trend_error"] = str(exc)
-
-                # Seasonality
-                try:
-                    season = await call_sub_tool(
-                        detect_seasonality,
-                        client,
-                        **common_kwargs,
-                    )
-                    inst_report["seasonality"] = season
-                except Exception as exc:
-                    _AUDIT.warning(
-                        "capacity_plan: seasonality failed for instance %s: %s",
-                        inst_id,
-                        exc,
-                        exc_info=True,
-                    )
-                    inst_report["seasonality"] = None
-                    inst_report["seasonality_error"] = str(exc)
-
-                # Change points (only if volatile trend detected)
-                is_volatile = False
-                if inst_report.get("trend"):
-                    classifications = inst_report["trend"].get("classifications", {})
-                    for _dp, info in classifications.items():
-                        if info.get("classification") == "volatile":
-                            is_volatile = True
-                            break
-
-                if is_volatile:
-                    try:
-                        cps = await call_sub_tool(
-                            detect_change_points,
-                            client,
-                            **common_kwargs,
-                        )
-                        inst_report["change_points"] = cps
-                    except Exception as exc:
-                        _AUDIT.warning(
-                            "capacity_plan: change points failed for instance %s: %s",
-                            inst_id,
-                            exc,
-                            exc_info=True,
-                        )
-                        inst_report["change_points"] = None
-                        inst_report["change_points_error"] = str(exc)
+                    inst_report["analysis"] = None
+                    inst_report["analysis_error"] = str(exc)
 
                 ds_report["instances"].append(inst_report)
 
@@ -680,64 +595,52 @@ async def capacity_plan(
         return handle_error(e)
 
 
-# Per-instance error keys capacity_plan records, one per analysis.
-_INSTANCE_ERROR_KEYS = ("forecast_error", "trend_error", "seasonality_error", "change_points_error")
-
-
 def _forecast_summary(ds_reports: list[dict]) -> list[dict]:
-    """One headline row per forecast datapoint: method, days to breach, trend.
+    """One headline row per datapoint: trend label and each method's hours to breach.
 
-    A datapoint the forecast could not run on carries its status instead.
+    A datapoint too short to analyze carries its status instead.
     """
     rows: list[dict] = []
     for ds in ds_reports:
         for inst in ds["instances"]:
-            forecasts = (inst.get("forecast") or {}).get("forecasts") or {}
-            for datapoint, fc in forecasts.items():
+            datapoints = (inst.get("analysis") or {}).get("datapoints") or {}
+            for datapoint, sections in datapoints.items():
                 row = {
                     "datasource": ds["datasource"],
                     "instance": inst["instance"],
                     "datapoint": datapoint,
                 }
-                if "status" in fc:
-                    row["status"] = fc["status"]
+                forecast = sections["forecast"]
+                if "status" in forecast:
+                    row["status"] = forecast["status"]
                 else:
-                    row["method"] = fc.get("method_used")
-                    row["days_until_breach"] = fc.get("days_until_breach")
-                    row["trend"] = fc.get("trend")
-                    if fc.get("fallback_reason"):
-                        row["fallback_reason"] = fc["fallback_reason"]
+                    row["trend"] = sections["trend"]["label"]
+                    row["hours_until_breach"] = {
+                        method: forecast[method]["hours_until_breach"]
+                        for method in ("linear", "holt_winters")
+                    }
                 rows.append(row)
     return rows
 
 
 def _instance_errors(ds_reports: list[dict]) -> list[str]:
-    """Every per-instance analysis error, as warning lines naming datasource and instance."""
-    errors: list[str] = []
-    for ds in ds_reports:
-        for inst in ds["instances"]:
-            for key in _INSTANCE_ERROR_KEYS:
-                if key in inst:
-                    analysis = key.removesuffix("_error")
-                    errors.append(
-                        f"{analysis} for {ds['datasource']}/{inst['instance']} failed: {inst[key]}"
-                    )
-    return errors
+    """Every failed instance analysis, as a warning line naming datasource and instance."""
+    return [
+        f"analyze_metric for {ds['datasource']}/{inst['instance']} failed: {inst['analysis_error']}"
+        for ds in ds_reports
+        for inst in ds["instances"]
+        if "analysis_error" in inst
+    ]
 
 
 def _instance_warnings(ds_reports: list[dict]) -> list[str]:
-    """Every sub-tool warning, naming datasource and instance, once per instance.
-
-    The analyses read the same window, so a capped series warns from each of them.
-    """
-    lines: dict[str, None] = {}
-    for ds in ds_reports:
-        for inst in ds["instances"]:
-            for key in _INSTANCE_ERROR_KEYS:
-                analysis = inst.get(key.removesuffix("_error")) or {}
-                for warning in analysis.get("warnings", []):
-                    lines[f"{ds['datasource']}/{inst['instance']}: {warning}"] = None
-    return list(lines)
+    """Every analysis warning, naming datasource and instance."""
+    return [
+        f"{ds['datasource']}/{inst['instance']}: {warning}"
+        for ds in ds_reports
+        for inst in ds["instances"]
+        for warning in (inst.get("analysis") or {}).get("warnings", [])
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -894,7 +797,6 @@ _DIAGNOSE_REQUIRED = [
     "correlate_alerts",
     "correlate_changes",
     "analyze_blast_radius",
-    "score_device_health",
 ]
 
 

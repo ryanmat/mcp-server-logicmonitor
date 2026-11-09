@@ -260,6 +260,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
   files the repository tracks.
+- `health_check` reads the first instance of up to five datasources once each through
+  `analyze_metric`, the summary and anomaly sections over 24 hours, and reports them under
+  `metrics` with the datasource and instance names. The `health_scores` and `anomalies` keys
+  leave, and a datasource whose read fails is a warning naming it.
+- `capacity_plan` reads each instance once through `analyze_metric`, for the trend, seasonality,
+  change point and forecast sections against a threshold of 90, and reports the result under
+  the instance's `analysis`, where it read the series three or four times. A
+  `forecast_summary` row carries the trend label and each method's `hours_until_breach`, and an
+  instance whose read fails carries one `analysis_error`.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
   pyjwt 2.15.1 and websockets 17.4.

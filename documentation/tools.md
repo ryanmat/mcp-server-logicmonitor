@@ -15,8 +15,8 @@ Composite workflow tools -- recommended starting point
 | Tool | Description | Write |
 |------|-------------|-------|
 | `triage` | Composite triage: correlates alerts, clusters by device/time, scores noise, assesses blast radius, and checks recent changes. Returns a prioritized incident report. | No |
-| `health_check` | Composite health check: resolves a device, scores health across datasources, detects anomalies, checks alerts, and calculates availability. Returns a single device health report. | No |
-| `capacity_plan` | Composite capacity planning: forecasts metric breach dates, classifies trends, detects seasonality and change points. Returns per-datasource capacity projections. | No |
+| `health_check` | Composite health check: resolves a device, reads the first instance of up to five datasources through analyze_metric (summary and anomalies over 24 hours), checks alerts, and calculates availability. Returns a single device health report. | No |
+| `capacity_plan` | Composite capacity planning: reads each instance once through analyze_metric to classify its trend, detect seasonality and change points, and forecast when it crosses 90. Returns per-datasource capacity projections. | No |
 | `portal_overview` | Composite portal overview: aggregates alert statistics, collector health, maintenance windows, noise scores, and dead devices into a shift-handoff report. | No |
 | `diagnose` | Composite diagnosis: given an alert or device, gathers alert details, device context, correlated alerts, recent changes, blast radius, and health score. Returns a diagnosis report with probable root cause and recommendations. | No |
 | `update_logicmodule` | Update a LogicModule definition (configsource, datasource, diagnosticsource, eventsource, logsource, propertysource, remediationsource, topologysource). Reads the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (mode='preview', default) or applies the merged definition (mode='apply'). The LogicMonitor update is full-replace, so the merged full definition is sent and fields you do not change are kept. | Yes |
