@@ -530,47 +530,6 @@
       "type": "object"
     }
   },
-  "classify_trend": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Classify metric trends as stable, increasing, decreasing, cyclic, or volatile. Uses linear regression slope, coefficient of variation, and autocorrelation.",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours of data to analyze",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
-      "type": "object"
-    }
-  },
   "clear_session_context": {
     "annotations": {
       "destructiveHint": false,
@@ -613,45 +572,6 @@
         "device_id",
         "device_datasource_id",
         "instance_id"
-      ],
-      "type": "object"
-    }
-  },
-  "compare_to_baseline": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Compare current metrics against a stored baseline. Reports deviation percentage and status (normal, elevated, reduced, anomalous) per datapoint.",
-    "inputSchema": {
-      "properties": {
-        "baseline_name": {
-          "description": "Name of the stored baseline",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Override device-datasource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Override device ID (uses baseline if omitted)",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 1,
-          "description": "Hours of recent data to compare",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Override instance ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "baseline_name"
       ],
       "type": "object"
     }
@@ -2687,93 +2607,6 @@
       "type": "object"
     }
   },
-  "detect_change_points": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Detect regime shifts in metric data using the CUSUM algorithm. Identifies points where the mean value changes significantly.",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours of data to analyze",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        },
-        "sensitivity": {
-          "default": 1.0,
-          "description": "Detection sensitivity (lower = more sensitive)",
-          "type": "number"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
-      "type": "object"
-    }
-  },
-  "detect_seasonality": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Detect periodic patterns in metric data using autocorrelation. Identifies dominant periods (1h, 4h, 12h, 24h, 168h) and peak activity hours.",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 168,
-          "description": "Hours of data to analyze (default 1 week)",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
-      "type": "object"
-    }
-  },
   "detect_site_outage": {
     "annotations": {
       "destructiveHint": false,
@@ -3125,62 +2958,6 @@
       },
       "required": [
         "remediationsource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "forecast_metric": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Forecast when a metric will breach a threshold using linear regression. Analyzes historical data to predict trend direction and estimated breach time.",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 168,
-          "description": "Hours of historical data for regression",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        },
-        "method": {
-          "default": "auto",
-          "description": "Forecasting method. 'auto' picks 'holt_winters' when hours_back is at least 168, the series has at least 48 samples, and its autocorrelation exceeds 0.5 in magnitude at a 12 or 24 hour lag shorter than half the series; otherwise 'linear'.",
-          "enum": [
-            "auto",
-            "linear",
-            "holt_winters"
-          ],
-          "type": "string"
-        },
-        "threshold": {
-          "description": "Threshold value that constitutes a breach",
-          "type": "number"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id",
-        "threshold"
       ],
       "type": "object"
     }
@@ -5376,63 +5153,6 @@
       "type": "object"
     }
   },
-  "get_metric_anomalies": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Detect metric anomalies using z-score analysis. Identifies data points deviating significantly from the mean.",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (optional, all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID (from get_device_datasources)",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours to look back (default: 24)",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        },
-        "method": {
-          "default": "auto",
-          "description": "Anomaly detection method (auto selects based on data distribution)",
-          "enum": [
-            "auto",
-            "zscore",
-            "iqr",
-            "mad"
-          ],
-          "type": "string"
-        },
-        "threshold": {
-          "default": 2.0,
-          "description": "Z-score threshold for anomaly detection (default: 2.0)",
-          "type": "number"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
-      "type": "object"
-    }
-  },
   "get_netscan": {
     "annotations": {
       "destructiveHint": false,
@@ -7619,52 +7339,6 @@
       "type": "object"
     }
   },
-  "save_baseline": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Save a metric baseline from historical data. Computes mean, min, max, stddev per datapoint and stores as a session variable for later comparison.",
-    "inputSchema": {
-      "properties": {
-        "baseline_name": {
-          "description": "Name for the stored baseline",
-          "type": "string"
-        },
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours of historical data to use",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id",
-        "baseline_name"
-      ],
-      "type": "object"
-    }
-  },
   "score_alert_noise": {
     "annotations": {
       "destructiveHint": false,
@@ -7690,51 +7364,6 @@
           "type": "integer"
         }
       },
-      "type": "object"
-    }
-  },
-  "score_device_health": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Score health of a specific device-datasource instance using z-score analysis. For full device health reports across all datasources, use the health_check composite tool instead.",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device-DataSource ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 4,
-          "description": "Hours of historical data for baseline",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        },
-        "weights": {
-          "description": "Optional dict of datapoint_name -> weight",
-          "type": "object"
-        }
-      },
-      "required": [
-        "device_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
       "type": "object"
     }
   },

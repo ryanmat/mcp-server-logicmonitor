@@ -4320,197 +4320,12 @@ TOOLS.extend(
                 },
             },
         ),
-        Tool(
-            name="get_metric_anomalies",
-            description=(
-                "Detect metric anomalies using z-score analysis. "
-                "Identifies data points deviating significantly from the mean."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "integer", "description": "Device ID"},
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID (from get_device_datasources)",
-                    },
-                    "instance_id": {"type": "integer", "description": "Instance ID"},
-                    "datapoints": {
-                        "type": "string",
-                        "description": "Comma-separated datapoint names (optional, all if omitted)",
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back (default: 24)",
-                    },
-                    "threshold": {
-                        "type": "number",
-                        "default": 2.0,
-                        "description": "Z-score threshold for anomaly detection (default: 2.0)",
-                    },
-                    "method": {
-                        "type": "string",
-                        "enum": ["auto", "zscore", "iqr", "mad"],
-                        "default": "auto",
-                        "description": (
-                            "Anomaly detection method (auto selects based on data distribution)"
-                        ),
-                    },
-                },
-                "required": ["device_id", "device_datasource_id", "instance_id"],
-            },
-        ),
-    ]
-)
-
-# Baselines
-TOOLS.extend(
-    [
-        Tool(
-            name="save_baseline",
-            description=(
-                "Save a metric baseline from historical data. "
-                "Computes mean, min, max, stddev per datapoint and stores "
-                "as a session variable for later comparison."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "baseline_name": {
-                        "type": "string",
-                        "description": "Name for the stored baseline",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": ("Comma-separated datapoint names (all if omitted)"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours of historical data to use",
-                    },
-                },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                    "baseline_name",
-                ],
-            },
-        ),
-        Tool(
-            name="compare_to_baseline",
-            description=(
-                "Compare current metrics against a stored baseline. "
-                "Reports deviation percentage and status (normal, elevated, "
-                "reduced, anomalous) per datapoint."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "baseline_name": {
-                        "type": "string",
-                        "description": "Name of the stored baseline",
-                    },
-                    "device_id": {
-                        "type": "integer",
-                        "description": ("Override device ID (uses baseline if omitted)"),
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": ("Override device-datasource ID"),
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": ("Override instance ID"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Hours of recent data to compare",
-                    },
-                },
-                "required": ["baseline_name"],
-            },
-        ),
     ]
 )
 
 # ML/Statistical Analysis
 TOOLS.extend(
     [
-        Tool(
-            name="forecast_metric",
-            description=(
-                "Forecast when a metric will breach a threshold using linear "
-                "regression. Analyzes historical data to predict trend direction "
-                "and estimated breach time."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "threshold": {
-                        "type": "number",
-                        "description": "Threshold value that constitutes a breach",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": ("Comma-separated datapoint names (all if omitted)"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 168,
-                        "description": "Hours of historical data for regression",
-                    },
-                    "method": {
-                        "type": "string",
-                        "enum": ["auto", "linear", "holt_winters"],
-                        "default": "auto",
-                        "description": (
-                            "Forecasting method. 'auto' picks 'holt_winters' when hours_back "
-                            "is at least 168, the series has at least 48 samples, and its "
-                            "autocorrelation exceeds 0.5 in magnitude at a 12 or 24 hour lag "
-                            "shorter than half the series; otherwise 'linear'."
-                        ),
-                    },
-                },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                    "threshold",
-                ],
-            },
-        ),
         Tool(
             name="correlate_metrics",
             description=(
@@ -4551,50 +4366,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="detect_change_points",
-            description=(
-                "Detect regime shifts in metric data using the CUSUM algorithm. "
-                "Identifies points where the mean value changes significantly."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": ("Comma-separated datapoint names (all if omitted)"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours of data to analyze",
-                    },
-                    "sensitivity": {
-                        "type": "number",
-                        "default": 1.0,
-                        "description": ("Detection sensitivity (lower = more sensitive)"),
-                    },
-                },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                ],
-            },
-        ),
-        Tool(
             name="score_alert_noise",
             description=(
                 "Score alert noise level using Shannon entropy and flap detection. "
@@ -4621,46 +4392,6 @@ TOOLS.extend(
                         "description": "Optional device group ID filter",
                     },
                 },
-            },
-        ),
-        Tool(
-            name="detect_seasonality",
-            description=(
-                "Detect periodic patterns in metric data using autocorrelation. "
-                "Identifies dominant periods (1h, 4h, 12h, 24h, 168h) and "
-                "peak activity hours."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": ("Comma-separated datapoint names (all if omitted)"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 168,
-                        "description": "Hours of data to analyze (default 1 week)",
-                    },
-                },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                ],
             },
         ),
         Tool(
@@ -4752,50 +4483,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="score_device_health",
-            description=(
-                "Score health of a specific device-datasource instance using "
-                "z-score analysis. For full device health reports across all "
-                "datasources, use the health_check composite tool instead."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": ("Comma-separated datapoint names (all if omitted)"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 4,
-                        "description": "Hours of historical data for baseline",
-                    },
-                    "weights": {
-                        "type": "object",
-                        "description": ("Optional dict of datapoint_name -> weight"),
-                    },
-                },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                ],
-            },
-        ),
-        Tool(
             name="calculate_error_budget",
             description=(
                 "Calculate SLO error budget consumption and projected "
@@ -4826,46 +4513,6 @@ TOOLS.extend(
                         "description": "SLO measurement period in days (default: 30)",
                     },
                 },
-            },
-        ),
-        Tool(
-            name="classify_trend",
-            description=(
-                "Classify metric trends as stable, increasing, decreasing, "
-                "cyclic, or volatile. Uses linear regression slope, coefficient "
-                "of variation, and autocorrelation."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device-DataSource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": ("Comma-separated datapoint names (all if omitted)"),
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours of data to analyze",
-                    },
-                },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                ],
             },
         ),
         Tool(
@@ -6620,7 +6267,6 @@ def get_tool_handler(tool_name: str) -> Any:
         analyze_metric,
         api_tokens,
         audit,
-        baselines,
         batchjobs,
         collectors,
         configsources,
@@ -6635,7 +6281,6 @@ def get_tool_handler(tool_name: str) -> Any:
         escalations,
         event_correlation,
         eventsources,
-        forecasting,
         imports,
         ingestion,
         integrations,
@@ -6939,22 +6584,13 @@ def get_tool_handler(tool_name: str) -> Any:
         # Correlation and Analysis
         "correlate_alerts": correlation.correlate_alerts,
         "get_alert_statistics": correlation.get_alert_statistics,
-        "get_metric_anomalies": correlation.get_metric_anomalies,
-        # Baselines
-        "save_baseline": baselines.save_baseline,
-        "compare_to_baseline": baselines.compare_to_baseline,
         # ML/Statistical Analysis
-        "forecast_metric": forecasting.forecast_metric,
         "correlate_metrics": correlation.correlate_metrics,
-        "detect_change_points": forecasting.detect_change_points,
         "score_alert_noise": scoring.score_alert_noise,
-        "detect_seasonality": forecasting.detect_seasonality,
-        "classify_trend": forecasting.classify_trend,
         "analyze_metric": analyze_metric.analyze_metric,
         "calculate_availability": scoring.calculate_availability,
         "analyze_blast_radius": topology_analysis.analyze_blast_radius,
         "correlate_changes": event_correlation.correlate_changes,
-        "score_device_health": scoring.score_device_health,
         "calculate_error_budget": scoring.calculate_error_budget,
         # Traces / APM
         "get_trace_services": traces.get_trace_services,

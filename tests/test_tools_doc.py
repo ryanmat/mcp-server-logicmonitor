@@ -45,10 +45,10 @@ _TITLES = {
     "imports": "Imports",
     "ingestion": "Ingestion",
     "otlp_metrics": "OTLP Metrics",
-    "correlation": "Correlation and Anomalies",
+    "correlation": "Correlation",
     "traces": "APM Traces",
     "ml_analysis": "ML and Statistical Analysis",
-    "session": "Session and Baselines",
+    "session": "Session",
     "terraform": "Terraform",
     "remediation": "Remediation",
 }

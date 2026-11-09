@@ -1,5 +1,5 @@
 # Description: Tests for shared statistical utility functions.
-# Description: Validates linear_regression, pearson_correlation, autocorrelation, cusum, entropy.
+# Description: Validates the shared statistics and paged reads, and the tools' use of them.
 
 import importlib
 import json
@@ -216,75 +216,6 @@ class TestAutocorrelation:
 
         assert autocorrelation([1.0], lag=1) == 0.0
         assert autocorrelation([], lag=1) == 0.0
-
-
-class TestCusum:
-    """Tests for CUSUM change point detection."""
-
-    def test_upward_shift(self):
-        """Detects upward shift in mean."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        # Stable at 10, then shifts to 20
-        values = [10.0] * 20 + [20.0] * 20
-        points = cusum(values, target=10.0)
-        assert len(points) > 0
-        assert any(p["direction"] == "increase" for p in points)
-
-    def test_downward_shift(self):
-        """Detects downward shift in mean."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        values = [20.0] * 20 + [10.0] * 20
-        points = cusum(values, target=20.0)
-        assert len(points) > 0
-        assert any(p["direction"] == "decrease" for p in points)
-
-    def test_stable_data_no_change_points(self):
-        """Stable data produces no change points."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        values = [10.0 + (i % 3) * 0.1 for i in range(40)]
-        points = cusum(values)
-        # Stable data should produce few or no change points
-        assert len(points) <= 1
-
-    def test_constant_data_no_change_points(self):
-        """Constant data (stddev=0) produces no change points."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        values = [5.0] * 20
-        points = cusum(values)
-        assert len(points) == 0
-
-    def test_short_series_returns_empty(self):
-        """Fewer than 4 values returns empty list."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        assert cusum([1.0, 2.0, 3.0]) == []
-        assert cusum([]) == []
-
-    def test_sensitivity_high_fewer_detections(self):
-        """Higher sensitivity threshold detects fewer change points."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        values = [10.0] * 15 + [15.0] * 15
-        low_sens = cusum(values, sensitivity=0.5)
-        high_sens = cusum(values, sensitivity=3.0)
-        assert len(low_sens) >= len(high_sens)
-
-    def test_change_point_has_required_fields(self):
-        """Change point dicts have index, direction, magnitude."""
-        from lm_mcp.tools.stats_helpers import cusum
-
-        values = [10.0] * 20 + [30.0] * 20
-        points = cusum(values, target=10.0)
-        assert len(points) > 0
-        for p in points:
-            assert "index" in p
-            assert "direction" in p
-            assert "magnitude" in p
-            assert p["direction"] in ("increase", "decrease")
 
 
 class TestShannonEntropy:
@@ -559,11 +490,11 @@ class TestFetchMetricSeriesOrderAndPaging:
         assert series["cpu"]["truncated"] is False
 
     @respx.mock
-    async def test_forecast_current_value_is_newest_sample(self, client):
-        """forecast_metric reports the newest sample as current_value on a newest-first page."""
+    async def test_latest_is_the_newest_sample(self, client):
+        """analyze_metric reports the newest sample as latest on a newest-first page."""
         import json
 
-        from lm_mcp.tools.forecasting import forecast_metric
+        from lm_mcp.tools.analyze_metric import analyze_metric
 
         respx.get(SERIES_URL).mock(
             return_value=httpx.Response(
@@ -575,20 +506,19 @@ class TestFetchMetricSeriesOrderAndPaging:
             )
         )
 
-        result = await forecast_metric(
+        result = await analyze_metric(
             client,
             device_id=1,
             device_datasource_id=10,
             instance_id=100,
-            threshold=200.0,
             datapoints="cpu",
-            hours_back=24,
-            method="linear",
+            hours=24,
+            analyses=["summary", "trend"],
         )
 
-        cpu = json.loads(result[0].text)["forecasts"]["cpu"]
-        assert cpu["current_value"] == 90.0
-        assert cpu["trend"] == "increasing"
+        cpu = json.loads(result[0].text)["datapoints"]["cpu"]
+        assert cpu["summary"]["latest"] == 90.0
+        assert cpu["trend"]["label"] == "increasing"
 
     @respx.mock
     async def test_next_page_marker_is_followed_until_empty(self, client):
@@ -737,52 +667,6 @@ class TestHoltWinters:
         assert len(result["forecast"]) == 6
 
 
-class TestPredictionInterval:
-    """Tests for prediction_interval function."""
-
-    def test_normal_residuals_produce_interval(self):
-        """Normal data produces a valid prediction interval."""
-        from lm_mcp.tools.stats_helpers import prediction_interval
-
-        y_vals = [10.0, 12.0, 11.0, 13.0, 14.0, 12.0, 15.0, 13.0, 16.0, 14.0]
-        y_pred = [10.5, 11.5, 12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0, 15.5]
-        result = prediction_interval(y_vals, y_pred)
-        assert result["lower"] < result["upper"]
-        assert result["confidence_level"] == 0.95
-
-    def test_insufficient_data_returns_defaults(self):
-        """Fewer than 2 data points returns default interval."""
-        from lm_mcp.tools.stats_helpers import prediction_interval
-
-        result = prediction_interval([1.0], [1.0])
-        assert result["data_quality"] == "insufficient"
-        assert result["lower"] == 0.0
-        assert result["upper"] == 0.0
-
-    def test_data_quality_levels(self):
-        """Data quality reflects sample size."""
-        from lm_mcp.tools.stats_helpers import prediction_interval
-
-        small = prediction_interval(list(range(5)), list(range(5)))
-        assert small["data_quality"] == "insufficient"
-
-        medium = prediction_interval(list(range(20)), list(range(20)))
-        assert medium["data_quality"] == "limited"
-
-        large = prediction_interval(
-            [float(i) for i in range(60)],
-            [float(i) for i in range(60)],
-        )
-        assert large["data_quality"] == "good"
-
-    def test_mismatched_lengths_raises(self):
-        """Mismatched input lengths raises ValueError."""
-        from lm_mcp.tools.stats_helpers import prediction_interval
-
-        with pytest.raises(ValueError, match="same length"):
-            prediction_interval([1.0, 2.0], [1.0])
-
-
 class TestIQRAnomalies:
     """Tests for iqr_anomalies function."""
 
@@ -868,16 +752,7 @@ SECOND_SERIES_URL = SERIES_URL.replace("/devices/1/", "/devices/2/")
 # The fetch_metric_series consumers that analyze every datapoint of one instance;
 # correlate_metrics reads one datapoint per source and has its own tests.
 INSTANCE_CONSUMERS = [
-    pytest.param(
-        "forecasting",
-        "forecast_metric",
-        {"threshold": 90.0, "method": "linear"},
-        id="forecast_metric",
-    ),
-    pytest.param("forecasting", "detect_change_points", {}, id="detect_change_points"),
-    pytest.param("forecasting", "classify_trend", {}, id="classify_trend"),
-    pytest.param("forecasting", "detect_seasonality", {}, id="detect_seasonality"),
-    pytest.param("scoring", "score_device_health", {}, id="score_device_health"),
+    pytest.param("analyze_metric", "analyze_metric", {}, id="analyze_metric"),
 ]
 
 

@@ -32,6 +32,32 @@ _LIST_TOOL_PENDING: dict[str, int] = {
     "get_topologysources": 42,
 }
 
+# The eight per-series tools analyze_metric replaces (spec R2.1).
+_SERIES_TOOLS_REPLACED = (
+    "forecast_metric",
+    "classify_trend",
+    "detect_seasonality",
+    "detect_change_points",
+    "get_metric_anomalies",
+    "score_device_health",
+    "save_baseline",
+    "compare_to_baseline",
+)
+
+
+class TestSeriesToolsReplaced:
+    """analyze_metric is registered and the eight per-series tools it replaces are not (R2.1)."""
+
+    def test_analyze_metric_is_registered(self):
+        assert "analyze_metric" in {tool.name for tool in TOOLS}
+        assert get_tool_handler("analyze_metric").__name__ == "analyze_metric"
+
+    @pytest.mark.parametrize("name", _SERIES_TOOLS_REPLACED)
+    def test_replaced_tool_is_not_registered(self, name):
+        assert name not in {tool.name for tool in TOOLS}
+        with pytest.raises(ValueError, match="Unknown tool"):
+            get_tool_handler(name)
+
 
 class TestRegistry:
     """Tests for tool registry."""

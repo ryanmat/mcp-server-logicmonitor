@@ -1,5 +1,5 @@
 # Description: Shared statistical utility functions for ML analysis tools.
-# Description: Provides linear regression, correlation, CUSUM, entropy, and metric fetching.
+# Description: Provides series statistics, change and cycle detection, Holt-Winters, paged reads.
 
 from __future__ import annotations
 
@@ -186,68 +186,6 @@ def autocorrelation(values: list[float], lag: int) -> float:
     cov = sum((values[i] - mean) * (values[i + lag] - mean) for i in range(n - lag)) / (n - lag)
 
     return cov / variance
-
-
-def cusum(
-    values: list[float],
-    target: float | None = None,
-    sensitivity: float = 1.0,
-) -> list[dict]:
-    """Detect change points using the CUSUM (Cumulative Sum) algorithm.
-
-    Args:
-        values: Time series values.
-        target: Expected mean (uses series mean if None).
-        sensitivity: Multiplier for the detection threshold. Lower values
-            detect smaller shifts; higher values detect only large shifts.
-
-    Returns:
-        List of change point dicts with index, direction, and magnitude.
-    """
-    if len(values) < 4:
-        return []
-
-    if target is None:
-        target = sum(values) / len(values)
-
-    # Estimate standard deviation for threshold
-    variance = sum((v - target) ** 2 for v in values) / len(values)
-    stddev = math.sqrt(variance) if variance > 0 else 0.0
-    if stddev == 0:
-        return []
-
-    threshold = sensitivity * stddev * 2.0
-
-    s_pos = 0.0
-    s_neg = 0.0
-    change_points = []
-
-    for i, value in enumerate(values):
-        deviation = value - target
-        s_pos = max(0.0, s_pos + deviation - stddev * 0.5)
-        s_neg = max(0.0, s_neg - deviation - stddev * 0.5)
-
-        if s_pos > threshold:
-            change_points.append(
-                {
-                    "index": i,
-                    "direction": "increase",
-                    "magnitude": round(s_pos, 4),
-                }
-            )
-            s_pos = 0.0
-
-        if s_neg > threshold:
-            change_points.append(
-                {
-                    "index": i,
-                    "direction": "decrease",
-                    "magnitude": round(s_neg, 4),
-                }
-            )
-            s_neg = 0.0
-
-    return change_points
 
 
 DAY_SECONDS = 86400
@@ -505,75 +443,6 @@ def holt_winters(
     fitted = [round(f, 6) for f in fitted]
 
     return {"fitted": fitted, "forecast": forecast, "residuals": residuals, "trend": trend}
-
-
-def prediction_interval(
-    y_values: list[float],
-    y_predicted: list[float],
-    confidence: float = 0.95,
-) -> dict:
-    """Compute prediction interval from actual and predicted values.
-
-    Uses residual standard error with a t-distribution lookup table
-    for common confidence levels.
-
-    Args:
-        y_values: Actual observed values.
-        y_predicted: Predicted (fitted) values.
-        confidence: Confidence level (default: 0.95).
-
-    Returns:
-        Dict with lower, upper bounds, confidence_level, and data_quality.
-    """
-    n = len(y_values)
-    if n != len(y_predicted):
-        raise ValueError("y_values and y_predicted must have the same length")
-    if n < 2:
-        return {
-            "lower": 0.0,
-            "upper": 0.0,
-            "confidence_level": confidence,
-            "data_quality": "insufficient",
-        }
-
-    residuals = [y_values[i] - y_predicted[i] for i in range(n)]
-    sse = sum(r * r for r in residuals)
-    rse = math.sqrt(sse / (n - 2)) if n > 2 else math.sqrt(sse / n)
-
-    # t-distribution critical values (two-tailed)
-    # Approximate for common confidence levels and moderate df
-    t_table: dict[float, dict[int, float]] = {
-        0.90: {5: 2.015, 10: 1.812, 20: 1.725, 30: 1.697, 50: 1.676, 100: 1.660},
-        0.95: {5: 2.571, 10: 2.228, 20: 2.086, 30: 2.042, 50: 2.009, 100: 1.984},
-        0.99: {5: 4.032, 10: 3.169, 20: 2.845, 30: 2.750, 50: 2.678, 100: 2.626},
-    }
-
-    # Find closest confidence level
-    closest_conf = min(t_table.keys(), key=lambda c: abs(c - confidence))
-    df_table = t_table[closest_conf]
-
-    # Find closest degrees of freedom
-    df = max(1, n - 2)
-    closest_df = min(df_table.keys(), key=lambda d: abs(d - df))
-    t_crit = df_table[closest_df]
-
-    margin = t_crit * rse
-    last_predicted = y_predicted[-1] if y_predicted else 0.0
-
-    # Data quality assessment
-    if n < 10:
-        data_quality = "insufficient"
-    elif n < 50:
-        data_quality = "limited"
-    else:
-        data_quality = "good"
-
-    return {
-        "lower": round(last_predicted - margin, 4),
-        "upper": round(last_predicted + margin, 4),
-        "confidence_level": confidence,
-        "data_quality": data_quality,
-    }
 
 
 def iqr_anomalies(values: list[float], multiplier: float = 1.5) -> dict:

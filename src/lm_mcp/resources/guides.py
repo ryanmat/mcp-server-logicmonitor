@@ -362,11 +362,10 @@ TOOL_CATEGORIES = {
             ],
         },
         "correlation": {
-            "description": "Alert correlation and metric anomaly detection",
+            "description": "Alert correlation and alert statistics",
             "tools": [
                 "correlate_alerts",
                 "get_alert_statistics",
-                "get_metric_anomalies",
             ],
         },
         "traces": {
@@ -385,22 +384,17 @@ TOOL_CATEGORIES = {
         "ml_analysis": {
             "description": "ML/statistical analysis and forecasting",
             "tools": [
-                "forecast_metric",
                 "correlate_metrics",
-                "detect_change_points",
                 "score_alert_noise",
-                "detect_seasonality",
                 "calculate_availability",
                 "analyze_blast_radius",
                 "correlate_changes",
-                "classify_trend",
                 "analyze_metric",
-                "score_device_health",
                 "calculate_error_budget",
             ],
         },
         "session": {
-            "description": "Session context, variable management, and baselines",
+            "description": "Session context, variable management, and history",
             "tools": [
                 "get_session_context",
                 "set_session_variable",
@@ -408,8 +402,6 @@ TOOL_CATEGORIES = {
                 "delete_session_variable",
                 "clear_session_context",
                 "list_session_history",
-                "save_baseline",
-                "compare_to_baseline",
             ],
         },
         "portals": {
@@ -638,7 +630,7 @@ MCP_ORCHESTRATION_GUIDE: dict = {
                 },
                 {
                     "server": "logicmonitor",
-                    "tool": "get_metric_anomalies",
+                    "tool": "analyze_metric",
                     "description": "Detect metric anomalies on root cause device",
                 },
             ],
@@ -713,7 +705,7 @@ MCP_ORCHESTRATION_GUIDE: dict = {
         ),
         (
             "Use session variables to store intermediate results: save "
-            "baselines, correlation IDs, and ticket references for later steps."
+            "correlation IDs and ticket references for later steps."
         ),
         (
             "Scope operations narrowly: filter alerts by time window and "

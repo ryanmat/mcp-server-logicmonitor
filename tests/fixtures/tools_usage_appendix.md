@@ -6,7 +6,7 @@ These tools use pure-Python statistical methods (no external ML libraries). They
 ```
 "Forecast when memory usage on device 150098 will exceed 90%"
 ```
-Uses `forecast_metric` with `threshold=90`. Supports `method` parameter: `"auto"` (default, selects based on data), `"linear"` (regression), or `"holt_winters"` (seasonal). Returns days until breach, trend direction, confidence interval, and method used. Use `hours_back=168` (1 week) for meaningful regression, or `hours_back=24` if the device has limited history.
+Uses `analyze_metric` with `analyses=["forecast"]` and `threshold=90`. Returns the least-squares and Holt-Winters slopes per hour and, for each method, when it crosses the threshold within 30 days (`breach_eta` in epoch seconds, `hours_until_breach`, `direction`), or the reason it does not. Holt-Winters fits a daily season and needs two days of samples; `hours` defaults to 168 (one week).
 
 **Metric correlation** -- find relationships between metrics across devices:
 ```
@@ -16,9 +16,9 @@ Uses `correlate_metrics` with a `sources` array. Each source requires `device_id
 
 **Change point detection** -- find when metric behavior shifted:
 ```
-"Detect any regime shifts in CPU metrics on device 150098 in the last 24 hours"
+"Detect any level shifts in CPU metrics on device 150098 over the last week"
 ```
-Uses `detect_change_points` with CUSUM algorithm. The `sensitivity` parameter (default 1.0) controls detection threshold -- lower values detect smaller shifts. Returns timestamps and direction of each detected change.
+Uses `analyze_metric` with `analyses=["change_points"]`. A shift is reported where the mean of the next 30 samples leaves the mean of the previous 30 by five times the noise in that comparison, with the daily cycle removed first when the window holds three days or more and that leaves less noise. Returns each shift's timestamp and the levels before and after it. A change in the last 30 samples is not reported yet.
 
 **Alert noise scoring** -- identify tuning opportunities:
 ```
@@ -26,11 +26,11 @@ Uses `detect_change_points` with CUSUM algorithm. The `sensitivity` parameter (d
 ```
 Uses `score_alert_noise`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
 
-**Device health scoring** -- aggregate health into a single number:
+**Metric status and anomalies** -- how far the latest samples sit from the window:
 ```
-"Give me a health score for the stress-demo pod"
+"How far from normal are the stress-demo pod's metrics right now?"
 ```
-Uses `score_device_health`. Computes z-scores for each datapoint's latest value against its historical window, then produces a weighted composite score (0-100). Status: healthy (80+), degraded (50-79), critical (<50). Use the `weights` parameter to emphasize specific datapoints.
+Uses `analyze_metric` with `analyses=["summary", "anomalies"]`. The summary gives each datapoint's latest value, mean, standard deviation, min, max and the latest sample's signed z-score; the anomalies section gives z-score, IQR and MAD hits, each method's 20 most extreme. `health_check` runs both sections on the first instance of up to five datasources.
 
 **Availability calculation** -- SLA reporting from alert data:
 ```
