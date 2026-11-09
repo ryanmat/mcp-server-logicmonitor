@@ -117,7 +117,10 @@ class TestOneFetch:
 
     @respx.mock
     async def test_default_runs_every_section(self, client):
-        """With analyses omitted the response carries every section the tool offers."""
+        """With analyses omitted the response carries every section that needs no argument.
+
+        The baseline needs baseline_hours_ago; the rest run on the window alone.
+        """
         from lm_mcp.tools.analyze_metric import SECTIONS
 
         respx.get(SERIES_URL).mock(
@@ -126,8 +129,9 @@ class TestOneFetch:
 
         body = _body(await _analyze(client))
 
-        assert body["analyses"] == list(SECTIONS)
-        assert set(SECTIONS) <= set(body["datapoints"]["cpu"])
+        unprompted = [s for s in SECTIONS if s != "baseline"]
+        assert body["analyses"] == unprompted
+        assert set(unprompted) <= set(body["datapoints"]["cpu"])
 
     @respx.mock
     async def test_analyses_selects_sections(self, client):
@@ -806,6 +810,257 @@ class TestAnomalies:
         ]
 
         assert [anomalies[m]["count"] for m in ("zscore", "iqr", "mad")] == [0, 0, 0]
+
+
+class TestForecast:
+    """R2.1 forecast: linear and Holt-Winters to the crossing or a 30-day cap, per hour."""
+
+    @respx.mock
+    async def test_linear_crossing_time_and_slope_per_hour(self, client):
+        """A climb of 2 an hour from 50 crosses 100 two hours after the latest sample at 96."""
+        rows = [(h, 50.0 + 2.0 * h) for h in range(24)]
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_hours(rows)))
+        )
+
+        forecast = _body(await _analyze(client, analyses=["forecast"], threshold=100.0))[
+            "datapoints"
+        ]["cpu"]["forecast"]
+
+        assert forecast["threshold"] == 100.0
+        assert forecast["horizon_days"] == 30
+        linear = forecast["linear"]
+        assert linear["slope_per_hour"] == 2.0
+        assert linear["breach_eta"] == BASE_EPOCH + 25 * 3600
+        assert linear["hours_until_breach"] == 2.0
+        assert linear["direction"] == "rising"
+
+    @respx.mock
+    async def test_linear_crossing_a_lower_threshold_is_falling(self, client):
+        """A fall of 2 an hour from 100 reaches 40 seven hours after the latest sample at 54."""
+        rows = [(h, 100.0 - 2.0 * h) for h in range(24)]
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_hours(rows)))
+        )
+
+        linear = _body(await _analyze(client, analyses=["forecast"], threshold=40.0))["datapoints"][
+            "cpu"
+        ]["forecast"]["linear"]
+
+        assert linear["breach_eta"] == BASE_EPOCH + 30 * 3600
+        assert linear["hours_until_breach"] == 7.0
+        assert linear["direction"] == "falling"
+
+    @respx.mock
+    async def test_holt_winters_scans_past_the_old_limits_and_slopes_per_hour(self, client):
+        """A daily cycle on a climb of 0.01 a sample crosses 77 some 250 samples ahead.
+
+        The scan reaches it where a 24- or 96-step scan stopped short, and the slope
+        is 0.12 an hour (twelve five-minute samples), not 0.01 a sample.
+        """
+        week = [50.0 + 5.0 * math.cos(2 * math.pi * i / 288) + 0.01 * i for i in range(2016)]
+        points = _every(300, week)
+        respx.get(SERIES_URL).mock(side_effect=_paged(points))
+
+        forecast = _body(await _analyze(client, analyses=["forecast"], threshold=77.0))[
+            "datapoints"
+        ]["cpu"]["forecast"]
+        hw = forecast["holt_winters"]
+
+        assert forecast["linear"]["hours_until_breach"] == 57.1875
+        steps_ahead = (hw["breach_eta"] - points[-1][0]) // 300
+        assert 200 < steps_ahead < 320
+        assert hw["season_length"] == 288
+        assert abs(hw["slope_per_hour"] - 0.12) < 0.03
+        assert hw["direction"] == "rising"
+
+    @respx.mock
+    async def test_holt_winters_slope_ignores_where_the_window_cuts_the_cycle(self, client):
+        """A flat daily cycle over 60 hours has a Holt-Winters slope of about 0 per hour.
+
+        Sixty hours start near a peak and end near a trough; the slope is the fit's own
+        trend, not the difference between its first and last values.
+        """
+        flat = [50.0 + 5.0 * math.cos(2 * math.pi * i / 288) for i in range(720)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, flat)))
+
+        hw = _body(await _analyze(client, analyses=["forecast"], hours=60))["datapoints"]["cpu"][
+            "forecast"
+        ]["holt_winters"]
+
+        assert abs(hw["slope_per_hour"]) < 0.01
+
+    @respx.mock
+    async def test_holt_winters_crosses_a_lower_threshold_falling(self, client):
+        """A daily cycle on a fall of 0.01 a sample reaches 73 some 390 samples ahead."""
+        week = [100.0 + 5.0 * math.cos(2 * math.pi * i / 288) - 0.01 * i for i in range(2016)]
+        points = _every(300, week)
+        respx.get(SERIES_URL).mock(side_effect=_paged(points))
+
+        hw = _body(await _analyze(client, analyses=["forecast"], threshold=73.0))["datapoints"][
+            "cpu"
+        ]["forecast"]["holt_winters"]
+
+        assert (hw["breach_eta"] - points[-1][0]) // 300 == 390
+        assert hw["direction"] == "falling"
+
+    @respx.mock
+    async def test_a_flat_series_crosses_nothing_and_says_why(self, client):
+        """A constant series reports no crossing from either method, each with its reason."""
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, [50.0] * 600)))
+
+        forecast = _body(await _analyze(client, analyses=["forecast"], threshold=80.0))[
+            "datapoints"
+        ]["cpu"]["forecast"]
+
+        for method in ("linear", "holt_winters"):
+            assert forecast[method]["breach_eta"] is None, method
+            assert forecast[method]["hours_until_breach"] is None, method
+        assert "flat" in forecast["linear"]["reason"]
+        assert "30 days" in forecast["holt_winters"]["reason"]
+
+    @respx.mock
+    async def test_without_a_threshold_the_forecast_has_slopes_and_no_crossing(self, client):
+        """With no threshold named the slopes are reported and the crossing says why not."""
+        rows = [(h, 50.0 + 2.0 * h) for h in range(24)]
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_hours(rows)))
+        )
+
+        forecast = _body(await _analyze(client, analyses=["forecast"]))["datapoints"]["cpu"][
+            "forecast"
+        ]
+
+        assert forecast["threshold"] is None
+        assert forecast["linear"]["slope_per_hour"] == 2.0
+        assert forecast["linear"]["breach_eta"] is None
+        assert "threshold" in forecast["linear"]["reason"]
+
+    @respx.mock
+    async def test_holt_winters_needs_two_days(self, client):
+        """A day of samples is too short for a daily season; the reason says so."""
+        rows = [(h, 50.0 + 2.0 * h) for h in range(24)]
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_hours(rows)))
+        )
+
+        hw = _body(await _analyze(client, analyses=["forecast"], threshold=100.0))["datapoints"][
+            "cpu"
+        ]["forecast"]["holt_winters"]
+
+        assert hw["breach_eta"] is None
+        assert "two days" in hw["reason"]
+
+
+def _window_page(values, start_epoch):
+    """One page of hourly samples from start_epoch, newest first."""
+    return _series_page([(start_epoch + h * 3600, v) for h, v in enumerate(values)])
+
+
+class TestBaseline:
+    """R2.1 baseline: the window against a caller-named earlier window, one more read."""
+
+    @respx.mock
+    async def test_baseline_reads_the_earlier_window_once_and_compares(self, client):
+        """The current window comes from the main read; the earlier one from one more read."""
+        route = respx.get(SERIES_URL).mock(
+            side_effect=[
+                httpx.Response(200, json=_window_page([70.0] * 24, BASE_EPOCH)),
+                httpx.Response(200, json=_window_page([50.0] * 24, BASE_EPOCH - 168 * 3600)),
+            ]
+        )
+
+        body = _body(
+            await _analyze(client, analyses=["baseline"], hours=24, baseline_hours_ago=168)
+        )
+
+        assert route.call_count == 2
+        params = route.calls[1].request.url.params
+        now = int(time.time())
+        assert abs(int(params["start"]) - (now - (168 + 24) * 3600)) < 60
+        assert abs(int(params["end"]) - (now - 168 * 3600)) < 60
+        baseline = body["datapoints"]["cpu"]["baseline"]
+        assert baseline["baseline"]["mean"] == 50.0
+        assert baseline["current"]["mean"] == 70.0
+        assert baseline["deviation_percent"] == 40.0
+        assert baseline["status"] == "elevated"
+
+    @pytest.mark.parametrize(
+        ("current", "status"),
+        [(55.0, "normal"), (35.0, "reduced"), (80.0, "anomalous")],
+    )
+    @respx.mock
+    async def test_baseline_status_bands(self, client, current, status):
+        """Within 20 percent is normal, within 50 elevated or reduced, past 50 anomalous."""
+        respx.get(SERIES_URL).mock(
+            side_effect=[
+                httpx.Response(200, json=_window_page([current] * 24, BASE_EPOCH)),
+                httpx.Response(200, json=_window_page([50.0] * 24, BASE_EPOCH - 24 * 3600)),
+            ]
+        )
+
+        baseline = _body(
+            await _analyze(client, analyses=["baseline"], hours=24, baseline_hours_ago=24)
+        )["datapoints"]["cpu"]["baseline"]
+
+        assert baseline["status"] == status
+
+    @respx.mock
+    async def test_a_zero_baseline_mean_has_no_percent(self, client):
+        """Against a baseline mean of 0 a nonzero window has no percentage and is anomalous."""
+        respx.get(SERIES_URL).mock(
+            side_effect=[
+                httpx.Response(200, json=_window_page([5.0] * 24, BASE_EPOCH)),
+                httpx.Response(200, json=_window_page([0.0] * 24, BASE_EPOCH - 24 * 3600)),
+            ]
+        )
+
+        baseline = _body(
+            await _analyze(client, analyses=["baseline"], hours=24, baseline_hours_ago=24)
+        )["datapoints"]["cpu"]["baseline"]
+
+        assert baseline["deviation_percent"] is None
+        assert baseline["status"] == "anomalous"
+
+    @respx.mock
+    async def test_baseline_named_without_a_window_is_refused_before_any_read(self, client):
+        """Naming the baseline section without baseline_hours_ago is INVALID_REQUEST."""
+        route = respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_window_page([1.0, 2.0], BASE_EPOCH))
+        )
+
+        error = envelope(await _analyze(client, analyses=["baseline"]))
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert "baseline_hours_ago" in error["message"]
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_a_window_named_without_the_section_reads_once(self, client):
+        """baseline_hours_ago with the baseline left out of analyses makes no second read."""
+        route = respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_window_page([1.0, 2.0, 3.0], BASE_EPOCH))
+        )
+
+        body = _body(await _analyze(client, analyses=["summary"], baseline_hours_ago=24))
+
+        assert route.call_count == 1
+        assert "baseline" not in body["datapoints"]["cpu"]
+
+    @pytest.mark.parametrize(("ago", "calls"), [(None, 1), (48, 2)])
+    @respx.mock
+    async def test_the_default_runs_the_baseline_only_with_a_window(self, client, ago, calls):
+        """With analyses omitted the baseline runs, and reads, only when a window is named."""
+        route = respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_window_page([1.0, 2.0, 3.0], BASE_EPOCH))
+        )
+        extra = {} if ago is None else {"baseline_hours_ago": ago}
+
+        body = _body(await _analyze(client, **extra))
+
+        assert route.call_count == calls
+        assert ("baseline" in body["analyses"]) is (ago is not None)
+        assert ("baseline" in body["datapoints"]["cpu"]) is (ago is not None)
 
 
 class TestSeriesEdges:

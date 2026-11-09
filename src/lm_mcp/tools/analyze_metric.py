@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+import statistics
 from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
@@ -14,6 +15,7 @@ from lm_mcp.tools.stats_helpers import (
     coefficient_of_variation,
     detrend,
     fetch_metric_series,
+    holt_winters,
     iqr_anomalies,
     linear_regression,
     mad_anomalies,
@@ -27,7 +29,7 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 # The sections analyze_metric offers, in the order it reports them.
-SECTIONS = ("summary", "trend", "seasonality", "change_points", "anomalies")
+SECTIONS = ("summary", "trend", "seasonality", "change_points", "anomalies", "forecast", "baseline")
 
 DEFAULT_HOURS = 168
 
@@ -44,6 +46,9 @@ MAD_THRESHOLD = 3.5
 
 # Each anomaly method lists at most this many hits, its most extreme, oldest first.
 MAX_ANOMALY_HITS = 20
+
+# The forecast projects this far past the latest sample, or to the threshold first.
+FORECAST_HORIZON_DAYS = 30
 
 
 def _x_hours(timestamps: list[int]) -> list[float]:
@@ -329,6 +334,163 @@ def _anomalies_section(values: list[float], timestamps: list[int]) -> dict[str, 
     }
 
 
+def _no_crossing(reason: str) -> dict[str, Any]:
+    return {"breach_eta": None, "hours_until_breach": None, "direction": None, "reason": reason}
+
+
+def linear_forecast(
+    values: list[float], timestamps: list[int], threshold: float | None
+) -> dict[str, Any]:
+    """The least-squares line per hour and when it crosses the threshold, within 30 days.
+
+    Args:
+        values: At least two samples, oldest first.
+        timestamps: Epoch seconds of the samples.
+        threshold: The level to reach, or None.
+
+    Returns:
+        slope_per_hour, r_squared and the crossing (breach_eta in epoch seconds,
+        hours_until_breach, direction), or a reason in place of the crossing.
+    """
+    x_hours = _x_hours(timestamps)
+    slope, intercept, r_squared = linear_regression(x_hours, values)
+    out: dict[str, Any] = {"slope_per_hour": round(slope, 6), "r_squared": round(r_squared, 4)}
+    if threshold is None:
+        return {**out, **_no_crossing("no threshold given")}
+    if abs(slope) < 1e-12:
+        return {**out, **_no_crossing("flat: the fitted line never reaches the threshold")}
+    hours_ahead = (threshold - intercept) / slope - x_hours[-1]
+    if hours_ahead <= 0:
+        return {
+            **out,
+            **_no_crossing("the fitted line crossed the threshold before the window ended"),
+        }
+    if hours_ahead > FORECAST_HORIZON_DAYS * 24:
+        return {
+            **out,
+            **_no_crossing(
+                f"the fitted line does not reach the threshold within {FORECAST_HORIZON_DAYS} days"
+            ),
+        }
+    return {
+        **out,
+        "breach_eta": round(timestamps[-1] + hours_ahead * 3600),
+        "hours_until_breach": round(hours_ahead, 4),
+        "direction": "rising" if slope > 0 else "falling",
+    }
+
+
+def holt_winters_forecast(
+    values: list[float], timestamps: list[int], threshold: float | None
+) -> dict[str, Any]:
+    """Holt-Winters with a daily season, projected to the threshold or the 30-day cap.
+
+    The season is a day of samples at the average interval, and the fit needs two of
+    them. The projection is scanned step by step to the first value on the far side
+    of the threshold from the latest sample.
+
+    Args:
+        values: At least two samples, oldest first.
+        timestamps: Epoch seconds of the samples.
+        threshold: The level to reach, or None.
+
+    Returns:
+        season_length, slope_per_hour (the fit's final smoothed trend) and the
+        crossing, or a reason in place of the crossing.
+    """
+    interval = _avg_interval(timestamps)
+    season = round(86400 / interval) if interval > 0 else 0
+    out: dict[str, Any] = {"season_length": season, "slope_per_hour": None}
+    if season < 2 or len(values) < 2 * season:
+        return {
+            **out,
+            **_no_crossing("Holt-Winters needs two days of samples to fit a daily season"),
+        }
+    horizon = math.ceil(FORECAST_HORIZON_DAYS * 86400 / interval)
+    fit = holt_winters(values, season_length=season, forecast_periods=horizon)
+    out["slope_per_hour"] = round(fit["trend"] * 3600 / interval, 6)
+    if threshold is None:
+        return {**out, **_no_crossing("no threshold given")}
+    latest = values[-1]
+    for step, projected in enumerate(fit["forecast"], start=1):
+        rising = latest < threshold <= projected
+        falling = latest > threshold >= projected
+        if rising or falling:
+            hours_ahead = step * interval / 3600
+            return {
+                **out,
+                "breach_eta": round(timestamps[-1] + step * interval),
+                "hours_until_breach": round(hours_ahead, 4),
+                "direction": "rising" if rising else "falling",
+            }
+    return {
+        **out,
+        **_no_crossing(
+            f"the forecast does not reach the threshold within {FORECAST_HORIZON_DAYS} days"
+        ),
+    }
+
+
+def _forecast_section(
+    values: list[float], timestamps: list[int], threshold: float | None
+) -> dict[str, Any]:
+    return {
+        "threshold": threshold,
+        "horizon_days": FORECAST_HORIZON_DAYS,
+        "linear": linear_forecast(values, timestamps, threshold),
+        "holt_winters": holt_winters_forecast(values, timestamps, threshold),
+    }
+
+
+def _window_stats(values: list[float]) -> dict[str, Any]:
+    if not values:
+        return {"mean": None, "stddev": None, "min": None, "max": None, "sample_count": 0}
+    return {
+        "mean": round(statistics.mean(values), 4),
+        "stddev": round(statistics.stdev(values), 4) if len(values) > 1 else 0.0,
+        "min": round(min(values), 4),
+        "max": round(max(values), 4),
+        "sample_count": len(values),
+    }
+
+
+def baseline_comparison(current: list[float], baseline: list[float]) -> dict[str, Any]:
+    """The window against an earlier one: both windows' statistics and the mean's deviation.
+
+    Within 20 percent of the baseline mean is normal, within 50 percent elevated or
+    reduced, past 50 percent anomalous. Against a baseline mean of 0 there is no
+    percentage, and any nonzero mean is anomalous.
+
+    Args:
+        current: The window's samples.
+        baseline: The earlier window's samples.
+
+    Returns:
+        baseline and current statistics, deviation_percent and status.
+    """
+    base = _window_stats(baseline)
+    now = _window_stats(current)
+    out: dict[str, Any] = {"baseline": base, "current": now}
+    if base["mean"] is None or now["mean"] is None:
+        return {**out, "deviation_percent": None, "status": "no_data"}
+    base_mean = statistics.mean(baseline)
+    now_mean = statistics.mean(current)
+    if base_mean == 0:
+        return {
+            **out,
+            "deviation_percent": None,
+            "status": "normal" if now_mean == 0 else "anomalous",
+        }
+    deviation = abs((now_mean - base_mean) / base_mean) * 100
+    if deviation <= 20:
+        status = "normal"
+    elif deviation <= 50:
+        status = "elevated" if now_mean > base_mean else "reduced"
+    else:
+        status = "anomalous"
+    return {**out, "deviation_percent": round(deviation, 2), "status": status}
+
+
 _SECTION_BUILDERS = {
     "summary": _summary_section,
     "trend": _trend_section,
@@ -345,8 +507,9 @@ async def _fetch_series(
     instance_id: int,
     datapoints: str | None,
     hours: int,
+    end_hours_ago: int = 0,
 ) -> dict[str, dict[str, Any]]:
-    """The one paged read of the window that every section is computed from."""
+    """One paged read: the window every section is computed from, or the baseline's."""
     return await fetch_metric_series(
         client,
         device_id,
@@ -354,6 +517,7 @@ async def _fetch_series(
         instance_id,
         datapoints=datapoints,
         hours_back=hours,
+        end_hours_ago=end_hours_ago,
     )
 
 
@@ -365,6 +529,8 @@ async def analyze_metric(
     datapoints: str | None = None,
     hours: int = DEFAULT_HOURS,
     analyses: list[str] | None = None,
+    threshold: float | None = None,
+    baseline_hours_ago: int | None = None,
 ) -> list[TextContent]:
     """Analyze each datapoint of one device instance's series, one section per analysis.
 
@@ -375,13 +541,20 @@ async def analyze_metric(
         instance_id: Instance ID.
         datapoints: Comma-separated datapoint names (all if omitted).
         hours: Hours of history to read (default: 168).
-        analyses: Sections to compute (default: all of SECTIONS).
+        analyses: Sections to compute (default: all of SECTIONS, the baseline only when
+            baseline_hours_ago is given).
+        threshold: Level the forecast reports the crossing of.
+        baseline_hours_ago: Hours before now the baseline window ends; it is as long
+            as the analyzed window and read with one more paged read.
 
     Returns:
         Per-datapoint sample count, truncated flag and the requested sections;
         warnings names any datapoint the page cap cut short.
     """
-    selected = list(SECTIONS) if analyses is None else list(analyses)
+    if analyses is None:
+        selected = [s for s in SECTIONS if s != "baseline" or baseline_hours_ago is not None]
+    else:
+        selected = list(analyses)
     unknown = [a for a in selected if a not in SECTIONS]
     if unknown or not selected:
         named = f"Unknown analyses {unknown}" if unknown else "No analyses named"
@@ -390,11 +563,29 @@ async def analyze_metric(
             f"{named}; analyze_metric offers {', '.join(SECTIONS)}.",
             "Name one or more of those sections, or omit analyses to run them all.",
         )
+    if "baseline" in selected and baseline_hours_ago is None:
+        return validation_error(
+            "INVALID_REQUEST",
+            "The baseline section compares against an earlier window; name it with "
+            "baseline_hours_ago.",
+            "Pass baseline_hours_ago, such as 168 for the same window a week earlier.",
+        )
 
     try:
         series = await _fetch_series(
             client, device_id, device_datasource_id, instance_id, datapoints, hours
         )
+        baseline_series: dict[str, dict[str, Any]] = {}
+        if "baseline" in selected and baseline_hours_ago is not None:
+            baseline_series = await _fetch_series(
+                client,
+                device_id,
+                device_datasource_id,
+                instance_id,
+                datapoints,
+                hours,
+                end_hours_ago=baseline_hours_ago,
+            )
 
         results: dict[str, Any] = {}
         for dp_name, dp_data in series.items():
@@ -407,6 +598,11 @@ async def analyze_metric(
             for section in selected:
                 if len(values) < 2:
                     entry[section] = {"status": "insufficient_data"}
+                elif section == "forecast":
+                    entry[section] = _forecast_section(values, timestamps, threshold)
+                elif section == "baseline":
+                    earlier = baseline_series.get(dp_name, {}).get("values", [])
+                    entry[section] = baseline_comparison(values, earlier)
                 else:
                     entry[section] = _SECTION_BUILDERS[section](values, timestamps)
             results[dp_name] = entry
@@ -419,7 +615,11 @@ async def analyze_metric(
             "analyses": selected,
             "datapoints": results,
         }
-        warnings = truncation_warnings(series)
+        if baseline_hours_ago is not None and "baseline" in selected:
+            response["baseline_hours_ago"] = baseline_hours_ago
+        warnings = truncation_warnings(series) + truncation_warnings(
+            {f"{name} (baseline)": data for name, data in baseline_series.items()}
+        )
         if warnings:
             response["warnings"] = warnings
         return format_response(response)
