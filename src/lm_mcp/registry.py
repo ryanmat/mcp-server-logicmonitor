@@ -4888,8 +4888,14 @@ TOOLS.extend(
                 "leaves less noise; each shift has its timestamp and the levels before and "
                 "after, and a change in the last 30 samples is not reported yet; "
                 "'anomalies' gives z-score, "
-                "IQR and MAD hits, each method's 20 most extreme. Use get_device_data for "
-                "the raw samples."
+                "IQR and MAD hits, each method's 20 most extreme; 'forecast' gives the "
+                "least-squares and Holt-Winters (daily season, two days of samples needed) "
+                "slopes per hour and, with threshold, when each crosses it, within 30 days; "
+                "'baseline' compares the window with one as long ending baseline_hours_ago "
+                "hours ago (one more read): both windows' statistics, the mean's percent "
+                "deviation and a status (normal within 20 percent, elevated or reduced "
+                "within 50, anomalous past it). The baseline runs only with "
+                "baseline_hours_ago. Use get_device_data for the raw samples."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4927,9 +4933,26 @@ TOOLS.extend(
                                 "seasonality",
                                 "change_points",
                                 "anomalies",
+                                "forecast",
+                                "baseline",
                             ],
                         },
-                        "description": "Sections to compute (all if omitted)",
+                        "description": (
+                            "Sections to compute (all if omitted; the baseline only with "
+                            "baseline_hours_ago)"
+                        ),
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "description": "Level the forecast reports the crossing of",
+                    },
+                    "baseline_hours_ago": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": (
+                            "Hours before now the baseline window ends, such as 168 for "
+                            "the same window a week earlier"
+                        ),
                     },
                 },
                 "required": [

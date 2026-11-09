@@ -475,8 +475,10 @@ def holt_winters(
         season_length * season_length
     )
 
-    # Initialize seasonal components from first season
-    seasonals = [values[i] - level for i in range(season_length)]
+    # The first season's mean sits at its middle sample; the seasonal components are
+    # that season less its trend line, so the climb within it is not read as season.
+    middle = (season_length - 1) / 2
+    seasonals = [values[i] - (level + trend * (i - middle)) for i in range(season_length)]
 
     fitted = []
     for i in range(n):
@@ -683,6 +685,7 @@ async def fetch_metric_series(
     instance_id: int,
     datapoints: str | None = None,
     hours_back: int = 24,
+    end_hours_ago: int = 0,
 ) -> dict[str, dict[str, Any]]:
     """Fetch metric data from LM API and transpose to per-datapoint series.
 
@@ -699,6 +702,8 @@ async def fetch_metric_series(
         instance_id: Instance ID.
         datapoints: Comma-separated datapoint names (all if omitted).
         hours_back: Number of hours to look back.
+        end_hours_ago: Hours before now the window ends; 0 reads up to now and sends
+            no end.
 
     Returns:
         Dict keyed by datapoint name, each containing:
@@ -707,9 +712,11 @@ async def fetch_metric_series(
         - truncated: True when the page cap stopped the read with samples left
     """
     now_epoch = int(time.time())
-    start_epoch = now_epoch - (hours_back * 3600)
+    start_epoch = now_epoch - ((hours_back + end_hours_ago) * 3600)
 
     params: dict[str, Any] = {"start": start_epoch}
+    if end_hours_ago:
+        params["end"] = now_epoch - end_hours_ago * 3600
     if datapoints:
         params["datapoints"] = datapoints
 
