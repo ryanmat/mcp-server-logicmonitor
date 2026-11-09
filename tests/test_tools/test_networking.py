@@ -1,5 +1,5 @@
 # Description: Tests for network intelligence MCP tools.
-# Description: Validates interface metrics, top talkers, burst, flap, power event tools.
+# Description: Validates interface metrics, top talkers, flap and power event tools.
 
 import json
 import time
@@ -191,133 +191,6 @@ class TestGetTopTalkers:
         assert data["top_talkers"][0]["total_bytes"] == 300
 
 
-class TestDetectAlertBurst:
-    @respx.mock
-    async def test_detects_burst(self, client):
-        from lm_mcp.tools.networking import detect_alert_burst
-
-        now = int(time.time())
-        # 10 alerts across 4 devices within 30 seconds, all same DataSource.
-        alerts = [
-            {
-                "id": i,
-                "startEpoch": now - 60 + i * 3,
-                "dataSourceName": "SNMP_Network_Interfaces",
-                "monitorObjectName": f"switch-{i % 4}",
-            }
-            for i in range(12)
-        ]
-        respx.get(f"{BASE}/alert/alerts").mock(
-            return_value=httpx.Response(200, json={"items": alerts, "total": 12})
-        )
-
-        result = await detect_alert_burst(
-            client,
-            window_seconds=60,
-            min_alerts=10,
-            min_devices=3,
-        )
-        data = json.loads(result[0].text)
-        assert data["total_alerts_in_window"] == 12
-        assert data["bursts_detected"] >= 1
-        assert data["bursts"][0]["datasource"] == "SNMP_Network_Interfaces"
-        assert data["bursts"][0]["alert_count"] >= 10
-
-    @respx.mock
-    async def test_no_burst_when_below_threshold(self, client):
-        from lm_mcp.tools.networking import detect_alert_burst
-
-        now = int(time.time())
-        alerts = [
-            {
-                "id": i,
-                "startEpoch": now - 60 + i,
-                "dataSourceName": "CPU",
-                "monitorObjectName": f"host-{i}",
-            }
-            for i in range(5)
-        ]
-        respx.get(f"{BASE}/alert/alerts").mock(
-            return_value=httpx.Response(200, json={"items": alerts, "total": 5})
-        )
-
-        result = await detect_alert_burst(client, window_seconds=60, min_alerts=10, min_devices=3)
-        data = json.loads(result[0].text)
-        assert data["bursts_detected"] == 0
-
-    @respx.mock
-    async def test_datasource_pattern_filter(self, client):
-        from lm_mcp.tools.networking import detect_alert_burst
-
-        now = int(time.time())
-        alerts = [
-            {
-                "id": i,
-                "startEpoch": now - 30 + i,
-                "dataSourceName": "SNMP_Network_Interfaces" if i < 12 else "CPU",
-                "monitorObjectName": f"dev-{i}",
-            }
-            for i in range(16)
-        ]
-        respx.get(f"{BASE}/alert/alerts").mock(
-            return_value=httpx.Response(200, json={"items": alerts, "total": 16})
-        )
-
-        result = await detect_alert_burst(
-            client,
-            window_seconds=60,
-            min_alerts=10,
-            min_devices=3,
-            datasource_pattern="interface",
-        )
-        data = json.loads(result[0].text)
-        # Only interface alerts should qualify.
-        assert data["total_alerts_in_window"] == 12
-
-
-class TestDetectAlertBurstTruncation:
-    """R4.2: detect_alert_burst warns only when the cap cut the window short."""
-
-    @staticmethod
-    def _alerts(n):
-        now = int(time.time())
-        return [
-            {
-                "id": i,
-                "startEpoch": now - 3000 + (i % 3000),
-                "dataSourceName": "CPU",
-                "monitorObjectName": f"host-{i % 50}",
-            }
-            for i in range(n)
-        ]
-
-    @respx.mock
-    async def test_warns_when_the_cap_binds(self, client):
-        from lm_mcp.tools.networking import detect_alert_burst
-
-        respx.get(f"{BASE}/alert/alerts").mock(
-            side_effect=alert_pages(self._alerts(6000), lower_bound=True)
-        )
-
-        result = await detect_alert_burst(client)
-        data = json.loads(result[0].text)
-        assert data["total_alerts_in_window"] == 5000
-        assert "Truncated at 5000 alerts" in data["warning"]
-
-    @respx.mock
-    async def test_no_warning_for_a_window_of_exactly_the_cap(self, client):
-        from lm_mcp.tools.networking import detect_alert_burst
-
-        respx.get(f"{BASE}/alert/alerts").mock(
-            side_effect=alert_pages(self._alerts(5000), lower_bound=True)
-        )
-
-        result = await detect_alert_burst(client)
-        data = json.loads(result[0].text)
-        assert data["total_alerts_in_window"] == 5000
-        assert "warning" not in data
-
-
 class TestGetLinkFlaps:
     @respx.mock
     async def test_identifies_flapping_interfaces(self, client):
@@ -470,19 +343,6 @@ class TestNetworkingErrorHandling:
         # handle_error produces a readable error string.
         assert is_error_result(result)
 
-    @respx.mock
-    async def test_burst_tolerates_empty_alert_list(self, client):
-        from lm_mcp.tools.networking import detect_alert_burst
-
-        respx.get(f"{BASE}/alert/alerts").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await detect_alert_burst(client)
-        data = json.loads(result[0].text)
-        assert data["bursts_detected"] == 0
-        assert data["total_alerts_in_window"] == 0
-
 
 class TestTopTalkersTruncation:
     """R4.2: the flow list is read as one page, so get_top_talkers says when it is partial."""
@@ -570,7 +430,7 @@ def _interface_power_alerts(n):
 
 
 class TestCappedAlertToolsWarn:
-    """R4.2: get_link_flaps and get_power_events carry detect_alert_burst's cap warning."""
+    """R4.2: get_link_flaps and get_power_events warn when the alert-window cap binds."""
 
     @pytest.mark.parametrize("tool_name", ["get_link_flaps", "get_power_events"])
     @respx.mock

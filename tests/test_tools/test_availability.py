@@ -1,5 +1,5 @@
-# Description: Tests for scoring and availability analysis tools.
-# Description: Validates alert noise scoring, availability, and error budget tools.
+# Description: Tests for the availability and error budget tools.
+# Description: Validates calculate_availability, calculate_error_budget and device resolution.
 
 import json
 import logging
@@ -59,252 +59,6 @@ def _make_alert(
         "endEpoch": end_epoch,
         "cleared": cleared,
     }
-
-
-class TestScoreAlertNoise:
-    """Tests for score_alert_noise tool."""
-
-    @respx.mock
-    async def test_no_alerts_zero_noise(self, client):
-        """No alerts produces noise score of 0."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["noise_score"] == 0
-        assert data["total_alerts"] == 0
-
-    @respx.mock
-    async def test_single_alert_low_noise(self, client):
-        """Single alert produces low noise score."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get(ALERT_URL).mock(side_effect=alert_lists([_make_alert(1, "s1", "CPU")]))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["noise_score"] <= 30
-        assert data["total_alerts"] == 1
-
-    @respx.mock
-    async def test_flapping_alerts_detected(self, client):
-        """Flapping alerts (clear + re-fire within 30 min) are detected."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        alerts = [
-            _make_alert(
-                1,
-                "s1",
-                "CPU",
-                "value",
-                start_epoch=BASE_EPOCH,
-                end_epoch=BASE_EPOCH + 300,
-                cleared=True,
-            ),
-            _make_alert(
-                2,
-                "s1",
-                "CPU",
-                "value",
-                start_epoch=BASE_EPOCH + 600,
-            ),
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["flap_count"] > 0
-        assert len(data["flapping_alerts"]) > 0
-
-    @respx.mock
-    async def test_repeat_alerts_increase_noise(self, client):
-        """Repeated alerts from same source increase noise."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        alerts = [
-            _make_alert(i, "s1", "CPU", "value", start_epoch=BASE_EPOCH + i * 60) for i in range(10)
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["total_alerts"] == 10
-        assert data["repeat_ratio"] > 0
-
-    @respx.mock
-    async def test_top_noisy_devices(self, client):
-        """Top noisy devices are ranked by alert count."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        alerts = [
-            _make_alert(1, "noisy-server", "CPU"),
-            _make_alert(2, "noisy-server", "Memory"),
-            _make_alert(3, "noisy-server", "Disk"),
-            _make_alert(4, "quiet-server", "CPU"),
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["top_noisy_devices"][0]["device"] == "noisy-server"
-        assert data["top_noisy_devices"][0]["count"] == 3
-
-    @respx.mock
-    async def test_top_noisy_datasources(self, client):
-        """Top noisy datasources are ranked by alert count."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        alerts = [
-            _make_alert(1, "s1", "CPU"),
-            _make_alert(2, "s2", "CPU"),
-            _make_alert(3, "s3", "CPU"),
-            _make_alert(4, "s1", "Memory"),
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["top_noisy_datasources"][0]["datasource"] == "CPU"
-        assert data["top_noisy_datasources"][0]["count"] == 3
-
-    @respx.mock
-    async def test_recommendations_present(self, client):
-        """Response always includes recommendations."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert "recommendations" in data
-        assert len(data["recommendations"]) > 0
-
-    @respx.mock
-    async def test_device_filter_passed(self, client):
-        """Device filter is passed to the API."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        route = respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        await score_alert_noise(client, device="server01")
-
-        params = dict(route.calls[0].request.url.params)
-        assert "monitorObjectName" in params.get("filter", "")
-
-    @respx.mock
-    async def test_group_id_filter_passed(self, client):
-        """Group ID filter resolves to monitorObjectGroups in the API call."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/5").mock(
-            return_value=httpx.Response(200, json={"id": 5, "fullPath": "Dev Portal/Test Group"})
-        )
-        route = respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        await score_alert_noise(client, group_id=5)
-
-        params = dict(route.calls[0].request.url.params)
-        assert 'monitorObjectGroups~"Dev Portal/Test Group"' in params.get("filter", "")
-
-    @respx.mock
-    async def test_hours_back_in_response(self, client):
-        """Response includes hours_back parameter."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
-
-        result = await score_alert_noise(client, hours_back=48)
-
-        data = json.loads(result[0].text)
-        assert data["hours_back"] == 48
-
-    @respx.mock
-    async def test_error_handling(self, client):
-        """API errors are returned as error response."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get(ALERT_URL).mock(
-            return_value=httpx.Response(500, json={"errorMessage": "Server error"})
-        )
-
-        result = await score_alert_noise(client)
-
-        assert is_error_result(result)
-
-    @respx.mock
-    async def test_noise_score_bounded(self, client):
-        """Noise score is bounded between 0 and 100."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        # Many diverse alerts to push entropy up
-        alerts = [_make_alert(i, f"server{i}", f"DS{i}", f"dp{i}") for i in range(50)]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert 0 <= data["noise_score"] <= 100
-
-    @respx.mock
-    async def test_moderate_repeat_ratio_not_maxed(self, client):
-        """A moderate repeat ratio should not peg the score at 100."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        # 10 alerts from same combo (high repeat) + 5 unique combos = ~0.2 repeat_ratio
-        alerts = [
-            _make_alert(i, "s1", "CPU", "value", start_epoch=BASE_EPOCH + i * 60) for i in range(10)
-        ] + [
-            _make_alert(
-                10 + i, f"server{i}", f"DS{i}", f"dp{i}", start_epoch=BASE_EPOCH + (10 + i) * 60
-            )
-            for i in range(5)
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["noise_score"] < 100
-
-    @respx.mock
-    async def test_score_100_requires_extreme_conditions(self, client):
-        """Score of 100 requires maxed entropy, flapping, and repeats."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        # All alerts from exactly one combo (max repeat, low entropy)
-        alerts = [
-            _make_alert(
-                i,
-                "s1",
-                "CPU",
-                "value",
-                start_epoch=BASE_EPOCH + i * 120,
-                end_epoch=BASE_EPOCH + i * 120 + 60,
-                cleared=True,
-            )
-            for i in range(20)
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        # With rebalanced weights, a single-combo set has low entropy (normalized=0)
-        # and repeat_ratio=1.0 (30 pts) + flap_ratio contributes the rest
-        assert 0 <= data["noise_score"] <= 100
 
 
 class TestCalculateAvailability:
@@ -600,63 +354,6 @@ class TestScoringGuardrails:
     """Tests for best practice guardrails in scoring tools."""
 
     @respx.mock
-    async def test_score_alert_noise_structured_recommendations_high_noise(self, client):
-        """High noise score includes structured recommendations."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        # Many repeated alerts from same device+datasource to push noise up
-        alerts = []
-        for i in range(20):
-            alerts.append(
-                _make_alert(
-                    i,
-                    "server01",
-                    "CPU",
-                    "value",
-                    start_epoch=BASE_EPOCH + i * 60,
-                    end_epoch=BASE_EPOCH + i * 60 + 30,
-                    cleared=True,
-                )
-            )
-            # Re-fire quickly for flapping
-            alerts.append(
-                _make_alert(
-                    100 + i,
-                    "server01",
-                    "CPU",
-                    "value",
-                    start_epoch=BASE_EPOCH + i * 60 + 60,
-                )
-            )
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
-
-        result = await score_alert_noise(client)
-        data = json.loads(result[0].text)
-
-        if data["noise_score"] > 50:
-            assert "structured_recommendations" in data
-            assert len(data["structured_recommendations"]) > 0
-            assert "anti_patterns" in data
-            assert len(data["anti_patterns"]) > 0
-            for rec in data["structured_recommendations"]:
-                assert "action" in rec
-                assert "how" in rec
-                assert "priority" in rec
-
-    @respx.mock
-    async def test_score_alert_noise_no_anti_patterns_low_noise(self, client):
-        """Low noise score omits anti_patterns key."""
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        respx.get(ALERT_URL).mock(side_effect=alert_lists([_make_alert(1, "s1", "CPU")]))
-
-        result = await score_alert_noise(client)
-        data = json.loads(result[0].text)
-
-        assert data["noise_score"] <= 50
-        assert "anti_patterns" not in data
-
-    @respx.mock
     async def test_calculate_availability_measurement_context_low(self, client):
         """Low availability includes measurement_window_context."""
         from lm_mcp.tools.scoring import calculate_availability
@@ -900,44 +597,6 @@ def _device_alert(alert_id, device_id, name, start_epoch, end_epoch, severity=3)
     }
 
 
-class TestScoreAlertNoisePaging:
-    """R4.2: score_alert_noise scores the whole window or says the cap cut it short."""
-
-    @respx.mock
-    async def test_scores_every_page(self, client):
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        alerts = [
-            _make_alert(i, f"dev-{i % 5}", f"DS-{i % 3}", start_epoch=BASE_EPOCH + i)
-            for i in range(2500)
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts, lower_bound=True))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["total_alerts"] == 2500
-        assert sum(d["count"] for d in data["top_noisy_devices"]) == 2500
-        assert data["truncated"] is False
-        assert data["api_total"] == 2500
-
-    @respx.mock
-    async def test_capped_window_is_declared(self, client):
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        alerts = [
-            _make_alert(i, f"dev-{i % 5}", "DS", start_epoch=BASE_EPOCH + i) for i in range(6000)
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts, lower_bound=True))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["total_alerts"] == 5000
-        assert data["truncated"] is True
-        assert data["api_total"] is None
-
-
 class TestAvailabilityResolvesDevice:
     """R4.3: calculate_availability resolves the device first and reads its alerts by id."""
 
@@ -1153,7 +812,7 @@ class TestAvailabilityDeviceWithGroup:
 
 
 class TestClearedAlerts:
-    """R4.3: availability and noise read cleared alerts beside the active ones."""
+    """R4.3: availability reads cleared alerts beside the active ones."""
 
     @respx.mock
     async def test_cleared_incident_counts_as_downtime(self, client):
@@ -1175,58 +834,17 @@ class TestClearedAlerts:
         assert data["total_downtime_minutes"] == 60.0
         assert data["availability_percent"] < 100.0
 
-    @respx.mock
-    async def test_cleared_alert_and_refire_count_as_a_flap(self, client):
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        cleared = [_make_alert(1, "s1", "CPU", start_epoch=BASE_EPOCH, end_epoch=BASE_EPOCH + 600)]
-        active = [_make_alert(2, "s1", "CPU", start_epoch=BASE_EPOCH + 1200)]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(active, cleared))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["total_alerts"] == 2
-        assert data["flap_count"] == 1
-        assert data["flapping_alerts"][0]["gap_seconds"] == 600
-
-    @pytest.mark.parametrize(
-        ("second_start", "flaps"),
-        [(BASE_EPOCH + 600, 0), (BASE_EPOCH + 1200, 1)],
-        ids=["opens-before-the-clear", "re-fires-as-it-clears"],
-    )
-    @respx.mock
-    async def test_a_flap_needs_the_clear_before_the_refire(self, client, second_start, flaps):
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        # An alert that opens while the previous one is still open overlaps it, so
-        # nothing cleared and re-fired; a live portal day held 660 such pairs among
-        # 4210 counted flaps. A re-fire in the second it cleared is a flap.
-        cleared = [
-            _make_alert(1, "s1", "CPU", start_epoch=BASE_EPOCH, end_epoch=BASE_EPOCH + 1200),
-            _make_alert(2, "s1", "CPU", start_epoch=second_start, end_epoch=BASE_EPOCH + 2400),
-        ]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists([], cleared))
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["total_alerts"] == 2
-        assert data["flap_count"] == flaps
-        assert len(data["flapping_alerts"]) == flaps
-
     @pytest.mark.parametrize(
         ("call", "url"),
         [
             ("availability_portal", ALERT_URL),
             ("availability_device", DEVICE_ALERTS_URL_TEMPLATE.format(id=5)),
-            ("noise_device", ALERT_URL),
         ],
-        ids=["availability-portal", "availability-device", "noise-device"],
+        ids=["availability-portal", "availability-device"],
     )
     @respx.mock
     async def test_cleared_read_repeats_the_active_clauses(self, client, call, url):
-        from lm_mcp.tools.scoring import calculate_availability, score_alert_noise
+        from lm_mcp.tools.scoring import calculate_availability
 
         respx.get(DEVICE_URL_TEMPLATE.format(id=5)).mock(
             return_value=httpx.Response(200, json={"id": 5, "displayName": "web-02"})
@@ -1235,10 +853,8 @@ class TestClearedAlerts:
 
         if call == "availability_portal":
             await calculate_availability(client, hours_back=24, severity_threshold="critical")
-        elif call == "availability_device":
-            await calculate_availability(client, device_id=5, hours_back=24)
         else:
-            await score_alert_noise(client, device="s1")
+            await calculate_availability(client, device_id=5, hours_back=24)
 
         filters = [c.request.url.params["filter"].split(",") for c in route.calls]
         assert len(filters) == 2
@@ -1266,53 +882,6 @@ class TestClearedAlerts:
         data = json.loads(result[0].text)
         assert data["incident_count"] == 1
         assert data["total_downtime_minutes"] == 60.0
-
-    @respx.mock
-    async def test_noise_counts_an_alert_in_both_lists_once(self, client):
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        active = [_make_alert(1, "s1", "CPU", start_epoch=BASE_EPOCH)]
-        cleared = [_make_alert(1, "s1", "CPU", start_epoch=BASE_EPOCH, end_epoch=BASE_EPOCH + 600)]
-        respx.get(ALERT_URL).mock(side_effect=alert_lists(active, cleared))
-
-        result = await score_alert_noise(client)
-
-        assert json.loads(result[0].text)["total_alerts"] == 1
-
-    @pytest.mark.parametrize(
-        ("n_active", "active_lb", "n_cleared", "cleared_lb", "total", "truncated", "api_total"),
-        [
-            (3, False, 4, False, 7, False, 7),
-            (10, False, 6000, True, 5010, True, None),
-            (6000, True, 10, False, 5010, True, None),
-        ],
-        ids=["both-exact", "cleared-capped", "active-capped"],
-    )
-    @respx.mock
-    async def test_truncation_covers_both_reads(
-        self, client, n_active, active_lb, n_cleared, cleared_lb, total, truncated, api_total
-    ):
-        from lm_mcp.tools.scoring import score_alert_noise
-
-        active = [_make_alert(i, f"dev-{i % 5}", "DS") for i in range(n_active)]
-        cleared = [
-            _make_alert(
-                100_000 + i, f"dev-{i % 5}", "DS", start_epoch=BASE_EPOCH, end_epoch=BASE_EPOCH + 60
-            )
-            for i in range(n_cleared)
-        ]
-        respx.get(ALERT_URL).mock(
-            side_effect=alert_lists(
-                active, cleared, lower_bound=active_lb, cleared_lower_bound=cleared_lb
-            )
-        )
-
-        result = await score_alert_noise(client)
-
-        data = json.loads(result[0].text)
-        assert data["total_alerts"] == total
-        assert data["truncated"] is truncated
-        assert data["api_total"] == api_total
 
     @respx.mock
     async def test_failed_device_lookup_logs_a_warning(self, client, caplog):

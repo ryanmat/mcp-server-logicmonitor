@@ -24,7 +24,7 @@ Uses `analyze_metric` with `analyses=["change_points"]`. A shift is reported whe
 ```
 "Score the alert noise across all devices over the last 24 hours"
 ```
-Uses `score_alert_noise`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
+Uses `analyze_alerts` with `analyses=["noise"]`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
 
 **Metric status and anomalies** -- how far the latest samples sit from the window:
 ```

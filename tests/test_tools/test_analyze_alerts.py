@@ -106,6 +106,7 @@ class TestOneRead:
 
         body = _body(await _analyze(client))
 
+        assert body["hours"] == 24
         assert body["analyses"] == list(SECTIONS)
         assert set(SECTIONS) <= set(body)
 

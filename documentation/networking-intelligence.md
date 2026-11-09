@@ -1,6 +1,6 @@
 # Networking Intelligence (v3.8.0)
 
-Reference guide for the eight network-layer tools introduced in v3.8.0.
+Reference guide for the network-layer tools introduced in v3.8.0. Alert-burst detection, also introduced then, is now the `bursts` section of `analyze_alerts`.
 
 Closes the correlation gap that let a customer power outage escape detection. The primitives answer the networking questions operators ask every day (interface performance, top talkers, flapping ports, collector health, UPS state); the composites combine them into site-outage detection and coverage auditing that generic AIOps correlation misses.
 
@@ -9,7 +9,6 @@ Closes the correlation gap that let a customer power outage escape detection. Th
 - [Primitives](#primitives)
   - [get_interface_metrics](#get_interface_metrics)
   - [get_top_talkers](#get_top_talkers)
-  - [detect_alert_burst](#detect_alert_burst)
   - [get_link_flaps](#get_link_flaps)
   - [get_collector_health](#get_collector_health)
   - [get_power_events](#get_power_events)
@@ -54,24 +53,6 @@ Ranks NetFlow flows for an exporter by bandwidth. Answers "what is consuming my 
 **Behavior:** Pulls raw flows from `/netflow/flows` in the window, aggregates client-side on the requested dimension, sorts by total bytes, returns top-N with `total_bytes`, `total_packets`, `flow_count`, and `percentage_of_total`.
 
 **Graceful degradation:** Returns `"note": "No flows exported in window -- check NetFlow exporter configuration"` when the exporter is not sending flows.
-
-### detect_alert_burst
-
-Sliding-window mass-event detector. Buckets alerts by DataSource, identifies windows where alert count and distinct device count exceed thresholds. Used for power outages, DDoS, switch cascade failures, firmware push regressions.
-
-**Parameters:**
-- `group_id` (int, optional) -- scope to a device group
-- `device` (str, optional) -- scope to a device name substring
-- `datasource_pattern` (str, optional) -- substring filter on `dataSourceName`, case-insensitive
-- `window_seconds` (int, optional, default `60`)
-- `min_alerts` (int, optional, default `10`)
-- `min_devices` (int, optional, default `3`)
-- `hours_back` (int, optional, default `1`)
-- `severity` (str, optional) -- `critical`, `error`, `warning`, `info`
-
-**Output:** Per-burst entries with `datasource`, `window_start`, `window_end`, `alert_count`, `device_count`, `alert_ids[:50]`, `top_devices[:10]`.
-
-**Hard cap:** 5000 alerts per analysis window. Exceeding the cap returns a `warning` field; narrow the scope or window for complete results.
 
 ### get_link_flaps
 
@@ -133,7 +114,7 @@ The headline tool. Chains four signals into a single site-outage verdict with co
 **Flow:**
 1. Enumerate devices in the group, derive the distinct set of collectors serving them via `currentCollectorId`.
 2. Query `get_collector_health` for each -- any `is_down=True` trips **Signal A**.
-3. Query `detect_alert_burst` filtered to Interface-family DataSources -- trips **Signal B**.
+3. Query `analyze_alerts` for `bursts` on the group's interface datasources (`datasource="interface"`, 5 alerts on 3 devices within `window_seconds`) -- trips **Signal B**.
 4. Query `get_power_events` scoped to the group -- trips **Signal C**.
 5. Count dead/unreachable devices in the group -- trips **Signal D** when count reaches `max(3, device_count // 5)`.
 6. Compute confidence score (see model below) and derive the verdict. A signal whose read fails is reported with `status: "unavailable"` and its `error`, and is left out of the score; the report then carries `confidence_level: "reduced"` and `unavailable_signals`.
@@ -178,7 +159,7 @@ Additive weights, capped at 100:
 | Signal | Weight | Trigger |
 |--------|--------|---------|
 | Collector down | +40 | `get_collector_health` reports `is_down=True` for any collector serving the group |
-| Interface burst | +25 | `detect_alert_burst` with `datasource_pattern="interface"` returns any burst |
+| Interface burst | +25 | `analyze_alerts` with `analyses=["bursts"]` and `datasource="interface"` returns any burst |
 | Power events | +25 | `get_power_events` returns any matched events in the last hour |
 | Device silence | +10 | Dead-device count in the group >= `max(3, group_size / 5)` |
 
@@ -193,7 +174,7 @@ Defaults are substring-match patterns (case-insensitive) used to identify infras
 | Tool | Parameter | Default |
 |------|-----------|---------|
 | `get_interface_metrics` | internal constant | `interface`, `interfaces`, `if-`, `port`, `ethernet`; prefers `SNMP_Network_Interfaces` |
-| `detect_alert_burst` | `datasource_pattern` | none (caller provides) |
+| `analyze_alerts` (`bursts`) | `datasource` | none (caller provides); `detect_site_outage` passes `interface` |
 | `get_link_flaps` | `interface_pattern` | `interface\|interfaces\|if-\|port\|ethernet` (regex) |
 | `get_power_events` | `patterns` | `UPS`, `PDU`, `APC`, `Liebert`, `Eaton`, `Battery`, `PowerSupply`, `Power_` |
 | `audit_network_monitoring_coverage` | internal | same as `get_power_events` plus `switch`, `router`, `firewall`, `wlan` for network-gear classification |

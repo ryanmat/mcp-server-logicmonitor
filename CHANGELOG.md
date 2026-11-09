@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 261: 257 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 256: 252 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 156 of them, or 160 in
+multi-portal mode. With writes off, the default, `tools/list` shows 151 of them, or 155 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -100,6 +100,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `score_device_health` | `analyze_metric` with `analyses=["summary"]`. Each datapoint's signed `z_score` takes the place of the 0 to 100 score, which no tool computes now. |
 | `save_baseline` | `analyze_metric` with `baseline_hours_ago`, which reads the earlier window when asked. Nothing is stored in the session, and the `baseline_` session variables are no longer read. |
 | `compare_to_baseline` | `analyze_metric` with `analyses=["baseline"]` and `baseline_hours_ago`. |
+| `correlate_alerts` | `analyze_alerts` with `analyses=["clusters"]`: clusters by device, datasource and signature (datasource and datapoint). The temporal-proximity clusters leave; `bursts` finds alerts bunched in time on one datasource. |
+| `get_alert_statistics` | `analyze_alerts` with `analyses=["statistics"]`: counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included. `bucket_size_hours` and `limit` leave. |
+| `score_alert_noise` | `analyze_alerts` with `analyses=["noise"]`, the same score, flap pairs and recommendations. |
+| `detect_alert_burst` | `analyze_alerts` with `analyses=["bursts"]`, `window_seconds`, `min_alerts` and `min_devices`; `datasource` in place of `datasource_pattern`, matched at the portal. |
+| `correlate_changes` | `analyze_alerts` with `analyses=["changes"]` and `correlation_window_minutes`. Only audit entries that name a change pair with spikes. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the

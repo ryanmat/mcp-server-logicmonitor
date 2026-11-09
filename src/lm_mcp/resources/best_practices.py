@@ -10,7 +10,7 @@ BEST_PRACTICES: dict[str, dict] = {
             {
                 "action": "Review flapping alerts and add hysteresis delay",
                 "how": (
-                    "Use score_alert_noise to identify flapping alerts, then adjust "
+                    "Use analyze_alerts' noise section to identify flapping alerts, then adjust "
                     "alert thresholds or add trigger_interval in DataSource datapoint "
                     "settings"
                 ),

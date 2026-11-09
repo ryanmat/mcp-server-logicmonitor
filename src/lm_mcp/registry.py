@@ -4249,78 +4249,6 @@ TOOLS.extend(
 TOOLS.extend(
     [
         Tool(
-            name="correlate_alerts",
-            description=(
-                "Correlate alerts by device, datasource, and temporal proximity. "
-                "Groups alerts into clusters to identify related issues."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 4,
-                        "description": "Hours to look back (default: 4)",
-                    },
-                    "device": {
-                        "type": "string",
-                        "description": "Filter by device name (substring match)",
-                    },
-                    "group_id": {
-                        "type": "integer",
-                        "description": "Filter by device group ID",
-                    },
-                    "severity": {
-                        "type": "string",
-                        "description": "Filter by severity (critical, error, warning, info)",
-                        "enum": ["critical", "error", "warning", "info"],
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "default": 500,
-                        "description": "Max alerts to fetch (default: 500)",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="get_alert_statistics",
-            description=(
-                "Aggregate alert counts by severity, device, datasource, and time bucket. "
-                "Returns statistical summary over a time window."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back (default: 24)",
-                    },
-                    "device": {
-                        "type": "string",
-                        "description": "Filter by device name (substring match)",
-                    },
-                    "group_id": {
-                        "type": "integer",
-                        "description": "Filter by device group ID",
-                    },
-                    "bucket_size_hours": {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Size of each time bucket in hours (default: 1)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "default": 1000,
-                        "description": "Max alerts to fetch (default: 1000)",
-                    },
-                },
-            },
-        ),
-        Tool(
             name="analyze_alerts",
             description=(
                 "Analyze one alert window: call this for how many alerts fired and when, "
@@ -4459,35 +4387,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="score_alert_noise",
-            description=(
-                "Score alert noise level using Shannon entropy and flap detection. "
-                "Produces a score from 0 (quiet) to 100 (extremely noisy) with "
-                "recommendations for tuning. Reads the window's cleared and active "
-                "alerts, so a cleared alert that re-fires counts as a flap; "
-                "truncated says when the 5000-alert cap cut either read short."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back",
-                    },
-                    "device": {
-                        "type": "string",
-                        "description": "Optional device name filter",
-                    },
-                    "group_id": {
-                        "type": "integer",
-                        "description": "Optional device group ID filter",
-                    },
-                },
-            },
-        ),
-        Tool(
             name="calculate_availability",
             description=(
                 "Calculate availability percentage from alert history. "
@@ -4549,30 +4448,6 @@ TOOLS.extend(
                     },
                 },
                 "required": ["device_id"],
-            },
-        ),
-        Tool(
-            name="correlate_changes",
-            description=(
-                "Cross-reference alert spikes with audit/change logs. "
-                "Identifies changes that may have triggered alert increases "
-                "using configurable correlation windows."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 24,
-                        "description": "Hours to look back",
-                    },
-                    "correlation_window_minutes": {
-                        "type": "integer",
-                        "default": 30,
-                        "description": ("Minutes after a change to look for alert spikes"),
-                    },
-                },
             },
         ),
         Tool(
@@ -6066,58 +5941,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="detect_alert_burst",
-            description=(
-                "Sliding-window detector for mass alert events: N alerts from the same "
-                "DataSource across M+ devices within T seconds. Answers 'did a bunch of "
-                "stuff break at once?' Used for detecting cascading failures like mass "
-                "interface-down events during a site outage."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "group_id": {
-                        "type": "integer",
-                        "description": "Scope to a device group",
-                    },
-                    "device": {
-                        "type": "string",
-                        "description": "Scope to a device name (substring match)",
-                    },
-                    "datasource_pattern": {
-                        "type": "string",
-                        "description": ("Substring match on dataSourceName (case-insensitive)"),
-                    },
-                    "window_seconds": {
-                        "type": "integer",
-                        "default": 60,
-                        "description": "Sliding window size in seconds",
-                    },
-                    "min_alerts": {
-                        "type": "integer",
-                        "default": 10,
-                        "description": "Minimum alerts in the window to qualify as burst",
-                    },
-                    "min_devices": {
-                        "type": "integer",
-                        "default": 3,
-                        "description": "Minimum distinct devices in the window",
-                    },
-                    "hours_back": {
-                        "type": "integer",
-                        "default": 1,
-                        "description": "Lookback window in hours",
-                    },
-                    "severity": {
-                        "type": "string",
-                        "enum": ["critical", "error", "warning", "info"],
-                        "description": "Filter by severity",
-                    },
-                },
-            },
-        ),
-        Tool(
             name="get_link_flaps",
             description=(
                 "Identify interfaces with repeated up/down transitions in a time window. "
@@ -6373,7 +6196,6 @@ def get_tool_handler(tool_name: str) -> Any:
         diagnostic_remediation,
         diagnosticsources,
         escalations,
-        event_correlation,
         eventsources,
         imports,
         ingestion,
@@ -6455,7 +6277,6 @@ def get_tool_handler(tool_name: str) -> Any:
         # Network Intelligence (v3.8.0)
         "get_interface_metrics": networking.get_interface_metrics,
         "get_top_talkers": networking.get_top_talkers,
-        "detect_alert_burst": networking.detect_alert_burst,
         "get_link_flaps": networking.get_link_flaps,
         "get_power_events": networking.get_power_events,
         # Metrics
@@ -6676,16 +6497,12 @@ def get_tool_handler(tool_name: str) -> Any:
         "ingest_logs": ingestion.ingest_logs,
         "push_metrics": ingestion.push_metrics,
         # Correlation and Analysis
-        "correlate_alerts": correlation.correlate_alerts,
-        "get_alert_statistics": correlation.get_alert_statistics,
         "analyze_alerts": analyze_alerts.analyze_alerts,
         # ML/Statistical Analysis
         "correlate_metrics": correlation.correlate_metrics,
-        "score_alert_noise": scoring.score_alert_noise,
         "analyze_metric": analyze_metric.analyze_metric,
         "calculate_availability": scoring.calculate_availability,
         "analyze_blast_radius": topology_analysis.analyze_blast_radius,
-        "correlate_changes": event_correlation.correlate_changes,
         "calculate_error_budget": scoring.calculate_error_budget,
         # Traces / APM
         "get_trace_services": traces.get_trace_services,

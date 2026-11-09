@@ -22,12 +22,9 @@ audit.py: token_id
 collectors.py: cid
 collectors.py: collector_group_id
 collectors.py: start_epoch
-correlation.py: SEVERITY_MAP[severity.lower()]
-correlation.py: start_epoch
 dashboards.py: group_id
 devices.py: group_id
 devices.py: parent_id
-event_correlation.py: start_epoch
 networking.py: end_epoch
 networking.py: exporter_device_id
 networking.py: SEVERITY_MAP[severity.lower()]
