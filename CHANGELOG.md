@@ -27,9 +27,12 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 ### Added
 
 - `analyze_metric` reads one device instance's series once and reports it by section: `summary`
-  (latest, mean, standard deviation, min, max, signed z-score of the latest sample) and `trend`
-  (least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, 24-hour
-  autocorrelation, label). `analyses` selects sections; `hours` defaults to 168.
+  (latest, mean, standard deviation, min, max, signed z-score of the latest sample), `trend`
+  (least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, detrended
+  24-hour autocorrelation, label), `seasonality` (detrended autocorrelation at 1, 4, 12, 24 and
+  168 hours, dominant period, peak hours in UTC) and `anomalies` (z-score above 3, outside 1.5
+  IQR, modified z-score above 3.5; each method's 20 most extreme hits and its count). `analyses`
+  selects sections; `hours` defaults to 168, which holds the 24-hour lag.
 
 ### Removed
 

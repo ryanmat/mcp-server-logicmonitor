@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import TextContent
 
 from lm_mcp.tools import format_response, handle_error
-from lm_mcp.tools.analyze_metric import trend_stats
+from lm_mcp.tools.analyze_metric import seasonality_stats, trend_stats
 from lm_mcp.tools.stats_helpers import (
     autocorrelation,
     cusum,
@@ -556,52 +556,13 @@ async def detect_seasonality(
                 }
                 continue
 
-            # Estimate sample interval
-            if len(timestamps) >= 2:
-                avg_interval = (timestamps[-1] - timestamps[0]) / (len(timestamps) - 1)
-            else:
-                avg_interval = 300  # Default 5-min
-
-            # Standard period lags in hours
-            period_hours = [1, 4, 12, 24, 168]
-            correlations = {}
-
-            for ph in period_hours:
-                lag = int(ph * 3600 / avg_interval) if avg_interval > 0 else 0
-                # Skip lags where we have insufficient data
-                if lag < 1 or lag >= len(values) // 2:
-                    continue
-                ac = autocorrelation(values, lag=lag)
-                correlations[f"{ph}h"] = round(ac, 4)
-
-            # Find dominant period
-            if correlations:
-                dominant_period = max(correlations, key=correlations.get)
-                max_autocorr = correlations[dominant_period]
-                is_seasonal = max_autocorr > 0.5
-            else:
-                dominant_period = None
-                max_autocorr = 0.0
-                is_seasonal = False
-
-            # Bin values by hour-of-day to find peak hours
-            hourly_bins: dict[int, list[float]] = {}
-            for val, ts in zip(values, timestamps, strict=True):
-                hour = (ts % 86400) // 3600
-                hourly_bins.setdefault(hour, []).append(val)
-
-            peak_hours = []
-            if hourly_bins:
-                hourly_means = {h: sum(v) / len(v) for h, v in hourly_bins.items()}
-                overall_mean = sum(values) / len(values)
-                peak_hours = sorted([h for h, m in hourly_means.items() if m > overall_mean])
-
+            stats = seasonality_stats(values, timestamps)
             results[dp_name] = {
-                "is_seasonal": is_seasonal,
-                "dominant_period": dominant_period,
-                "max_autocorrelation": max_autocorr,
-                "correlations": correlations,
-                "peak_hours": peak_hours,
+                "is_seasonal": stats["is_seasonal"],
+                "dominant_period": stats["dominant_period"],
+                "max_autocorrelation": stats["max_autocorrelation"],
+                "correlations": stats["autocorrelation"],
+                "peak_hours": stats["peak_hours_utc"],
                 "sample_count": len(values),
             }
 

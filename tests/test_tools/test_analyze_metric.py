@@ -1,7 +1,8 @@
 # Description: Tests for analyze_metric, the one-fetch analysis of a device instance's series.
-# Description: Covers the paged read, the summary and trend sections, selection and warnings.
+# Description: Covers the paged read, each section, section selection and warnings.
 
 import json
+import math
 import time
 from unittest.mock import patch
 
@@ -58,6 +59,23 @@ def _series_page(points, next_page=""):
 def _hours(hours_and_values):
     """(hour offset, value) pairs as (epoch, value) pairs from BASE_EPOCH."""
     return [(BASE_EPOCH + int(h * 3600), v) for h, v in hours_and_values]
+
+
+def _paged(points, page_size=500):
+    """(epoch, cpu) pairs as newest-first pages of 500 rows linked by nextPageParams."""
+    newest_first = sorted(points, key=lambda p: p[0], reverse=True)
+    chunks = [newest_first[i : i + page_size] for i in range(0, len(newest_first), page_size)]
+    pages = []
+    for n, chunk in enumerate(chunks):
+        oldest = chunk[-1][0]
+        marker = "" if n == len(chunks) - 1 else f"start={BASE_EPOCH - 86400}&end={oldest - 1}"
+        pages.append(httpx.Response(200, json=_series_page(chunk, next_page=marker)))
+    return pages
+
+
+def _every(seconds, values):
+    """Values at a fixed interval from BASE_EPOCH, as (epoch, value) pairs."""
+    return [(BASE_EPOCH + i * seconds, v) for i, v in enumerate(values)]
 
 
 async def _analyze(client, **kwargs):
@@ -275,6 +293,187 @@ class TestTrend:
         assert trend["autocorrelation_24h"] == old["autocorrelation_24h"]
         assert trend["label"] == old["classification"]
         assert trend["confidence"] == old["confidence"]
+
+
+class TestSeasonality:
+    """R2.1 seasonality: detrended autocorrelation table, dominant period, peak hours in UTC."""
+
+    @respx.mock
+    async def test_daily_cycle_found_on_the_default_window(self, client):
+        """A week of five-minute samples, read whole by default, shows its 24-hour period.
+
+        The default window is 168 hours, so the 24-hour lag fits inside half the series
+        (classify_trend's 24-hour default could not hold it). Every section comes from
+        the same five pages.
+        """
+        week = [50.0 + 20.0 * math.cos(2 * math.pi * i / 288) + 0.01 * i for i in range(2016)]
+        route = respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, week)))
+
+        body = _body(await _analyze(client))
+
+        assert route.call_count == 5
+        start = int(route.calls[0].request.url.params["start"])
+        assert abs(start + 168 * 3600 - int(time.time())) < 60
+        seasonality = body["datapoints"]["cpu"]["seasonality"]
+        assert set(seasonality["autocorrelation"]) == {"1h", "4h", "12h", "24h"}
+        assert seasonality["dominant_period"] == "24h"
+        assert seasonality["is_seasonal"] is True
+
+    @respx.mock
+    async def test_a_small_cycle_on_a_steep_ramp_is_found(self, client):
+        """A daily cycle holding a thousandth of the variance under a steep ramp is still found.
+
+        Detrending removes the ramp and keeps the cycle; only rounding residue is zeroed.
+        """
+        values = [20.0 * math.cos(2 * math.pi * i / 288) + 1.0 * i for i in range(2016)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, values)))
+
+        seasonality = _body(await _analyze(client, analyses=["seasonality"]))["datapoints"]["cpu"][
+            "seasonality"
+        ]
+
+        assert seasonality["dominant_period"] == "24h"
+        assert seasonality["is_seasonal"] is True
+
+    @respx.mock
+    async def test_detrending_reads_the_hours_between_samples(self, client):
+        """An unevenly sampled climb is a straight line in hours: no cycle, no 24-hour echo.
+
+        Samples alternate one and nine minutes apart; a line fitted against the sample
+        index instead of the time leaves a zigzag that reads as structure.
+        """
+        times = []
+        t = BASE_EPOCH
+        for i in range(2000):
+            times.append(t)
+            t += 60 if i % 2 == 0 else 540
+        values = [100.0 + 0.5 * (ts - BASE_EPOCH) / 3600 for ts in times]
+        respx.get(SERIES_URL).mock(side_effect=_paged(list(zip(times, values, strict=True))))
+
+        cpu = _body(await _analyze(client, analyses=["seasonality", "trend"]))["datapoints"]["cpu"]
+
+        assert set(cpu["seasonality"]["autocorrelation"].values()) == {0.0}
+        assert cpu["trend"]["autocorrelation_24h"] == 0.0
+
+    @respx.mock
+    async def test_a_ramp_is_not_seasonal_once_detrended(self, client):
+        """A straight ramp has no cycle: every detrended autocorrelation is 0."""
+        ramp = [100.0 + 0.5 * i for i in range(600)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, ramp)))
+
+        seasonality = _body(await _analyze(client, analyses=["seasonality"]))["datapoints"]["cpu"][
+            "seasonality"
+        ]
+
+        assert set(seasonality["autocorrelation"].values()) == {0.0}
+        assert seasonality["max_autocorrelation"] == 0.0
+        assert seasonality["is_seasonal"] is False
+
+    @respx.mock
+    async def test_peak_hours_are_utc_hours_above_the_mean(self, client):
+        """Two days of hourly samples high from 09:00 to 17:00 UTC peak in exactly those hours."""
+        values = [100.0 if 9 <= h % 24 <= 17 else 10.0 for h in range(48)]
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_every(3600, values)))
+        )
+
+        seasonality = _body(await _analyze(client, analyses=["seasonality"]))["datapoints"]["cpu"][
+            "seasonality"
+        ]
+
+        assert seasonality["peak_hours_utc"] == list(range(9, 18))
+
+    @respx.mock
+    async def test_trend_label_reads_the_detrended_autocorrelation(self, client):
+        """A long ramp is decreasing, not cyclic: its 24-hour autocorrelation is detrended."""
+        ramp = [500.0 - 3.0 * k / 60.0 for k in range(2000)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(60, ramp)))
+
+        trend = _body(await _analyze(client, analyses=["trend"]))["datapoints"]["cpu"]["trend"]
+
+        assert trend["autocorrelation_24h"] == 0.0
+        assert trend["label"] == "decreasing"
+
+
+def _with_spikes(base_count, spikes):
+    """A five-minute series cycling 50 to 54, with {index: value} spikes laid over it."""
+    values = [50.0 + (i % 5) for i in range(base_count)]
+    for index, value in spikes.items():
+        values[index] = value
+    return _every(300, values)
+
+
+class TestAnomalies:
+    """R2.1 anomalies: z-score, IQR and MAD hits, each under its method's name."""
+
+    @respx.mock
+    async def test_each_method_reports_the_spike(self, client):
+        """One spike in a steady cycle is a hit for all three methods, at its timestamp."""
+        points = _with_spikes(40, {30: 200.0})
+        respx.get(SERIES_URL).mock(return_value=httpx.Response(200, json=_series_page(points)))
+
+        anomalies = _body(await _analyze(client, analyses=["anomalies"]))["datapoints"]["cpu"][
+            "anomalies"
+        ]
+
+        assert set(anomalies) == {"zscore", "iqr", "mad"}
+        assert anomalies["zscore"]["threshold"] == 3.0
+        assert anomalies["iqr"]["multiplier"] == 1.5
+        assert anomalies["mad"]["threshold"] == 3.5
+        for method in ("zscore", "iqr", "mad"):
+            assert anomalies[method]["count"] == 1, method
+            assert [h["timestamp"] for h in anomalies[method]["hits"]] == [points[30][0]], method
+            assert anomalies[method]["hits"][0]["value"] == 200.0, method
+
+    @respx.mock
+    async def test_hits_keep_the_most_extreme_in_time_order(self, client):
+        """Past the cap the most extreme hits are kept, listed oldest first; count is the total."""
+        from lm_mcp.tools.analyze_metric import MAX_ANOMALY_HITS
+
+        spikes = {10 + 5 * k: 100.0 + k for k in range(30)}
+        points = _with_spikes(200, spikes)
+        respx.get(SERIES_URL).mock(return_value=httpx.Response(200, json=_series_page(points)))
+
+        mad = _body(await _analyze(client, analyses=["anomalies"]))["datapoints"]["cpu"][
+            "anomalies"
+        ]["mad"]
+
+        assert MAX_ANOMALY_HITS == 20
+        assert mad["count"] == 30
+        kept = [h["value"] for h in mad["hits"]]
+        assert kept == [100.0 + k for k in range(10, 30)]
+
+    @respx.mock
+    async def test_the_z_score_fence_is_three(self, client):
+        """A sample at |z| between 2 and 3 is not a z-score hit; one between 3 and 4 is."""
+        values = [50.0 + (i % 5) for i in range(200)]
+        values[50] = 55.5
+        values[150] = 57.5
+        mean = sum(values) / len(values)
+        sd = math.sqrt(sum((v - mean) ** 2 for v in values) / (len(values) - 1))
+        assert 2.0 < (values[50] - mean) / sd < 3.0
+        assert 3.0 < (values[150] - mean) / sd < 4.0
+        points = _every(300, values)
+        respx.get(SERIES_URL).mock(return_value=httpx.Response(200, json=_series_page(points)))
+
+        zscore = _body(await _analyze(client, analyses=["anomalies"]))["datapoints"]["cpu"][
+            "anomalies"
+        ]["zscore"]
+
+        assert [h["timestamp"] for h in zscore["hits"]] == [points[150][0]]
+
+    @respx.mock
+    async def test_a_flat_series_has_no_hits(self, client):
+        """A constant series has no hits under any method."""
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_every(300, [5.0] * 20)))
+        )
+
+        anomalies = _body(await _analyze(client, analyses=["anomalies"]))["datapoints"]["cpu"][
+            "anomalies"
+        ]
+
+        assert [anomalies[m]["count"] for m in ("zscore", "iqr", "mad")] == [0, 0, 0]
 
 
 class TestSeriesEdges:
