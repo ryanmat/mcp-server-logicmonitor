@@ -3313,6 +3313,77 @@
       "type": "object"
     }
   },
+  "get_apm_service_alerts": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get the alerts on one APM trace service, one page at a time",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
+          "type": "integer"
+        },
+        "service_id": {
+          "description": "APM service device ID",
+          "type": "integer"
+        },
+        "severity": {
+          "description": "Filter by alert severity",
+          "enum": [
+            "critical",
+            "error",
+            "warning",
+            "info"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_apm_services": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List APM trace services, the deviceType 6 devices, one page at a time. Entry point for discovering traced services; read a service's datasources, operations (the instances of its operations datasource), metrics and properties with get_device_datasources, get_device_instances, get_device_data and get_device_properties, passing the service id as device_id.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by service display name (substring match)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Results to skip for pagination",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_audit_logs": {
     "annotations": {
       "destructiveHint": false,
@@ -6073,275 +6144,6 @@
           "default": 0,
           "description": "Pagination offset",
           "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_trace_operation_metrics": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get per-operation RED metrics (Duration, ErrorOperationCount, OperationCount)",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device datasource ID",
-          "type": "integer"
-        },
-        "end_time": {
-          "description": "End time in epoch seconds",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Operation instance ID",
-          "type": "integer"
-        },
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        },
-        "start_time": {
-          "description": "Start time in epoch seconds",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "service_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_operations": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List operations (endpoints/routes) for an APM service datasource",
-    "inputSchema": {
-      "properties": {
-        "device_datasource_id": {
-          "description": "Device datasource ID (from get_trace_service_datasources)",
-          "type": "integer"
-        },
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "name_filter": {
-          "description": "Filter by operation name (substring match)",
-          "type": "string"
-        },
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "service_id",
-        "device_datasource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_service": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get detailed information about a specific APM trace service",
-    "inputSchema": {
-      "properties": {
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "service_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_service_alerts": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get alerts for an APM trace service",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        },
-        "severity": {
-          "description": "Filter by alert severity",
-          "enum": [
-            "critical",
-            "error",
-            "warning",
-            "info"
-          ],
-          "type": "string"
-        }
-      },
-      "required": [
-        "service_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_service_datasources": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List datasources applied to an APM service (e.g. LogicMonitor_APM_Services, _Operations)",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "name_filter": {
-          "description": "Filter by datasource name (substring match)",
-          "type": "string"
-        },
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "service_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_service_metrics": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get APM service-level RED metrics (Duration, ErrorOperationCount, OperationCount)",
-    "inputSchema": {
-      "properties": {
-        "datapoints": {
-          "description": "Comma-separated datapoint names (all if omitted)",
-          "type": "string"
-        },
-        "device_datasource_id": {
-          "description": "Device datasource ID",
-          "type": "integer"
-        },
-        "end_time": {
-          "description": "End time in epoch seconds",
-          "type": "integer"
-        },
-        "instance_id": {
-          "description": "Instance ID",
-          "type": "integer"
-        },
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        },
-        "start_time": {
-          "description": "Start time in epoch seconds",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "service_id",
-        "device_datasource_id",
-        "instance_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_service_properties": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get properties for an APM service (OTel attributes, namespace, metadata)",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "name_filter": {
-          "description": "Filter by property name (substring match)",
-          "type": "string"
-        },
-        "service_id": {
-          "description": "APM service device ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "service_id"
-      ],
-      "type": "object"
-    }
-  },
-  "get_trace_services": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List APM trace services (deviceType:6). Entry point for discovering traced services.",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "namespace": {
-          "description": "Filter by service name (substring match)",
-          "type": "string"
         }
       },
       "type": "object"

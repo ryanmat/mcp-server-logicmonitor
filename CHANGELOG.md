@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 255: 251 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 249: 245 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 150 of them, or 154 in
+multi-portal mode. With writes off, the default, `tools/list` shows 144 of them, or 148 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -106,6 +106,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `detect_alert_burst` | `analyze_alerts` with `analyses=["bursts"]`, `window_seconds`, `min_alerts` and `min_devices`; `datasource` in place of `datasource_pattern`, matched at the portal. |
 | `correlate_changes` | `analyze_alerts` with `analyses=["changes"]` and `correlation_window_minutes`. Only audit entries that name a change pair with spikes. |
 | `calculate_error_budget` | `calculate_availability` with `target_slo`, which adds `error_budget` over the `hours_back` window; `period_days` leaves, and the budget block carries `period_days` as `hours_back` over 24. |
+| `get_trace_services` | `get_apm_services`, which pages through `limit` and `offset` and takes `name_filter` in place of `namespace`, or `get_services`. |
+| `get_trace_service` | `get_service` with the service id. |
+| `get_trace_service_alerts` | `get_apm_service_alerts`, the same read, paged through `limit` and `offset`. |
+| `get_trace_service_datasources` | `get_device_datasources` with the service id as `device_id`. |
+| `get_trace_operations` | `get_device_instances` on the service's operations datasource. |
+| `get_trace_service_metrics` | `get_device_data` on the service-level instance. |
+| `get_trace_operation_metrics` | `get_device_data` on the operation's instance. |
+| `get_trace_service_properties` | `get_device_properties` with the service id as `device_id`. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the

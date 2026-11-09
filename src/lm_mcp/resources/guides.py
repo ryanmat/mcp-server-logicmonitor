@@ -368,16 +368,13 @@ TOOL_CATEGORIES = {
             ],
         },
         "traces": {
-            "description": "APM trace service discovery, metrics, and properties",
+            "description": (
+                "APM trace services (deviceType 6 devices) and their alerts; the device "
+                "tools read their datasources, operations, metrics and properties"
+            ),
             "tools": [
-                "get_trace_services",
-                "get_trace_service",
-                "get_trace_service_alerts",
-                "get_trace_service_datasources",
-                "get_trace_operations",
-                "get_trace_service_metrics",
-                "get_trace_operation_metrics",
-                "get_trace_service_properties",
+                "get_apm_services",
+                "get_apm_service_alerts",
             ],
         },
         "ml_analysis": {
