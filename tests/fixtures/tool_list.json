@@ -951,7 +951,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing ConfigSource with same name before creating",
+          "description": "If true, replace the ConfigSource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1059,7 +1059,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing DataSource with same name before creating",
+          "description": "If true, replace the DataSource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1172,7 +1172,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing DiagnosticSource with same name before creating",
+          "description": "If true, replace the DiagnosticSource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1298,7 +1298,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing EventSource with same name before creating",
+          "description": "If true, replace the EventSource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1457,7 +1457,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing LogSource with same name before creating",
+          "description": "If true, replace the LogSource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1484,7 +1484,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing PropertySource with same name before creating",
+          "description": "If true, replace the PropertySource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1553,7 +1553,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing RemediationSource with same name before creating",
+          "description": "If true, replace the RemediationSource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },
@@ -1687,7 +1687,7 @@
         },
         "overwrite": {
           "default": false,
-          "description": "If true, delete existing TopologySource with same name before creating",
+          "description": "If true, replace the TopologySource holding the same name in place with a PUT to its id; nothing is deleted first",
           "type": "boolean"
         }
       },

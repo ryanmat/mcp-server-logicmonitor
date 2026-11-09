@@ -2656,8 +2656,10 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing DataSource with same name "
-                        "before creating",
+                        "description": (
+                            "If true, replace the DataSource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
+                        ),
                     },
                 },
                 "required": ["definition"],
@@ -3750,8 +3752,10 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing ConfigSource "
-                        "with same name before creating",
+                        "description": (
+                            "If true, replace the ConfigSource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
+                        ),
                     },
                 },
                 "required": ["definition"],
@@ -3789,8 +3793,10 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing EventSource "
-                        "with same name before creating",
+                        "description": (
+                            "If true, replace the EventSource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
+                        ),
                     },
                 },
                 "required": ["definition"],
@@ -3875,8 +3881,10 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing PropertySource "
-                        "with same name before creating",
+                        "description": (
+                            "If true, replace the PropertySource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
+                        ),
                     },
                 },
                 "required": ["definition"],
@@ -3937,8 +3945,10 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing LogSource "
-                        "with same name before creating",
+                        "description": (
+                            "If true, replace the LogSource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
+                        ),
                     },
                 },
                 "required": ["definition"],
@@ -3999,8 +4009,10 @@ TOOLS.extend(
                     "overwrite": {
                         "type": "boolean",
                         "default": False,
-                        "description": "If true, delete existing TopologySource "
-                        "with same name before creating",
+                        "description": (
+                            "If true, replace the TopologySource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
+                        ),
                     },
                 },
                 "required": ["definition"],
@@ -4765,8 +4777,8 @@ TOOLS.extend(
                         "type": "boolean",
                         "default": False,
                         "description": (
-                            "If true, delete existing DiagnosticSource with same name "
-                            "before creating"
+                            "If true, replace the DiagnosticSource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
                         ),
                     },
                 },
@@ -4903,8 +4915,8 @@ TOOLS.extend(
                         "type": "boolean",
                         "default": False,
                         "description": (
-                            "If true, delete existing RemediationSource with same name "
-                            "before creating"
+                            "If true, replace the RemediationSource holding the same name in "
+                            "place with a PUT to its id; nothing is deleted first"
                         ),
                     },
                 },

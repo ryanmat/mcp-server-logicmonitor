@@ -18,6 +18,7 @@ from lm_mcp.tools import (
     require_write_permission,
     sanitize_filter_value,
 )
+from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -119,39 +120,13 @@ async def create_logsource(
     Args:
         client: LogicMonitor API client.
         definition: Full LogSource definition dict in REST API format.
-        overwrite: If True, delete existing LogSource with the same name
-            before creating.
+        overwrite: If True, replace the LogSource holding the definition's name in
+            place (a PUT to its id); nothing is deleted first.
 
     Returns:
         List of TextContent with created LogSource info or error.
     """
-    try:
-        payload = normalize_definition_fields(definition, keep=_REST_FIELDS)
-        payload.pop("id", None)
-
-        if overwrite and payload.get("name"):
-            existing = await client.get(
-                "/setting/logsources",
-                params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
-            )
-            items = existing.get("items", [])
-            if items:
-                await client.delete(f"/setting/logsources/{items[0]['id']}")
-
-        result = await client.post("/setting/logsources", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"LogSource '{result.get('name')}' created successfully",
-                "logsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await create_module(client, "logsource", definition, overwrite)
 
 
 @require_write_permission
@@ -226,29 +201,7 @@ async def get_logsource(
     Returns:
         List of TextContent with LogSource details or error.
     """
-    try:
-        result = await client.get(f"/setting/logsources/{logsource_id}")
-        if raw:
-            return format_response(result)
-
-        logsource = {
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "description": result.get("description"),
-            "applies_to": result.get("appliesTo"),
-            "group": result.get("group"),
-            "log_type": result.get("logType"),
-            "collect_method": result.get("collectMethod"),
-            "version": result.get("version"),
-            "filters": result.get("filters", []),
-            "log_file_path": result.get("logFilePath"),
-            "log_file_format": result.get("logFileFormat"),
-            "log_source_type": result.get("logSourceType"),
-        }
-
-        return format_response(logsource)
-    except Exception as e:
-        return handle_error(e)
+    return await get_module(client, "logsource", logsource_id, raw)
 
 
 def _device_logsource_row(item: dict) -> dict:
@@ -309,18 +262,4 @@ async def delete_logsource(
     Returns:
         List of TextContent with deletion confirmation or error.
     """
-    try:
-        ls = await client.get(f"/setting/logsources/{logsource_id}")
-        ls_name = ls.get("name", f"ID:{logsource_id}")
-
-        await client.delete(f"/setting/logsources/{logsource_id}")
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"LogSource '{ls_name}' deleted",
-                "logsource_id": logsource_id,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await delete_module(client, "logsource", logsource_id)

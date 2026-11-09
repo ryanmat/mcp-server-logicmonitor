@@ -17,6 +17,7 @@ from lm_mcp.tools import (
     require_write_permission,
     sanitize_filter_value,
 )
+from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -112,39 +113,13 @@ async def create_propertysource(
     Args:
         client: LogicMonitor API client.
         definition: Full PropertySource definition dict in REST API format.
-        overwrite: If True, delete existing PropertySource with the same name
-            before creating.
+        overwrite: If True, replace the PropertySource holding the definition's name in
+            place (a PUT to its id); nothing is deleted first.
 
     Returns:
         List of TextContent with created PropertySource info or error.
     """
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        if overwrite and payload.get("name"):
-            existing = await client.get(
-                "/setting/propertyrules",
-                params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
-            )
-            items = existing.get("items", [])
-            if items:
-                await client.delete(f"/setting/propertyrules/{items[0]['id']}")
-
-        result = await client.post("/setting/propertyrules", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"PropertySource '{result.get('name')}' created successfully",
-                "propertysource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await create_module(client, "propertysource", definition, overwrite)
 
 
 @require_write_permission
@@ -221,21 +196,7 @@ async def delete_propertysource(
     Returns:
         List of TextContent with deletion confirmation or error.
     """
-    try:
-        ps = await client.get(f"/setting/propertyrules/{propertysource_id}")
-        ps_name = ps.get("name", f"ID:{propertysource_id}")
-
-        await client.delete(f"/setting/propertyrules/{propertysource_id}")
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"PropertySource '{ps_name}' deleted",
-                "propertysource_id": propertysource_id,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await delete_module(client, "propertysource", propertysource_id)
 
 
 async def get_propertysource(
@@ -253,25 +214,4 @@ async def get_propertysource(
     Returns:
         List of TextContent with PropertySource details or error.
     """
-    try:
-        result = await client.get(f"/setting/propertyrules/{propertysource_id}")
-        if raw:
-            return format_response(result)
-
-        source = {
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "display_name": result.get("displayName"),
-            "description": result.get("description"),
-            "applies_to": result.get("appliesTo"),
-            "technology": result.get("technology"),
-            "group": result.get("group"),
-            "version": result.get("version"),
-            "tags": result.get("tags"),
-            "audit_version": result.get("auditVersion"),
-            "install_date": result.get("installDate"),
-        }
-
-        return format_response(source)
-    except Exception as e:
-        return handle_error(e)
+    return await get_module(client, "propertysource", propertysource_id, raw)

@@ -22,6 +22,7 @@ _ZERO_RETRY_MODULES = [
     "test_availability",
     "test_correlate_metrics",
     "test_diagnosticsources",
+    "test_logicmodules",
     "test_networking",
     "test_remediationsources",
     "test_topology_analysis",

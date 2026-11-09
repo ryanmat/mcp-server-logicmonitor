@@ -19,6 +19,7 @@ from lm_mcp.tools import (
     sanitize_filter_value,
 )
 from lm_mcp.tools.diagnostic_remediation import run_pre_execution_checks
+from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -118,37 +119,7 @@ async def get_remediationsource(
     Returns:
         List of TextContent with source details or error.
     """
-    try:
-        result = await client.get(f"/setting/remediationsources/{source_id}")
-        if raw:
-            return format_response(result)
-
-        detail = {
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "display_name": result.get("displayName"),
-            "description": result.get("description"),
-            "applies_to": result.get("appliesTo"),
-            "group": result.get("group"),
-            "collect_method": result.get("collectMethod"),
-            "collect_interval": result.get("collectInterval"),
-            "tags": result.get("tags", []),
-            "technical_notes": result.get("technicalNotes"),
-            "groovy_script": result.get("groovyScript"),
-            "datapoints": [
-                {
-                    "id": dp.get("id"),
-                    "name": dp.get("name"),
-                    "description": dp.get("description"),
-                    "type": dp.get("type"),
-                }
-                for dp in result.get("dataPoints", [])
-            ],
-        }
-
-        return format_response(detail)
-    except Exception as e:
-        return handle_error(e)
+    return await get_module(client, "remediationsource", source_id, raw)
 
 
 @require_write_permission
@@ -247,40 +218,13 @@ async def create_remediationsource(
     Args:
         client: LogicMonitor API client.
         definition: Full RemediationSource definition dict in REST API format.
-        overwrite: If True, delete existing RemediationSource with the same
-            name before creating.
+        overwrite: If True, replace the RemediationSource holding the definition's name in
+            place (a PUT to its id); nothing is deleted first.
 
     Returns:
         List of TextContent with created RemediationSource info or error.
     """
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        if overwrite and payload.get("name"):
-            existing = await client.get(
-                "/setting/remediationsources",
-                params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
-            )
-            items = existing.get("items", [])
-            if items:
-                await client.delete(f"/setting/remediationsources/{items[0]['id']}")
-
-        result = await client.post("/setting/remediationsources", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"RemediationSource '{result.get('name')}' created successfully",
-                "remediationsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await create_module(client, "remediationsource", definition, overwrite)
 
 
 @require_write_permission
@@ -362,18 +306,4 @@ async def delete_remediationsource(
     Returns:
         List of TextContent with deletion confirmation or error.
     """
-    try:
-        source = await client.get(f"/setting/remediationsources/{remediationsource_id}")
-        source_name = source.get("name", f"ID:{remediationsource_id}")
-
-        await client.delete(f"/setting/remediationsources/{remediationsource_id}")
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"RemediationSource '{source_name}' deleted",
-                "remediationsource_id": remediationsource_id,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await delete_module(client, "remediationsource", remediationsource_id)
