@@ -250,6 +250,151 @@ def cusum(
     return change_points
 
 
+DAY_SECONDS = 86400
+
+# A daily profile must reach this share of its time-of-day bins to be subtracted.
+MIN_PROFILE_COVERAGE = 0.9
+
+
+def remove_daily_cycle(
+    values: list[float], timestamps: list[int], exclude_near: list[int] | None = None
+) -> tuple[list[float], bool]:
+    """Subtract the series' daily profile when the samples span three days or more.
+
+    Each sample whose centered 24-hour window lies inside the series contributes its
+    distance from that window's mean, a level that follows trends and steps, to the
+    bin of its time of day at the sample interval. Each bin's profile is the median of
+    those distances across days, so the one day a step crosses does not shape it.
+    The profile, centered on zero, is subtracted from every sample in its bin.
+    Samples within 12 hours of a time in `exclude_near`, whose 24-hour window straddles
+    a known change, are left out of the profile. A profile that reaches fewer than
+    MIN_PROFILE_COVERAGE of the bins does not describe the day, and none is applied.
+
+    Args:
+        values: Samples, oldest first.
+        timestamps: Epoch seconds of the samples, ascending.
+        exclude_near: Epoch seconds of changes already found, if any.
+
+    Returns:
+        The series less its daily profile and True, or the series unchanged and False
+        when it spans less than three days or the profile reaches too few bins.
+    """
+    n = len(values)
+    if n < 2 or timestamps[-1] - timestamps[0] < 3 * DAY_SECONDS:
+        return list(values), False
+    interval = (timestamps[-1] - timestamps[0]) / (n - 1)
+    bins = max(1, round(DAY_SECONDS / interval))
+
+    prefix = [0.0]
+    for v in values:
+        prefix.append(prefix[-1] + v)
+    half = DAY_SECONDS / 2
+    by_bin: dict[int, list[float]] = {}
+    lo = hi = 0
+    for i, t in enumerate(timestamps):
+        if t - half < timestamps[0] or t + half > timestamps[-1]:
+            continue
+        if exclude_near and any(abs(t - c) < half for c in exclude_near):
+            continue
+        while timestamps[lo] < t - half:
+            lo += 1
+        while hi < n and timestamps[hi] <= t + half:
+            hi += 1
+        level = (prefix[hi] - prefix[lo]) / (hi - lo)
+        by_bin.setdefault(round((t % DAY_SECONDS) / interval) % bins, []).append(values[i] - level)
+
+    if len(by_bin) < MIN_PROFILE_COVERAGE * bins:
+        return list(values), False
+    profile: dict[int, float] = {}
+    for b, distances in by_bin.items():
+        ordered = sorted(distances)
+        mid = len(ordered) // 2
+        profile[b] = ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+    center = sum(profile.values()) / len(profile)
+    return [
+        v - (profile.get(round((t % DAY_SECONDS) / interval) % bins, center) - center)
+        for v, t in zip(values, timestamps, strict=True)
+    ], True
+
+
+# A window difference this many noise scales from its center is a level shift.
+SHIFT_THRESHOLD = 5.0
+
+# Fewer block differences than this give no robust center or spread of their own.
+MIN_SHIFT_BLOCKS = 15
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    return ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def window_shifts(values: list[float], window: int) -> tuple[list[dict], float]:
+    """Find level shifts where the mean of the next `window` samples leaves the previous.
+
+    At each sample the difference of the two means is centered on the median of the
+    differences taken every fifth of a window, which a steady trend shifts by its slope
+    times the window. It is scaled by the larger of two: 1.4826 times their median
+    absolute deviation, which carries whatever autocorrelation the noise has, and the
+    scale independent noise of the series' first differences would give. A change
+    disturbs the differences within a window of it, about ten of them, so on a series
+    of a day or more a few changes leave the center and the spread to the noise; on a
+    shorter one a change inflates the spread and smaller shifts go unfound. With fewer
+    than MIN_SHIFT_BLOCKS of those differences the center is zero and the first
+    differences set the scale. Samples past SHIFT_THRESHOLD are kept from the largest
+    down, at least `window` apart, each dated to its own sample.
+
+    Args:
+        values: Time series values, oldest first.
+        window: Samples on each side of the comparison.
+
+    Returns:
+        The shifts, each with index and direction ("increase" or "decrease"), and the
+        scale used; no shifts and an infinite scale when the series is shorter than
+        two windows.
+    """
+    n = len(values)
+    if n < 2 * window:
+        return [], math.inf
+
+    prefix = [0.0]
+    for v in values:
+        prefix.append(prefix[-1] + v)
+
+    def difference(i: int) -> float:
+        return (prefix[i + window] - 2 * prefix[i] + prefix[i - window]) / window
+
+    diffs = [values[i + 1] - values[i] for i in range(n - 1)]
+    mean_diff = sum(diffs) / len(diffs)
+    independent = math.sqrt(
+        sum((d - mean_diff) ** 2 for d in diffs) / max(1, len(diffs) - 1)
+    ) / math.sqrt(window)
+    blocks = [difference(i) for i in range(window, n - window + 1, max(1, window // 5))]
+    center = spread = 0.0
+    if len(blocks) >= MIN_SHIFT_BLOCKS:
+        center = _median(blocks)
+        spread = 1.4826 * _median([abs(b - center) for b in blocks])
+    scale = max(spread, independent)
+    if scale == 0:
+        return [], 0.0
+
+    candidates = []
+    for i in range(window, n - window + 1):
+        z = (difference(i) - center) / scale
+        if abs(z) > SHIFT_THRESHOLD:
+            candidates.append((abs(z), i, z))
+    candidates.sort(reverse=True)
+    kept: list[tuple[int, float]] = []
+    for _, i, z in candidates:
+        if all(abs(i - j) >= window for j, _ in kept):
+            kept.append((i, z))
+    points = [
+        {"index": i, "direction": "increase" if z > 0 else "decrease"} for i, z in sorted(kept)
+    ]
+    return points, scale
+
+
 def shannon_entropy(probabilities: list[float]) -> float:
     """Compute Shannon entropy of a probability distribution.
 

@@ -3,6 +3,7 @@
 
 import json
 import math
+import random
 import time
 from unittest.mock import patch
 
@@ -393,6 +394,337 @@ class TestSeasonality:
 
         assert trend["autocorrelation_24h"] == 0.0
         assert trend["label"] == "decreasing"
+
+
+def _step(before, after, level_before=100.0, level_after=130.0):
+    """A level shift at five-minute samples: `before` samples, then `after` at the new level."""
+    return _every(300, [level_before] * before + [level_after] * after)
+
+
+class TestChangePoints:
+    """R2.1 change_points: the windows before and after each sample compared, each shift dated."""
+
+    @respx.mock
+    async def test_a_level_shift_is_one_point_at_its_timestamp(self, client):
+        """A shift from 100 to 130 is one increase at the first sample of the new level.
+
+        The comparison of the 30 samples after with the 30 before peaks at that sample.
+        """
+        points = _step(60, 60)
+        respx.get(SERIES_URL).mock(return_value=httpx.Response(200, json=_series_page(points)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["window"] == 30
+        assert section["points"] == [
+            {"timestamp": points[60][0], "direction": "increase", "before": 100.0, "after": 130.0}
+        ]
+
+    @respx.mock
+    async def test_a_drop_is_a_decrease(self, client):
+        """A shift down is reported as a decrease with both levels."""
+        points = _step(50, 50, level_after=70.0)
+        respx.get(SERIES_URL).mock(return_value=httpx.Response(200, json=_series_page(points)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["points"] == [
+            {"timestamp": points[50][0], "direction": "decrease", "before": 100.0, "after": 70.0}
+        ]
+
+    @respx.mock
+    async def test_noise_around_a_steady_level_has_no_points(self, client):
+        """Noise in runs of four around a steady level is no shift."""
+        noise = [100.0 + (1.0 if (i // 4) % 2 else -1.0) for i in range(160)]
+        respx.get(SERIES_URL).mock(
+            return_value=httpx.Response(200, json=_series_page(_every(300, noise)))
+        )
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["points"] == []
+
+    @respx.mock
+    async def test_a_small_shift_is_dated_to_its_first_sample(self, client):
+        """A shift of four in alternating noise of one is dated to its first sample."""
+        values = [100.0 + (1.0 if i % 2 else -1.0) + (4.0 if i >= 61 else 0.0) for i in range(130)]
+        points = _every(300, values)
+        respx.get(SERIES_URL).mock(return_value=httpx.Response(200, json=_series_page(points)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert [(p["timestamp"], p["direction"]) for p in section["points"]] == [
+            (points[61][0], "increase")
+        ]
+        assert section["points"][0]["before"] == 100.0
+        assert section["points"][0]["after"] == 104.0
+
+    @respx.mock
+    async def test_a_daily_cycle_on_a_ramp_has_no_points(self, client):
+        """A clean daily cycle over a week is a cycle, not a run of level shifts.
+
+        With three days or more the cycle comes out before the windows are compared; left
+        in, each half of the cycle reads as a level change against the window before it.
+        """
+        week = [50.0 + 20.0 * math.cos(2 * math.pi * i / 288) + 0.01 * i for i in range(2016)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, week)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["deseasonalized"] is True
+        assert section["points"] == []
+
+    @respx.mock
+    async def test_a_step_inside_a_noisy_daily_cycle_is_one_point(self, client):
+        """A step of 8 under a daily cycle of 20 and noise of 3 is one increase where it starts."""
+        points = _noisy_week(seed=11, step_at=1000, step=8.0)
+        respx.get(SERIES_URL).mock(side_effect=_paged(points))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert len(section["points"]) == 1
+        found = section["points"][0]
+        assert found["direction"] == "increase"
+        assert abs(found["timestamp"] - points[1000][0]) <= 3 * 300
+        assert 6.0 < found["after"] - found["before"] < 10.0
+
+    @respx.mock
+    async def test_a_noisy_ramp_is_not_a_shift(self, client):
+        """A climb of 58 a day under a daily cycle and noise reports no level shift.
+
+        A steady climb moves every window difference by the same amount, the center.
+        """
+        respx.get(SERIES_URL).mock(side_effect=_paged(_noisy_week(seed=23, slope=0.2)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["points"] == []
+
+    @respx.mock
+    async def test_a_steep_short_climb_is_not_a_shift(self, client):
+        """A climb of 0.5 a sample in noise of 1 over a day is no shift."""
+        rng = random.Random(13)
+        values = [100.0 + 0.5 * i + rng.gauss(0, 1.0) for i in range(300)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, values)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["points"] == []
+
+    @pytest.mark.parametrize(("seed", "at"), [(2047, 1001)])
+    def test_the_profile_is_a_median_across_days(self, seed, at):
+        """The day a step crosses does not shape the daily profile, so the step stands alone.
+
+        With a mean across days this week gains a decrease 883 samples after the step.
+        """
+        from lm_mcp.tools.analyze_metric import change_point_stats
+
+        stepped = _noisy_week(seed=seed, step_at=1000, step=8.0)
+        points = change_point_stats([v for _, v in stepped], [t for t, _ in stepped])["points"]
+
+        assert [(p["timestamp"], p["direction"]) for p in points] == [(stepped[at][0], "increase")]
+
+    @respx.mock
+    async def test_under_three_days_the_cycle_stays_in(self, client):
+        """Two and a half days of a noisy cycle are too few to estimate it; it stays in.
+
+        From two days every time of day has a sample to read, but a profile of one or
+        two days takes in any step those days hold, so the cut is at three.
+        """
+        rng = random.Random(3)
+        days = [
+            50.0 + 20.0 * math.cos(2 * math.pi * i / 288) + rng.gauss(0, 3.0) for i in range(720)
+        ]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, days)))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["deseasonalized"] is False
+
+    @respx.mock
+    async def test_changes_every_ten_hours_leave_no_profile_to_rebuild(self, client):
+        """Level changes every 10 hours leave no day to read the cycle from; each is a point.
+
+        The daily profile rebuilt without the day around each change has nothing left to
+        read, so the series is analyzed as it is and the section says the cycle stayed in.
+        """
+        rng = random.Random(5)
+        values = [(80.0 if (i // 120) % 2 else 50.0) + rng.gauss(0, 1.0) for i in range(1008)]
+        points = _every(300, values)
+        respx.get(SERIES_URL).mock(side_effect=_paged(points))
+
+        section = _body(await _analyze(client, analyses=["change_points"]))["datapoints"]["cpu"][
+            "change_points"
+        ]
+
+        assert section["deseasonalized"] is False
+        found = [
+            ((p["timestamp"] - points[0][0]) // 300, p["direction"]) for p in section["points"]
+        ]
+        assert [index for index, _ in found] == [120 * k for k in range(1, 9)]
+        assert [direction for _, direction in found] == ["increase", "decrease"] * 4
+
+    @pytest.mark.parametrize("phi", [0.5, 0.8])
+    def test_autocorrelated_noise_is_no_shift_and_a_step_is_one(self, phi):
+        """Smooth noise wanders without reading as shifts; a step of 15 is one point.
+
+        Eight seeded weeks of a daily cycle and AR(1) noise of sd 3: no point without a
+        step, and the step found within one sample. First differences see only the fast
+        part of such noise; the spread of the block differences carries the slow part.
+        """
+        from lm_mcp.tools.analyze_metric import change_point_stats
+
+        for seed in range(6000, 6008):
+            quiet = _smooth_week(seed, phi)
+            assert change_point_stats([v for _, v in quiet], [t for t, _ in quiet])["points"] == []
+            stepped = _smooth_week(seed, phi, step_at=1000, step=15.0)
+            points = change_point_stats([v for _, v in stepped], [t for t, _ in stepped])["points"]
+            assert len(points) == 1
+            assert abs(points[0]["timestamp"] - stepped[1000][0]) <= 300
+
+    @pytest.mark.parametrize("phi", [0.5, 0.8])
+    def test_a_day_of_autocorrelated_noise_is_no_shift(self, phi):
+        """Forty seeded 24-hour windows of AR(1) noise of sd 3 report no point.
+
+        A day holds nine 30-sample blocks; the spread of their differences, taken every
+        six samples, is steady enough to scale by where nine alone are not.
+        """
+        from lm_mcp.tools.analyze_metric import change_point_stats
+
+        false_points = 0
+        for seed in range(7000, 7040):
+            rng = random.Random(seed)
+            noise = 0.0
+            values = []
+            for _ in range(288):
+                noise = phi * noise + rng.gauss(0, 3.0 * math.sqrt(1 - phi * phi))
+                values.append(50.0 + noise)
+            timestamps = [BASE_EPOCH + i * 300 for i in range(288)]
+            false_points += len(change_point_stats(values, timestamps)["points"])
+
+        assert false_points == 0
+
+    def test_changes_a_day_apart_leave_the_cycle_in(self):
+        """Three changes a day apart in four days leave no day to read the cycle from.
+
+        The profile rebuilt without each change's day reaches too few times of day, so
+        the series is analyzed as it is, and any point found is one of the changes.
+        """
+        from lm_mcp.tools.analyze_metric import change_point_stats
+
+        rng = random.Random(1)
+        values = [
+            50.0
+            + 20.0 * math.cos(2 * math.pi * i / 288)
+            + (15.0 if i >= 288 else 0.0)
+            - (15.0 if i >= 605 else 0.0)
+            + (15.0 if i >= 922 else 0.0)
+            + rng.gauss(0, 2.0)
+            for i in range(1152)
+        ]
+        timestamps = [BASE_EPOCH + i * 300 for i in range(1152)]
+
+        section = change_point_stats(values, timestamps)
+
+        assert section["deseasonalized"] is False
+        changes = [timestamps[i] for i in (288, 605, 922)]
+        assert all(min(abs(p["timestamp"] - c) for c in changes) <= 900 for p in section["points"])
+
+    def test_a_profile_reaching_part_of_the_day_is_not_applied(self):
+        """Exclusions that leave a fifth of the times of day give no profile to subtract."""
+        from lm_mcp.tools.stats_helpers import remove_daily_cycle
+
+        values = [50.0 + 20.0 * math.cos(2 * math.pi * i / 288) for i in range(1152)]
+        timestamps = [BASE_EPOCH + i * 300 for i in range(1152)]
+        near = [timestamps[i] for i in (288, 605, 922)]
+
+        series, applied = remove_daily_cycle(values, timestamps, exclude_near=near)
+
+        assert applied is False
+        assert series == values
+
+    def test_the_profile_is_rebuilt_without_the_day_of_a_step(self):
+        """A step of 20 is one point once the profile is rebuilt without the day around it.
+
+        The first profile takes in that day, and read against it this week shows a
+        decrease at sample 714 that is not there.
+        """
+        from lm_mcp.tools.analyze_metric import change_point_stats
+
+        stepped = _noisy_week(seed=2022, step_at=1000, step=20.0)
+        points = change_point_stats([v for _, v in stepped], [t for t, _ in stepped])["points"]
+
+        assert [(p["timestamp"], p["direction"]) for p in points] == [
+            (stepped[1000][0], "increase")
+        ]
+
+    def test_seeded_weeks_have_no_false_points_and_find_every_step(self):
+        """Over 20 seeded weeks of cycle and noise: no point without a step, the step with one.
+
+        The step is 8, under three noise units; each found point lies within three
+        samples (15 minutes) of where the step starts.
+        """
+        from lm_mcp.tools.analyze_metric import change_point_stats
+
+        false_points = 0
+        found = 0
+        for seed in range(2000, 2020):
+            quiet = _noisy_week(seed=seed)
+            false_points += len(
+                change_point_stats([v for _, v in quiet], [t for t, _ in quiet])["points"]
+            )
+            stepped = _noisy_week(seed=seed, step_at=1000, step=8.0)
+            points = change_point_stats([v for _, v in stepped], [t for t, _ in stepped])["points"]
+            found += len(points) == 1 and abs(points[0]["timestamp"] - stepped[1000][0]) <= 900
+
+        assert false_points == 0
+        assert found == 20
+
+
+def _noisy_week(seed, step_at=None, step=0.0, slope=0.0):
+    """A week of five-minute samples: daily cycle of 20, seeded noise of 3, a step and a slope."""
+    rng = random.Random(seed)
+    return _every(
+        300,
+        [
+            50.0
+            + 20.0 * math.cos(2 * math.pi * i / 288)
+            + slope * i
+            + rng.gauss(0, 3.0)
+            + (step if step_at is not None and i >= step_at else 0.0)
+            for i in range(2016)
+        ],
+    )
+
+
+def _smooth_week(seed, phi, step_at=None, step=0.0):
+    """A week of five-minute samples: a daily cycle of 20 and seeded AR(1) noise of sd 3."""
+    rng = random.Random(seed)
+    noise = 0.0
+    values = []
+    for i in range(2016):
+        noise = phi * noise + rng.gauss(0, 3.0 * math.sqrt(1 - phi * phi))
+        level = step if step_at is not None and i >= step_at else 0.0
+        values.append(50.0 + 20.0 * math.cos(2 * math.pi * i / 288) + noise + level)
+    return _every(300, values)
 
 
 def _with_spikes(base_count, spikes):
