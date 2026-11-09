@@ -336,6 +336,26 @@ class TestSeasonality:
         assert seasonality["is_seasonal"] is True
 
     @respx.mock
+    async def test_detrending_reads_the_hours_between_samples(self, client):
+        """An unevenly sampled climb is a straight line in hours: no cycle, no 24-hour echo.
+
+        Samples alternate one and nine minutes apart; a line fitted against the sample
+        index instead of the time leaves a zigzag that reads as structure.
+        """
+        times = []
+        t = BASE_EPOCH
+        for i in range(2000):
+            times.append(t)
+            t += 60 if i % 2 == 0 else 540
+        values = [100.0 + 0.5 * (ts - BASE_EPOCH) / 3600 for ts in times]
+        respx.get(SERIES_URL).mock(side_effect=_paged(list(zip(times, values, strict=True))))
+
+        cpu = _body(await _analyze(client, analyses=["seasonality", "trend"]))["datapoints"]["cpu"]
+
+        assert set(cpu["seasonality"]["autocorrelation"].values()) == {0.0}
+        assert cpu["trend"]["autocorrelation_24h"] == 0.0
+
+    @respx.mock
     async def test_a_ramp_is_not_seasonal_once_detrended(self, client):
         """A straight ramp has no cycle: every detrended autocorrelation is 0."""
         ramp = [100.0 + 0.5 * i for i in range(600)]
