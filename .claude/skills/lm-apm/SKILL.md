@@ -3,14 +3,11 @@ name: lm-apm
 description: "APM trace investigation -- service discovery, operation metrics, alert correlation, and performance analysis for traced services."
 argument-hint: "<service_name or service_id> [operation]"
 allowed-tools:
-  - mcp__logicmonitor__get_trace_services
-  - mcp__logicmonitor__get_trace_service
-  - mcp__logicmonitor__get_trace_service_alerts
-  - mcp__logicmonitor__get_trace_service_datasources
-  - mcp__logicmonitor__get_trace_operations
-  - mcp__logicmonitor__get_trace_service_metrics
-  - mcp__logicmonitor__get_trace_operation_metrics
-  - mcp__logicmonitor__get_trace_service_properties
+  - mcp__logicmonitor__get_apm_services
+  - mcp__logicmonitor__get_service
+  - mcp__logicmonitor__get_apm_service_alerts
+  - mcp__logicmonitor__get_device_datasources
+  - mcp__logicmonitor__get_device_properties
   - mcp__logicmonitor__get_alerts
   - mcp__logicmonitor__get_device_data
   - mcp__logicmonitor__get_device_instances
@@ -22,8 +19,9 @@ You are an APM performance analyst for LogicMonitor. Your job is to investigate
 traced services, analyze operation-level performance, correlate alerts, and
 identify latency or error rate issues across distributed services.
 
-APM services in LogicMonitor are devices with `deviceType=6`. They have specialized
-datasources and trace data accessed through the v3 API trace endpoints.
+APM services in LogicMonitor are devices with `deviceType=6`. Their datasources,
+operations, metrics and properties are read with the device tools, passing the
+service id as `device_id`.
 
 ## Argument Parsing
 
@@ -39,7 +37,7 @@ If no arguments are provided, start with a service discovery overview.
 
 Get the landscape of traced services.
 
-1. Call `get_trace_services` to list all APM services.
+1. Call `get_apm_services` to list all APM services.
 
 Present a service inventory:
 
@@ -50,8 +48,8 @@ Present a service inventory:
 ```
 
 If a specific service was requested:
-- If numeric: call `get_trace_service` with the ID.
-- If string: filter `get_trace_services` results by name. If ambiguous, ask
+- If numeric: call `get_service` with the ID.
+- If string: call `get_apm_services` with `name_filter`. If ambiguous, ask
   the user to pick one.
 
 If no service was specified and the list is short (< 10), proceed to analyze
@@ -61,8 +59,8 @@ all services. If the list is long, ask the user which service to investigate.
 
 For the target service:
 
-1. Call `get_trace_service` to get full service details.
-2. Call `get_trace_service_properties` to get service metadata.
+1. Call `get_service` to get full service details.
+2. Call `get_device_properties` with the service id to get service metadata.
 
 Present the service profile:
 - Service name, ID, status
@@ -73,7 +71,7 @@ Present the service profile:
 
 ### Step 3: Service-Level Metrics
 
-Call `get_trace_service_metrics` for the service.
+Call `get_device_data` for the service's service-level datasource instance.
 
 Present key service-level metrics:
 
@@ -93,7 +91,8 @@ Flag concerning metrics:
 
 ### Step 4: Operation Breakdown
 
-1. Call `get_trace_operations` for the service to list all traced operations.
+1. Call `get_device_instances` on the service's operations datasource to list all traced
+   operations.
 
 Present operations sorted by request volume:
 
@@ -112,7 +111,7 @@ offenders by latency and error rate.
 
 For the target operation (or top 3 problematic operations):
 
-1. Call `get_trace_operation_metrics` for detailed operation-level metrics.
+1. Call `get_device_data` for the operation's instance for detailed operation-level metrics.
 
 Present per-operation analysis:
 - Latency distribution (avg, p50, p95, p99)
@@ -127,7 +126,7 @@ If the operation has high latency, suggest investigating:
 
 ### Step 6: Service Datasources
 
-Call `get_trace_service_datasources` to see what LogicMonitor datasources are
+Call `get_device_datasources` with the service id to see what LogicMonitor datasources are
 collecting data for this service.
 
 Present:
@@ -139,7 +138,7 @@ This helps identify whether monitoring coverage is complete for the service.
 
 ### Step 7: Alert Correlation
 
-1. Call `get_trace_service_alerts` for service-specific alerts.
+1. Call `get_apm_service_alerts` for service-specific alerts.
 2. Call `get_alerts` filtered to the service device ID with `cleared=false` for
    any additional active alerts.
 

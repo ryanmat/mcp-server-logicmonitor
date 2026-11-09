@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 255 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 249 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -415,18 +415,12 @@ Alert-window analysis: statistics, clusters, noise, bursts and changes
 
 ## APM Traces
 
-APM trace service discovery, metrics, and properties
+APM trace services (deviceType 6 devices) and their alerts; the device tools read their datasources, operations, metrics and properties
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_trace_services` | List APM trace services (deviceType:6). Entry point for discovering traced services. | No |
-| `get_trace_service` | Get detailed information about a specific APM trace service | No |
-| `get_trace_service_alerts` | Get alerts for an APM trace service | No |
-| `get_trace_service_datasources` | List datasources applied to an APM service (e.g. LogicMonitor_APM_Services, _Operations) | No |
-| `get_trace_operations` | List operations (endpoints/routes) for an APM service datasource | No |
-| `get_trace_service_metrics` | Get APM service-level RED metrics (Duration, ErrorOperationCount, OperationCount) | No |
-| `get_trace_operation_metrics` | Get per-operation RED metrics (Duration, ErrorOperationCount, OperationCount) | No |
-| `get_trace_service_properties` | Get properties for an APM service (OTel attributes, namespace, metadata) | No |
+| `get_apm_services` | List APM trace services, the deviceType 6 devices, one page at a time. Entry point for discovering traced services; read a service's datasources, operations (the instances of its operations datasource), metrics and properties with get_device_datasources, get_device_instances, get_device_data and get_device_properties, passing the service id as device_id. | No |
+| `get_apm_service_alerts` | Get the alerts on one APM trace service, one page at a time | No |
 
 ## ML and Statistical Analysis
 

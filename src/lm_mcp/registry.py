@@ -4651,45 +4651,39 @@ TOOLS.extend(
 TOOLS.extend(
     [
         Tool(
-            name="get_trace_services",
+            name="get_apm_services",
             description=(
-                "List APM trace services (deviceType:6). "
-                "Entry point for discovering traced services."
+                "List APM trace services, the deviceType 6 devices, one page at a time. "
+                "Entry point for discovering traced services; read a service's datasources, "
+                "operations (the instances of its operations datasource), metrics and "
+                "properties with get_device_datasources, get_device_instances, "
+                "get_device_data and get_device_properties, passing the service id as "
+                "device_id."
             ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "namespace": {
+                    "name_filter": {
                         "type": "string",
-                        "description": "Filter by service name (substring match)",
+                        "description": "Filter by service display name (substring match)",
                     },
                     "limit": {
                         "type": "integer",
                         "default": 50,
                         "description": "Max results",
                     },
-                },
-            },
-        ),
-        Tool(
-            name="get_trace_service",
-            description="Get detailed information about a specific APM trace service",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "service_id": {
+                    "offset": {
                         "type": "integer",
-                        "description": "APM service device ID",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
                     },
                 },
-                "required": ["service_id"],
             },
         ),
         Tool(
-            name="get_trace_service_alerts",
-            description="Get alerts for an APM trace service",
+            name="get_apm_service_alerts",
+            description="Get the alerts on one APM trace service, one page at a time",
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -4708,160 +4702,10 @@ TOOLS.extend(
                         "default": 50,
                         "description": "Max results",
                     },
-                },
-                "required": ["service_id"],
-            },
-        ),
-        Tool(
-            name="get_trace_service_datasources",
-            description=(
-                "List datasources applied to an APM service "
-                "(e.g. LogicMonitor_APM_Services, _Operations)"
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "service_id": {
+                    "offset": {
                         "type": "integer",
-                        "description": "APM service device ID",
-                    },
-                    "name_filter": {
-                        "type": "string",
-                        "description": "Filter by datasource name (substring match)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "Max results",
-                    },
-                },
-                "required": ["service_id"],
-            },
-        ),
-        Tool(
-            name="get_trace_operations",
-            description="List operations (endpoints/routes) for an APM service datasource",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "service_id": {
-                        "type": "integer",
-                        "description": "APM service device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device datasource ID (from get_trace_service_datasources)",
-                    },
-                    "name_filter": {
-                        "type": "string",
-                        "description": "Filter by operation name (substring match)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "Max results",
-                    },
-                },
-                "required": ["service_id", "device_datasource_id"],
-            },
-        ),
-        Tool(
-            name="get_trace_service_metrics",
-            description=(
-                "Get APM service-level RED metrics (Duration, ErrorOperationCount, OperationCount)"
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "service_id": {
-                        "type": "integer",
-                        "description": "APM service device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device datasource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Instance ID",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": "Comma-separated datapoint names (all if omitted)",
-                    },
-                    "start_time": {
-                        "type": "integer",
-                        "description": "Start time in epoch seconds",
-                    },
-                    "end_time": {
-                        "type": "integer",
-                        "description": "End time in epoch seconds",
-                    },
-                },
-                "required": ["service_id", "device_datasource_id", "instance_id"],
-            },
-        ),
-        Tool(
-            name="get_trace_operation_metrics",
-            description=(
-                "Get per-operation RED metrics (Duration, ErrorOperationCount, OperationCount)"
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "service_id": {
-                        "type": "integer",
-                        "description": "APM service device ID",
-                    },
-                    "device_datasource_id": {
-                        "type": "integer",
-                        "description": "Device datasource ID",
-                    },
-                    "instance_id": {
-                        "type": "integer",
-                        "description": "Operation instance ID",
-                    },
-                    "datapoints": {
-                        "type": "string",
-                        "description": "Comma-separated datapoint names (all if omitted)",
-                    },
-                    "start_time": {
-                        "type": "integer",
-                        "description": "Start time in epoch seconds",
-                    },
-                    "end_time": {
-                        "type": "integer",
-                        "description": "End time in epoch seconds",
-                    },
-                },
-                "required": ["service_id", "device_datasource_id", "instance_id"],
-            },
-        ),
-        Tool(
-            name="get_trace_service_properties",
-            description=(
-                "Get properties for an APM service (OTel attributes, namespace, metadata)"
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "service_id": {
-                        "type": "integer",
-                        "description": "APM service device ID",
-                    },
-                    "name_filter": {
-                        "type": "string",
-                        "description": "Filter by property name (substring match)",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "Max results",
+                        "default": 0,
+                        "description": "Results to skip for pagination",
                     },
                 },
                 "required": ["service_id"],
@@ -6489,14 +6333,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "calculate_availability": scoring.calculate_availability,
         "analyze_blast_radius": topology_analysis.analyze_blast_radius,
         # Traces / APM
-        "get_trace_services": traces.get_trace_services,
-        "get_trace_service": traces.get_trace_service,
-        "get_trace_service_alerts": traces.get_trace_service_alerts,
-        "get_trace_service_datasources": traces.get_trace_service_datasources,
-        "get_trace_operations": traces.get_trace_operations,
-        "get_trace_service_metrics": traces.get_trace_service_metrics,
-        "get_trace_operation_metrics": traces.get_trace_operation_metrics,
-        "get_trace_service_properties": traces.get_trace_service_properties,
+        "get_apm_services": traces.get_apm_services,
+        "get_apm_service_alerts": traces.get_apm_service_alerts,
         # Session
         "get_session_context": session.get_session_context,
         "set_session_variable": session.set_session_variable,
