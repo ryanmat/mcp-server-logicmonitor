@@ -5,12 +5,9 @@ argument-hint: "[severity] [device] [hours_back]"
 allowed-tools:
   - mcp__logicmonitor__get_alerts
   - mcp__logicmonitor__get_alert_details
-  - mcp__logicmonitor__get_alert_statistics
-  - mcp__logicmonitor__score_alert_noise
-  - mcp__logicmonitor__correlate_alerts
+  - mcp__logicmonitor__analyze_alerts
   - mcp__logicmonitor__get_device
   - mcp__logicmonitor__analyze_blast_radius
-  - mcp__logicmonitor__correlate_changes
   - mcp__logicmonitor__acknowledge_alert
   - mcp__logicmonitor__add_alert_note
   - mcp__logicmonitor__bulk_acknowledge_alerts
@@ -41,7 +38,9 @@ Gather the current alert landscape.
 
 1. Call `get_alerts` with `cleared=false`. Apply severity and device filters if provided.
    Limit to the `hours_back` window.
-2. Call `get_alert_statistics` for time-bucketed trend data over the same window.
+2. Call `analyze_alerts` once over the same window, with the same filters, for the
+   `statistics`, `noise`, `clusters` and `changes` sections; Steps 2, 3 and 5 read its
+   sections. `statistics.hourly` gives the hour-by-hour volume, cleared alerts included.
 
 Present a summary table:
 
@@ -59,7 +58,7 @@ If there are zero active alerts, report that and stop.
 
 Evaluate whether the alert volume is signal or noise.
 
-1. Call `score_alert_noise` for the current alert set.
+1. Read the `noise` section from Step 1's `analyze_alerts` call.
 
 Apply the decision tree:
 
@@ -72,12 +71,12 @@ Apply the decision tree:
 
 Identify clusters of related alerts.
 
-1. Call `correlate_alerts` with a 5-minute temporal window scoped to the active alerts.
+1. Read the `clusters` section from Step 1's `analyze_alerts` call: clusters by device,
+   by datasource and by signature (datasource and datapoint).
 
 For each cluster found:
 - List member alerts (ID, resource, datasource, datapoint)
-- Identify the common factor (shared device, shared datasource, shared device group,
-  temporal proximity)
+- Identify the common factor (shared device, shared datasource, shared signature)
 - Suggest a root cause hypothesis
 
 If no clusters are found, note that alerts appear independent.
@@ -102,7 +101,8 @@ Present an impact assessment:
 
 Check whether recent changes explain the alerts.
 
-1. Call `correlate_changes` for the affected devices/groups over the triage window.
+1. Read the `changes` section from Step 1's `analyze_alerts` call: audit write actions
+   paired with the alert spikes that followed them.
 
 If changes are found:
 - List each change with timestamp, type, and description

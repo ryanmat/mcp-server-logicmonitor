@@ -1,5 +1,5 @@
 # Description: Scoring and availability analysis tools for LogicMonitor.
-# Description: Provides alert noise scoring, availability, and error budget tools.
+# Description: Provides the availability and error budget tools.
 
 from __future__ import annotations
 
@@ -21,52 +21,11 @@ from lm_mcp.tools import (
     resolve_group_filter,
 )
 from lm_mcp.tools.alerts import read_cleared_and_active
-from lm_mcp.tools.analyze_alerts import noise_stats, window_filter
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 logger = logging.getLogger(__name__)
-
-
-async def score_alert_noise(
-    client: LogicMonitorClient,
-    hours_back: int = 24,
-    device: str | None = None,
-    group_id: int | None = None,
-) -> list[TextContent]:
-    """Score alert noise level using Shannon entropy and flap detection.
-
-    Analyzes alert frequency distribution and identifies flapping alerts
-    (alerts that clear and re-fire within 30 minutes). Produces a noise
-    score from 0 (quiet) to 100 (extremely noisy).
-
-    Args:
-        client: LogicMonitor API client.
-        hours_back: Hours to look back (default: 24).
-        device: Optional device name filter.
-        group_id: Optional device group ID filter.
-
-    Returns:
-        Noise score with entropy, flapping alerts, and recommendations;
-        truncated says whether the 5000-alert cap cut the active or the cleared
-        read short and api_total is the sum of both reads' API counts, null
-        when either reported only a lower bound.
-    """
-    try:
-        start_epoch = int(time.time()) - hours_back * 3600
-        filter_str = await window_filter(client, start_epoch, device=device, group_id=group_id)
-        alerts, truncated, api_total = await read_cleared_and_active(client, filter_str)
-        return format_response(
-            {
-                **noise_stats(alerts),
-                "truncated": truncated,
-                "api_total": api_total,
-                "hours_back": hours_back,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
 
 
 async def calculate_availability(

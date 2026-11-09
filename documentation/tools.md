@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 261 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 256 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -119,13 +119,12 @@ Collector status and management
 
 ## Networking
 
-Network intelligence primitives: interface metrics, NetFlow top talkers, alert burst detection, link flap identification, power event filtering (UPS/PDU)
+Network intelligence primitives: interface metrics, NetFlow top talkers, link flap identification, power event filtering (UPS/PDU)
 
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_interface_metrics` | Pull interface-level metrics (in/out bytes, errors, discards, utilization, status) for a device's interface over a time window. Answers 'how is this port performing?' Resolves the Interface-family DataSource and the instance matching the interface name before fetching datapoints. | No |
 | `get_top_talkers` | Rank NetFlow flows on an exporter by bandwidth, packets, or flow count. Group by source IP, destination IP, protocol, application, or source->destination pair. Answers 'what is consuming my WAN?' | No |
-| `detect_alert_burst` | Sliding-window detector for mass alert events: N alerts from the same DataSource across M+ devices within T seconds. Answers 'did a bunch of stuff break at once?' Used for detecting cascading failures like mass interface-down events during a site outage. | No |
 | `get_link_flaps` | Identify interfaces with repeated up/down transitions in a time window. Answers 'which ports are unstable?' Common causes: bad cable, duplex mismatch, bad SFP, PoE power cycling, WAN instability. | No |
 | `get_power_events` | Filter alerts for UPS/PDU power-event signatures across APC, Liebert, and Eaton DataSources ('on battery', 'runtime remaining', 'input voltage lost') over a time window. Returns events matched by DataSource or alert name substring with counts per pattern. | No |
 
@@ -408,12 +407,10 @@ Native OTLP metrics: PromQL range queries and metric/label discovery (feature-fl
 
 ## Correlation
 
-Alert correlation and alert statistics
+Alert-window analysis: statistics, clusters, noise, bursts and changes
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `correlate_alerts` | Correlate alerts by device, datasource, and temporal proximity. Groups alerts into clusters to identify related issues. | No |
-| `get_alert_statistics` | Aggregate alert counts by severity, device, datasource, and time bucket. Returns statistical summary over a time window. | No |
 | `analyze_alerts` | Analyze one alert window: call this for how many alerts fired and when, which alerts belong together, how noisy alerting is, which datasources burst, or which portal changes preceded a spike over the last hours. One read of the window's active and cleared alerts, under the severity, device, group and datasource filters, feeds every section; 'statistics' gives active and cleared totals, counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included; 'clusters' groups two or more alerts by device, by datasource and by signature (datasource and datapoint), with their alert ids and first and last start times; 'noise' gives a 0 to 100 score from the entropy of alerts over datasource and datapoint (weight 40), flaps, an alert on the same device and datapoint that re-fires within 30 minutes of clearing (30), and repeats, a combination with three or more alerts (30), with the first ten flap pairs and tuning recommendations; 'bursts' gives the windows of window_seconds on one datasource that hold at least min_alerts alerts on min_devices devices; 'changes' reads the audit log once and pairs each write action (create, add, update, delete, remove or modify) with the first 5-minute alert spike, a bucket above the mean by one standard deviation, within correlation_window_minutes after it, with a confidence from 1.0 to 0.5. truncated says when the 5000-alert cap cut either read short. Use get_alerts to list or page through the alerts themselves. | No |
 
 ## APM Traces
@@ -438,10 +435,8 @@ ML/statistical analysis and forecasting
 | Tool | Description | Write |
 |------|-------------|-------|
 | `correlate_metrics` | Compute Pearson correlation between multiple metric series. Builds an NxN correlation matrix and highlights strong correlations (\|r\| > 0.7). Maximum 10 sources. | No |
-| `score_alert_noise` | Score alert noise level using Shannon entropy and flap detection. Produces a score from 0 (quiet) to 100 (extremely noisy) with recommendations for tuning. Reads the window's cleared and active alerts, so a cleared alert that re-fires counts as a flap; truncated says when the 5000-alert cap cut either read short. | No |
 | `calculate_availability` | Calculate availability percentage from alert history. Computes SLA-style uptime metrics, MTTR, and per-device breakdown from the window's cleared and active alerts, read as two lists; truncated says when the 5000-alert cap cut either read short. Common mistakes: hours_back defaults to 720 (30 days). Narrow scope with device_id/group_id for performance. | No |
 | `analyze_blast_radius` | Analyze the blast radius of a device failure using topology data. Traverses neighbors to identify downstream impact and scores overall blast radius (0-100). | No |
-| `correlate_changes` | Cross-reference alert spikes with audit/change logs. Identifies changes that may have triggered alert increases using configurable correlation windows. | No |
 | `analyze_metric` | Analyze one device instance's metric series: call this for statistics on a datapoint's recent history, such as its current level against the window, whether it is rising, its daily cycle, when it shifted, or which samples stand out. One paged read of the window feeds every section; 'summary' gives latest, mean, standard deviation, min, max and the latest sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, the detrended 24-hour autocorrelation and a label (volatile, cyclic, increasing, decreasing or stable); 'seasonality' gives detrended autocorrelation at 1, 4, 12, 24 and 168 hours, the dominant period and the peak hours in UTC; 'change_points' gives level shifts, where the mean of the next 30 samples leaves the mean of the previous 30 by five times the noise in that comparison (measured with any steady trend and autocorrelation the noise has), with the daily cycle removed first when the window holds three days or more and that leaves less noise; each shift has its timestamp and the levels before and after it, less the daily cycle when that was removed. A change in the last 30 samples is not reported yet, small shifts in strongly autocorrelated noise go unfound, on a window under a day a change inflates the noise and smaller shifts go unfound, and changes about a day apart in a few days leave the cycle in and go unfound; 'anomalies' gives z-score, IQR and MAD hits, each method's 20 most extreme; 'forecast' gives the least-squares and Holt-Winters (daily season, two days of samples needed) slopes per hour and, with threshold, when each crosses it, within 30 days; 'baseline' compares the window with one as long ending baseline_hours_ago hours ago (one more read): both windows' statistics, the mean's percent deviation and a status (normal within 20 percent, elevated or reduced within 50, anomalous past it). The baseline runs only with baseline_hours_ago. Use get_device_data for the raw samples. | No |
 | `calculate_error_budget` | Calculate SLO error budget consumption and projected exhaustion date. Computes remaining budget, burn rate, and status (healthy/warning/critical/exhausted) based on actual availability vs target SLO. | No |
 
@@ -540,7 +535,7 @@ Uses `analyze_metric` with `analyses=["change_points"]`. A shift is reported whe
 ```
 "Score the alert noise across all devices over the last 24 hours"
 ```
-Uses `score_alert_noise`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
+Uses `analyze_alerts` with `analyses=["noise"]`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
 
 **Metric status and anomalies** -- how far the latest samples sit from the window:
 ```

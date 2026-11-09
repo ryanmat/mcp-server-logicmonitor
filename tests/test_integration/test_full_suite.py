@@ -1535,7 +1535,7 @@ class TestServerCallToolFlow:
         """list_tools returns the full set of registered tools."""
         from lm_mcp.registry import TOOLS
 
-        assert len(TOOLS) == 261
+        assert len(TOOLS) == 256
         tool_names = {t.name for t in TOOLS}
         assert "get_devices" in tool_names
         assert "get_alerts" in tool_names
@@ -1548,7 +1548,7 @@ class TestServerCallToolFlow:
         # v3.8.0 networking intelligence
         assert "get_interface_metrics" in tool_names
         assert "get_top_talkers" in tool_names
-        assert "detect_alert_burst" in tool_names
+        assert "analyze_alerts" in tool_names
         assert "get_link_flaps" in tool_names
         assert "get_power_events" in tool_names
         assert "get_collector_health" in tool_names

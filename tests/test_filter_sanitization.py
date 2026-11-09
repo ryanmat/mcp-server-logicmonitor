@@ -190,33 +190,33 @@ class TestWildcardNoteInResponse:
         assert params["filter"] == 'hostname~"coll"'
 
 
-class TestCorrelationSanitization:
-    """Tests that correlation and scoring tools sanitize device filter values."""
+class TestAlertWindowSanitization:
+    """analyze_alerts sanitizes its device and datasource filter values."""
 
-    @respx.mock
-    async def test_correlate_alerts_strips_wildcard(self, client):
-        """correlate_alerts strips wildcards from device parameter."""
-        from lm_mcp.tools.correlation import _build_alert_filter
+    async def test_window_filter_strips_wildcards(self, client):
+        """The alert-window filter strips wildcards from device and datasource."""
+        from lm_mcp.tools.analyze_alerts import window_filter
 
-        result = await _build_alert_filter(client, hours_back=4, device="server*")
+        result = await window_filter(client, 1705276800, device="server*", datasource="*ping*")
 
         assert 'monitorObjectName~"server"' in result
+        assert 'resourceTemplateName~"ping"' in result
         assert "*" not in result
 
     @respx.mock
-    async def test_score_alert_noise_strips_wildcard(self, client):
-        """score_alert_noise strips wildcards from device parameter."""
-        from lm_mcp.tools.scoring import score_alert_noise
+    async def test_analyze_alerts_sends_the_stripped_device(self, client):
+        """analyze_alerts sends the device without its wildcard on both reads."""
+        from lm_mcp.tools.analyze_alerts import analyze_alerts
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await score_alert_noise(client, device="prod*")
+        await analyze_alerts(client, device="prod*", analyses=["noise"])
 
-        params = dict(route.calls[0].request.url.params)
-        assert 'monitorObjectName~"prod"' in params["filter"]
-        assert "*" not in params["filter"]
+        for call in route.calls:
+            assert 'monitorObjectName~"prod"' in call.request.url.params["filter"]
+            assert "*" not in call.request.url.params["filter"]
 
 
 class TestFilterValueSentToApi:

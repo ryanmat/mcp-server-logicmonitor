@@ -8,8 +8,7 @@ allowed-tools:
   - mcp__logicmonitor__get_device
   - mcp__logicmonitor__get_device_data
   - mcp__logicmonitor__analyze_metric
-  - mcp__logicmonitor__correlate_alerts
-  - mcp__logicmonitor__correlate_changes
+  - mcp__logicmonitor__analyze_alerts
   - mcp__logicmonitor__analyze_blast_radius
   - mcp__logicmonitor__test_awx_connection
   - mcp__logicmonitor__get_job_templates
@@ -70,8 +69,8 @@ Build the remediation context with deeper analysis.
 1. Call `analyze_metric` with `analyses=["summary", "anomalies"]` for the alerting
    datasource/instance.
 2. Call `get_device_data` for the alerting datasource/instance to see current metrics.
-3. Call `correlate_alerts` to find related alerts that may share a root cause.
-4. Call `correlate_changes` to check for recent changes that may have caused the issue.
+3. Call `analyze_alerts` with `analyses=["clusters", "changes"]` to find related alerts
+   that may share a root cause and recent changes that may have caused the issue.
 
 Present a diagnosis summary:
 - Latest-sample z-scores and anomaly hits

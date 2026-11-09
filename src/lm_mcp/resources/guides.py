@@ -101,13 +101,11 @@ TOOL_CATEGORIES = {
         "networking": {
             "description": (
                 "Network intelligence primitives: interface metrics, NetFlow top "
-                "talkers, alert burst detection, link flap identification, power "
-                "event filtering (UPS/PDU)"
+                "talkers, link flap identification, power event filtering (UPS/PDU)"
             ),
             "tools": [
                 "get_interface_metrics",
                 "get_top_talkers",
-                "detect_alert_burst",
                 "get_link_flaps",
                 "get_power_events",
             ],
@@ -362,10 +360,10 @@ TOOL_CATEGORIES = {
             ],
         },
         "correlation": {
-            "description": "Alert correlation and alert statistics",
+            "description": (
+                "Alert-window analysis: statistics, clusters, noise, bursts and changes"
+            ),
             "tools": [
-                "correlate_alerts",
-                "get_alert_statistics",
                 "analyze_alerts",
             ],
         },
@@ -386,10 +384,8 @@ TOOL_CATEGORIES = {
             "description": "ML/statistical analysis and forecasting",
             "tools": [
                 "correlate_metrics",
-                "score_alert_noise",
                 "calculate_availability",
                 "analyze_blast_radius",
-                "correlate_changes",
                 "analyze_metric",
                 "calculate_error_budget",
             ],
@@ -587,13 +583,10 @@ MCP_ORCHESTRATION_GUIDE: dict = {
             "steps": [
                 {
                     "server": "logicmonitor",
-                    "tool": "correlate_alerts",
-                    "description": "Identify alert clusters by device and time",
-                },
-                {
-                    "server": "logicmonitor",
-                    "tool": "get_alert_statistics",
-                    "description": "Get severity distribution and top talkers",
+                    "tool": "analyze_alerts",
+                    "description": (
+                        "Cluster the window's alerts and count them by severity and device"
+                    ),
                 },
                 {
                     "server": "pagerduty",
@@ -616,7 +609,7 @@ MCP_ORCHESTRATION_GUIDE: dict = {
             "steps": [
                 {
                     "server": "logicmonitor",
-                    "tool": "correlate_alerts",
+                    "tool": "analyze_alerts",
                     "description": "Find correlated alert clusters",
                 },
                 {

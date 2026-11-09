@@ -59,6 +59,30 @@ class TestSeriesToolsReplaced:
             get_tool_handler(name)
 
 
+# The five alert-window tools analyze_alerts replaces (spec R2.2).
+_ALERT_WINDOW_TOOLS_REPLACED = (
+    "correlate_alerts",
+    "get_alert_statistics",
+    "score_alert_noise",
+    "detect_alert_burst",
+    "correlate_changes",
+)
+
+
+class TestAlertWindowToolsReplaced:
+    """analyze_alerts is registered and the five alert-window tools it replaces are not (R2.2)."""
+
+    def test_analyze_alerts_is_registered(self):
+        assert "analyze_alerts" in {tool.name for tool in TOOLS}
+        assert get_tool_handler("analyze_alerts").__name__ == "analyze_alerts"
+
+    @pytest.mark.parametrize("name", _ALERT_WINDOW_TOOLS_REPLACED)
+    def test_replaced_tool_is_not_registered(self, name):
+        assert name not in {tool.name for tool in TOOLS}
+        with pytest.raises(ValueError, match="Unknown tool"):
+            get_tool_handler(name)
+
+
 class TestRegistry:
     """Tests for tool registry."""
 

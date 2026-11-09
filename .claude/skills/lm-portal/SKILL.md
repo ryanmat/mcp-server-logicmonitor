@@ -3,12 +3,10 @@ name: lm-portal
 description: "Portal-wide health overview -- alert breakdown, collector status, active SDTs, alert clusters, noise scoring, and down devices."
 argument-hint: "[hours_back]"
 allowed-tools:
-  - mcp__logicmonitor__get_alert_statistics
+  - mcp__logicmonitor__analyze_alerts
   - mcp__logicmonitor__get_alerts
   - mcp__logicmonitor__get_collectors
   - mcp__logicmonitor__get_active_sdts
-  - mcp__logicmonitor__correlate_alerts
-  - mcp__logicmonitor__score_alert_noise
   - mcp__logicmonitor__get_devices
 ---
 
@@ -32,7 +30,9 @@ Execute these steps in order. Present findings incrementally.
 
 Get the overall alert picture.
 
-1. Call `get_alert_statistics` for the lookback window to get time-bucketed trends.
+1. Call `analyze_alerts` for the lookback window with `analyses=["statistics", "clusters",
+   "noise"]`; Steps 4 and 5 read its other sections. `statistics.hourly` gives the
+   hour-by-hour volume.
 2. Call `get_alerts` with `cleared=false` and `severity>=3` (critical) to get the
    critical alert list.
 
@@ -84,7 +84,7 @@ coincide with SDT expirations, flag potential alert storms on SDT end.
 
 ### Step 4: Alert Clustering
 
-Call `correlate_alerts` scoped to critical alerts from the lookback window.
+Read the `clusters` section from Step 1's `analyze_alerts` call.
 
 Present the top 5 clusters:
 
@@ -99,14 +99,13 @@ Present the top 5 clusters:
 2. ...
 ```
 
-Identify common factors: shared device group, shared datasource, shared collector,
-temporal burst.
+Identify common factors: shared device, shared datasource, shared signature.
 
 If no clusters are found, note that critical alerts appear independent.
 
 ### Step 5: Noise Assessment
 
-Call `score_alert_noise` for the portal-wide alert set.
+Read the `noise` section from Step 1's `analyze_alerts` call.
 
 Report:
 - Overall noise score (0-100)

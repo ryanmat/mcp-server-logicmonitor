@@ -657,74 +657,6 @@
       "type": "object"
     }
   },
-  "correlate_alerts": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Correlate alerts by device, datasource, and temporal proximity. Groups alerts into clusters to identify related issues.",
-    "inputSchema": {
-      "properties": {
-        "device": {
-          "description": "Filter by device name (substring match)",
-          "type": "string"
-        },
-        "group_id": {
-          "description": "Filter by device group ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 4,
-          "description": "Hours to look back (default: 4)",
-          "type": "integer"
-        },
-        "limit": {
-          "default": 500,
-          "description": "Max alerts to fetch (default: 500)",
-          "type": "integer"
-        },
-        "severity": {
-          "description": "Filter by severity (critical, error, warning, info)",
-          "enum": [
-            "critical",
-            "error",
-            "warning",
-            "info"
-          ],
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "correlate_changes": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Cross-reference alert spikes with audit/change logs. Identifies changes that may have triggered alert increases using configurable correlation windows.",
-    "inputSchema": {
-      "properties": {
-        "correlation_window_minutes": {
-          "default": 30,
-          "description": "Minutes after a change to look for alert spikes",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours to look back",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
   "correlate_metrics": {
     "annotations": {
       "destructiveHint": false,
@@ -2631,63 +2563,6 @@
       "type": "object"
     }
   },
-  "detect_alert_burst": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Sliding-window detector for mass alert events: N alerts from the same DataSource across M+ devices within T seconds. Answers 'did a bunch of stuff break at once?' Used for detecting cascading failures like mass interface-down events during a site outage.",
-    "inputSchema": {
-      "properties": {
-        "datasource_pattern": {
-          "description": "Substring match on dataSourceName (case-insensitive)",
-          "type": "string"
-        },
-        "device": {
-          "description": "Scope to a device name (substring match)",
-          "type": "string"
-        },
-        "group_id": {
-          "description": "Scope to a device group",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 1,
-          "description": "Lookback window in hours",
-          "type": "integer"
-        },
-        "min_alerts": {
-          "default": 10,
-          "description": "Minimum alerts in the window to qualify as burst",
-          "type": "integer"
-        },
-        "min_devices": {
-          "default": 3,
-          "description": "Minimum distinct devices in the window",
-          "type": "integer"
-        },
-        "severity": {
-          "description": "Filter by severity",
-          "enum": [
-            "critical",
-            "error",
-            "warning",
-            "info"
-          ],
-          "type": "string"
-        },
-        "window_seconds": {
-          "default": 60,
-          "description": "Sliding window size in seconds",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
   "detect_site_outage": {
     "annotations": {
       "destructiveHint": false,
@@ -3289,44 +3164,6 @@
         "offset": {
           "default": 0,
           "description": "Pagination offset",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_alert_statistics": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Aggregate alert counts by severity, device, datasource, and time bucket. Returns statistical summary over a time window.",
-    "inputSchema": {
-      "properties": {
-        "bucket_size_hours": {
-          "default": 1,
-          "description": "Size of each time bucket in hours (default: 1)",
-          "type": "integer"
-        },
-        "device": {
-          "description": "Filter by device name (substring match)",
-          "type": "string"
-        },
-        "group_id": {
-          "description": "Filter by device group ID",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours to look back (default: 24)",
-          "type": "integer"
-        },
-        "limit": {
-          "default": 1000,
-          "description": "Max alerts to fetch (default: 1000)",
           "type": "integer"
         }
       },
@@ -7417,34 +7254,6 @@
       "required": [
         "report_id"
       ],
-      "type": "object"
-    }
-  },
-  "score_alert_noise": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Score alert noise level using Shannon entropy and flap detection. Produces a score from 0 (quiet) to 100 (extremely noisy) with recommendations for tuning. Reads the window's cleared and active alerts, so a cleared alert that re-fires counts as a flap; truncated says when the 5000-alert cap cut either read short.",
-    "inputSchema": {
-      "properties": {
-        "device": {
-          "description": "Optional device name filter",
-          "type": "string"
-        },
-        "group_id": {
-          "description": "Optional device group ID filter",
-          "type": "integer"
-        },
-        "hours_back": {
-          "default": 24,
-          "description": "Hours to look back",
-          "type": "integer"
-        }
-      },
       "type": "object"
     }
   },
