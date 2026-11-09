@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from mcp.types import TextContent
 
 from lm_mcp.tools import call_sub_tool, format_response, handle_error
+from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
 from lm_mcp.tools.configsources import update_configsource
 from lm_mcp.tools.datasources import update_datasource
 from lm_mcp.tools.diagnosticsources import update_diagnosticsource
@@ -119,11 +120,8 @@ def _trim_detail(report: dict, detail_level: str, full_keys: set[str]) -> dict:
 
 _TRIAGE_REQUIRED = [
     "get_alerts",
-    "get_alert_statistics",
-    "correlate_alerts",
-    "score_alert_noise",
+    "analyze_alerts",
     "analyze_blast_radius",
-    "correlate_changes",
 ]
 
 
@@ -137,9 +135,9 @@ async def triage(
 ) -> list[TextContent]:
     """Composite triage: correlate, cluster, score, and assess alerts.
 
-    Fetches active alerts, builds time-bucketed statistics, clusters
-    related alerts, scores noise, analyzes blast radius for critical
-    clusters, and cross-references recent changes.
+    Reads the alert window once through analyze_alerts for its statistics,
+    clusters, noise and changes, then analyzes blast radius for the busiest
+    device clusters.
 
     Args:
         client: LogicMonitor API client.
@@ -157,61 +155,36 @@ async def triage(
         return blocked
 
     try:
-        from lm_mcp.tools.correlation import correlate_alerts, get_alert_statistics
-        from lm_mcp.tools.event_correlation import correlate_changes
-        from lm_mcp.tools.scoring import score_alert_noise
+        from lm_mcp.tools.analyze_alerts import analyze_alerts
         from lm_mcp.tools.topology_analysis import analyze_blast_radius
 
         warnings: list[str] = []
         report: dict = {"hours_back": hours_back, "detail_level": detail_level}
 
-        # 1. Get alert statistics
+        # 1. One read of the alert window feeds statistics, clusters, noise and changes
+        window: dict = {}
         try:
-            stats = await call_sub_tool(
-                get_alert_statistics,
+            window = await call_sub_tool(
+                analyze_alerts,
                 client,
-                hours_back=hours_back,
-                device=device,
-                group_id=group_id,
-            )
-            report["statistics"] = stats
-        except Exception as exc:
-            warnings.append(f"get_alert_statistics failed: {exc}")
-            report["statistics"] = None
-
-        # 2. Correlate alerts (clusters)
-        clusters_data: dict = {}
-        try:
-            clusters_data = await call_sub_tool(
-                correlate_alerts,
-                client,
-                hours_back=hours_back,
+                hours=hours_back,
                 severity=severity,
                 device=device,
                 group_id=group_id,
+                analyses=["statistics", "clusters", "noise", "changes"],
             )
-            report["clusters"] = clusters_data
         except Exception as exc:
-            warnings.append(f"correlate_alerts failed: {exc}")
-            report["clusters"] = None
+            warnings.append(f"analyze_alerts failed: {exc}")
+        if window.get("truncated"):
+            warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
+        report["statistics"] = window.get("statistics")
+        report["clusters"] = window.get("clusters")
+        report["noise"] = window.get("noise")
 
-        # 3. Score alert noise
-        try:
-            noise = await call_sub_tool(
-                score_alert_noise,
-                client,
-                hours_back=hours_back,
-                device=device,
-                group_id=group_id,
-            )
-            report["noise"] = noise
-        except Exception as exc:
-            warnings.append(f"score_alert_noise failed: {exc}")
-            report["noise"] = None
-
-        # 4. Blast radius for critical clusters (up to 3 devices)
+        # 2. Blast radius for critical clusters (up to 3 devices)
         blast_results: list[dict] = []
-        clusters = clusters_data.get("clusters", []) if clusters_data else []
+        clusters_data = window.get("clusters") or {}
+        clusters = clusters_data.get("clusters", [])
         device_clusters = [c for c in clusters if c.get("type") == "device"]
         for cluster in device_clusters[:3]:
             device_key = cluster.get("key", "")
@@ -245,17 +218,8 @@ async def triage(
                 warnings.append(f"blast_radius for {device_key} failed: {exc}")
         report["blast_radius"] = blast_results
 
-        # 5. Correlate changes
-        try:
-            changes = await call_sub_tool(
-                correlate_changes,
-                client,
-                hours_back=hours_back,
-            )
-            report["changes"] = changes
-        except Exception as exc:
-            warnings.append(f"correlate_changes failed: {exc}")
-            report["changes"] = None
+        # 3. Changes paired to spikes, from the same window read
+        report["changes"] = window.get("changes")
 
         if warnings:
             report["warnings"] = warnings
@@ -649,12 +613,10 @@ def _instance_warnings(ds_reports: list[dict]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 _PORTAL_OVERVIEW_REQUIRED = [
-    "get_alert_statistics",
+    "analyze_alerts",
     "get_alerts",
     "get_collectors",
     "get_active_sdts",
-    "correlate_alerts",
-    "score_alert_noise",
     "get_devices",
 ]
 
@@ -666,8 +628,8 @@ async def portal_overview(
 ) -> list[TextContent]:
     """Composite portal overview for shift-handoff reporting.
 
-    Aggregates alert statistics, collector health, maintenance windows,
-    noise scores, and dead/unmonitored devices.
+    Aggregates alert statistics, clusters and noise from one analyze_alerts
+    read, collector health, maintenance windows, and dead/unmonitored devices.
 
     Args:
         client: LogicMonitor API client.
@@ -683,26 +645,28 @@ async def portal_overview(
 
     try:
         from lm_mcp.tools.alerts import get_alerts
+        from lm_mcp.tools.analyze_alerts import analyze_alerts
         from lm_mcp.tools.collectors import get_collectors
-        from lm_mcp.tools.correlation import correlate_alerts, get_alert_statistics
         from lm_mcp.tools.devices import get_devices
-        from lm_mcp.tools.scoring import score_alert_noise
         from lm_mcp.tools.sdts import get_active_sdts
 
         warnings: list[str] = []
         report: dict = {"hours_back": hours_back, "detail_level": detail_level}
 
-        # 1. Alert statistics
+        # 1. One read of the alert window feeds statistics, clusters and noise
+        window: dict = {}
         try:
-            stats = await call_sub_tool(
-                get_alert_statistics,
+            window = await call_sub_tool(
+                analyze_alerts,
                 client,
-                hours_back=hours_back,
+                hours=hours_back,
+                analyses=["statistics", "clusters", "noise"],
             )
-            report["alert_statistics"] = stats
         except Exception as exc:
-            warnings.append(f"get_alert_statistics failed: {exc}")
-            report["alert_statistics"] = None
+            warnings.append(f"analyze_alerts failed: {exc}")
+        if window.get("truncated"):
+            warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
+        report["alert_statistics"] = window.get("statistics")
 
         # 2. High-severity active alerts (critical + error)
         try:
@@ -743,29 +707,9 @@ async def portal_overview(
             warnings.append(f"get_active_sdts failed: {exc}")
             report["active_sdts"] = None
 
-        # 5. Correlate alerts
-        try:
-            cluster_data = await call_sub_tool(
-                correlate_alerts,
-                client,
-                hours_back=hours_back,
-            )
-            report["alert_clusters"] = cluster_data
-        except Exception as exc:
-            warnings.append(f"correlate_alerts failed: {exc}")
-            report["alert_clusters"] = None
-
-        # 6. Noise assessment
-        try:
-            noise = await call_sub_tool(
-                score_alert_noise,
-                client,
-                hours_back=hours_back,
-            )
-            report["noise"] = noise
-        except Exception as exc:
-            warnings.append(f"score_alert_noise failed: {exc}")
-            report["noise"] = None
+        # 5. Alert clusters and noise, from the window read in step 1
+        report["alert_clusters"] = window.get("clusters")
+        report["noise"] = window.get("noise")
 
         # 7. Dead/unmonitored devices
         try:
@@ -795,8 +739,7 @@ _DIAGNOSE_REQUIRED = [
     "get_alert_details",
     "get_device",
     "get_device_properties",
-    "correlate_alerts",
-    "correlate_changes",
+    "analyze_alerts",
     "analyze_blast_radius",
 ]
 
@@ -828,9 +771,8 @@ async def diagnose(
 
     try:
         from lm_mcp.tools.alerts import get_alert_details, get_alerts
-        from lm_mcp.tools.correlation import correlate_alerts
+        from lm_mcp.tools.analyze_alerts import analyze_alerts
         from lm_mcp.tools.devices import get_device
-        from lm_mcp.tools.event_correlation import correlate_changes
         from lm_mcp.tools.resources import get_device_properties
         from lm_mcp.tools.topology_analysis import analyze_blast_radius
 
@@ -908,29 +850,22 @@ async def diagnose(
             except Exception as exc:
                 warnings.append(f"get_device_properties failed: {exc}")
 
-        # 3. Correlated alerts
+        # 3. Correlated alerts and changes: one read of the last four hours
         try:
-            corr = await call_sub_tool(
-                correlate_alerts,
+            window = await call_sub_tool(
+                analyze_alerts,
                 client,
-                hours_back=4,
+                hours=4,
+                analyses=["clusters", "changes"],
             )
-            report["correlated_alerts"] = corr
+            report["correlated_alerts"] = window.get("clusters")
+            report["changes"] = window.get("changes")
+            if window.get("truncated"):
+                warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
         except Exception as exc:
-            warnings.append(f"correlate_alerts failed: {exc}")
+            warnings.append(f"analyze_alerts failed: {exc}")
 
-        # 4. Change correlation
-        try:
-            changes = await call_sub_tool(
-                correlate_changes,
-                client,
-                hours_back=4,
-            )
-            report["changes"] = changes
-        except Exception as exc:
-            warnings.append(f"correlate_changes failed: {exc}")
-
-        # 5. Blast radius
+        # 4. Blast radius
         if target_device_id is not None:
             try:
                 blast = await call_sub_tool(
@@ -1357,7 +1292,7 @@ _SITE_OUTAGE_REQUIRED = [
     "get_alerts",
     "get_devices",
     "get_collector_health",
-    "detect_alert_burst",
+    "analyze_alerts",
     "get_power_events",
 ]
 
@@ -1397,7 +1332,7 @@ async def detect_site_outage(
 
     Chains four signals into a single verdict:
       A) CollectorDown — any collector serving devices in this group is down
-      B) Mass interface-down burst — detect_alert_burst on Interface-family DSes
+      B) Mass interface-down burst — analyze_alerts bursts on interface datasources
       C) Power events — UPS/PDU alerts in the last hour
       D) Device silence — count of dead devices in the group
 
@@ -1428,9 +1363,10 @@ async def detect_site_outage(
         return blocked
 
     try:
+        from lm_mcp.tools.analyze_alerts import analyze_alerts
         from lm_mcp.tools.collectors import get_collector_health
         from lm_mcp.tools.devices import get_devices
-        from lm_mcp.tools.networking import detect_alert_burst, get_power_events
+        from lm_mcp.tools.networking import get_power_events
 
         warnings: list[str] = []
 
@@ -1495,17 +1431,20 @@ async def detect_site_outage(
         # Signal B: mass interface-down burst in the window.
         burst_signal: dict | None = None
         try:
-            burst_data = await call_sub_tool(
-                detect_alert_burst,
+            window = await call_sub_tool(
+                analyze_alerts,
                 client,
+                hours=hours_back,
                 group_id=group_id,
-                datasource_pattern="interface",
+                datasource="interface",
+                analyses=["bursts"],
                 window_seconds=window_seconds,
                 min_alerts=5,
                 min_devices=3,
-                hours_back=hours_back,
             )
-            burst_signal = burst_data
+            burst_signal = window.get("bursts")
+            if window.get("truncated"):
+                warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
         except Exception as exc:
             warnings.append(f"Burst detection failed: {exc}")
             unavailable["interface_burst"] = f"Burst detection failed: {exc}"
