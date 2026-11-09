@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import math
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
@@ -20,12 +19,9 @@ from lm_mcp.tools import (
     lm_error_code,
     quote_filter_value,
     resolve_group_filter,
-    sanitize_filter_value,
 )
-from lm_mcp.tools.alerts import paginate_alerts
-from lm_mcp.tools.stats_helpers import (
-    shannon_entropy,
-)
+from lm_mcp.tools.alerts import read_cleared_and_active
+from lm_mcp.tools.analyze_alerts import noise_stats, window_filter
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -58,150 +54,17 @@ async def score_alert_noise(
         when either reported only a lower bound.
     """
     try:
-        now_epoch = int(time.time())
-        start_epoch = now_epoch - (hours_back * 3600)
-
-        # Fetch the window's active and cleared alerts; flap detection needs the cleared ones
-        filters = [f"startEpoch>:{start_epoch}"]
-        if device:
-            clean_val, _ = sanitize_filter_value(device)
-            filters.append(f"monitorObjectName~{quote_filter_value(clean_val)}")
-        if group_id is not None:
-            filters.append(await resolve_group_filter(client, group_id))
-
-        alerts, truncated, api_total = await _read_cleared_and_active(client, ",".join(filters))
-
-        if not alerts:
-            return format_response(
-                {
-                    "noise_score": 0,
-                    "entropy": 0.0,
-                    "total_alerts": 0,
-                    "truncated": truncated,
-                    "api_total": api_total,
-                    "flapping_alerts": [],
-                    "top_noisy_devices": [],
-                    "top_noisy_datasources": [],
-                    "recommendations": ["No alerts in the time window."],
-                    "hours_back": hours_back,
-                }
-            )
-
-        # Count alerts by datasource+datapoint combo for entropy
-        combo_counts: dict[str, int] = defaultdict(int)
-        device_counts: dict[str, int] = defaultdict(int)
-        ds_counts: dict[str, int] = defaultdict(int)
-
-        for alert in alerts:
-            ds = alert.get("resourceTemplateName", "unknown")
-            dp = alert.get("dataPointName", "unknown")
-            dev = alert.get("monitorObjectName", "unknown")
-            combo_counts[f"{ds}:{dp}"] += 1
-            device_counts[dev] += 1
-            ds_counts[ds] += 1
-
-        # Shannon entropy of alert frequency distribution
-        total = sum(combo_counts.values())
-        probabilities = [c / total for c in combo_counts.values()]
-        entropy = shannon_entropy(probabilities)
-        # Normalize: max entropy = log2(num combos)
-        max_entropy = math.log2(len(combo_counts)) if len(combo_counts) > 1 else 1.0
-        normalized_entropy = entropy / max_entropy if max_entropy > 0 else 0.0
-
-        # Flap detection: same device+datapoint clears then re-fires within 30 min
-        alert_events: dict[str, list[dict]] = defaultdict(list)
-        for alert in alerts:
-            dev = alert.get("monitorObjectName", "unknown")
-            dp = alert.get("dataPointName", "unknown")
-            key = f"{dev}:{dp}"
-            alert_events[key].append(alert)
-
-        flapping_alerts = []
-        flap_count = 0
-        for key, events in alert_events.items():
-            # Sort by start time
-            sorted_events = sorted(events, key=lambda a: a.get("startEpoch", 0))
-            for i in range(1, len(sorted_events)):
-                prev = sorted_events[i - 1]
-                curr = sorted_events[i]
-                prev_end = prev.get("endEpoch", 0)
-                curr_start = curr.get("startEpoch", 0)
-                # endEpoch=0 means still active, skip for flap detection; an alert
-                # that starts before the previous one cleared overlaps it, no re-fire
-                if prev_end > 0 and 0 <= curr_start - prev_end < 1800:
-                    flap_count += 1
-                    if len(flapping_alerts) < 10:
-                        flapping_alerts.append(
-                            {
-                                "key": key,
-                                "gap_seconds": curr_start - prev_end,
-                                "alert_id": curr.get("id"),
-                            }
-                        )
-
-        # Repeat ratio: alerts from same combo appearing 3+ times
-        repeat_count = sum(1 for c in combo_counts.values() if c >= 3)
-        repeat_ratio = repeat_count / len(combo_counts) if combo_counts else 0.0
-
-        flap_ratio = flap_count / len(alerts) if alerts else 0.0
-
-        # Noise score: weighted combination (entropy 40%, flap 30%, repeat 30%)
-        noise_score = min(100, int(normalized_entropy * 40 + flap_ratio * 30 + repeat_ratio * 30))
-
-        # Top noisy devices and datasources
-        top_devices = sorted(device_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-        top_datasources = sorted(ds_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-
-        # Recommendations
-        recommendations = []
-        if flap_count > 0:
-            recommendations.append(
-                f"{flap_count} flapping alert(s) detected. "
-                "Consider adding alert delay or hysteresis."
-            )
-        if repeat_ratio > 0.5:
-            recommendations.append(
-                "High repeat ratio. Review alert thresholds and consider consolidation rules."
-            )
-        if noise_score > 70:
-            recommendations.append(
-                "Very high noise level. Review top noisy devices "
-                "and datasources for tuning opportunities."
-            )
-        if not recommendations:
-            recommendations.append("Alert noise levels are acceptable.")
-
-        # Best practice guardrails
-        from lm_mcp.resources.best_practices import get_best_practices
-
-        if noise_score > 50:
-            bp = get_best_practices("high_alert_noise").get("high_alert_noise", {})
-            structured_recs = bp.get("recommended_actions", [])
-            anti_patterns = bp.get("anti_patterns", [])
-        else:
-            structured_recs = []
-            anti_patterns = []
-
-        result_data: dict = {
-            "noise_score": noise_score,
-            "entropy": round(entropy, 4),
-            "normalized_entropy": round(normalized_entropy, 4),
-            "total_alerts": len(alerts),
-            "truncated": truncated,
-            "api_total": api_total,
-            "flap_count": flap_count,
-            "flapping_alerts": flapping_alerts,
-            "repeat_ratio": round(repeat_ratio, 4),
-            "top_noisy_devices": [{"device": d, "count": c} for d, c in top_devices],
-            "top_noisy_datasources": [{"datasource": ds, "count": c} for ds, c in top_datasources],
-            "recommendations": recommendations,
-            "structured_recommendations": structured_recs,
-            "hours_back": hours_back,
-        }
-        if noise_score > 50:
-            result_data["anti_patterns"] = anti_patterns
-
-        return format_response(result_data)
+        start_epoch = int(time.time()) - hours_back * 3600
+        filter_str = await window_filter(client, start_epoch, device=device, group_id=group_id)
+        alerts, truncated, api_total = await read_cleared_and_active(client, filter_str)
+        return format_response(
+            {
+                **noise_stats(alerts),
+                "truncated": truncated,
+                "api_total": api_total,
+                "hours_back": hours_back,
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
@@ -281,7 +144,7 @@ async def calculate_availability(
         # reads its own alert list, which keeps alerts recorded under an
         # earlier display name.
         alert_path = "/alert/alerts" if device is None else f"/device/devices/{device['id']}/alerts"
-        alerts, truncated, api_total = await _read_cleared_and_active(
+        alerts, truncated, api_total = await read_cleared_and_active(
             client, ",".join(filters), path=alert_path
         )
 
@@ -394,40 +257,6 @@ async def calculate_availability(
         )
     except Exception as e:
         return handle_error(e)
-
-
-async def _read_cleared_and_active(
-    client: LogicMonitorClient,
-    filter_str: str,
-    path: str = "/alert/alerts",
-) -> tuple[list[dict], bool, int | None]:
-    """Read a window's active and cleared alerts as one list.
-
-    Both alert lists return active alerts only unless the filter carries
-    cleared:true, so the window takes two reads, each under the alert cap. An
-    alert that clears between the reads appears in both and is kept once, as
-    the cleared copy, which carries its endEpoch.
-
-    Args:
-        client: LogicMonitor API client.
-        filter_str: Filter string for the active read; the cleared read adds
-            cleared:true to it.
-        path: Alert list to read, as paginate_alerts takes it.
-
-    Returns:
-        The alerts, whether the cap cut either read short, and the sum of both
-        API totals, or None when either reported only a lower bound.
-    """
-    active, active_cut, active_total = await paginate_alerts(client, filter_str, path=path)
-    cleared, cleared_cut, cleared_total = await paginate_alerts(
-        client, f"{filter_str},cleared:true", path=path
-    )
-    cleared_ids = {alert["id"] for alert in cleared if alert.get("id") is not None}
-    alerts = [alert for alert in active if alert.get("id") not in cleared_ids] + cleared
-    api_total = (
-        None if active_total is None or cleared_total is None else active_total + cleared_total
-    )
-    return alerts, active_cut or cleared_cut, api_total
 
 
 async def _resolve_device(

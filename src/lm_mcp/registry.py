@@ -4320,6 +4320,59 @@ TOOLS.extend(
                 },
             },
         ),
+        Tool(
+            name="analyze_alerts",
+            description=(
+                "Analyze one alert window: call this for how many alerts fired and when, "
+                "which alerts belong together, or how noisy alerting is over the last "
+                "hours. One read of the window's active and cleared alerts, under the "
+                "severity, device and group filters, feeds every section; 'statistics' "
+                "gives active and cleared totals, counts by severity, the ten busiest "
+                "devices and datasources, and the volume of each hour, cleared alerts "
+                "included; 'clusters' groups two or more alerts by device, by datasource "
+                "and by signature (datasource and datapoint), with their alert ids and "
+                "first and last start times; 'noise' gives a 0 to 100 score from the "
+                "entropy of alerts over datasource and datapoint (weight 40), flaps, an "
+                "alert on the same device and datapoint that re-fires within 30 minutes "
+                "of clearing (30), and repeats, a combination with three or more alerts "
+                "(30), with the first ten flap pairs and tuning recommendations. "
+                "truncated says when the 5000-alert cap cut either read short. Use "
+                "get_alerts to list or page through the alerts themselves."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hours": {
+                        "type": "integer",
+                        "default": 24,
+                        "minimum": 1,
+                        "description": "Hours the window reaches back from now (default: 24)",
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "error", "warning", "info"],
+                        "description": "Only alerts of this severity",
+                    },
+                    "device": {
+                        "type": "string",
+                        "description": "Only alerts on devices whose name contains this",
+                    },
+                    "group_id": {
+                        "type": "integer",
+                        "description": "Only alerts on devices in this device group",
+                    },
+                    "analyses": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["statistics", "clusters", "noise"],
+                        },
+                        "description": "Sections to compute (all if omitted)",
+                    },
+                },
+            },
+        ),
     ]
 )
 
@@ -6264,6 +6317,7 @@ def get_tool_handler(tool_name: str) -> Any:
         actions,
         alert_rules,
         alerts,
+        analyze_alerts,
         analyze_metric,
         api_tokens,
         audit,
@@ -6584,6 +6638,7 @@ def get_tool_handler(tool_name: str) -> Any:
         # Correlation and Analysis
         "correlate_alerts": correlation.correlate_alerts,
         "get_alert_statistics": correlation.get_alert_statistics,
+        "analyze_alerts": analyze_alerts.analyze_alerts,
         # ML/Statistical Analysis
         "correlate_metrics": correlation.correlate_metrics,
         "score_alert_noise": scoring.score_alert_noise,

@@ -5,14 +5,12 @@ from __future__ import annotations
 
 import math
 import time
-from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
 from lm_mcp.tools import (
     SEVERITY_MAP,
-    SEVERITY_NAMES,
     format_response,
     handle_error,
     quote_filter_value,
@@ -20,6 +18,7 @@ from lm_mcp.tools import (
     sanitize_filter_value,
 )
 from lm_mcp.tools.alerts import paginate_alerts
+from lm_mcp.tools.analyze_alerts import alert_counts, cluster_by_datasource, cluster_by_device
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
     pearson_correlation,
@@ -66,70 +65,6 @@ async def _build_alert_filter(
         filters.append(await resolve_group_filter(client, group_id))
 
     return ",".join(filters)
-
-
-def _cluster_by_device(alerts: list[dict]) -> list[dict]:
-    """Group alerts by device name.
-
-    Args:
-        alerts: List of raw alert dicts from API.
-
-    Returns:
-        List of cluster dicts for devices with 2+ alerts.
-    """
-    by_device: dict[str, list[dict]] = defaultdict(list)
-    for alert in alerts:
-        device = alert.get("monitorObjectName", "unknown")
-        by_device[device].append(alert)
-
-    clusters = []
-    for device, device_alerts in sorted(by_device.items(), key=lambda x: len(x[1]), reverse=True):
-        if len(device_alerts) >= 2:
-            epochs = [a.get("startEpoch", 0) for a in device_alerts]
-            clusters.append(
-                {
-                    "type": "device",
-                    "key": device,
-                    "count": len(device_alerts),
-                    "alert_ids": [a.get("id") for a in device_alerts],
-                    "first_alert_time": min(epochs),
-                    "last_alert_time": max(epochs),
-                }
-            )
-    return clusters
-
-
-def _cluster_by_datasource(alerts: list[dict]) -> list[dict]:
-    """Group alerts by datasource name across devices.
-
-    Args:
-        alerts: List of raw alert dicts from API.
-
-    Returns:
-        List of cluster dicts for datasources with 2+ alerts.
-    """
-    by_ds: dict[str, list[dict]] = defaultdict(list)
-    for alert in alerts:
-        ds = alert.get("resourceTemplateName", "unknown")
-        by_ds[ds].append(alert)
-
-    clusters = []
-    for ds, ds_alerts in sorted(by_ds.items(), key=lambda x: len(x[1]), reverse=True):
-        if len(ds_alerts) >= 2:
-            devices = list({a.get("monitorObjectName", "") for a in ds_alerts})
-            epochs = [a.get("startEpoch", 0) for a in ds_alerts]
-            clusters.append(
-                {
-                    "type": "datasource",
-                    "key": ds,
-                    "count": len(ds_alerts),
-                    "devices": devices,
-                    "alert_ids": [a.get("id") for a in ds_alerts],
-                    "first_alert_time": min(epochs),
-                    "last_alert_time": max(epochs),
-                }
-            )
-    return clusters
 
 
 def _cluster_by_time(alerts: list[dict]) -> list[dict]:
@@ -222,8 +157,8 @@ async def correlate_alerts(
         alerts, truncated, api_total = await paginate_alerts(client, filter_str, cap=limit)
 
         # Build all cluster types
-        device_clusters = _cluster_by_device(alerts)
-        ds_clusters = _cluster_by_datasource(alerts)
+        device_clusters = cluster_by_device(alerts)
+        ds_clusters = cluster_by_datasource(alerts)
         temporal_clusters = _cluster_by_time(alerts)
 
         all_clusters = device_clusters + ds_clusters + temporal_clusters
@@ -269,38 +204,7 @@ async def get_alert_statistics(
         filter_str = await _build_alert_filter(client, hours_back, device=device, group_id=group_id)
         alerts, truncated, api_total = await paginate_alerts(client, filter_str, cap=limit)
 
-        # Count by severity
-        by_severity: dict[str, int] = {
-            "critical": 0,
-            "error": 0,
-            "warning": 0,
-            "info": 0,
-        }
-        for alert in alerts:
-            sev = alert.get("severity", 0)
-            name = SEVERITY_NAMES.get(sev, "unknown")
-            if name in by_severity:
-                by_severity[name] += 1
-
-        # Count by device (top 10)
-        device_counts: dict[str, int] = defaultdict(int)
-        for alert in alerts:
-            dev = alert.get("monitorObjectName", "unknown")
-            device_counts[dev] += 1
-        by_device = [
-            {"device": d, "count": c}
-            for d, c in sorted(device_counts.items(), key=lambda x: x[1], reverse=True)
-        ][:10]
-
-        # Count by datasource (top 10)
-        ds_counts: dict[str, int] = defaultdict(int)
-        for alert in alerts:
-            ds = alert.get("resourceTemplateName", "unknown")
-            ds_counts[ds] += 1
-        by_datasource = [
-            {"datasource": ds, "count": c}
-            for ds, c in sorted(ds_counts.items(), key=lambda x: x[1], reverse=True)
-        ][:10]
+        counts = alert_counts(alerts)
 
         # Time bucketing
         now_epoch = int(time.time())
@@ -327,9 +231,7 @@ async def get_alert_statistics(
                     "total": len(alerts),
                     "truncated": truncated,
                     "api_total": api_total,
-                    "by_severity": by_severity,
-                    "by_device": by_device,
-                    "by_datasource": by_datasource,
+                    **counts,
                 },
                 "time_buckets": time_buckets,
                 "time_window_hours": hours_back,

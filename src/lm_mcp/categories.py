@@ -24,6 +24,7 @@ WORKFLOW_TOOLS: frozenset[str] = frozenset(
         "correlate_metrics",
         "calculate_availability",
         "calculate_error_budget",
+        "analyze_alerts",
         "analyze_metric",
         "analyze_blast_radius",
         "detect_site_outage",
