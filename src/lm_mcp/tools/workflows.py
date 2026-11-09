@@ -350,7 +350,8 @@ async def health_check(
             warnings.append(f"get_device_datasources failed: {exc}")
             report["datasource_count"] = 0
 
-        # 3. Analyze the first instance of the first 5 datasources that have one
+        # 3. Analyze the first instance of each of the first 5 datasources, skipping
+        # any with no instance
         metrics: list[dict] = []
         for ds in ds_list[:5]:
             ds_id = ds.get("id")
