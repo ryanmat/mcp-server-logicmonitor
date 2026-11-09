@@ -507,7 +507,9 @@ async def get_link_flaps(
         alerts, truncated, _ = await paginate_alerts(client, ",".join(filters))
 
         pattern_re = re.compile(interface_pattern, re.IGNORECASE)
-        interface_alerts = [a for a in alerts if pattern_re.search(a.get("dataSourceName") or "")]
+        interface_alerts = [
+            a for a in alerts if pattern_re.search(a.get("resourceTemplateName") or "")
+        ]
 
         grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
         for alert in interface_alerts:
@@ -532,7 +534,7 @@ async def get_link_flaps(
                     "first_transition": first_epoch,
                     "last_transition": last_epoch,
                     "still_active": still_active,
-                    "datasource": group_alerts[0].get("dataSourceName"),
+                    "datasource": group_alerts[0].get("resourceTemplateName"),
                 }
             )
 
@@ -569,7 +571,7 @@ async def get_power_events(
     """Filter alerts for UPS, PDU, and power-infrastructure signatures.
 
     Queries alerts in the lookback window, then client-side filters by
-    substring match on dataSourceName or alertName against UPS/PDU/battery
+    substring match on resourceTemplateName or alertName against UPS/PDU/battery
     patterns. Patterns are case-insensitive.
 
     Args:
@@ -607,7 +609,7 @@ async def get_power_events(
         matched: list[dict] = []
 
         for alert in alerts:
-            ds_name = (alert.get("dataSourceName") or "").lower()
+            ds_name = (alert.get("resourceTemplateName") or "").lower()
             alert_name = (alert.get("alertName") or "").lower()
             combined = f"{ds_name} {alert_name}"
             matching_patterns = [p for p in lower_patterns if p in combined]
@@ -620,7 +622,7 @@ async def get_power_events(
                     "id": alert.get("id"),
                     "severity": alert.get("severity"),
                     "device": alert.get("monitorObjectName"),
-                    "datasource": alert.get("dataSourceName"),
+                    "datasource": alert.get("resourceTemplateName"),
                     "datapoint": alert.get("dataPointName"),
                     "alert_value": alert.get("alertValue"),
                     "start_epoch": alert.get("startEpoch"),

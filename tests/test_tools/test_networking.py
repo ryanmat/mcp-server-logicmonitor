@@ -328,7 +328,7 @@ class TestGetLinkFlaps:
             {
                 "id": i,
                 "startEpoch": now - 3600 + i * 60,
-                "dataSourceName": "SNMP_Network_Interfaces",
+                "resourceTemplateName": "SNMP_Network_Interfaces",
                 "monitorObjectName": "sw1",
                 "instanceName": "Gi0/1",
                 "cleared": i % 2 == 0,
@@ -346,6 +346,7 @@ class TestGetLinkFlaps:
         assert top["device"] == "sw1"
         assert top["interface"] == "Gi0/1"
         assert top["transitions"] >= 4
+        assert top["datasource"] == "SNMP_Network_Interfaces"
 
     @respx.mock
     async def test_no_flaps_when_below_threshold(self, client):
@@ -356,7 +357,7 @@ class TestGetLinkFlaps:
             {
                 "id": 1,
                 "startEpoch": now - 100,
-                "dataSourceName": "SNMP_Network_Interfaces",
+                "resourceTemplateName": "SNMP_Network_Interfaces",
                 "monitorObjectName": "sw1",
                 "instanceName": "Gi0/1",
             }
@@ -381,8 +382,7 @@ class TestGetPowerEvents:
                 "id": 1,
                 "severity": 4,
                 "startEpoch": now - 100,
-                "dataSourceName": "APC_UPS_Battery",
-                "alertName": "UPS On Battery",
+                "resourceTemplateName": "APC_UPS_Battery",
                 "monitorObjectName": "ups-01",
                 "dataPointName": "BatteryStatus",
             },
@@ -390,8 +390,7 @@ class TestGetPowerEvents:
                 "id": 2,
                 "severity": 3,
                 "startEpoch": now - 200,
-                "dataSourceName": "Liebert_UPS",
-                "alertName": "Runtime Remaining Low",
+                "resourceTemplateName": "Liebert_UPS",
                 "monitorObjectName": "ups-02",
                 "dataPointName": "RuntimeRemaining",
             },
@@ -399,8 +398,7 @@ class TestGetPowerEvents:
                 "id": 3,
                 "severity": 2,
                 "startEpoch": now - 300,
-                "dataSourceName": "CPU",
-                "alertName": "CPU high",
+                "resourceTemplateName": "CPU",
                 "monitorObjectName": "server-01",
                 "dataPointName": "CpuPercent",
             },
@@ -414,6 +412,7 @@ class TestGetPowerEvents:
         assert data["total_alerts_scanned"] == 3
         assert data["total_power_events"] == 2
         assert "ups" in data["patterns_matched_counts"]
+        assert {e["datasource"] for e in data["events"]} == {"APC_UPS_Battery", "Liebert_UPS"}
 
     @respx.mock
     async def test_custom_patterns_override_defaults(self, client):
@@ -424,8 +423,7 @@ class TestGetPowerEvents:
             {
                 "id": 1,
                 "startEpoch": now - 100,
-                "dataSourceName": "CustomPowerSensor",
-                "alertName": "Power loss",
+                "resourceTemplateName": "CustomPowerSensor",
                 "monitorObjectName": "sensor-1",
             }
         ]
@@ -446,8 +444,7 @@ class TestGetPowerEvents:
             {
                 "id": 1,
                 "startEpoch": now - 100,
-                "dataSourceName": "CPU",
-                "alertName": "CPU high",
+                "resourceTemplateName": "CPU",
                 "monitorObjectName": "server-01",
             }
         ]
@@ -563,8 +560,7 @@ def _interface_power_alerts(n):
         {
             "id": i,
             "startEpoch": now - 3000 + i % 2900,
-            "dataSourceName": "SNMP_Network_Interfaces UPS",
-            "alertName": "UPS on battery",
+            "resourceTemplateName": "SNMP_Network_Interfaces UPS",
             "monitorObjectName": f"sw-{i % 40}",
             "instanceName": f"Gi0/{i % 8}",
             "cleared": True,

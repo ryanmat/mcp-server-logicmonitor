@@ -172,6 +172,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Fixed
 
+- `get_link_flaps` and `get_power_events` read an alert's datasource from `resourceTemplateName`.
+  They read `dataSourceName`, which alert rows do not carry, so on a live portal link flaps matched
+  no interface and power events matched no datasource.
 - `update_logicmodule` with `type="topologysource"` reads the TopologySource from
   `/setting/topologysources/{id}` and writes it back; it failed before, naming an export tool that
   does not exist.
