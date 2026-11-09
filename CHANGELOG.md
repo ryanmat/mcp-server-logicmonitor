@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals below take the server from 306 tools to 267: 263 with one portal,
-plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in multi-portal mode.
-With writes off, the default, `tools/list` shows 162 of them, or 166 in multi-portal mode. Prompts
-go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
+Against 4.3.0, the removals and additions below take the server from 306 tools to 268: 264 with
+one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
+multi-portal mode. With writes off, the default, `tools/list` shows 163 of them, or 167 in
+multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
 31 s on each CI leg, against 2,959 passing and 8 skipped in 179 to 191 s for 4.3.0, and the
@@ -23,6 +23,13 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 `TF_WORKSPACE_DIR`, `TF_TERRAFORM_BINARY`, `TF_TIMEOUT`, `TF_AUTO_APPROVE_ENABLED`,
 `LM_ANALYSIS_MAX_CONCURRENCY`, `LM_API_VERSION`, `LM_CORS_ORIGINS`, `LM_FIELD_VALIDATION`,
 `LM_SESSION_ENABLED` and `LM_SESSION_PERSIST_PATH`.
+
+### Added
+
+- `analyze_metric` reads one device instance's series once and reports it by section: `summary`
+  (latest, mean, standard deviation, min, max, signed z-score of the latest sample) and `trend`
+  (least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, 24-hour
+  autocorrelation, label). `analyses` selects sections; `hours` defaults to 168.
 
 ### Removed
 

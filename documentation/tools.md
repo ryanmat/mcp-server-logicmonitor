@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 267 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -446,6 +446,7 @@ ML/statistical analysis and forecasting
 | `analyze_blast_radius` | Analyze the blast radius of a device failure using topology data. Traverses neighbors to identify downstream impact and scores overall blast radius (0-100). | No |
 | `correlate_changes` | Cross-reference alert spikes with audit/change logs. Identifies changes that may have triggered alert increases using configurable correlation windows. | No |
 | `classify_trend` | Classify metric trends as stable, increasing, decreasing, cyclic, or volatile. Uses linear regression slope, coefficient of variation, and autocorrelation. | No |
+| `analyze_metric` | Analyze one device instance's metric series: call this for statistics on a datapoint's recent history, such as its current level against the window or whether it is rising. One paged read of the window feeds every section; 'summary' gives latest, mean, standard deviation, min, max and the latest sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, the 24-hour autocorrelation and a label (volatile, cyclic, increasing, decreasing or stable). Use get_device_data for the raw samples. | No |
 | `score_device_health` | Score health of a specific device-datasource instance using z-score analysis. For full device health reports across all datasources, use the health_check composite tool instead. | No |
 | `calculate_error_budget` | Calculate SLO error budget consumption and projected exhaustion date. Computes remaining budget, burn rate, and status (healthy/warning/critical/exhausted) based on actual availability vs target SLO. | No |
 

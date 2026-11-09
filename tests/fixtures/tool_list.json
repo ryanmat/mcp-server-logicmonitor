@@ -219,6 +219,59 @@
       "type": "object"
     }
   },
+  "analyze_metric": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Analyze one device instance's metric series: call this for statistics on a datapoint's recent history, such as its current level against the window or whether it is rising. One paged read of the window feeds every section; 'summary' gives latest, mean, standard deviation, min, max and the latest sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, the 24-hour autocorrelation and a label (volatile, cyclic, increasing, decreasing or stable). Use get_device_data for the raw samples.",
+    "inputSchema": {
+      "properties": {
+        "analyses": {
+          "description": "Sections to compute (all if omitted)",
+          "items": {
+            "enum": [
+              "summary",
+              "trend"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "datapoints": {
+          "description": "Comma-separated datapoint names (all if omitted)",
+          "type": "string"
+        },
+        "device_datasource_id": {
+          "description": "Device-DataSource ID",
+          "type": "integer"
+        },
+        "device_id": {
+          "description": "Device ID",
+          "type": "integer"
+        },
+        "hours": {
+          "default": 168,
+          "description": "Hours of history to read (default: 168)",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "instance_id": {
+          "description": "Instance ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "device_id",
+        "device_datasource_id",
+        "instance_id"
+      ],
+      "type": "object"
+    }
+  },
   "audit_network_monitoring_coverage": {
     "annotations": {
       "destructiveHint": false,

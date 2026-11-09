@@ -23,6 +23,7 @@ from lm_mcp.tools import (
     sanitize_filter_value,
 )
 from lm_mcp.tools.alerts import paginate_alerts
+from lm_mcp.tools.analyze_metric import summary_stats
 from lm_mcp.tools.stats_helpers import (
     fetch_metric_series,
     shannon_entropy,
@@ -565,7 +566,7 @@ async def score_device_health(
                 }
             )
 
-        factors = []
+        factors: list[dict[str, Any]] = []
         anomaly_count = 0
 
         for dp_name, dp_data in series.items():
@@ -574,13 +575,11 @@ async def score_device_health(
             if len(values) < 2:
                 continue
 
-            mean = sum(values) / len(values)
-            variance = sum((v - mean) ** 2 for v in values) / (len(values) - 1)
-            stddev = math.sqrt(variance) if variance > 0 else 0.0
-
-            latest = values[-1]
-
-            z_score = abs(latest - mean) / stddev if stddev > 0 else 0.0
+            stats = summary_stats(values)
+            mean = stats["mean"]
+            stddev = stats["stddev"]
+            latest = stats["latest"]
+            z_score = abs(stats["z_score"])
 
             weight = 1.0
             if weights and dp_name in weights:

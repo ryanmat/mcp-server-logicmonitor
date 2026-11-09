@@ -394,6 +394,7 @@ TOOL_CATEGORIES = {
                 "analyze_blast_radius",
                 "correlate_changes",
                 "classify_trend",
+                "analyze_metric",
                 "score_device_health",
                 "calculate_error_budget",
             ],
