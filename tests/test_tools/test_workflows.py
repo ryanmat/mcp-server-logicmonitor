@@ -248,7 +248,7 @@ class TestCheckRequiredTools:
     """Tests for check_required_tools utility."""
 
     def test_every_composite_requires_only_registered_tools(self):
-        """A composite's required list names registered tools, so none waits on a removed one."""
+        """Every composite's required list names only tools the registry holds."""
         from lm_mcp.registry import TOOLS
         from lm_mcp.tools import workflows
 
@@ -508,7 +508,7 @@ class TestHealthCheck:
 
     @respx.mock
     async def test_summary_trims_the_metrics_block(self, auth, lm_env):
-        """The summary level keeps the device and its counts and trims metrics."""
+        """The summary level keeps the device id and datasource count and trims metrics."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         respx.get(f"{_DS_URL}/10/instances/100/data").mock(return_value=_steady_cpu_and_mem())
 
@@ -552,7 +552,7 @@ class TestHealthCheck:
 
     @respx.mock
     async def test_a_failed_read_is_a_warning(self, auth, lm_env):
-        """A datasource whose read fails leaves metrics and names itself in warnings."""
+        """A datasource whose read fails is absent from metrics and named in warnings."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         respx.get(f"{_DS_URL}/10/instances/100/data").mock(return_value=_portal_error())
 
@@ -689,7 +689,7 @@ class TestCapacityPlan:
 
     @respx.mock
     async def test_a_volatile_instance_is_read_once(self, auth, lm_env):
-        """Change points come from the one read, where a volatile trend once cost a second."""
+        """Change points come from the read the other sections use: one read per instance."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         _mock_capacity_portal({102: _swinging_cpu()})
 
