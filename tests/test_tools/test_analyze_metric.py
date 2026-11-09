@@ -855,6 +855,22 @@ class TestForecast:
         assert hw["direction"] == "rising"
 
     @respx.mock
+    async def test_holt_winters_slope_ignores_where_the_window_cuts_the_cycle(self, client):
+        """A flat daily cycle over 60 hours has a Holt-Winters slope of about 0 per hour.
+
+        Sixty hours start near a peak and end near a trough; the slope is the fit's own
+        trend, not the difference between its first and last values.
+        """
+        flat = [50.0 + 5.0 * math.cos(2 * math.pi * i / 288) for i in range(720)]
+        respx.get(SERIES_URL).mock(side_effect=_paged(_every(300, flat)))
+
+        hw = _body(await _analyze(client, analyses=["forecast"], hours=60))["datapoints"]["cpu"][
+            "forecast"
+        ]["holt_winters"]
+
+        assert abs(hw["slope_per_hour"]) < 0.01
+
+    @respx.mock
     async def test_holt_winters_crosses_a_lower_threshold_falling(self, client):
         """A daily cycle on a fall of 0.01 a sample reaches 73 some 390 samples ahead."""
         week = [100.0 + 5.0 * math.cos(2 * math.pi * i / 288) - 0.01 * i for i in range(2016)]

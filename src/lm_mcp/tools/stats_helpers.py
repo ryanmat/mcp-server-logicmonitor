@@ -457,7 +457,8 @@ def holt_winters(
         forecast_periods: Number of future periods to forecast.
 
     Returns:
-        Dict with fitted, forecast, and residuals lists.
+        Dict with fitted, forecast, and residuals lists, and trend, the final smoothed
+        trend per sample.
 
     Raises:
         ValueError: If insufficient data for the season length.
@@ -503,7 +504,7 @@ def holt_winters(
     residuals = [round(values[i] - fitted[i], 6) for i in range(n)]
     fitted = [round(f, 6) for f in fitted]
 
-    return {"fitted": fitted, "forecast": forecast, "residuals": residuals}
+    return {"fitted": fitted, "forecast": forecast, "residuals": residuals, "trend": trend}
 
 
 def prediction_interval(

@@ -395,7 +395,7 @@ def holt_winters_forecast(
         threshold: The level to reach, or None.
 
     Returns:
-        season_length, slope_per_hour (the fitted series' average slope) and the
+        season_length, slope_per_hour (the fit's final smoothed trend) and the
         crossing, or a reason in place of the crossing.
     """
     interval = _avg_interval(timestamps)
@@ -408,8 +408,7 @@ def holt_winters_forecast(
         }
     horizon = math.ceil(FORECAST_HORIZON_DAYS * 86400 / interval)
     fit = holt_winters(values, season_length=season, forecast_periods=horizon)
-    fitted = fit["fitted"]
-    out["slope_per_hour"] = round((fitted[-1] - fitted[0]) / (len(fitted) - 1) * 3600 / interval, 6)
+    out["slope_per_hour"] = round(fit["trend"] * 3600 / interval, 6)
     if threshold is None:
         return {**out, **_no_crossing("no threshold given")}
     latest = values[-1]
