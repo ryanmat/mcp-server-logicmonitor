@@ -89,13 +89,14 @@ For each cluster (or top 5 alerts if no clusters), perform a deep dive.
 2. Call `get_device` to get resource context (type, group membership, collector).
 3. Call `analyze_blast_radius` with `depth=2` on the affected device.
 
-Present an impact assessment:
+Present an impact assessment from the counts:
 
-- **blast_radius > 60** — High impact. This device has significant downstream
-  dependencies. Escalate immediately.
-- **blast_radius 30-60** — Moderate impact. Dependencies exist. Monitor closely
-  and prepare for escalation.
-- **blast_radius < 30** — Low impact. Limited blast radius. Standard remediation.
+- `neighbor_count` and `dependent_count` — how many devices the failure reaches
+  directly and beyond. More dependents, and dependents on `critical_path_devices`,
+  mean wider impact; escalate when critical neighbors (`critical_alert_count`) sit
+  among them.
+- `unreadable` naming the device — its topology could not be read. Say so, and do
+  not call the impact low.
 
 ### Step 5: Change Correlation
 

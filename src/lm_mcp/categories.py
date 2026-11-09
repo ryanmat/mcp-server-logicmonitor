@@ -20,7 +20,6 @@ WORKFLOW_TOOLS: frozenset[str] = frozenset(
         "capacity_plan",
         "correlate_metrics",
         "calculate_availability",
-        "calculate_error_budget",
         "analyze_alerts",
         "analyze_metric",
         "analyze_blast_radius",

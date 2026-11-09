@@ -4351,8 +4351,11 @@ TOOLS.extend(
             name="correlate_metrics",
             description=(
                 "Compute Pearson correlation between multiple metric series. "
-                "Builds an NxN correlation matrix and highlights strong "
-                "correlations (|r| > 0.7). Maximum 10 sources."
+                "Joins the series by timestamp bucket, as wide as the coarsest "
+                "series' median sample interval with finer series averaged into it, "
+                "and correlates over the buckets every series holds, reported as "
+                "shared_samples. Builds an NxN correlation matrix and highlights "
+                "strong correlations (|r| > 0.7). Maximum 10 sources."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4393,7 +4396,10 @@ TOOLS.extend(
                 "Computes SLA-style uptime metrics, MTTR, and per-device "
                 "breakdown from the window's cleared and active alerts, read as "
                 "two lists; truncated says when the 5000-alert cap cut either "
-                "read short."
+                "read short. With target_slo it adds error_budget for the window: "
+                "budget, consumed and remaining minutes, percent consumed, burn rate, "
+                "projected exhaustion in days and a status (healthy, warning past 50 "
+                "percent, critical past 90, exhausted)."
                 "\n\nCommon mistakes: hours_back defaults to 720 (30 days). "
                 "Narrow scope with device_id/group_id for performance."
             ),
@@ -4423,15 +4429,27 @@ TOOLS.extend(
                             "Minimum severity for downtime (critical, error, warning, info)"
                         ),
                     },
+                    "target_slo": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 100,
+                        "description": (
+                            "Target availability percentage, such as 99.9; adds error_budget "
+                            "over the hours_back window"
+                        ),
+                    },
                 },
             },
         ),
         Tool(
             name="analyze_blast_radius",
             description=(
-                "Analyze the blast radius of a device failure using topology "
-                "data. Traverses neighbors to identify downstream impact and "
-                "scores overall blast radius (0-100)."
+                "Count the devices a device failure could reach through topology "
+                "neighbors: neighbor_count at depth 1, dependent_count beyond it, each "
+                "device's alert status, and critical path devices. A device whose "
+                "neighbors neither topology path answers is listed under unreadable "
+                "with a warning, never counted as zero; on a portal without those "
+                "routes every read is unreadable."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4448,39 +4466,6 @@ TOOLS.extend(
                     },
                 },
                 "required": ["device_id"],
-            },
-        ),
-        Tool(
-            name="calculate_error_budget",
-            description=(
-                "Calculate SLO error budget consumption and projected "
-                "exhaustion date. Computes remaining budget, burn rate, "
-                "and status (healthy/warning/critical/exhausted) based "
-                "on actual availability vs target SLO."
-            ),
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {
-                        "type": "integer",
-                        "description": "Filter to a specific device",
-                    },
-                    "group_id": {
-                        "type": "integer",
-                        "description": "Filter to a device group; not with device_id",
-                    },
-                    "target_slo": {
-                        "type": "number",
-                        "default": 99.9,
-                        "description": "Target SLO percentage (default: 99.9)",
-                    },
-                    "period_days": {
-                        "type": "integer",
-                        "default": 30,
-                        "description": "SLO measurement period in days (default: 30)",
-                    },
-                },
             },
         ),
         Tool(
@@ -6503,7 +6488,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "analyze_metric": analyze_metric.analyze_metric,
         "calculate_availability": scoring.calculate_availability,
         "analyze_blast_radius": topology_analysis.analyze_blast_radius,
-        "calculate_error_budget": scoring.calculate_error_budget,
         # Traces / APM
         "get_trace_services": traces.get_trace_services,
         "get_trace_service": traces.get_trace_service,

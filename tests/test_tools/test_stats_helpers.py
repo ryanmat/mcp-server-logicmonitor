@@ -787,6 +787,17 @@ def _complete_page():
     )
 
 
+def _complete_page_before_base():
+    """One final page over the capped read's newest three samples, so the two join."""
+    return httpx.Response(
+        200,
+        json=_data_page(
+            [BASE_EPOCH, BASE_EPOCH - 300, BASE_EPOCH - 600],
+            [[60.0, 80.0], [55.0, 75.0], [50.0, 70.0]],
+        ),
+    )
+
+
 class TestTruncatedSeriesWarnings:
     """R5 follow-up: every consumer reports a series the page cap cut short."""
 
@@ -838,7 +849,7 @@ class TestTruncatedSeriesWarnings:
 
         capped_url = SERIES_URL if capped_device == 1 else SECOND_SERIES_URL
         respx.get(capped_url).mock(side_effect=_capped_pages())
-        respx.get(complete_url).mock(return_value=_complete_page())
+        respx.get(complete_url).mock(return_value=_complete_page_before_base())
 
         result = await correlate_metrics(
             client,
@@ -868,7 +879,7 @@ class TestTruncatedSeriesWarnings:
         )
 
         data = json.loads(result[0].text)
-        assert data["sample_count"] == 3
+        assert data["shared_samples"] == 3
         assert "warnings" not in data
 
 
@@ -887,10 +898,7 @@ def _cpu_page(times_sec, values):
 
 
 class TestCorrelateMetricsAlignment:
-    """R5 follow-up: series of different lengths are trimmed to their newest samples.
-
-    fetch_metric_series returns samples oldest first, so the newest are at the tail.
-    """
+    """R2.3: series of different lengths join on the timestamp buckets both hold."""
 
     @staticmethod
     async def _correlate(client):
@@ -923,13 +931,15 @@ class TestCorrelateMetricsAlignment:
         data = await self._correlate(client)
 
         assert data["correlation_matrix"][0][1] == 1.0
-        assert data["sample_count"] == len(SHARED_CPU)
+        assert data["shared_samples"] == len(SHARED_CPU)
 
     @respx.mock
-    async def test_the_longer_source_keeps_its_newest_samples(self, client):
-        """A source with a newer sample keeps it and drops its oldest; pairing is by position."""
-        from lm_mcp.tools.stats_helpers import pearson_correlation
+    async def test_a_newer_sample_without_a_partner_is_left_out(self, client):
+        """A sample in a bucket the other source lacks is left out; the shared times pair.
 
+        Paired by position from the newest, the extra sample shifted every pair and r
+        fell below 1.
+        """
         newest = SHARED_TIMES[-1] + 300
         respx.get(SERIES_URL).mock(
             return_value=_cpu_page([*SHARED_TIMES, newest], [*SHARED_CPU, 40.0])
@@ -938,7 +948,5 @@ class TestCorrelateMetricsAlignment:
 
         data = await self._correlate(client)
 
-        kept = [*SHARED_CPU[1:], 40.0]
-        expected = round(pearson_correlation(kept, SHARED_CPU), 4)
-        assert expected != 1.0
-        assert data["correlation_matrix"][0][1] == expected
+        assert data["correlation_matrix"][0][1] == 1.0
+        assert data["shared_samples"] == len(SHARED_CPU)

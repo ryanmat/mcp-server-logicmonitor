@@ -387,7 +387,6 @@ TOOL_CATEGORIES = {
                 "calculate_availability",
                 "analyze_blast_radius",
                 "analyze_metric",
-                "calculate_error_budget",
             ],
         },
         "session": {

@@ -2,6 +2,7 @@
 # Description: Validates analyze_blast_radius for downstream impact assessment.
 
 import json
+import logging
 
 import httpx
 import pytest
@@ -59,7 +60,9 @@ class TestAnalyzeBlastRadius:
         data = json.loads(result[0].text)
         assert data["total_affected_devices"] == 2
         assert data["device_id"] == 1
-        assert data["blast_radius_score"] >= 20
+        assert data["neighbor_count"] == 2
+        assert data["dependent_count"] == 0
+        assert data["unreadable"] == []
 
     @respx.mock
     async def test_multi_depth_traversal(self, client):
@@ -88,6 +91,8 @@ class TestAnalyzeBlastRadius:
         depths = {d["device_id"]: d["depth"] for d in data["affected_devices"]}
         assert depths[2] == 1
         assert depths[3] == 2
+        assert data["neighbor_count"] == 1
+        assert data["dependent_count"] == 1
 
     @respx.mock
     async def test_no_neighbors(self, client):
@@ -102,7 +107,8 @@ class TestAnalyzeBlastRadius:
 
         data = json.loads(result[0].text)
         assert data["total_affected_devices"] == 0
-        assert data["blast_radius_score"] == 0
+        assert data["neighbor_count"] == 0
+        assert data["unreadable"] == []
 
     @respx.mock
     async def test_alert_lookup_failure_marks_degraded(self, client):
@@ -139,8 +145,8 @@ class TestAnalyzeBlastRadius:
         assert data["depth"] == 3
 
     @respx.mock
-    async def test_critical_alerts_increase_score(self, client):
-        """Neighbors with critical alerts increase blast radius score."""
+    async def test_critical_alerts_are_counted(self, client):
+        """A neighbor with a critical alert counts toward critical_alert_count."""
         from lm_mcp.tools.topology_analysis import analyze_blast_radius
 
         respx.get(f"{BASE_URL}/topology/devices/1/neighbors").mock(
@@ -162,8 +168,7 @@ class TestAnalyzeBlastRadius:
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
         data = json.loads(result[0].text)
-        assert data["critical_alert_count"] >= 1
-        assert data["blast_radius_score"] > 10
+        assert data["critical_alert_count"] == 1
 
     @respx.mock
     async def test_avoids_revisiting_source_device(self, client):
@@ -205,9 +210,12 @@ class TestAnalyzeBlastRadius:
         assert "device_id" in data
         assert "depth" in data
         assert "total_affected_devices" in data
-        assert "blast_radius_score" in data
+        assert "neighbor_count" in data
+        assert "dependent_count" in data
+        assert "unreadable" in data
         assert "affected_devices" in data
         assert "critical_path_devices" in data
+        assert "blast_radius_score" not in data
 
     @respx.mock
     async def test_topology_api_fallback(self, client):
@@ -246,3 +254,60 @@ class TestAnalyzeBlastRadius:
 
         data = json.loads(result[0].text)
         assert data["total_affected_devices"] == 0
+        assert data["unreadable"] == [1]
+
+
+class TestBlastRadiusUnreadable:
+    """R2.3: a neighbor read neither path answers is logged and reported, never a zero."""
+
+    @respx.mock
+    async def test_route_missing_on_both_paths_is_unreadable(self, client, caplog):
+        """The live portal answers both paths with errorCode 1400, a route it lacks."""
+        from lm_mcp.tools.topology_analysis import analyze_blast_radius
+
+        missing = {"errorMessage": "HTTP 404 Not Found", "errorCode": 1400, "errorDetail": None}
+        respx.get(f"{BASE_URL}/topology/devices/1786/neighbors").mock(
+            return_value=httpx.Response(404, json=missing)
+        )
+        respx.get(f"{BASE_URL}/device/devices/1786/neighbors").mock(
+            return_value=httpx.Response(404, json=missing)
+        )
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.topology_analysis"):
+            result = await analyze_blast_radius(client, device_id=1786, depth=2)
+
+        data = json.loads(result[0].text)
+        assert data["unreadable"] == [1786]
+        assert data["neighbor_count"] == 0
+        assert "warning" in data
+        records = [r for r in caplog.records if r.name == "lm_mcp.tools.topology_analysis"]
+        assert [r.levelno for r in records] == [logging.WARNING]
+        assert "1786" in records[0].getMessage()
+        assert records[0].exc_info is not None
+
+    @respx.mock
+    async def test_one_unreadable_neighbor_leaves_the_rest_counted(self, client):
+        from lm_mcp.tools.topology_analysis import analyze_blast_radius
+
+        respx.get(f"{BASE_URL}/topology/devices/1/neighbors").mock(
+            return_value=httpx.Response(
+                200, json={"items": [{"id": 2, "displayName": "a"}, {"id": 3, "displayName": "b"}]}
+            )
+        )
+        respx.get(f"{BASE_URL}/topology/devices/2/neighbors").mock(
+            return_value=httpx.Response(200, json={"items": [{"id": 4, "displayName": "c"}]})
+        )
+        respx.get(f"{BASE_URL}/topology/devices/3/neighbors").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "boom"})
+        )
+        respx.get(f"{BASE_URL}/device/devices/3/neighbors").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "boom"})
+        )
+        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        result = await analyze_blast_radius(client, device_id=1, depth=2)
+
+        data = json.loads(result[0].text)
+        assert data["neighbor_count"] == 2
+        assert data["dependent_count"] == 1
+        assert data["unreadable"] == [3]

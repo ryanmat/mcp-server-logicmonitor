@@ -13,12 +13,12 @@ from mcp.types import TextContent
 from lm_mcp.exceptions import LMError, NotFoundError
 from lm_mcp.tools import (
     SEVERITY_MAP,
-    call_sub_tool,
     format_response,
     handle_error,
     lm_error_code,
     quote_filter_value,
     resolve_group_filter,
+    validation_error,
 )
 from lm_mcp.tools.alerts import read_cleared_and_active
 
@@ -35,12 +35,14 @@ async def calculate_availability(
     group_id: int | None = None,
     hours_back: int = 720,
     severity_threshold: str = "error",
+    target_slo: float | None = None,
 ) -> list[TextContent]:
     """Calculate availability percentage from alert history.
 
     Fetches cleared and active alerts at or above the severity threshold,
     computes downtime windows, merges overlapping incidents, and calculates
-    SLA-style availability metrics.
+    SLA-style availability metrics; with target_slo, the error budget for the
+    window too.
 
     Args:
         client: LogicMonitor API client.
@@ -50,11 +52,20 @@ async def calculate_availability(
         hours_back: Hours to look back (default: 720 = 30 days).
         severity_threshold: Minimum severity to count as downtime
             (critical, error, warning, info). Default: error.
+        target_slo: Target availability percentage, above 0 and at most 100; adds
+            error_budget, measured over the hours_back window.
 
     Returns:
         Availability percentage, downtime, MTTR, and per-device breakdown;
         a device that does not resolve is an error, never 100 percent.
     """
+    if target_slo is not None and not 0 < target_slo <= 100:
+        return validation_error(
+            "INVALID_REQUEST",
+            f"target_slo must be above 0 and at most 100, got {target_slo}.",
+            "Pass the target availability percentage, such as 99.9.",
+        )
+
     try:
         now_epoch = int(time.time())
         start_epoch = now_epoch - (hours_back * 3600)
@@ -113,20 +124,21 @@ async def calculate_availability(
             scope["device_id"] = device["id"]
 
         if not alerts:
-            return format_response(
-                {
-                    "availability_percent": 100.0,
-                    "total_downtime_minutes": 0,
-                    "total_uptime_minutes": total_window_minutes,
-                    "mttr_minutes": 0,
-                    "incident_count": 0,
-                    "longest_incident_minutes": 0,
-                    "by_device": {},
-                    "hours_back": hours_back,
-                    "severity_threshold": severity_threshold,
-                    **scope,
-                }
-            )
+            empty: dict[str, Any] = {
+                "availability_percent": 100.0,
+                "total_downtime_minutes": 0,
+                "total_uptime_minutes": total_window_minutes,
+                "mttr_minutes": 0,
+                "incident_count": 0,
+                "longest_incident_minutes": 0,
+                "by_device": {},
+                "hours_back": hours_back,
+                "severity_threshold": severity_threshold,
+                **scope,
+            }
+            if target_slo is not None:
+                empty["error_budget"] = error_budget(target_slo, hours_back, 0.0)
+            return format_response(empty)
 
         # Group alerts by device and compute downtime windows; a resolved
         # device's alerts all count under its current display name.
@@ -197,25 +209,87 @@ async def calculate_availability(
                 "anti_patterns": bp.get("anti_patterns", []),
             }
 
-        return format_response(
-            {
-                "availability_percent": round(worst_availability, 4),
-                "total_downtime_minutes": round(total_downtime_seconds / 60.0, 2),
-                "total_uptime_minutes": round(
-                    max(0.0, total_window_minutes - total_downtime_seconds / 60.0), 2
-                ),
-                "mttr_minutes": round(mttr, 2),
-                "incident_count": incident_count,
-                "longest_incident_minutes": round(longest_incident, 2),
-                "by_device": by_device,
-                "hours_back": hours_back,
-                "severity_threshold": severity_threshold,
-                "measurement_window_context": measurement_context,
-                **scope,
-            }
-        )
+        response: dict[str, Any] = {
+            "availability_percent": round(worst_availability, 4),
+            "total_downtime_minutes": round(total_downtime_seconds / 60.0, 2),
+            "total_uptime_minutes": round(
+                max(0.0, total_window_minutes - total_downtime_seconds / 60.0), 2
+            ),
+            "mttr_minutes": round(mttr, 2),
+            "incident_count": incident_count,
+            "longest_incident_minutes": round(longest_incident, 2),
+            "by_device": by_device,
+            "hours_back": hours_back,
+            "severity_threshold": severity_threshold,
+            "measurement_window_context": measurement_context,
+            **scope,
+        }
+        if target_slo is not None:
+            response["error_budget"] = error_budget(
+                target_slo, hours_back, total_downtime_seconds / 60.0
+            )
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
+
+
+def error_budget(target_slo: float, hours_back: int, consumed_minutes: float) -> dict[str, Any]:
+    """The error budget a window of hours_back holds at target_slo, and how much is spent.
+
+    The budget is the window's minutes times (1 - target_slo / 100). The burn rate is
+    the consumed share of the budget, and the projected exhaustion is the days the
+    remaining budget lasts at the window's daily downtime. Status is exhausted with
+    nothing left, critical past 90 percent consumed, warning past 50, else healthy; a
+    100 percent target with no downtime is healthy.
+
+    Args:
+        target_slo: Target availability percentage, above 0 and at most 100.
+        hours_back: Window length in hours, the SLO period.
+        consumed_minutes: Downtime in the window.
+
+    Returns:
+        target_slo, period_days, the budget, consumed and remaining minutes, the
+        consumed percent, burn rate, projected exhaustion in days (None when nothing
+        burns or nothing remains) and status.
+    """
+    period_days = hours_back / 24
+    total_budget_minutes = hours_back * 60 * (1 - target_slo / 100)
+    remaining_minutes = max(0.0, total_budget_minutes - consumed_minutes)
+    burn_rate = consumed_minutes / total_budget_minutes if total_budget_minutes > 0 else 0.0
+    daily_consumption = consumed_minutes / period_days if period_days > 0 else 0.0
+    projected_exhaustion_days = (
+        remaining_minutes / daily_consumption
+        if daily_consumption > 0 and remaining_minutes > 0
+        else None
+    )
+    consumed_percent = (
+        consumed_minutes / total_budget_minutes * 100 if total_budget_minutes > 0 else 0.0
+    )
+
+    if total_budget_minutes == 0 and consumed_minutes == 0:
+        status = "healthy"
+    elif remaining_minutes <= 0:
+        status = "exhausted"
+    elif consumed_percent > 90:
+        status = "critical"
+    elif consumed_percent > 50:
+        status = "warning"
+    else:
+        status = "healthy"
+
+    return {
+        "target_slo": target_slo,
+        "period_days": round(period_days, 2),
+        "total_budget_minutes": round(total_budget_minutes, 2),
+        "consumed_minutes": round(consumed_minutes, 2),
+        "remaining_minutes": round(remaining_minutes, 2),
+        "budget_consumed_percent": round(consumed_percent, 2),
+        "burn_rate": round(burn_rate, 4),
+        "projected_exhaustion_days": (
+            round(projected_exhaustion_days, 1) if projected_exhaustion_days is not None else None
+        ),
+        "status": status,
+    }
 
 
 async def _resolve_device(
@@ -299,103 +373,3 @@ def _merge_intervals(
             merged.append((start, end))
 
     return merged
-
-
-async def calculate_error_budget(
-    client: LogicMonitorClient,
-    device_id: int | None = None,
-    group_id: int | None = None,
-    target_slo: float = 99.9,
-    period_days: int = 30,
-) -> list[TextContent]:
-    """Calculate SLO error budget consumption and projected exhaustion.
-
-    Calls calculate_availability internally, then computes remaining
-    error budget based on the target SLO.
-
-    Args:
-        client: LogicMonitor API client.
-        device_id: Optional device ID filter.
-        group_id: Optional device group ID filter.
-        target_slo: Target SLO percentage (default: 99.9).
-        period_days: SLO measurement period in days (default: 30).
-
-    Returns:
-        Error budget status with remaining minutes and burn rate.
-    """
-    try:
-        # Route through call_sub_tool so an upstream error from
-        # calculate_availability (e.g. the failed device lookup above) surfaces
-        # as a clean RuntimeError rather than a JSONDecodeError -- this is
-        # the same hardening v3.8.2 added to workflow composites.
-        avail_data = await call_sub_tool(
-            calculate_availability,
-            client,
-            device_id=device_id,
-            group_id=group_id,
-            hours_back=period_days * 24,
-        )
-
-        total_minutes = period_days * 24 * 60
-        total_budget_minutes = total_minutes * (1 - target_slo / 100)
-        consumed_minutes = avail_data.get("total_downtime_minutes", 0)
-        remaining_minutes = max(0.0, total_budget_minutes - consumed_minutes)
-
-        # Calculate elapsed days in the period
-        elapsed_days = period_days  # Full period for historical calculation
-
-        # Burn rate: how fast we are consuming the budget
-        if elapsed_days > 0 and total_budget_minutes > 0:
-            burn_rate = consumed_minutes / (elapsed_days * (total_budget_minutes / period_days))
-        else:
-            burn_rate = 0.0
-
-        # Projected exhaustion
-        if burn_rate > 0 and remaining_minutes > 0:
-            daily_consumption = consumed_minutes / elapsed_days if elapsed_days > 0 else 0
-            projected_exhaustion_days = (
-                remaining_minutes / daily_consumption if daily_consumption > 0 else None
-            )
-        else:
-            projected_exhaustion_days = None
-
-        # Budget consumption percentage
-        budget_consumed_percent = (
-            (consumed_minutes / total_budget_minutes * 100) if total_budget_minutes > 0 else 0.0
-        )
-
-        # Status classification
-        # Edge case: 100% SLO means zero budget. If no downtime
-        # occurred, treat it as healthy rather than exhausted.
-        if total_budget_minutes == 0 and consumed_minutes == 0:
-            status = "healthy"
-        elif remaining_minutes <= 0:
-            status = "exhausted"
-        elif budget_consumed_percent > 90:
-            status = "critical"
-        elif budget_consumed_percent > 50:
-            status = "warning"
-        else:
-            status = "healthy"
-
-        return format_response(
-            {
-                "target_slo": target_slo,
-                "period_days": period_days,
-                "actual_availability": avail_data.get("availability_percent", 100.0),
-                "total_budget_minutes": round(total_budget_minutes, 2),
-                "consumed_minutes": round(consumed_minutes, 2),
-                "remaining_minutes": round(remaining_minutes, 2),
-                "budget_consumed_percent": round(budget_consumed_percent, 2),
-                "burn_rate": round(burn_rate, 4),
-                "projected_exhaustion_days": (
-                    round(projected_exhaustion_days, 1)
-                    if projected_exhaustion_days is not None
-                    else None
-                ),
-                "status": status,
-                "incident_count": avail_data.get("incident_count", 0),
-            }
-        )
-    except Exception as e:
-        return handle_error(e)

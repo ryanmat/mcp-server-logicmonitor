@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 256: 252 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 255: 251 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 151 of them, or 155 in
+multi-portal mode. With writes off, the default, `tools/list` shows 150 of them, or 154 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -105,6 +105,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `score_alert_noise` | `analyze_alerts` with `analyses=["noise"]`, the same score, flap pairs and recommendations. |
 | `detect_alert_burst` | `analyze_alerts` with `analyses=["bursts"]`, `window_seconds`, `min_alerts` and `min_devices`; `datasource` in place of `datasource_pattern`, matched at the portal. |
 | `correlate_changes` | `analyze_alerts` with `analyses=["changes"]` and `correlation_window_minutes`. Only audit entries that name a change pair with spikes. |
+| `calculate_error_budget` | `calculate_availability` with `target_slo`, which adds `error_budget` over the `hours_back` window; `period_days` leaves, and the budget block carries `period_days` as `hours_back` over 24. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -298,6 +299,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `alert_statistics`, `alert_clusters` and `noise`, and `diagnose` reads the last four hours once
   for `correlated_alerts` and `changes`. Each window now holds cleared alerts beside the active
   ones, and a window the 5000-alert cap cut short adds a warning.
+- `correlate_metrics` joins the series by timestamp bucket, as wide as the coarsest series'
+  median sample interval with finer series averaged into it, and reports `shared_samples` and
+  `bucket_seconds` in place of `sample_count`. It paired samples by position from the newest, so
+  a missing sample or an offset clock misaligned every pair before it.
+- `analyze_blast_radius` reports `neighbor_count` and `dependent_count` in place of the 0 to 100
+  `blast_radius_score`, and lists a device whose neighbors neither topology path answers under
+  `unreadable`, with a warning, where it counted it as having none. A read-only probe of the
+  sandbox portal found neither `/topology/devices/{id}/neighbors` nor
+  `/device/devices/{id}/neighbors`, so on such a portal every read is unreadable.
 - `detect_site_outage` finds the interface burst through `analyze_alerts`, reading only interface
   datasources' alerts for the group. It matched the datasource on `dataSourceName`, which alert
   rows do not carry, so the interface burst signal never fired on a live portal.

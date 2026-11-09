@@ -4,7 +4,6 @@
   "analyze_metric",
   "audit_network_monitoring_coverage",
   "calculate_availability",
-  "calculate_error_budget",
   "capacity_plan",
   "clear_session_context",
   "correlate_metrics",
