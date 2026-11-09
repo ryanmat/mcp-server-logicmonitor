@@ -59,6 +59,53 @@ def linear_regression(x: list[float], y: list[float]) -> tuple[float, float, flo
     return slope, intercept, r_squared
 
 
+# Theil-Sen reads every pair of samples; above this many samples it reads an evenly
+# spaced subsample spanning the whole series, so a week of one-minute samples costs
+# about 125,000 pairs rather than 50 million.
+THEIL_SEN_MAX_SAMPLES = 500
+
+
+def theil_sen_slope(x: list[float], y: list[float]) -> float:
+    """Compute the Theil-Sen slope: the median of the slopes between every pair of samples.
+
+    A spike moves one sample's pairs, a minority of the whole, so the median stays on
+    the series' underlying slope where least squares is pulled toward the spike.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values.
+
+    Returns:
+        The median pairwise slope; 0.0 when every x value is identical.
+
+    Raises:
+        ValueError: If x and y have different lengths or fewer than 2 points.
+    """
+    n = len(x)
+    if n != len(y):
+        raise ValueError("x and y must have the same length")
+    if n < 2:
+        raise ValueError("At least 2 data points required for regression")
+
+    if n > THEIL_SEN_MAX_SAMPLES:
+        picks = [
+            round(i * (n - 1) / (THEIL_SEN_MAX_SAMPLES - 1)) for i in range(THEIL_SEN_MAX_SAMPLES)
+        ]
+        x = [x[i] for i in picks]
+        y = [y[i] for i in picks]
+        n = THEIL_SEN_MAX_SAMPLES
+
+    slopes = sorted(
+        (y[j] - y[i]) / (x[j] - x[i]) for i in range(n) for j in range(i + 1, n) if x[j] != x[i]
+    )
+    if not slopes:
+        return 0.0
+    mid = len(slopes) // 2
+    if len(slopes) % 2:
+        return slopes[mid]
+    return (slopes[mid - 1] + slopes[mid]) / 2
+
+
 def pearson_correlation(x: list[float], y: list[float]) -> float:
     """Compute Pearson correlation coefficient between two series.
 

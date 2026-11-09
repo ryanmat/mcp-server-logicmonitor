@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import TextContent
 
 from lm_mcp.tools import format_response, handle_error
+from lm_mcp.tools.analyze_metric import trend_stats
 from lm_mcp.tools.stats_helpers import (
     autocorrelation,
-    coefficient_of_variation,
     cusum,
     fetch_metric_series,
     holt_winters,
@@ -481,46 +481,14 @@ async def classify_trend(
                 }
                 continue
 
-            # Compute metrics for classification
-            cv = coefficient_of_variation(values)
-
-            t0 = timestamps[0] if timestamps else 0
-            x_hours = [(t - t0) / 3600.0 for t in timestamps]
-            slope, _intercept, r_squared = linear_regression(x_hours, values)
-
-            # Autocorrelation at ~24h lag (use lag that represents 24h)
-            # Estimate sample interval from timestamps
-            if len(timestamps) >= 2:
-                avg_interval = (timestamps[-1] - timestamps[0]) / (len(timestamps) - 1)
-                lag_24h = max(1, int(86400 / avg_interval)) if avg_interval > 0 else 1
-            else:
-                lag_24h = 1
-            autocorr = autocorrelation(values, lag=lag_24h)
-
-            # Classification logic
-            if cv > 0.5:
-                classification = "volatile"
-                confidence = min(1.0, cv)
-            elif abs(autocorr) > 0.7:
-                classification = "cyclic"
-                confidence = abs(autocorr)
-            elif r_squared > 0.5 and slope > 0:
-                classification = "increasing"
-                confidence = r_squared
-            elif r_squared > 0.5 and slope < 0:
-                classification = "decreasing"
-                confidence = r_squared
-            else:
-                classification = "stable"
-                confidence = max(0.0, 1.0 - cv)
-
+            stats = trend_stats(values, timestamps)
             classifications[dp_name] = {
-                "classification": classification,
-                "confidence": round(confidence, 4),
-                "slope_per_hour": round(slope, 6),
-                "volatility_index": round(cv, 4),
-                "autocorrelation_24h": round(autocorr, 4),
-                "r_squared": round(r_squared, 4),
+                "classification": stats["label"],
+                "confidence": round(stats["confidence"], 4),
+                "slope_per_hour": round(stats["slope_per_hour"], 6),
+                "volatility_index": round(stats["coefficient_of_variation"], 4),
+                "autocorrelation_24h": round(stats["autocorrelation_24h"], 4),
+                "r_squared": round(stats["r_squared"], 4),
                 "sample_count": len(values),
             }
 

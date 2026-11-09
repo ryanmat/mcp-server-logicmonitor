@@ -4868,6 +4868,57 @@ TOOLS.extend(
                 ],
             },
         ),
+        Tool(
+            name="analyze_metric",
+            description=(
+                "Analyze one device instance's metric series: call this for statistics "
+                "on a datapoint's recent history, such as its current level against the "
+                "window or whether it is rising. One paged read of the window feeds every "
+                "section; 'summary' gives latest, mean, standard deviation, min, max and "
+                "the latest sample's signed z-score; 'trend' gives least-squares and "
+                "Theil-Sen slopes per hour, r-squared, coefficient of variation, the "
+                "24-hour autocorrelation and a label (volatile, cyclic, increasing, "
+                "decreasing or stable). Use get_device_data for the raw samples."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {
+                        "type": "integer",
+                        "description": "Device ID",
+                    },
+                    "device_datasource_id": {
+                        "type": "integer",
+                        "description": "Device-DataSource ID",
+                    },
+                    "instance_id": {
+                        "type": "integer",
+                        "description": "Instance ID",
+                    },
+                    "datapoints": {
+                        "type": "string",
+                        "description": "Comma-separated datapoint names (all if omitted)",
+                    },
+                    "hours": {
+                        "type": "integer",
+                        "default": 168,
+                        "minimum": 1,
+                        "description": "Hours of history to read (default: 168)",
+                    },
+                    "analyses": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": ["summary", "trend"]},
+                        "description": "Sections to compute (all if omitted)",
+                    },
+                },
+                "required": [
+                    "device_id",
+                    "device_datasource_id",
+                    "instance_id",
+                ],
+            },
+        ),
     ]
 )
 
@@ -6517,6 +6568,7 @@ def get_tool_handler(tool_name: str) -> Any:
         actions,
         alert_rules,
         alerts,
+        analyze_metric,
         api_tokens,
         audit,
         baselines,
@@ -6849,6 +6901,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "score_alert_noise": scoring.score_alert_noise,
         "detect_seasonality": forecasting.detect_seasonality,
         "classify_trend": forecasting.classify_trend,
+        "analyze_metric": analyze_metric.analyze_metric,
         "calculate_availability": scoring.calculate_availability,
         "analyze_blast_radius": topology_analysis.analyze_blast_radius,
         "correlate_changes": event_correlation.correlate_changes,

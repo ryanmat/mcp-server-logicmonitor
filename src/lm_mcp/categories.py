@@ -28,6 +28,7 @@ WORKFLOW_TOOLS: frozenset[str] = frozenset(
         "calculate_availability",
         "calculate_error_budget",
         "classify_trend",
+        "analyze_metric",
         "forecast_metric",
         "compare_to_baseline",
         "save_baseline",
