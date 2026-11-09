@@ -1084,7 +1084,7 @@ class TestDiagnose:
         props_data = {"properties": [{"name": "os", "value": "linux"}]}
         corr_data = {"clusters": [], "cluster_count": 0}
         changes_data = {"correlated_events": []}
-        blast_data = {"blast_radius_score": 10, "affected_devices": []}
+        blast_data = {"neighbor_count": 1, "dependent_count": 0, "unreadable": []}
 
         with (
             _patch_sub("lm_mcp.tools.alerts.get_alert_details", alert_detail),
@@ -1123,7 +1123,7 @@ class TestDiagnose:
         props_data = {"properties": []}
         corr_data = {"clusters": [], "cluster_count": 0}
         changes_data = {"correlated_events": []}
-        blast_data = {"blast_radius_score": 0, "affected_devices": []}
+        blast_data = {"neighbor_count": 0, "dependent_count": 0, "unreadable": []}
 
         with (
             _patch_sub("lm_mcp.tools.alerts.get_alerts", alerts_list),

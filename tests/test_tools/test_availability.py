@@ -1,5 +1,5 @@
 # Description: Tests for the availability and error budget tools.
-# Description: Validates calculate_availability, calculate_error_budget and device resolution.
+# Description: Validates calculate_availability, its error budget and device resolution.
 
 import json
 import logging
@@ -385,101 +385,110 @@ class TestScoringGuardrails:
             assert len(ctx["recommendations"]) > 0
 
 
-class TestCalculateErrorBudget:
-    """Tests for calculate_error_budget tool."""
+class TestAvailabilitySlo:
+    """R2.3: calculate_availability(target_slo=) reports the error budget for its window."""
+
+    @staticmethod
+    def _outage(minutes):
+        """One cleared incident of the given minutes, inside a 30-day window."""
+        start = int(time.time()) - 30 * 24 * 3600 + 1000
+        return [
+            {
+                "id": "a1",
+                "severity": 3,
+                "monitorObjectName": "server1",
+                "startEpoch": start,
+                "endEpoch": start + minutes * 60,
+                "cleared": True,
+            }
+        ]
+
+    @pytest.mark.parametrize(
+        ("target", "minutes", "status", "consumed_percent"),
+        [
+            (99.9, 0, "healthy", 0.0),
+            (99.9, 30, "warning", 69.44),
+            (99.9, 40, "critical", 92.59),
+            (99.9, 100, "exhausted", 231.48),
+            (99.0, 60, "healthy", 13.89),
+        ],
+        ids=["no-downtime", "warning", "critical", "exhausted", "99.0"],
+    )
+    @respx.mock
+    async def test_budget_follows_the_downtime(
+        self, client, target, minutes, status, consumed_percent
+    ):
+        from lm_mcp.tools.scoring import calculate_availability
+
+        cleared = self._outage(minutes) if minutes else []
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([], cleared))
+
+        result = await calculate_availability(client, hours_back=720, target_slo=target)
+
+        budget = json.loads(result[0].text)["error_budget"]
+        assert budget["target_slo"] == target
+        assert budget["period_days"] == 30
+        assert budget["total_budget_minutes"] == round(43200 * (1 - target / 100), 2)
+        assert budget["consumed_minutes"] == minutes
+        assert budget["budget_consumed_percent"] == consumed_percent
+        assert budget["status"] == status
 
     @respx.mock
-    async def test_error_budget_zero_downtime(self, client):
-        """Zero downtime gives healthy status with full budget remaining."""
-        from lm_mcp.tools.scoring import calculate_error_budget
+    async def test_burn_rate_and_projected_exhaustion(self, client):
+        """60 minutes of a 432-minute budget over 30 days: 372 left, gone in 186 days."""
+        from lm_mcp.tools.scoring import calculate_availability
 
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([], self._outage(60)))
 
-        result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
+        result = await calculate_availability(client, hours_back=720, target_slo=99.0)
 
-        data = json.loads(result[0].text)
-        assert data["status"] == "healthy"
-        assert data["actual_availability"] == 100.0
-        assert data["remaining_minutes"] > 0
-        assert data["budget_consumed_percent"] == 0.0
-
-    @respx.mock
-    async def test_error_budget_partial_consumption(self, client):
-        """Partial downtime shows correct consumption percentage."""
-        from lm_mcp.tools.scoring import calculate_error_budget
-
-        now_epoch = int(time.time())
-        start_epoch = now_epoch - (30 * 24 * 3600)
-
-        respx.get(ALERT_URL).mock(
-            side_effect=alert_lists(
-                [
-                    {
-                        "id": "a1",
-                        "severity": 3,
-                        "monitorObjectName": "server1",
-                        "startEpoch": start_epoch + 1000,
-                        "endEpoch": start_epoch + 4600,  # 60 min downtime
-                    },
-                ]
-            )
-        )
-
-        result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
-
-        data = json.loads(result[0].text)
-        assert data["consumed_minutes"] > 0
-        assert data["remaining_minutes"] >= 0
-        assert data["status"] in ("healthy", "warning", "critical", "exhausted")
+        budget = json.loads(result[0].text)["error_budget"]
+        assert budget["remaining_minutes"] == 372.0
+        assert budget["burn_rate"] == 0.1389
+        assert budget["projected_exhaustion_days"] == 186.0
 
     @respx.mock
-    async def test_error_budget_exhausted(self, client):
-        """Massive downtime exhausts the budget."""
-        from lm_mcp.tools.scoring import calculate_error_budget
+    async def test_a_100_percent_slo_without_downtime_is_healthy(self, client):
+        from lm_mcp.tools.scoring import calculate_availability
 
-        now_epoch = int(time.time())
-        start_epoch = now_epoch - (30 * 24 * 3600)
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([]))
 
-        # 99.9% SLO over 30 days = 43.2 min budget. Create 100 min downtime.
-        respx.get(ALERT_URL).mock(
-            side_effect=alert_lists(
-                [
-                    {
-                        "id": "a1",
-                        "severity": 3,
-                        "monitorObjectName": "server1",
-                        "startEpoch": start_epoch + 1000,
-                        "endEpoch": start_epoch + 7000,  # 100 min
-                    },
-                ]
-            )
-        )
+        result = await calculate_availability(client, hours_back=720, target_slo=100.0)
 
-        result = await calculate_error_budget(client, target_slo=99.9, period_days=30)
+        budget = json.loads(result[0].text)["error_budget"]
+        assert budget["total_budget_minutes"] == 0.0
+        assert budget["status"] == "healthy"
+        assert budget["projected_exhaustion_days"] is None
 
-        data = json.loads(result[0].text)
-        assert data["status"] in ("critical", "exhausted")
-        assert data["budget_consumed_percent"] > 90
+    @respx.mock
+    async def test_no_budget_without_a_target(self, client):
+        from lm_mcp.tools.scoring import calculate_availability
 
-    async def test_error_budget_slo_100_edge_case(self, client):
-        """SLO of 100% means zero budget -- any downtime exhausts it."""
-        import respx as _respx
+        respx.get(ALERT_URL).mock(side_effect=alert_lists([], self._outage(30)))
 
-        from lm_mcp.tools.scoring import calculate_error_budget
+        result = await calculate_availability(client, hours_back=720)
 
-        with _respx.mock:
-            _respx.get(ALERT_URL).mock(
-                return_value=httpx.Response(200, json={"items": [], "total": 0})
-            )
-            result = await calculate_error_budget(
-                client,
-                target_slo=100.0,
-                period_days=30,
-            )
+        assert "error_budget" not in json.loads(result[0].text)
 
-        data = json.loads(result[0].text)
-        assert data["total_budget_minutes"] == 0.0
-        assert data["status"] == "healthy"  # No downtime with 0 budget = healthy
+    @pytest.mark.parametrize("target", [0.0, -1.0, 100.5])
+    @respx.mock
+    async def test_target_outside_0_to_100_is_refused_before_any_read(self, client, target):
+        from lm_mcp.tools.scoring import calculate_availability
+        from tests.envelope import envelope
+
+        result = await calculate_availability(client, target_slo=target)
+
+        assert envelope(result)["code"] == "INVALID_REQUEST"
+        assert len(respx.calls) == 0
+
+    def test_calculate_error_budget_is_not_registered(self):
+        from lm_mcp.registry import TOOLS, get_tool_handler
+
+        tool = next(t for t in TOOLS if t.name == "calculate_availability")
+        assert "target_slo" in tool.inputSchema["properties"]
+        assert "calculate_error_budget" not in {t.name for t in TOOLS}
+        with pytest.raises(ValueError, match="Unknown tool"):
+            get_tool_handler("calculate_error_budget")
 
 
 DEVICE_URL_TEMPLATE = "https://test.logicmonitor.com/santaba/rest/device/devices/{id}"
@@ -542,41 +551,6 @@ class TestCalculateAvailabilityDeviceLookup:
         data = json.loads(result[0].text)
         assert "error" not in data or data.get("error") is False
         assert list(data["by_device"]) == ["server1"]
-
-
-class TestCalculateErrorBudgetSubToolHardening:
-    """Regression test mirroring the v3.8.2 _call_sub_tool fix.
-
-    Prior behavior: calculate_error_budget did a raw json.loads on the
-    text returned by calculate_availability. If the inner call returned
-    an Error: ... envelope, json.loads raised JSONDecodeError and the
-    composite crashed. The fix routes through call_sub_tool so the error
-    surfaces cleanly.
-    """
-
-    @respx.mock
-    async def test_inner_failure_surfaces_as_clean_error(self, client):
-        from lm_mcp.tools.scoring import calculate_error_budget
-
-        # calculate_availability will return an Error envelope because the
-        # device lookup 404s. Without the call_sub_tool routing, this
-        # would JSONDecodeError below.
-        respx.get(DEVICE_URL_TEMPLATE.format(id=99999)).mock(
-            return_value=httpx.Response(404, json={"errorMessage": "Device not found"})
-        )
-
-        result = await calculate_error_budget(
-            client,
-            device_id=99999,
-            target_slo=99.9,
-            period_days=30,
-        )
-
-        text = result[0].text
-        assert is_error_result(result)
-        # The JSONDecodeError message ("Expecting value: line 1 column 1")
-        # must NOT appear -- that was the v3.8.2-pattern regression signal.
-        assert "Expecting value" not in text
 
 
 DEVICES_URL = "https://test.logicmonitor.com/santaba/rest/device/devices"
@@ -779,17 +753,6 @@ class TestAvailabilityDeviceWithGroup:
 
         assert isinstance(result[0], ErrorContent)
         assert "group_id" in result[0].text
-        assert "not both" in result[0].text
-        assert len(respx.calls) == 0
-
-    @respx.mock
-    async def test_error_budget_surfaces_the_refusal(self, client):
-        from lm_mcp.tools import ErrorContent
-        from lm_mcp.tools.scoring import calculate_error_budget
-
-        result = await calculate_error_budget(client, device_id=5, group_id=7)
-
-        assert isinstance(result[0], ErrorContent)
         assert "not both" in result[0].text
         assert len(respx.calls) == 0
 

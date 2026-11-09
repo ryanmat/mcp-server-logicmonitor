@@ -22,11 +22,14 @@ async def analyze_blast_radius(
     device_id: int,
     depth: int = 2,
 ) -> list[TextContent]:
-    """Analyze the blast radius of a device failure using topology data.
+    """Count the devices a device failure could reach through its topology neighbors.
 
-    Traverses the device's neighbors up to the specified depth to identify
-    all potentially affected downstream devices. Checks alert status of
-    affected devices and scores the overall blast radius.
+    Traverses the device's neighbors up to the specified depth, reading each
+    device's neighbors from /topology/devices/{id}/neighbors and then
+    /device/devices/{id}/neighbors. A device neither path answers is logged and
+    listed under unreadable, so a failed read is never a count of zero; a
+    read-only probe of the sandbox portal on 2026-11-09 found neither route.
+    Checks the alert status of the devices reached.
 
     Args:
         client: LogicMonitor API client.
@@ -34,7 +37,9 @@ async def analyze_blast_radius(
         depth: Maximum traversal depth (1-3, default: 2).
 
     Returns:
-        Blast radius score, affected devices list, and critical path devices.
+        neighbor_count (depth 1) and dependent_count (depth 2 and beyond), the
+        devices reached with their depth and alert status, critical path devices,
+        the critical alert count, and unreadable with a warning when a read failed.
     """
     try:
         depth = min(max(depth, 1), 3)
@@ -44,7 +49,7 @@ async def analyze_blast_radius(
         affected_devices: list[dict] = []
         current_layer = [device_id]
         neighbor_map: dict[int, list[int]] = defaultdict(list)
-        neighbor_lookup_failures = 0
+        unreadable: list[int] = []
 
         for current_depth in range(1, depth + 1):
             next_layer = []
@@ -59,7 +64,11 @@ async def analyze_blast_radius(
                     )
                     neighbors = result.get("items", [])
                 except Exception:
-                    # If topology endpoint fails, try device neighbors
+                    logger.debug(
+                        "blast radius: topology neighbors read failed for device %s",
+                        dev_id,
+                        exc_info=True,
+                    )
                     try:
                         result = await client.get(
                             f"/device/devices/{dev_id}/neighbors",
@@ -67,10 +76,12 @@ async def analyze_blast_radius(
                         )
                         neighbors = result.get("items", [])
                     except Exception:
-                        logger.exception(
-                            "blast radius: neighbor lookup failed for device %s", dev_id
+                        logger.warning(
+                            "blast radius: neighbors of device %s unreadable on both paths",
+                            dev_id,
+                            exc_info=True,
                         )
-                        neighbor_lookup_failures += 1
+                        unreadable.append(dev_id)
                         neighbors = []
 
                 for neighbor in neighbors:
@@ -142,28 +153,29 @@ async def analyze_blast_radius(
             if path_counts.get(dev["device_id"], 0) >= 2
         ]
 
-        # Blast radius score (0-100)
-        affected_count = len(affected_devices)
-        blast_radius_score = min(
-            100,
-            affected_count * 10 + critical_alert_count * 15 + len(critical_path_devices) * 20,
-        )
+        neighbor_count = sum(1 for dev in affected_devices if dev["depth"] == 1)
 
         response: dict = {
             "device_id": device_id,
             "depth": depth,
-            "total_affected_devices": affected_count,
-            "blast_radius_score": blast_radius_score,
+            "total_affected_devices": len(affected_devices),
+            "neighbor_count": neighbor_count,
+            "dependent_count": len(affected_devices) - neighbor_count,
             "affected_devices": affected_devices,
             "critical_path_devices": critical_path_devices,
             "critical_alert_count": critical_alert_count,
+            "unreadable": unreadable,
         }
-        if neighbor_lookup_failures or alert_check_failures:
+        if unreadable:
+            response["warning"] = (
+                f"Neighbors of {len(unreadable)} device(s) could not be read on either "
+                "topology path; the counts cover only the devices read."
+            )
+        if alert_check_failures:
             response["degraded"] = True
             response["degraded_detail"] = (
-                f"{neighbor_lookup_failures} neighbor lookup(s) and "
-                f"{alert_check_failures} alert lookup(s) failed; the blast radius and "
-                "critical counts may be understated."
+                f"{alert_check_failures} alert lookup(s) failed; the critical counts may be "
+                "understated."
             )
         return format_response(response)
     except Exception as e:

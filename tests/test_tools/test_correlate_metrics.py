@@ -199,8 +199,8 @@ class TestCorrelateMetrics:
         assert len(data["labels"]) == 2
 
     @respx.mock
-    async def test_sample_count_in_response(self, client):
-        """Response includes the sample count used for correlation."""
+    async def test_shared_samples_in_response(self, client):
+        """Response includes the bucket count shared by every series and the bucket width."""
         from lm_mcp.tools.correlation import correlate_metrics
 
         for dev_id in [1, 2]:
@@ -226,7 +226,9 @@ class TestCorrelateMetrics:
         result = await correlate_metrics(client, sources=sources)
 
         data = json.loads(result[0].text)
-        assert data["sample_count"] == 8
+        assert data["shared_samples"] == 8
+        assert data["bucket_seconds"] == 300
+        assert "sample_count" not in data
 
     @respx.mock
     async def test_insufficient_data(self, client):
@@ -275,3 +277,88 @@ class TestCorrelateMetrics:
         result = await correlate_metrics(client, sources=sources)
 
         assert is_error_result(result)
+
+
+def _series(times, values):
+    return httpx.Response(
+        200,
+        json={
+            "dataPoints": ["cpu"],
+            "values": [[v] for v in values],
+            "time": [t * 1000 for t in times],
+        },
+    )
+
+
+_SOURCES = [
+    {"device_id": 1, "device_datasource_id": 10, "instance_id": 100, "datapoint": "cpu"},
+    {"device_id": 2, "device_datasource_id": 10, "instance_id": 100, "datapoint": "cpu"},
+]
+
+
+def _data_url(dev_id):
+    return (
+        "https://test.logicmonitor.com/santaba/rest"
+        f"/device/devices/{dev_id}/devicedatasources/10/instances/100/data"
+    )
+
+
+class TestCorrelateMetricsByBucket:
+    """R2.3: series join by timestamp bucket, not by position, and report the shared count."""
+
+    @respx.mock
+    async def test_offset_series_with_a_gap_join_by_time(self, client):
+        """B is 2A + 1 sampled 60 s after A and missing its sixth sample.
+
+        Paired by position from the newest, B's samples before the gap meet A's from
+        the bucket after theirs and r falls below 0.9; joined by bucket every pair
+        lines up and r is 1.
+        """
+        from lm_mcp.tools.correlation import correlate_metrics
+
+        a = [1.0, 5.0, 2.0, 8.0, 3.0, 9.0, 4.0, 7.0, 6.0, 10.0]
+        a_times = [BASE_EPOCH + i * 300 for i in range(10)]
+        b_times = [t + 60 for i, t in enumerate(a_times) if i != 5]
+        b = [2 * v + 1 for i, v in enumerate(a) if i != 5]
+        respx.get(_data_url(1)).mock(return_value=_series(a_times, a))
+        respx.get(_data_url(2)).mock(return_value=_series(b_times, b))
+
+        data = json.loads((await correlate_metrics(client, sources=_SOURCES))[0].text)
+
+        assert data["correlation_matrix"][0][1] == 1.0
+        assert data["shared_samples"] == 9
+        assert data["bucket_seconds"] == 300
+
+    @respx.mock
+    async def test_a_finer_series_is_averaged_into_the_coarser_buckets(self, client):
+        """A minute-by-minute series meets a five-minute one at each five-minute bucket."""
+        from lm_mcp.tools.correlation import correlate_metrics
+
+        coarse = [float(v) for v in (3, 9, 1, 7, 5, 8)]
+        coarse_times = [BASE_EPOCH + i * 300 for i in range(6)]
+        fine_times = [BASE_EPOCH + i * 60 for i in range(30)]
+        fine = [coarse[i // 5] + (i % 5 - 2) for i in range(30)]
+        respx.get(_data_url(1)).mock(return_value=_series(coarse_times, coarse))
+        respx.get(_data_url(2)).mock(return_value=_series(fine_times, fine))
+
+        data = json.loads((await correlate_metrics(client, sources=_SOURCES))[0].text)
+
+        assert data["bucket_seconds"] == 300
+        assert data["shared_samples"] == 6
+        assert data["correlation_matrix"][0][1] == 1.0
+
+    @respx.mock
+    async def test_series_that_share_under_two_buckets_are_refused(self, client):
+        from lm_mcp.tools.correlation import correlate_metrics
+
+        respx.get(_data_url(1)).mock(
+            return_value=_series([BASE_EPOCH, BASE_EPOCH + 300], [1.0, 2.0])
+        )
+        respx.get(_data_url(2)).mock(
+            return_value=_series([BASE_EPOCH + 3600, BASE_EPOCH + 3900], [1.0, 2.0])
+        )
+
+        result = await correlate_metrics(client, sources=_SOURCES)
+
+        assert is_error_result(result)
+        assert "overlapping" in result[0].text

@@ -281,7 +281,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Analyze the blast radius of a device failure using topology data. Traverses neighbors to identify downstream impact and scores overall blast radius (0-100).",
+    "description": "Count the devices a device failure could reach through topology neighbors: neighbor_count at depth 1, dependent_count beyond it, each device's alert status, and critical path devices. A device whose neighbors neither topology path answers is listed under unreadable with a warning, never counted as zero; on a portal without those routes every read is unreadable.",
     "inputSchema": {
       "properties": {
         "depth": {
@@ -512,7 +512,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Calculate availability percentage from alert history. Computes SLA-style uptime metrics, MTTR, and per-device breakdown from the window's cleared and active alerts, read as two lists; truncated says when the 5000-alert cap cut either read short.\n\nCommon mistakes: hours_back defaults to 720 (30 days). Narrow scope with device_id/group_id for performance.",
+    "description": "Calculate availability percentage from alert history. Computes SLA-style uptime metrics, MTTR, and per-device breakdown from the window's cleared and active alerts, read as two lists; truncated says when the 5000-alert cap cut either read short. With target_slo it adds error_budget for the window: budget, consumed and remaining minutes, percent consumed, burn rate, projected exhaustion in days and a status (healthy, warning past 50 percent, critical past 90, exhausted).\n\nCommon mistakes: hours_back defaults to 720 (30 days). Narrow scope with device_id/group_id for performance.",
     "inputSchema": {
       "properties": {
         "device_id": {
@@ -532,38 +532,11 @@
           "default": "error",
           "description": "Minimum severity for downtime (critical, error, warning, info)",
           "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "calculate_error_budget": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Calculate SLO error budget consumption and projected exhaustion date. Computes remaining budget, burn rate, and status (healthy/warning/critical/exhausted) based on actual availability vs target SLO.",
-    "inputSchema": {
-      "properties": {
-        "device_id": {
-          "description": "Filter to a specific device",
-          "type": "integer"
-        },
-        "group_id": {
-          "description": "Filter to a device group; not with device_id",
-          "type": "integer"
-        },
-        "period_days": {
-          "default": 30,
-          "description": "SLO measurement period in days (default: 30)",
-          "type": "integer"
         },
         "target_slo": {
-          "default": 99.9,
-          "description": "Target SLO percentage (default: 99.9)",
+          "description": "Target availability percentage, such as 99.9; adds error_budget over the hours_back window",
+          "exclusiveMinimum": 0,
+          "maximum": 100,
           "type": "number"
         }
       },
@@ -665,7 +638,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Compute Pearson correlation between multiple metric series. Builds an NxN correlation matrix and highlights strong correlations (|r| > 0.7). Maximum 10 sources.",
+    "description": "Compute Pearson correlation between multiple metric series. Joins the series by timestamp bucket, as wide as the coarsest series' median sample interval with finer series averaged into it, and correlates over the buckets every series holds, reported as shared_samples. Builds an NxN correlation matrix and highlights strong correlations (|r| > 0.7). Maximum 10 sources.",
     "inputSchema": {
       "properties": {
         "hours_back": {
