@@ -147,7 +147,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 These run server-side in pure Python, so an assistant gets the result in one call.
 
 - Alert correlation clusters, statistics by severity and device, noise scoring with flap detection, and burst detection
-- `analyze_metric` reads a series once for its summary, trend, seasonality, change points, anomalies (z-score, IQR, MAD), linear and Holt-Winters forecast to a threshold, and a comparison with an earlier window; metric correlation across series
+- `analyze_metric` reads a series once for its summary, trend, seasonality, change points, anomalies (z-score, IQR, MAD) and linear and Holt-Winters forecast to a threshold, and with one more read compares it with an earlier window; metric correlation across series
 - Availability with MTTR from active and cleared alerts, and SLO error budgets
 - Topology-based blast radius, and change correlation against audit logs
 

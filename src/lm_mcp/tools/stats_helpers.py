@@ -1,5 +1,5 @@
 # Description: Shared statistical utility functions for ML analysis tools.
-# Description: Provides regression, correlation, Holt-Winters, anomaly fences, entropy, paged reads.
+# Description: Provides series statistics, change and cycle detection, Holt-Winters, paged reads.
 
 from __future__ import annotations
 
