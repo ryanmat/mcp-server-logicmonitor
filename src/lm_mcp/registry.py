@@ -4873,12 +4873,17 @@ TOOLS.extend(
             description=(
                 "Analyze one device instance's metric series: call this for statistics "
                 "on a datapoint's recent history, such as its current level against the "
-                "window or whether it is rising. One paged read of the window feeds every "
-                "section; 'summary' gives latest, mean, standard deviation, min, max and "
-                "the latest sample's signed z-score; 'trend' gives least-squares and "
-                "Theil-Sen slopes per hour, r-squared, coefficient of variation, the "
-                "24-hour autocorrelation and a label (volatile, cyclic, increasing, "
-                "decreasing or stable). Use get_device_data for the raw samples."
+                "window, whether it is rising, its daily cycle, or which samples stand "
+                "out. One paged read of the window feeds every section; "
+                "'summary' gives latest, mean, standard deviation, min, max and the latest "
+                "sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes "
+                "per hour, r-squared, coefficient of variation, the detrended 24-hour "
+                "autocorrelation and a label (volatile, cyclic, increasing, decreasing or "
+                "stable); 'seasonality' gives detrended autocorrelation at 1, 4, 12, 24 and "
+                "168 hours, the dominant period and the peak hours in UTC; 'anomalies' "
+                "gives z-score, "
+                "IQR and MAD hits, each method's 20 most extreme. Use get_device_data for "
+                "the raw samples."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4908,7 +4913,15 @@ TOOLS.extend(
                     },
                     "analyses": {
                         "type": "array",
-                        "items": {"type": "string", "enum": ["summary", "trend"]},
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "summary",
+                                "trend",
+                                "seasonality",
+                                "anomalies",
+                            ],
+                        },
                         "description": "Sections to compute (all if omitted)",
                     },
                 },

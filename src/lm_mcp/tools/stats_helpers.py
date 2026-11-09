@@ -59,6 +59,30 @@ def linear_regression(x: list[float], y: list[float]) -> tuple[float, float, flo
     return slope, intercept, r_squared
 
 
+def detrend(x: list[float], y: list[float]) -> list[float]:
+    """Return y less its least-squares line, so a trend does not read as a cycle.
+
+    A series the line explains to rounding error (a straight ramp, or a flat line)
+    returns all zeros rather than floating-point residue, which autocorrelation would
+    otherwise read as structure.
+
+    Args:
+        x: Independent variable values.
+        y: Dependent variable values, at least 2.
+
+    Returns:
+        The residuals, one per sample.
+    """
+    slope, intercept, _ = linear_regression(x, y)
+    residuals = [yi - (slope * xi + intercept) for xi, yi in zip(x, y, strict=True)]
+    mean = sum(y) / len(y)
+    ss_tot = sum((yi - mean) ** 2 for yi in y)
+    ss_res = sum(r * r for r in residuals)
+    if ss_res <= 1e-12 * ss_tot or ss_tot == 0:
+        return [0.0] * len(y)
+    return residuals
+
+
 # Theil-Sen reads every pair of samples; above this many samples it reads an evenly
 # spaced subsample spanning the whole series, so a week of one-minute samples costs
 # about 125,000 pairs rather than 50 million.
