@@ -1266,3 +1266,34 @@ class TestDashboardListPaging:
             return_value=httpx.Response(200, json={"id": 7, "widgetsConfig": {}})
         )
         await assert_negative_total_reads_as_more(client, getattr(dashboards, name), path, kwargs)
+
+
+class TestGetDashboardRaw:
+    """R2.3: raw=true returns the dashboard REST object with its widgets, as export did."""
+
+    @respx.mock
+    async def test_raw_adds_the_widgets_and_default_keeps_the_portal_link(self, client):
+        from lm_mcp.tools.dashboards import get_dashboard
+
+        body = {
+            "id": 123,
+            "name": "Production Overview",
+            "groupId": 1,
+            "widgetsConfig": {"7": {"col": 1, "row": 1, "sizex": 6, "sizey": 4}},
+        }
+        widgets = [{"id": 7, "name": "CPU", "type": "cgraph", "dashboardId": 123}]
+        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+        listed = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/123/widgets"
+        ).mock(return_value=httpx.Response(200, json={"items": widgets, "total": 1}))
+
+        raw = json.loads((await get_dashboard(client, dashboard_id=123, raw=True))[0].text)
+        assert listed.call_count == 1
+        projected = json.loads((await get_dashboard(client, dashboard_id=123))[0].text)
+
+        assert raw == {**body, "widgets_full": widgets}
+        assert listed.call_count == 1
+        assert "widgets_full" not in projected
+        assert "portal_url" in projected

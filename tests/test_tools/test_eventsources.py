@@ -404,3 +404,31 @@ class TestDeleteEventsource:
 
         result = await delete_eventsource(client, eventsource_id=999)
         assert is_error_result(result)
+
+
+class TestGetEventsourceRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.eventsources import get_eventsource
+
+        body = {
+            "id": 1,
+            "name": "WindowsEventLog",
+            "displayName": "Windows Event Log",
+            "appliesTo": "isWindows()",
+            "technology": "Windows",
+            "group": "Events",
+            "filters": [],
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/eventsources/1").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_eventsource(client, eventsource_id=1, raw=True))[0].text)
+        projected = json.loads((await get_eventsource(client, eventsource_id=1))[0].text)
+
+        assert raw == body
+        assert "displayName" not in projected
+        assert projected["display_name"] == body["displayName"]

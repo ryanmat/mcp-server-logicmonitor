@@ -106,7 +106,7 @@ async def create_eventsource(
 ) -> list[TextContent]:
     """Create an EventSource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_eventsource).
+    Accepts REST API format (the format get_eventsource returns with raw=true).
     Use this for creating EventSources from exported definitions or from
     scratch. For LM Exchange format imports, use import_eventsource instead.
 
@@ -210,18 +210,22 @@ async def update_eventsource(
 async def get_eventsource(
     client: LogicMonitorClient,
     eventsource_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific EventSource.
 
     Args:
         client: LogicMonitor API client.
         eventsource_id: EventSource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with EventSource details or error.
     """
     try:
         result = await client.get(f"/setting/eventsources/{eventsource_id}")
+        if raw:
+            return format_response(result)
 
         source = {
             "id": result.get("id"),

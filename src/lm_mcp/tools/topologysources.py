@@ -109,8 +109,8 @@ async def create_topologysource(
 ) -> list[TextContent]:
     """Create a TopologySource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_topologysource
-    if one exists). Use this for creating TopologySources from definitions.
+    Accepts REST API format (the format get_topologysource returns with raw=true).
+    Use this for creating TopologySources from definitions.
     For LM Exchange format imports, use import_topologysource instead.
 
     Args:
@@ -249,18 +249,22 @@ async def delete_topologysource(
 async def get_topologysource(
     client: LogicMonitorClient,
     topologysource_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific TopologySource.
 
     Args:
         client: LogicMonitor API client.
         topologysource_id: TopologySource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with TopologySource details or error.
     """
     try:
         result = await client.get(f"/setting/topologysources/{topologysource_id}")
+        if raw:
+            return format_response(result)
 
         source = {
             "id": result.get("id"),

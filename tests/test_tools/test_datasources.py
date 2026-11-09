@@ -695,3 +695,33 @@ class TestDeleteDatasource:
         result = await delete_datasource(client, datasource_id=999)
 
         assert is_error_result(result)
+
+
+class TestGetDatasourceRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.datasources import get_datasource
+
+        body = {
+            "id": 100,
+            "name": "CPU",
+            "displayName": "CPU Usage",
+            "appliesTo": "isWindows()",
+            "collectMethod": "wmi",
+            "collectInterval": 60,
+            "collectorAttribute": {"name": "wmi"},
+            "dataPoints": [{"id": 1, "name": "CPUBusyPercent", "type": 0, "alertExpr": "> 90"}],
+            "graphs": [],
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources/100").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_datasource(client, datasource_id=100, raw=True))[0].text)
+        projected = json.loads((await get_datasource(client, datasource_id=100))[0].text)
+
+        assert raw == body
+        assert "displayName" not in projected
+        assert projected["display_name"] == body["displayName"]

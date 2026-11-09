@@ -187,3 +187,35 @@ class TestGetAlertRule:
         result = await get_alert_rule(client, rule_id=999)
 
         assert is_error_result(result)
+
+
+class TestGetAlertRuleRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.alert_rules import get_alert_rule
+
+        body = {
+            "id": 100,
+            "name": "Critical",
+            "priority": 1,
+            "escalatingChainId": 5,
+            "levelStr": "Critical",
+            "datasource": "*",
+            "datapoint": "*",
+            "instance": "*",
+            "escalationInterval": 15,
+            "devices": ["*"],
+            "deviceGroups": ["*"],
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/rules/100").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_alert_rule(client, rule_id=100, raw=True))[0].text)
+        projected = json.loads((await get_alert_rule(client, rule_id=100))[0].text)
+
+        assert raw == body
+        assert "escalatingChainId" not in projected
+        assert projected["escalation_chain_id"] == body["escalatingChainId"]

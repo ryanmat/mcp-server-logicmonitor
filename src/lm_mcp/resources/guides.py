@@ -308,21 +308,6 @@ TOOL_CATEGORIES = {
                 "get_scheduled_downtime_jobs",
             ],
         },
-        "exports": {
-            "description": "Export LogicModule definitions as JSON",
-            "tools": [
-                "export_datasource",
-                "export_dashboard",
-                "export_alert_rule",
-                "export_escalation_chain",
-                "export_configsource",
-                "export_eventsource",
-                "export_propertysource",
-                "export_logsource",
-                "export_diagnosticsource",
-                "export_remediationsource",
-            ],
-        },
         "imports": {
             "description": "Import LogicModule definitions from JSON",
             "tools": [

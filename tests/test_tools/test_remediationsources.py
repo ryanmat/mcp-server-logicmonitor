@@ -670,3 +670,30 @@ class TestDeleteRemediationSource:
         result = await delete_remediationsource(client, remediationsource_id=999)
 
         assert "error" in result[0].text.lower()
+
+
+class TestGetRemediationsourceRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.remediationsources import get_remediationsource
+
+        body = {
+            "id": 10,
+            "name": "RestartSvc",
+            "displayName": "Restart service",
+            "appliesTo": "false()",
+            "groovyScript": "println 'restart'",
+            "accessGroupIds": [1],
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/10").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_remediationsource(client, source_id=10, raw=True))[0].text)
+        projected = json.loads((await get_remediationsource(client, source_id=10))[0].text)
+
+        assert raw == body
+        assert "displayName" not in projected
+        assert projected["display_name"] == body["displayName"]

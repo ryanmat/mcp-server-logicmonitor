@@ -162,18 +162,26 @@ async def get_dashboards(
 async def get_dashboard(
     client: LogicMonitorClient,
     dashboard_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific dashboard.
 
     Args:
         client: LogicMonitor API client.
         dashboard_id: Dashboard ID.
+        raw: Return the REST object with its widgets under widgets_full, the template
+            create_dashboard clones, instead of the object with its portal link.
 
     Returns:
         List of TextContent with dashboard details or error.
     """
     try:
         result = await client.get(f"/dashboard/dashboards/{dashboard_id}")
+        if raw:
+            widgets = await client.get(
+                f"/dashboard/dashboards/{dashboard_id}/widgets", params={"size": 1000}
+            )
+            return format_response({**result, "widgets_full": widgets.get("items", [])})
         result["portal_url"] = portal_url("dashboard", dashboard_id)
         return format_response(result)
     except Exception as e:
@@ -245,19 +253,20 @@ async def create_dashboard(
     template: dict | None = None,
     template_path: str | None = None,
 ) -> list[TextContent]:
-    """Create a new dashboard, optionally cloning widgets from an exported template.
+    """Create a new dashboard, optionally cloning widgets from a template.
 
-    The template (an exported dashboard definition from ``export_dashboard``) can be
+    The template (a dashboard definition from ``get_dashboard`` with ``raw=true``) can be
     passed inline via ``template`` or loaded by reference from a local file via
-    ``template_path`` -- the latter keeps a large exported definition out of the model
-    context. An ``export_dashboard`` envelope (``{..., "definition": {...}}``) is
-    unwrapped automatically. When the template has widgets, the shell is created first,
-    then each widget in ``widgets_full`` is recreated on the new dashboard and the
-    exported ``widgetsConfig`` placement is re-applied with the new widget ids. Explicit
+    ``template_path`` -- the latter keeps a large definition out of the model context. A
+    file saved from the 4.3.0 ``export_dashboard`` tool holds the definition in an
+    envelope (``{..., "definition": {...}}``), which is unwrapped automatically. When
+    the template has widgets, the shell is created first, then each widget in
+    ``widgets_full`` is recreated on the new dashboard and the template's
+    ``widgetsConfig`` placement is re-applied with the new widget ids. Explicit
     parameters (group_id, description, widget_tokens) override template values.
 
     There is no separate "import_dashboard": dashboards have no LM Exchange format, so
-    recreating an exported dashboard is a create, not an import.
+    recreating a dashboard from its definition is a create, not an import.
 
     Args:
         client: LogicMonitor API client.
@@ -266,16 +275,17 @@ async def create_dashboard(
         description: Dashboard description.
         sharable: Whether dashboard is sharable (default: True).
         widget_tokens: List of token dicts (e.g., [{"name": "##host##", "value": "server1"}]).
-        template: Full dashboard definition to use as base (from export_dashboard).
-        template_path: Path to a local JSON file holding the dashboard definition or an
-            export_dashboard envelope. Ignored when ``template`` is provided.
+        template: Full dashboard definition to use as base (from get_dashboard with
+            raw=true).
+        template_path: Path to a local JSON file holding the dashboard definition, or
+            a 4.3.0 export_dashboard envelope. Ignored when ``template`` is provided.
 
     Returns:
         List of TextContent with created dashboard details or error.
     """
     try:
         # Load the template by reference if a path was given (keeps a large exported
-        # definition out of the model context); unwrap an export_dashboard envelope.
+        # definition out of the model context); unwrap a 4.3.0 export_dashboard envelope.
         if template is None and template_path:
             with open(template_path, encoding="utf-8") as fh:
                 loaded = json.loads(fh.read())

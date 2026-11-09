@@ -112,7 +112,7 @@ async def create_logsource(
 ) -> list[TextContent]:
     """Create a LogSource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_logsource).
+    Accepts REST API format (the format get_logsource returns with raw=true).
     Use this for creating LogSources from exported definitions or from
     scratch. For LM Exchange format imports, use import_logsource instead.
 
@@ -214,18 +214,22 @@ async def update_logsource(
 async def get_logsource(
     client: LogicMonitorClient,
     logsource_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific LogSource.
 
     Args:
         client: LogicMonitor API client.
         logsource_id: LogSource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with LogSource details or error.
     """
     try:
         result = await client.get(f"/setting/logsources/{logsource_id}")
+        if raw:
+            return format_response(result)
 
         logsource = {
             "id": result.get("id"),

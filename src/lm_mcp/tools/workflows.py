@@ -1043,48 +1043,49 @@ async def search_tools(
 
 
 # ---------------------------------------------------------------------------
-# Composite tool: update_logicmodule (safe export-modify-update for source types)
+# Composite tool: update_logicmodule (safe read-modify-update for source types)
 # ---------------------------------------------------------------------------
 
-# Map of LogicModule type -> (export tool that reads the full definition, full-replace PUT
-# handler, id argument name, fields the merged definition must keep). The PUT handlers are
-# internal, not registered tools. No export tool exists for TopologySources, so their
-# definition is read from the settings path directly; LM_ENABLED_TOOLS and LM_DISABLED_TOOLS
-# patterns on the export name still gate it. Only DataSource and ConfigSource bodies carry
-# displayName.
+# Map of LogicModule type -> (settings path the full definition is read from, full-replace
+# PUT handler, id argument name, fields the merged definition must keep). The read and the
+# PUT handlers are internal, not registered tools; LM_ENABLED_TOOLS and LM_DISABLED_TOOLS
+# patterns on the type's get_<type> name gate the read. Only DataSource and ConfigSource
+# bodies carry displayName.
 _LogicModuleRow = tuple[str, Callable[..., Awaitable[list[TextContent]]], str, tuple[str, ...]]
 _NAME_AND_DISPLAY_NAME = ("name", "displayName")
 _NAME = ("name",)
 _LM_TYPES: dict[str, _LogicModuleRow] = {
     "configsource": (
-        "export_configsource",
+        "configsources",
         update_configsource,
         "configsource_id",
         _NAME_AND_DISPLAY_NAME,
     ),
-    "datasource": ("export_datasource", update_datasource, "datasource_id", _NAME_AND_DISPLAY_NAME),
-    "eventsource": ("export_eventsource", update_eventsource, "eventsource_id", _NAME),
-    "logsource": ("export_logsource", update_logsource, "logsource_id", _NAME),
-    "propertysource": ("export_propertysource", update_propertysource, "propertysource_id", _NAME),
-    "topologysource": (
-        "export_topologysource",
-        update_topologysource,
-        "topologysource_id",
-        _NAME,
-    ),
+    "datasource": ("datasources", update_datasource, "datasource_id", _NAME_AND_DISPLAY_NAME),
+    "eventsource": ("eventsources", update_eventsource, "eventsource_id", _NAME),
+    "logsource": ("logsources", update_logsource, "logsource_id", _NAME),
+    "propertysource": ("propertyrules", update_propertysource, "propertysource_id", _NAME),
+    "topologysource": ("topologysources", update_topologysource, "topologysource_id", _NAME),
     "diagnosticsource": (
-        "export_diagnosticsource",
+        "diagnosticsources",
         update_diagnosticsource,
         "diagnosticsource_id",
         _NAME,
     ),
     "remediationsource": (
-        "export_remediationsource",
+        "remediationsources",
         update_remediationsource,
         "remediationsource_id",
         _NAME,
     ),
 }
+
+
+async def _get_module_raw(client: LogicMonitorClient, module_type: str, module_id: int) -> dict:
+    """Read one LogicModule's full REST object, the body its full-replace PUT takes back."""
+    path = _LM_TYPES[module_type][0]
+    result: dict = await client.get(f"/setting/{path}/{module_id}")
+    return result
 
 
 def _deep_merge(base: dict, overlay: dict, *, path: str = "") -> tuple[dict, list[str]]:
@@ -1209,23 +1210,13 @@ async def update_logicmodule(
                 }
             )
 
-        export_name, update_handler, id_arg, required_fields = _LM_TYPES[type]
+        _path, update_handler, id_arg, required_fields = _LM_TYPES[type]
 
-        blocked = check_required_tools([export_name])
+        blocked = check_required_tools([f"get_{type}"])
         if blocked:
             return blocked
 
-        if type == "topologysource":
-            base = await client.get(f"/setting/topologysources/{id}")
-        else:
-            from lm_mcp.registry import get_tool_handler
-
-            current = await call_sub_tool(get_tool_handler(export_name), client, **{id_arg: id})
-            # DO NOT use `.get("definition") or current` -- an empty dict definition
-            # is falsy and would silently fall through to the envelope wrapper.
-            # `.get(key, default)` returns the value when key is present (even if
-            # falsy) and the default only when key is absent.
-            base = current.get("definition", current)
+        base = await _get_module_raw(client, type, id)
 
         merged, merge_warnings = _deep_merge(base, changes)
 
@@ -1238,7 +1229,7 @@ async def update_logicmodule(
                         "message": (
                             f"merged definition missing required field '{required}'. "
                             "LM API will reject the update. Either keep it from the "
-                            "exported definition or set it explicitly in changes."
+                            "current definition or set it explicitly in changes."
                         ),
                     }
                 )

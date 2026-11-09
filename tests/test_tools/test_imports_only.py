@@ -1,5 +1,5 @@
-# Description: Tests for Import/Export MCP tools.
-# Description: Validates export and import functions for LogicModules and configurations.
+# Description: Tests for the LogicModule import tools.
+# Description: Validates the LM Exchange imports, their envelopes, conflicts and errors.
 
 import json
 
@@ -26,154 +26,6 @@ def client(auth):
         auth=auth,
         timeout=30,
     )
-
-
-class TestExportDatasource:
-    """Tests for export_datasource tool."""
-
-    @respx.mock
-    async def test_export_datasource_returns_full_definition(self, client):
-        """export_datasource returns complete DataSource JSON."""
-        from lm_mcp.tools.imports import export_datasource
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources/123").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 123,
-                    "name": "CPU",
-                    "displayName": "CPU Stats",
-                    "description": "CPU monitoring",
-                    "appliesTo": "isLinux()",
-                    "collectMethod": "script",
-                    "dataPoints": [{"id": 1, "name": "CPUPercent"}],
-                },
-            )
-        )
-
-        result = await export_datasource(client, datasource_id=123)
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["datasource_id"] == 123
-        assert data["name"] == "CPU"
-        assert data["format"] == "json"
-        assert data["definition"]["collectMethod"] == "script"
-
-    @respx.mock
-    async def test_export_datasource_not_found(self, client):
-        """export_datasource returns error for missing datasource."""
-        from lm_mcp.tools.imports import export_datasource
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources/999").mock(
-            return_value=httpx.Response(404, json={"errorMessage": "DataSource not found"})
-        )
-
-        result = await export_datasource(client, datasource_id=999)
-
-        assert is_error_result(result)
-
-
-class TestExportDashboard:
-    """Tests for export_dashboard tool."""
-
-    @respx.mock
-    async def test_export_dashboard_with_widgets(self, client):
-        """export_dashboard includes widgets when requested."""
-        from lm_mcp.tools.imports import export_dashboard
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/456").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 456,
-                    "name": "Production Overview",
-                    "groupId": 1,
-                    "description": "Main dashboard",
-                },
-            )
-        )
-
-        respx.get(
-            "https://test.logicmonitor.com/santaba/rest/dashboard/dashboards/456/widgets"
-        ).mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {"id": 1, "name": "CPU Widget", "type": "cgraph"},
-                        {"id": 2, "name": "Memory Widget", "type": "cgraph"},
-                    ],
-                    "total": 2,
-                },
-            )
-        )
-
-        result = await export_dashboard(client, dashboard_id=456, include_widgets=True)
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["dashboard_id"] == 456
-        assert data["name"] == "Production Overview"
-        assert len(data["definition"]["widgets_full"]) == 2
-
-
-class TestExportAlertRule:
-    """Tests for export_alert_rule tool."""
-
-    @respx.mock
-    async def test_export_alert_rule_returns_definition(self, client):
-        """export_alert_rule returns complete alert rule JSON."""
-        from lm_mcp.tools.imports import export_alert_rule
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/rules/789").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 789,
-                    "name": "Critical CPU Alert",
-                    "priority": 100,
-                    "escalatingChainId": 1,
-                    "datasource": "CPU",
-                },
-            )
-        )
-
-        result = await export_alert_rule(client, alert_rule_id=789)
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["alert_rule_id"] == 789
-        assert data["name"] == "Critical CPU Alert"
-
-
-class TestExportEscalationChain:
-    """Tests for export_escalation_chain tool."""
-
-    @respx.mock
-    async def test_export_escalation_chain_returns_definition(self, client):
-        """export_escalation_chain returns complete chain JSON."""
-        from lm_mcp.tools.imports import export_escalation_chain
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/101").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 101,
-                    "name": "On-Call Team",
-                    "destinations": [
-                        {"type": "single", "period": {"minutes": 15}, "contact": "admin"}
-                    ],
-                },
-            )
-        )
-
-        result = await export_escalation_chain(client, escalation_chain_id=101)
-
-        assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["escalation_chain_id"] == 101
-        assert data["name"] == "On-Call Team"
 
 
 class TestImportDatasource:
@@ -780,33 +632,8 @@ class TestImportHandleConflict:
         assert "fieldsToPreserve" not in url_str
 
 
-class TestDiagnosticSourceImportExport:
-    """Tests for export_diagnosticsource and import_diagnosticsource."""
-
-    @respx.mock
-    async def test_export_diagnosticsource_returns_full_definition(self, client):
-        """export_diagnosticsource returns complete DiagnosticSource JSON."""
-        from lm_mcp.tools.imports import export_diagnosticsource
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/12").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 12,
-                    "name": "Top CPU",
-                    "appliesTo": "isLinux()",
-                    "groovyScript": "println 'top'",
-                    "scriptType": "groovy",
-                },
-            )
-        )
-
-        result = await export_diagnosticsource(client, diagnosticsource_id=12)
-
-        data = json.loads(result[0].text)
-        assert data["diagnosticsource_id"] == 12
-        assert data["format"] == "json"
-        assert data["definition"]["groovyScript"] == "println 'top'"
+class TestDiagnosticSourceImport:
+    """Tests for import_diagnosticsource."""
 
     @respx.mock
     async def test_import_diagnosticsource_success(self, client, monkeypatch):
@@ -860,29 +687,51 @@ class TestDiagnosticSourceImportExport:
         assert "create_diagnosticsource" in text
 
 
-class TestRemediationSourceExport:
-    """Tests for export_remediationsource (no import counterpart exists)."""
+_EXPORT_TOOLS = (
+    "export_datasource",
+    "export_dashboard",
+    "export_alert_rule",
+    "export_escalation_chain",
+    "export_configsource",
+    "export_eventsource",
+    "export_propertysource",
+    "export_logsource",
+    "export_diagnosticsource",
+    "export_remediationsource",
+)
 
-    @respx.mock
-    async def test_export_remediationsource_returns_full_definition(self, client):
-        """export_remediationsource returns complete RemediationSource JSON."""
-        from lm_mcp.tools.imports import export_remediationsource
+# The projecting getters that take raw=true in place of the export tools (spec R2.3).
+_RAW_GETTERS = (
+    "get_datasource",
+    "get_configsource",
+    "get_eventsource",
+    "get_propertysource",
+    "get_logsource",
+    "get_topologysource",
+    "get_diagnosticsource",
+    "get_remediationsource",
+    "get_dashboard",
+    "get_alert_rule",
+    "get_escalation_chain",
+)
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/remediationsources/3").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "id": 3,
-                    "name": "RestartSvc",
-                    "appliesTo": "false()",
-                    "groovyScript": "println 'restart'",
-                },
-            )
-        )
 
-        result = await export_remediationsource(client, remediationsource_id=3)
+class TestExportToolsLeave:
+    """R2.3, R2.13: the ten export tools leave; the getters return the REST object with raw."""
 
-        data = json.loads(result[0].text)
-        assert data["remediationsource_id"] == 3
-        assert data["format"] == "json"
-        assert data["definition"]["groovyScript"] == "println 'restart'"
+    @pytest.mark.parametrize("name", _EXPORT_TOOLS)
+    def test_export_tool_is_not_registered(self, name):
+        from lm_mcp.registry import TOOLS, get_tool_handler
+
+        assert name not in {tool.name for tool in TOOLS}
+        with pytest.raises(ValueError, match="Unknown tool"):
+            get_tool_handler(name)
+
+    @pytest.mark.parametrize("name", _RAW_GETTERS)
+    def test_getter_declares_raw(self, name):
+        from lm_mcp.registry import TOOLS
+
+        (tool,) = [t for t in TOOLS if t.name == name]
+        raw = tool.inputSchema["properties"]["raw"]
+        assert raw["type"] == "boolean"
+        assert raw["default"] is False

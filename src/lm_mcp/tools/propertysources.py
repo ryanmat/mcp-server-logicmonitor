@@ -105,7 +105,7 @@ async def create_propertysource(
 ) -> list[TextContent]:
     """Create a PropertySource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_propertysource).
+    Accepts REST API format (the format get_propertysource returns with raw=true).
     Use this for creating PropertySources from exported definitions or from
     scratch. For LM Exchange format imports, use import_propertysource instead.
 
@@ -241,18 +241,22 @@ async def delete_propertysource(
 async def get_propertysource(
     client: LogicMonitorClient,
     propertysource_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific PropertySource.
 
     Args:
         client: LogicMonitor API client.
         propertysource_id: PropertySource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with PropertySource details or error.
     """
     try:
         result = await client.get(f"/setting/propertyrules/{propertysource_id}")
+        if raw:
+            return format_response(result)
 
         source = {
             "id": result.get("id"),

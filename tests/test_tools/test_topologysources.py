@@ -2,6 +2,7 @@
 # Description: Validates create_topologysource and update_topologysource functions.
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -256,3 +257,30 @@ class TestDeleteTopologysource:
 
         result = await delete_topologysource(client, topologysource_id=999)
         assert is_error_result(result)
+
+
+# GET /setting/topologysources/1 on a live portal, 2026-11-07 (the update_logicmodule
+# fixture).
+_TOPOLOGYSOURCE = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "topologysource_1.json").read_text()
+)
+
+
+class TestGetTopologysourceRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.topologysources import get_topologysource
+
+        body = _TOPOLOGYSOURCE
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/topologysources/1").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_topologysource(client, topologysource_id=1, raw=True))[0].text)
+        projected = json.loads((await get_topologysource(client, topologysource_id=1))[0].text)
+
+        assert raw == body
+        assert "appliesTo" not in projected
+        assert projected["applies_to"] == body["appliesTo"]

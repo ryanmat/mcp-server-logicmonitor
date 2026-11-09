@@ -942,7 +942,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create a ConfigSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_configsource output). For LM Exchange format, use import_configsource.",
+    "description": "Create a ConfigSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_configsource with raw=true). For LM Exchange format, use import_configsource.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -991,11 +991,11 @@
           "type": "boolean"
         },
         "template": {
-          "description": "Full dashboard definition to clone from (from export_dashboard). Name is overridden, id is stripped.",
+          "description": "Full dashboard definition to clone from (from get_dashboard with raw=true). Name is overridden, id is stripped.",
           "type": "object"
         },
         "template_path": {
-          "description": "Path to a local JSON file holding the dashboard definition or an export_dashboard envelope; loaded by reference so a large export stays out of context. Ignored if template is set.",
+          "description": "Path to a local JSON file holding the dashboard definition, or a 4.3.0 export_dashboard envelope; loaded by reference so a large definition stays out of context. Ignored if template is set.",
           "type": "string"
         },
         "widget_tokens": {
@@ -1050,7 +1050,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create a DataSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_datasource output). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_datasource. Script DataSource datapoints require appropriate type values.",
+    "description": "Create a DataSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_datasource with raw=true). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_datasource. Script DataSource datapoints require appropriate type values.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -1163,7 +1163,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource.",
+    "description": "Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_diagnosticsource with raw=true). For LM Exchange format, use import_diagnosticsource.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -1289,7 +1289,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create an EventSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_eventsource output). For LM Exchange format, use import_eventsource.",
+    "description": "Create an EventSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_eventsource with raw=true). For LM Exchange format, use import_eventsource.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -1448,7 +1448,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create a LogSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_logsource output). For LM Exchange format, use import_logsource.",
+    "description": "Create a LogSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_logsource with raw=true). For LM Exchange format, use import_logsource.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -1475,7 +1475,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create a PropertySource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_propertysource output). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_propertysource.",
+    "description": "Create a PropertySource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_propertysource with raw=true). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_propertysource.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -1544,7 +1544,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint.",
+    "description": "Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_remediationsource with raw=true). RemediationSources have no LM Exchange import endpoint.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -2671,226 +2671,6 @@
       "type": "object"
     }
   },
-  "export_alert_rule": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export an alert rule definition",
-    "inputSchema": {
-      "properties": {
-        "alert_rule_id": {
-          "description": "Alert rule ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "alert_rule_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_configsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a ConfigSource definition (REST API format). Output can be used with create_configsource.",
-    "inputSchema": {
-      "properties": {
-        "configsource_id": {
-          "description": "ConfigSource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "configsource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_dashboard": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a dashboard definition",
-    "inputSchema": {
-      "properties": {
-        "dashboard_id": {
-          "description": "Dashboard ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "dashboard_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_datasource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a datasource definition (REST API format). Output can be used with create_datasource.",
-    "inputSchema": {
-      "properties": {
-        "datasource_id": {
-          "description": "Datasource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "datasource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_diagnosticsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource.",
-    "inputSchema": {
-      "properties": {
-        "diagnosticsource_id": {
-          "description": "DiagnosticSource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "diagnosticsource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_escalation_chain": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export an escalation chain definition",
-    "inputSchema": {
-      "properties": {
-        "escalation_chain_id": {
-          "description": "Escalation chain ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "escalation_chain_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_eventsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export an EventSource definition (REST API format). Output can be used with create_eventsource.",
-    "inputSchema": {
-      "properties": {
-        "eventsource_id": {
-          "description": "EventSource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "eventsource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_logsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a LogSource definition (REST API format). Output can be used with create_logsource.",
-    "inputSchema": {
-      "properties": {
-        "logsource_id": {
-          "description": "LogSource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "logsource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_propertysource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a PropertySource definition (REST API format). Output can be used with create_propertysource.",
-    "inputSchema": {
-      "properties": {
-        "propertysource_id": {
-          "description": "PropertySource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "propertysource_id"
-      ],
-      "type": "object"
-    }
-  },
-  "export_remediationsource": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource.",
-    "inputSchema": {
-      "properties": {
-        "remediationsource_id": {
-          "description": "RemediationSource ID",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "remediationsource_id"
-      ],
-      "type": "object"
-    }
-  },
   "get_access_group": {
     "annotations": {
       "destructiveHint": false,
@@ -3107,6 +2887,11 @@
     "description": "Get details about a specific alert rule",
     "inputSchema": {
       "properties": {
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object (every field the API returns) instead of the summary",
+          "type": "boolean"
+        },
         "rule_id": {
           "description": "Alert rule ID",
           "type": "integer"
@@ -3657,6 +3442,11 @@
         "configsource_id": {
           "description": "ConfigSource ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_configsource takes, instead of the summary",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3817,6 +3607,11 @@
         "dashboard_id": {
           "description": "Dashboard ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the REST object with its widgets under widgets_full, the template create_dashboard clones, instead of the object with its portal link",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3955,6 +3750,11 @@
         "datasource_id": {
           "description": "Datasource ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_datasource takes, instead of the summary",
+          "type": "boolean"
         }
       },
       "required": [
@@ -4688,6 +4488,11 @@
     "description": "Get details about a specific DiagnosticSource including datapoints",
     "inputSchema": {
       "properties": {
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_diagnosticsource takes, instead of the summary",
+          "type": "boolean"
+        },
         "source_id": {
           "description": "DiagnosticSource ID",
           "type": "integer"
@@ -4748,6 +4553,11 @@
         "chain_id": {
           "description": "Escalation chain ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object (every field the API returns) instead of the summary",
+          "type": "boolean"
         }
       },
       "required": [
@@ -4795,6 +4605,11 @@
         "eventsource_id": {
           "description": "EventSource ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_eventsource takes, instead of the summary",
+          "type": "boolean"
         }
       },
       "required": [
@@ -5028,6 +4843,11 @@
         "logsource_id": {
           "description": "LogSource ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_logsource takes, instead of the summary",
+          "type": "boolean"
         }
       },
       "required": [
@@ -5421,6 +5241,11 @@
         "propertysource_id": {
           "description": "PropertySource ID",
           "type": "integer"
+        },
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_propertysource takes, instead of the summary",
+          "type": "boolean"
         }
       },
       "required": [
@@ -5568,6 +5393,11 @@
     "description": "Get details about a specific RemediationSource including the Groovy script",
     "inputSchema": {
       "properties": {
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_remediationsource takes, instead of the summary",
+          "type": "boolean"
+        },
         "source_id": {
           "description": "RemediationSource ID",
           "type": "integer"
@@ -6059,6 +5889,11 @@
     "description": "Get details about a specific TopologySource",
     "inputSchema": {
       "properties": {
+        "raw": {
+          "default": false,
+          "description": "Return the full REST object, the definition create_topologysource takes, instead of the summary",
+          "type": "boolean"
+        },
         "topologysource_id": {
           "description": "TopologySource ID",
           "type": "integer"
@@ -6415,7 +6250,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Import a ConfigSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_configsource), use create_configsource instead.",
+    "description": "Import a ConfigSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_configsource with raw=true), use create_configsource instead.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -6448,7 +6283,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Import a DataSource from LM Exchange JSON format via multipart upload (requires write permission). This expects LM Exchange format, not REST API format. For REST API format definitions (e.g., from export_datasource), use create_datasource instead.",
+    "description": "Import a DataSource from LM Exchange JSON format via multipart upload (requires write permission). This expects LM Exchange format, not REST API format. For REST API format definitions (e.g., from get_datasource with raw=true), use create_datasource instead.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -6481,7 +6316,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_diagnosticsource), use create_diagnosticsource instead.",
+    "description": "Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_diagnosticsource with raw=true), use create_diagnosticsource instead.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -6514,7 +6349,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Import an EventSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_eventsource), use create_eventsource instead.",
+    "description": "Import an EventSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_eventsource with raw=true), use create_eventsource instead.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -6580,7 +6415,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Import a LogSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_logsource), use create_logsource instead.",
+    "description": "Import a LogSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_logsource with raw=true), use create_logsource instead.",
     "inputSchema": {
       "properties": {
         "definition": {
@@ -6613,7 +6448,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Import a PropertySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_propertysource), use create_propertysource instead.",
+    "description": "Import a PropertySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_propertysource with raw=true), use create_propertysource instead.",
     "inputSchema": {
       "properties": {
         "definition": {

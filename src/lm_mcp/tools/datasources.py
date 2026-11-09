@@ -100,18 +100,22 @@ async def get_datasources(
 async def get_datasource(
     client: LogicMonitorClient,
     datasource_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific DataSource.
 
     Args:
         client: LogicMonitor API client.
         datasource_id: DataSource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with DataSource details or error.
     """
     try:
         result = await client.get(f"/setting/datasources/{datasource_id}")
+        if raw:
+            return format_response(result)
 
         # Extract key details for a cleaner response
         datasource = {
@@ -159,7 +163,7 @@ async def create_datasource(
 ) -> list[TextContent]:
     """Create a DataSource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_datasource).
+    Accepts REST API format (the format get_datasource returns with raw=true).
     Use this for creating DataSources from exported definitions or from
     scratch. For LM Exchange format imports, use import_datasource instead.
 

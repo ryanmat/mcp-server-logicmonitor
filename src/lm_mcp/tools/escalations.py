@@ -62,18 +62,22 @@ async def get_escalation_chains(
 async def get_escalation_chain(
     client: LogicMonitorClient,
     chain_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific escalation chain.
 
     Args:
         client: LogicMonitor API client.
         chain_id: Escalation chain ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with chain details or error.
     """
     try:
         result = await client.get(f"/setting/alert/chains/{chain_id}")
+        if raw:
+            return format_response(result)
 
         # Parse destinations into readable format.
         # LM API can return stages as [[{...}]] (nested) or [{...}] (flat).

@@ -102,6 +102,7 @@ async def get_remediationsources(
 async def get_remediationsource(
     client: LogicMonitorClient,
     source_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get details for a specific RemediationSource.
 
@@ -112,12 +113,15 @@ async def get_remediationsource(
     Args:
         client: LogicMonitor API client.
         source_id: RemediationSource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with source details or error.
     """
     try:
         result = await client.get(f"/setting/remediationsources/{source_id}")
+        if raw:
+            return format_response(result)
 
         detail = {
             "id": result.get("id"),
@@ -236,7 +240,7 @@ async def create_remediationsource(
 ) -> list[TextContent]:
     """Create a RemediationSource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_remediationsource).
+    Accepts REST API format (the format get_remediationsource returns with raw=true).
     There is no LM Exchange import endpoint for RemediationSources; this is
     the only programmatic creation path.
 
