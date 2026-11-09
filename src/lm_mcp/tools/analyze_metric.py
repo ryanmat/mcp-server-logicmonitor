@@ -1,5 +1,5 @@
 # Description: analyze_metric reads one device instance's series once and analyzes it by section.
-# Description: Holds the series math the per-series tools share until they leave the registry.
+# Description: Holds the series math that classify_trend and the other per-series tools share.
 
 from __future__ import annotations
 
