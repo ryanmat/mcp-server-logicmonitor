@@ -482,6 +482,7 @@ class TestAvailabilitySlo:
         assert len(respx.calls) == 0
 
     def test_calculate_error_budget_is_not_registered(self):
+        """R2.13: the error budget tool leaves for calculate_availability(target_slo=)."""
         from lm_mcp.registry import TOOLS, get_tool_handler
 
         tool = next(t for t in TOOLS if t.name == "calculate_availability")

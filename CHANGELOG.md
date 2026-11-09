@@ -55,7 +55,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   dropped after the fetch by default, never when a `username` is given, and `dropped` counts
   them; `username` takes a comma-separated list and is refused when wildcard stripping leaves
   nothing. A request past the 10,000-row offset or a filter over 900 characters is refused as
-  `INVALID_REQUEST` before it is sent. The filter semantics come from #63.
+  `INVALID_REQUEST` before it is sent. The filter semantics come from #63. `get_change_audit` reads a
+  change the same way, from `Action=` or the description's leading verb, where it kept any
+  entry whose description held create, add, update, delete, remove or modify anywhere.
 
 ### Removed
 

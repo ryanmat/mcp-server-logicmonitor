@@ -64,7 +64,7 @@ _ALERT_WINDOW_TOOLS_REPLACED = (
 
 
 class TestAlertWindowToolsReplaced:
-    """analyze_alerts is registered and the five alert-window tools it replaces are not (R2.2)."""
+    """analyze_alerts is registered; the five tools it replaces are not (R2.2, R2.13)."""
 
     def test_analyze_alerts_is_registered(self):
         assert "analyze_alerts" in {tool.name for tool in TOOLS}

@@ -58,7 +58,7 @@ async def _logs(client, **kwargs):
 
 
 class TestAuditLogsAll:
-    """kind="all": the filters the accesslogs API honors, sent through list_tool."""
+    """R2.11 kind="all": the filters the accesslogs API honors, sent through list_tool."""
 
     @respx.mock
     async def test_returns_rows_with_the_epoch_and_local_times(self, client):
@@ -226,7 +226,7 @@ class TestAuditLogsAll:
             ({"offset": 9990, "limit": 50}, "10000"),
             ({"username": LONG_USERNAMES}, "HTTP 500"),
             ({"kind": "change", "username": LONG_USERNAMES}, "HTTP 500"),
-            ({"kind": "change", "offset": 9900}, "10000"),
+            ({"kind": "change", "offset": 9990}, "10000"),
             ({"kind": "login"}, "kind"),
             ({"change_type": "delete"}, "change_type"),
         ],
@@ -294,7 +294,7 @@ class TestSystemActors:
 
 
 class TestAuditLogsChange:
-    """kind="change": the verb read from the description, over a pool of the newest rows."""
+    """R2.11 kind="change": the verb read from the description, over a pool of the newest rows."""
 
     @respx.mock
     async def test_classifies_and_filters_changes(self, client):
@@ -478,6 +478,18 @@ class TestAuditLogsChange:
 
         assert (data["scanned"], data["has_more"]) == (1, True)
         assert "note" in data
+
+    @respx.mock
+    async def test_the_pool_shrinks_to_fit_under_the_offset_ceiling(self, client):
+        """Near the 10,000-row ceiling the pool reads only the rows left, not a refusal."""
+        route = respx.get(URL).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        data = json.loads((await _logs(client, kind="change", offset=9600, limit=50))[0].text)
+
+        assert route.calls[0].request.url.params["size"] == "400"
+        assert data["change_logs"] == []
 
     @respx.mock
     async def test_reports_the_filter_sent(self, client):

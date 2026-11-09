@@ -185,9 +185,10 @@ async def _change_logs(
     notes: list[str],
 ) -> list[TextContent]:
     """Scan a pool of the newest rows for changes, stopping at limit."""
-    # Changes are a small share of the feed, so read a larger pool than requested.
-    pool = min(1000, max(limit * 10, 200))
-    flt = _within_ceilings(filters, pool, offset)
+    # Changes are a small share of the feed, so read a larger pool than requested, as far as
+    # the offset ceiling leaves room; only offset + limit past it is refused.
+    pool = min(1000, max(limit * 10, 200), max(OFFSET_CEILING - offset, 0))
+    flt = _within_ceilings(filters, max(pool, limit), offset)
     items, result = await _query(client, flt, pool, offset)
 
     logs: list[dict[str, Any]] = []

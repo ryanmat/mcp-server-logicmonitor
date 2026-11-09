@@ -14,7 +14,7 @@ from lm_mcp.tools import is_error_result
 BASE_URL = "https://test.logicmonitor.com/santaba/rest"
 DEVICES_URL = f"{BASE_URL}/device/devices"
 
-# The seven trace tools whose reads the device tools already make (spec R2.3).
+# The seven trace tools whose reads the device tools already make (spec R2.3, R2.13).
 REMOVED_TRACE_TOOLS = (
     "get_trace_services",
     "get_trace_service",
@@ -189,7 +189,7 @@ class TestGetApmServiceAlerts:
 
 
 class TestApmRegistration:
-    """The service pair stays, two APM tools remain, and seven trace tools leave (R2.3)."""
+    """The service pair stays, two APM tools remain, and seven trace tools leave (R2.3, R2.13)."""
 
     def test_the_service_pair_and_the_two_apm_tools_are_registered(self):
         from lm_mcp.registry import TOOLS, get_tool_handler
