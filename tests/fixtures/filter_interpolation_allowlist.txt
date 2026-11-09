@@ -18,7 +18,6 @@ analyze_alerts.py: start_epoch
 api_tokens.py: token_id
 audit.py: int(end_time)
 audit.py: int(start_time)
-audit.py: token_id
 collectors.py: cid
 collectors.py: collector_group_id
 collectors.py: start_epoch

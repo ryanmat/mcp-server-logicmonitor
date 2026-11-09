@@ -234,9 +234,6 @@ TOOL_CATEGORIES = {
             "description": "Audit logs and activity tracking",
             "tools": [
                 "get_audit_logs",
-                "get_api_token_audit",
-                "get_login_audit",
-                "get_change_audit",
             ],
         },
         "cost": {
@@ -529,9 +526,9 @@ COMMON_QUERY_EXAMPLES = {
         },
         {
             "description": "Get failed login attempts",
-            "tool": "get_login_audit",
-            "args": {"failed_only": True},
-            "notes": "Use failed_only=True for security review.",
+            "tool": "get_audit_logs",
+            "args": {"kind": "login", "failed_only": True},
+            "notes": "kind=login with failed_only=True for security review.",
         },
         {
             "description": "Check device neighbors for topology context",
@@ -644,8 +641,8 @@ MCP_ORCHESTRATION_GUIDE: dict = {
                 },
                 {
                     "server": "logicmonitor",
-                    "tool": "get_change_audit",
-                    "description": "Check for LM config changes in same window",
+                    "tool": "get_audit_logs",
+                    "description": "Check for LM config changes in same window (kind=change)",
                 },
                 {
                     "server": "slack",

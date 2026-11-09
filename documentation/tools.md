@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 249 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 246 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -265,10 +265,7 @@ Audit logs and activity tracking
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_audit_logs` | Read the portal audit log: call this for who did what and when. kind='all' returns one page of entries, newest first; kind='change' returns the configuration changes (create, update, delete or import, read from each entry's description) found in a pool of the newest entries, with scanned and has_more. username is an exact name or a comma-separated list; action and resource_type are text the description must contain (the portal applies one, the second is matched on the fetched page); start_time and end_time bound the entry time in epoch seconds. System and automation actors (System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the fetch unless exclude_system is false or a username is given; dropped counts them and paging follows the rows the portal returned. offset plus the rows read must stay within 10,000, and the filter within about 900 characters. | No |
-| `get_api_token_audit` | Get API token usage audit logs | No |
-| `get_login_audit` | Get login/authentication audit logs | No |
-| `get_change_audit` | Get configuration change audit logs | No |
+| `get_audit_logs` | Read the portal audit log: call this for who did what and when. kind='all' returns one page of entries, newest first; kind='change' returns the configuration changes (create, update, delete or import, read from each entry's description) found in a pool of the newest entries, with scanned and has_more; kind='login' returns portal sign-ins, sign-outs and failed logins, one query per login wording (up to six calls), with status and method per row, success_only or failed_only, and total as a lower bound while has_more is true; kind='api_token' returns the rows naming an API token, given by access_id or token_id (read to its access ID), keeping only that exact access ID, with event (change, rejected, throttled), path and method per row. username is an exact name or a comma-separated list; action and resource_type (kinds all and change) are whole words the description holds (the portal applies one, the second is matched on the fetched page); start_time and end_time bound the entry time in epoch seconds. System and automation actors (System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the fetch for kinds all and change unless exclude_system is false or a username is given; dropped counts them and paging follows the rows the portal returned. An argument another kind reads is refused. offset plus the rows read must stay within 10,000, and the filter within about 900 characters. | No |
 
 ## Cost Optimization
 
