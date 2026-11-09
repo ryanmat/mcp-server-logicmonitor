@@ -153,16 +153,16 @@ BEST_PRACTICES: dict[str, dict] = {
             {
                 "action": "Set latency baselines for inference endpoints",
                 "how": (
-                    "Use save_baseline to capture normal inference latency, then "
-                    "compare_to_baseline to detect degradation"
+                    "Use analyze_metric with baseline_hours_ago to compare inference "
+                    "latency against an earlier window and detect degradation"
                 ),
                 "priority": "medium",
             },
             {
                 "action": "Monitor error rates and rate limiting",
                 "how": (
-                    "Use get_metric_anomalies to detect spikes in error rates or "
-                    "sudden drops in throughput indicating rate limits"
+                    "Use analyze_metric's anomalies section to detect spikes in error "
+                    "rates or sudden drops in throughput indicating rate limits"
                 ),
                 "priority": "medium",
             },

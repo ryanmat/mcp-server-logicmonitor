@@ -277,28 +277,6 @@ class TestTrend:
 
         assert -3.0 < trend["theil_sen_slope_per_hour"] < 0.0
 
-    @respx.mock
-    async def test_trend_matches_classify_trend_on_the_same_page(self, client):
-        """The trend math is classify_trend's, moved: the shared figures agree on one page."""
-        from lm_mcp.tools.forecasting import classify_trend
-
-        rows = [(h * 0.5, 50.0 + (h % 7) * 3.0 + h * 0.2) for h in range(120)]
-        respx.get(SERIES_URL).mock(
-            return_value=httpx.Response(200, json=_series_page(_hours(rows)))
-        )
-
-        trend = _body(await _analyze(client, analyses=["trend"]))["datapoints"]["cpu"]["trend"]
-        old = _body(await classify_trend(client, **SERIES_ARGS, datapoints="cpu"))[
-            "classifications"
-        ]["cpu"]
-
-        assert trend["slope_per_hour"] == old["slope_per_hour"]
-        assert trend["r_squared"] == old["r_squared"]
-        assert trend["coefficient_of_variation"] == old["volatility_index"]
-        assert trend["autocorrelation_24h"] == old["autocorrelation_24h"]
-        assert trend["label"] == old["classification"]
-        assert trend["confidence"] == old["confidence"]
-
 
 class TestSeasonality:
     """R2.1 seasonality: detrended autocorrelation table, dominant period, peak hours in UTC."""
@@ -308,7 +286,7 @@ class TestSeasonality:
         """A week of five-minute samples, read whole by default, shows its 24-hour period.
 
         The default window is 168 hours, so the 24-hour lag fits inside half the series
-        (classify_trend's 24-hour default could not hold it). Every section comes from
+        (a 24-hour window could not hold it). Every section comes from
         the same five pages.
         """
         week = [50.0 + 20.0 * math.cos(2 * math.pi * i / 288) + 0.01 * i for i in range(2016)]

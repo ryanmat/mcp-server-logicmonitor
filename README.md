@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 268 tools, 3 workflow prompts, and 25 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 260 tools, 3 workflow prompts, and 25 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 268 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
+The 260 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
-- the `lm://guide/tool-categories` resource: all 268 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 260 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -147,9 +147,8 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 These run server-side in pure Python, so an assistant gets the result in one call.
 
 - Alert correlation clusters, statistics by severity and device, noise scoring with flap detection, and burst detection
-- Metric anomaly detection (z-score, IQR, MAD), saved baselines and drift, correlation, change points, trend classification, and seasonality
-- Forecasting with linear regression or Holt-Winters, with confidence intervals and breach prediction. The response names the method that ran and why it fell back
-- Availability with MTTR from active and cleared alerts, SLO error budgets, and device health scoring
+- `analyze_metric` reads a series once for its summary, trend, seasonality, change points, anomalies (z-score, IQR, MAD), linear and Holt-Winters forecast to a threshold, and a comparison with an earlier window; metric correlation across series
+- Availability with MTTR from active and cleared alerts, and SLO error budgets
 - Topology-based blast radius, and change correlation against audit logs
 
 Composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) combine these. Each takes `detail_level` (`summary` or `full`) and returns partial results when a sub-tool fails.
@@ -161,7 +160,7 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 | Skill | Command | Description |
 |-------|---------|-------------|
 | Alert Triage | `/lm-triage` | Investigate active alerts, score noise, correlate clusters, assess blast radius, take action |
-| Device Health | `/lm-health <device>` | Health check: metrics, anomalies, health score, availability, topology |
+| Device Health | `/lm-health <device>` | Health check: metrics, anomalies, availability, topology |
 | Portal Overview | `/lm-portal` | Portal-wide snapshot for shift handoff: alerts, collectors, SDTs, down devices |
 | Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
 | APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
@@ -294,7 +293,7 @@ Clients read these through the standard MCP resource and prompt calls.
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 268 tools organized by domain category |
+| `lm://guide/tool-categories` | All 260 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

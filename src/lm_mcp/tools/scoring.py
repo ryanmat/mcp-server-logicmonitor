@@ -1,5 +1,5 @@
 # Description: Scoring and availability analysis tools for LogicMonitor.
-# Description: Provides scoring, availability, health, and error budget tools.
+# Description: Provides alert noise scoring, availability, and error budget tools.
 
 from __future__ import annotations
 
@@ -23,11 +23,8 @@ from lm_mcp.tools import (
     sanitize_filter_value,
 )
 from lm_mcp.tools.alerts import paginate_alerts
-from lm_mcp.tools.analyze_metric import summary_stats
 from lm_mcp.tools.stats_helpers import (
-    fetch_metric_series,
     shannon_entropy,
-    truncation_warnings,
 )
 
 if TYPE_CHECKING:
@@ -514,150 +511,6 @@ def _merge_intervals(
             merged.append((start, end))
 
     return merged
-
-
-async def score_device_health(
-    client: LogicMonitorClient,
-    device_id: int,
-    device_datasource_id: int,
-    instance_id: int,
-    datapoints: str | None = None,
-    hours_back: int = 4,
-    weights: dict[str, float] | None = None,
-) -> list[TextContent]:
-    """Compute a composite health score (0-100) for a device instance.
-
-    Fetches metric data, computes z-scores for the latest value of each
-    datapoint against its historical distribution, and aggregates into
-    a single health score.
-
-    Args:
-        client: LogicMonitor API client.
-        device_id: Device ID.
-        device_datasource_id: Device-DataSource ID.
-        instance_id: Instance ID.
-        datapoints: Comma-separated datapoint names (all if omitted).
-        hours_back: Hours of historical data for z-score baseline (default: 4).
-        weights: Optional dict of datapoint_name -> weight for scoring.
-
-    Returns:
-        Health score with status, contributing factors, and anomaly count;
-        warnings names any datapoint the page cap cut short.
-    """
-    try:
-        series = await fetch_metric_series(
-            client,
-            device_id,
-            device_datasource_id,
-            instance_id,
-            datapoints=datapoints,
-            hours_back=hours_back,
-        )
-
-        if not series:
-            return format_response(
-                {
-                    "device_id": device_id,
-                    "health_score": 100,
-                    "status": "unknown",
-                    "message": "No metric data available",
-                    "contributing_factors": [],
-                    "anomaly_count": 0,
-                }
-            )
-
-        factors: list[dict[str, Any]] = []
-        anomaly_count = 0
-
-        for dp_name, dp_data in series.items():
-            values = dp_data["values"]
-
-            if len(values) < 2:
-                continue
-
-            stats = summary_stats(values)
-            mean = stats["mean"]
-            stddev = stats["stddev"]
-            latest = stats["latest"]
-            z_score = abs(stats["z_score"])
-
-            weight = 1.0
-            if weights and dp_name in weights:
-                weight = weights[dp_name]
-
-            if z_score > 2.0:
-                anomaly_count += 1
-
-            factors.append(
-                {
-                    "datapoint": dp_name,
-                    "latest_value": round(latest, 4),
-                    "mean": round(mean, 4),
-                    "stddev": round(stddev, 4),
-                    "z_score": round(z_score, 2),
-                    "weight": weight,
-                    "weighted_impact": round(z_score * weight, 4),
-                }
-            )
-
-        # Sort by weighted impact (most impactful first)
-        factors.sort(key=lambda f: f["weighted_impact"], reverse=True)
-
-        # Health score: start at 100, subtract weighted z-scores
-        if factors:
-            total_weight = sum(f["weight"] for f in factors)
-            weighted_z_sum = sum(f["z_score"] * f["weight"] for f in factors)
-            avg_weighted_z = weighted_z_sum / total_weight if total_weight > 0 else 0
-            health_score = max(0, int(100 - avg_weighted_z * 15))
-        else:
-            health_score = 100
-
-        # Status classification
-        if health_score >= 80:
-            status = "healthy"
-        elif health_score >= 50:
-            status = "degraded"
-        else:
-            status = "critical"
-
-        # Best practice guardrails
-        from lm_mcp.resources.best_practices import get_best_practices
-
-        structured_recs: list[dict] = []
-        anti_patterns: list[str] = []
-        if health_score < 50:
-            bp = get_best_practices("device_health_low").get("device_health_low", {})
-            structured_recs = bp.get("recommended_actions", [])
-            anti_patterns = bp.get("anti_patterns", [])
-        elif health_score < 80:
-            structured_recs = [
-                {
-                    "action": "Monitor trend",
-                    "how": "Re-check health score in 1-2 hours to detect worsening",
-                    "priority": "low",
-                }
-            ]
-
-        result_data: dict = {
-            "device_id": device_id,
-            "device_datasource_id": device_datasource_id,
-            "instance_id": instance_id,
-            "health_score": health_score,
-            "status": status,
-            "contributing_factors": factors,
-            "anomaly_count": anomaly_count,
-            "recommendations": structured_recs,
-            "hours_back": hours_back,
-        }
-        if health_score < 50:
-            result_data["anti_patterns"] = anti_patterns
-        warnings = truncation_warnings(series)
-        if warnings:
-            result_data["warnings"] = warnings
-
-        return format_response(result_data)
-    except Exception as e:
-        return handle_error(e)
 
 
 async def calculate_error_budget(

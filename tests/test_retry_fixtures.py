@@ -18,11 +18,9 @@ _API = "https://test.logicmonitor.com/santaba/rest"
 
 _ZERO_RETRY_MODULES = [
     "test_alert_rules",
-    "test_baselines",
     "test_correlation",
     "test_diagnosticsources",
     "test_event_correlation",
-    "test_forecasting",
     "test_networking",
     "test_remediationsources",
     "test_scoring",

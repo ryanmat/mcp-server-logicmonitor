@@ -146,7 +146,7 @@ class TestSkillFileStructure:
             "mcp__logicmonitor__get_alert_details",
             "mcp__logicmonitor__get_device",
             "mcp__logicmonitor__get_device_data",
-            "mcp__logicmonitor__score_device_health",
+            "mcp__logicmonitor__analyze_metric",
             "mcp__logicmonitor__correlate_alerts",
             "mcp__logicmonitor__correlate_changes",
             "mcp__logicmonitor__analyze_blast_radius",

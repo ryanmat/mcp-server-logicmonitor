@@ -7,7 +7,7 @@ allowed-tools:
   - mcp__logicmonitor__get_alert_details
   - mcp__logicmonitor__get_device
   - mcp__logicmonitor__get_device_data
-  - mcp__logicmonitor__score_device_health
+  - mcp__logicmonitor__analyze_metric
   - mcp__logicmonitor__correlate_alerts
   - mcp__logicmonitor__correlate_changes
   - mcp__logicmonitor__analyze_blast_radius
@@ -67,13 +67,14 @@ If no active alerts are found for the target, report that and stop.
 
 Build the remediation context with deeper analysis.
 
-1. Call `score_device_health` for the affected device.
+1. Call `analyze_metric` with `analyses=["summary", "anomalies"]` for the alerting
+   datasource/instance.
 2. Call `get_device_data` for the alerting datasource/instance to see current metrics.
 3. Call `correlate_alerts` to find related alerts that may share a root cause.
 4. Call `correlate_changes` to check for recent changes that may have caused the issue.
 
 Present a diagnosis summary:
-- Health score and contributing factors
+- Latest-sample z-scores and anomaly hits
 - Current metric values vs. thresholds
 - Correlated alerts (if any)
 - Recent changes (if any)
@@ -164,12 +165,12 @@ If the job fails, present the error output and suggest next steps.
 Verify whether the remediation resolved the issue.
 
 1. Call `get_device_data` for the alerting datasource to check current metric values.
-2. Call `score_device_health` to get the updated health score.
+2. Call `analyze_metric` again to get the updated z-scores.
 3. Call `get_alert_details` to check if the alert has cleared.
 
 Present a before/after comparison:
 - Metric values: before vs. after
-- Health score: before vs. after
+- Latest-sample z-scores: before vs. after
 - Alert status: still active or cleared
 
 ### Step 9: Documentation
@@ -202,7 +203,7 @@ After completing the workflow, present a structured summary:
 ```
 ## Remediation Summary
 - Alert: [alert_id] -- [datasource/datapoint] on [device]
-- Health Score: [before] -> [after]
+- Z-scores: [before] -> [after]
 - Template Used: [template_name]
 - Job ID: [job_id]
 - Result: [success/failed/partial]

@@ -5,7 +5,6 @@ import dataclasses
 import json
 
 import pytest
-import respx
 
 from lm_mcp import session as session_module
 from lm_mcp.config import LMConfig
@@ -256,7 +255,7 @@ def two_portals(tmp_path, monkeypatch, reset_portals):
 
 
 class TestSessionKeyedByPortal:
-    """Session variables, baselines and history are kept per portal (spec R2.12)."""
+    """Session variables and history are kept per portal (spec R2.12)."""
 
     @pytest.fixture(autouse=True)
     def _fresh_sessions(self, monkeypatch):
@@ -280,19 +279,6 @@ class TestSessionKeyedByPortal:
 
         assert envelope(under_globex)["code"] == "NOT_FOUND"
         assert json.loads(under_acme[0].text)["value"] == "acme-web"
-
-    @respx.mock
-    async def test_baseline_saved_under_one_portal_is_absent_under_another(self, two_portals):
-        from lm_mcp import portals
-
-        portals.activate("acme")
-        await self._call("set_session_variable", name="baseline_cpu", value={"datapoints": {}})
-        await self._call("use_portal", customer="globex")
-
-        error = envelope(await self._call("compare_to_baseline", baseline_name="cpu"))
-
-        assert error["code"] == "NOT_FOUND"
-        assert "Baseline 'cpu' not found" in error["message"]
 
     async def test_history_is_per_portal(self, two_portals):
         from lm_mcp import portals

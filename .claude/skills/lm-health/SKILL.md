@@ -1,6 +1,6 @@
 ---
 name: lm-health
-description: "Health check on a LogicMonitor device -- metric status, anomalies, health score, availability, alerts, and topology context."
+description: "Health check on a LogicMonitor device -- metric status, anomalies, availability, alerts, and topology context."
 argument-hint: "<device_id or device_name>"
 allowed-tools:
   - mcp__logicmonitor__get_device
@@ -8,8 +8,7 @@ allowed-tools:
   - mcp__logicmonitor__get_device_datasources
   - mcp__logicmonitor__get_device_instances
   - mcp__logicmonitor__get_device_data
-  - mcp__logicmonitor__score_device_health
-  - mcp__logicmonitor__get_metric_anomalies
+  - mcp__logicmonitor__analyze_metric
   - mcp__logicmonitor__get_alerts
   - mcp__logicmonitor__get_device_properties
   - mcp__logicmonitor__calculate_availability
@@ -75,23 +74,26 @@ Present key metrics:
 
 Skip categories with no matching datasources.
 
-### Step 4: Health Scoring
+### Step 4: Metric Status
 
-Call `score_device_health` for the device.
+For each key instance from Step 3, call `analyze_metric` with
+`analyses=["summary", "anomalies"]` and `hours=24`. Each datapoint's `summary` carries
+`z_score`, how many standard deviations the latest sample sits from the window's mean.
 
-Apply the decision tree:
+Apply the decision tree to the mean of |z_score| across the device's datapoints:
 
-- **score >= 80** — Healthy. Device is operating within normal parameters.
-- **score 50-79** — Degraded. Some metrics are outside normal ranges. Identify which
-  datasources are contributing to the lower score.
-- **score < 50** — Unhealthy. Multiple metrics are in alert or anomalous state.
+- **1.33 or less** — Healthy. Device is operating within normal parameters.
+- **above 1.33, up to 3.33** — Degraded. Some metrics are outside normal ranges.
+  Identify which datasources carry the largest |z_score|.
+- **above 3.33** — Unhealthy. Multiple metrics are in alert or anomalous state.
   Flag for immediate attention.
 
 ### Step 5: Anomaly Detection
 
 For datasources in the Degraded or Unhealthy categories from Step 4:
 
-1. Call `get_metric_anomalies` with `method=zscore` and `threshold=2.0`.
+1. Read the `anomalies` section of the Step 4 analysis: each method's count and its
+   most extreme hits.
 
 List each anomaly with:
 - Datasource and datapoint name
@@ -159,7 +161,7 @@ Compile all findings into a structured report:
 - Collector: [collector id/name]
 - Status: [current status]
 
-### Health Score: [score]/100 — [Healthy/Degraded/Unhealthy]
+### Status: [Healthy/Degraded/Unhealthy] (mean |z_score| [value])
 
 ### Key Metrics
 - CPU: [utilization]%

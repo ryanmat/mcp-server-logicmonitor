@@ -159,13 +159,7 @@ def test_composite_handler_has_no_summarize_argument(name):
     assert "summarize" not in inspect.signature(registry.get_tool_handler(name)).parameters
 
 
-def test_forecast_metric_methods_are_the_statistical_ones():
-    method = _tool("forecast_metric").inputSchema["properties"]["method"]
-
-    assert method["enum"] == ["auto", "linear", "holt_winters"]
-
-
-@pytest.mark.parametrize("module", ["registry.py", "tools/forecasting.py", "tools/workflows.py"])
+@pytest.mark.parametrize("module", ["registry.py", "tools/workflows.py"])
 def test_module_names_neither_summarize_nor_ttm(module):
     text = (_SRC / module).read_text()
 

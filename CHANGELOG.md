@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 268: 264 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 260: 256 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 163 of them, or 167 in
+multi-portal mode. With writes off, the default, `tools/list` shows 155 of them, or 159 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -83,11 +83,18 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `update_diagnosticsource` | `update_logicmodule` with `type="diagnosticsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 | `update_remediationsource` | `update_logicmodule` with `type="remediationsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 | `get_idle_resources` | `get_cost_recommendations`, with `category` set to one description from `get_cost_recommendation_categories`. The portal applied only the first category of the tool's OR filter, so it returned one category's rows, and it rejects `cloudProvider` as a filter field. |
+| `forecast_metric` | `analyze_metric` with `analyses=["forecast"]` and `threshold`: the linear and Holt-Winters crossings within 30 days and each method's slope per hour. |
+| `classify_trend` | `analyze_metric` with `analyses=["trend"]`: the label, least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation and the detrended 24-hour autocorrelation. |
+| `detect_seasonality` | `analyze_metric` with `analyses=["seasonality"]`. |
+| `detect_change_points` | `analyze_metric` with `analyses=["change_points"]`, which compares the mean of the 30 samples after each sample with the 30 before it, where the tool summed deviations from the series mean. |
+| `get_metric_anomalies` | `analyze_metric` with `analyses=["anomalies"]`, which runs z-score, IQR and MAD together at fixed fences (3, 1.5 IQR and 3.5), where the tool ran one method at a threshold you set. |
+| `score_device_health` | `analyze_metric` with `analyses=["summary"]`. Each datapoint's signed `z_score` takes the place of the 0 to 100 score, which no tool computes now. |
+| `save_baseline` | `analyze_metric` with `baseline_hours_ago`, which reads the earlier window when asked. Nothing is stored in the session, and the `baseline_` session variables are no longer read. |
+| `compare_to_baseline` | `analyze_metric` with `analyses=["baseline"]` and `baseline_hours_ago`. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
   summary from the report.
-- The `ttm` method on `forecast_metric`. `method` takes `auto`, `linear` or `holt_winters`.
 - The `name_filter` argument on `get_action_chains`. The portal applies no filter on the action
   chain list, and the tool matched names only among the one page of rows it fetched. Page through
   the list with `offset`.
@@ -250,8 +257,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   its arguments name the one it switched to. Code that calls a write-gated handler or
   `portal_url` outside `execute_tool` in multi-portal mode gets a `RuntimeError`; an audit line
   written outside a call carries no portal. `lm_mcp.portals.is_active_writable` is removed.
-- In multi-portal mode each portal keeps its own session: variables, the baselines
-  `save_baseline` stores, and history. A variable set under one portal is absent under another,
+- In multi-portal mode each portal keeps its own session: variables and history. A variable set under one portal is absent under another,
   and `clear_session_context` clears the session of the portal it runs under. Calls made before
   `use_portal` share one session, as single-portal mode keeps one. A `use_portal` is recorded in
   the history it was called from: the portal it switched away from, or the shared session before
@@ -269,6 +275,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   the instance's `analysis`, where it read the series three or four times. A
   `forecast_summary` row carries the trend label and each method's `hours_until_breach`, and an
   instance whose read fails carries one `analysis_error`.
+- The `lm-capacity`, `lm-health` and `lm-remediate` skills call `analyze_metric` in place of the
+  tools it replaces. `lm-health` grades the mean of |`z_score`| across a device's datapoints at
+  1.33 and 3.33, the points where the removed health score crossed 80 and 50.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
   pyjwt 2.15.1 and websockets 17.4.

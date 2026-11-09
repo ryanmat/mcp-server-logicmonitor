@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 260 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -406,15 +406,14 @@ Native OTLP metrics: PromQL range queries and metric/label discovery (feature-fl
 | `get_otlp_label_values` | [PREVIEW] List values observed for one native OTLP metric label (e.g. all service_name values) | No |
 | `query_otlp_metrics` | [PREVIEW] Run a PromQL range query against native OTLP metrics. Returns a time-series matrix | No |
 
-## Correlation and Anomalies
+## Correlation
 
-Alert correlation and metric anomaly detection
+Alert correlation and alert statistics
 
 | Tool | Description | Write |
 |------|-------------|-------|
 | `correlate_alerts` | Correlate alerts by device, datasource, and temporal proximity. Groups alerts into clusters to identify related issues. | No |
 | `get_alert_statistics` | Aggregate alert counts by severity, device, datasource, and time bucket. Returns statistical summary over a time window. | No |
-| `get_metric_anomalies` | Detect metric anomalies using z-score analysis. Identifies data points deviating significantly from the mean. | No |
 
 ## APM Traces
 
@@ -437,22 +436,17 @@ ML/statistical analysis and forecasting
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `forecast_metric` | Forecast when a metric will breach a threshold using linear regression. Analyzes historical data to predict trend direction and estimated breach time. | No |
 | `correlate_metrics` | Compute Pearson correlation between multiple metric series. Builds an NxN correlation matrix and highlights strong correlations (\|r\| > 0.7). Maximum 10 sources. | No |
-| `detect_change_points` | Detect regime shifts in metric data using the CUSUM algorithm. Identifies points where the mean value changes significantly. | No |
 | `score_alert_noise` | Score alert noise level using Shannon entropy and flap detection. Produces a score from 0 (quiet) to 100 (extremely noisy) with recommendations for tuning. Reads the window's cleared and active alerts, so a cleared alert that re-fires counts as a flap; truncated says when the 5000-alert cap cut either read short. | No |
-| `detect_seasonality` | Detect periodic patterns in metric data using autocorrelation. Identifies dominant periods (1h, 4h, 12h, 24h, 168h) and peak activity hours. | No |
 | `calculate_availability` | Calculate availability percentage from alert history. Computes SLA-style uptime metrics, MTTR, and per-device breakdown from the window's cleared and active alerts, read as two lists; truncated says when the 5000-alert cap cut either read short. Common mistakes: hours_back defaults to 720 (30 days). Narrow scope with device_id/group_id for performance. | No |
 | `analyze_blast_radius` | Analyze the blast radius of a device failure using topology data. Traverses neighbors to identify downstream impact and scores overall blast radius (0-100). | No |
 | `correlate_changes` | Cross-reference alert spikes with audit/change logs. Identifies changes that may have triggered alert increases using configurable correlation windows. | No |
-| `classify_trend` | Classify metric trends as stable, increasing, decreasing, cyclic, or volatile. Uses linear regression slope, coefficient of variation, and autocorrelation. | No |
 | `analyze_metric` | Analyze one device instance's metric series: call this for statistics on a datapoint's recent history, such as its current level against the window, whether it is rising, its daily cycle, when it shifted, or which samples stand out. One paged read of the window feeds every section; 'summary' gives latest, mean, standard deviation, min, max and the latest sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, the detrended 24-hour autocorrelation and a label (volatile, cyclic, increasing, decreasing or stable); 'seasonality' gives detrended autocorrelation at 1, 4, 12, 24 and 168 hours, the dominant period and the peak hours in UTC; 'change_points' gives level shifts, where the mean of the next 30 samples leaves the mean of the previous 30 by five times the noise in that comparison (measured with any steady trend and autocorrelation the noise has), with the daily cycle removed first when the window holds three days or more and that leaves less noise; each shift has its timestamp and the levels before and after it, less the daily cycle when that was removed. A change in the last 30 samples is not reported yet, small shifts in strongly autocorrelated noise go unfound, on a window under a day a change inflates the noise and smaller shifts go unfound, and changes about a day apart in a few days leave the cycle in and go unfound; 'anomalies' gives z-score, IQR and MAD hits, each method's 20 most extreme; 'forecast' gives the least-squares and Holt-Winters (daily season, two days of samples needed) slopes per hour and, with threshold, when each crosses it, within 30 days; 'baseline' compares the window with one as long ending baseline_hours_ago hours ago (one more read): both windows' statistics, the mean's percent deviation and a status (normal within 20 percent, elevated or reduced within 50, anomalous past it). The baseline runs only with baseline_hours_ago. Use get_device_data for the raw samples. | No |
-| `score_device_health` | Score health of a specific device-datasource instance using z-score analysis. For full device health reports across all datasources, use the health_check composite tool instead. | No |
 | `calculate_error_budget` | Calculate SLO error budget consumption and projected exhaustion date. Computes remaining budget, burn rate, and status (healthy/warning/critical/exhausted) based on actual availability vs target SLO. | No |
 
-## Session and Baselines
+## Session
 
-Session context, variable management, and baselines
+Session context, variable management, and history
 
 | Tool | Description | Write |
 |------|-------------|-------|
@@ -462,8 +456,6 @@ Session context, variable management, and baselines
 | `delete_session_variable` | Delete a user-defined session variable | No |
 | `clear_session_context` | Clear all session context (variables and history) | No |
 | `list_session_history` | List recent tool call history | No |
-| `save_baseline` | Save a metric baseline from historical data. Computes mean, min, max, stddev per datapoint and stores as a session variable for later comparison. | No |
-| `compare_to_baseline` | Compare current metrics against a stored baseline. Reports deviation percentage and status (normal, elevated, reduced, anomalous) per datapoint. | No |
 
 ## Portals
 
@@ -529,7 +521,7 @@ These tools use pure-Python statistical methods (no external ML libraries). They
 ```
 "Forecast when memory usage on device 150098 will exceed 90%"
 ```
-Uses `forecast_metric` with `threshold=90`. Supports `method` parameter: `"auto"` (default, selects based on data), `"linear"` (regression), or `"holt_winters"` (seasonal). Returns days until breach, trend direction, confidence interval, and method used. Use `hours_back=168` (1 week) for meaningful regression, or `hours_back=24` if the device has limited history.
+Uses `analyze_metric` with `analyses=["forecast"]` and `threshold=90`. Returns the least-squares and Holt-Winters slopes per hour and, for each method, when it crosses the threshold within 30 days (`breach_eta` in epoch seconds, `hours_until_breach`, `direction`), or the reason it does not. Holt-Winters fits a daily season and needs two days of samples; `hours` defaults to 168 (one week).
 
 **Metric correlation** -- find relationships between metrics across devices:
 ```
@@ -539,9 +531,9 @@ Uses `correlate_metrics` with a `sources` array. Each source requires `device_id
 
 **Change point detection** -- find when metric behavior shifted:
 ```
-"Detect any regime shifts in CPU metrics on device 150098 in the last 24 hours"
+"Detect any level shifts in CPU metrics on device 150098 over the last week"
 ```
-Uses `detect_change_points` with CUSUM algorithm. The `sensitivity` parameter (default 1.0) controls detection threshold -- lower values detect smaller shifts. Returns timestamps and direction of each detected change.
+Uses `analyze_metric` with `analyses=["change_points"]`. A shift is reported where the mean of the next 30 samples leaves the mean of the previous 30 by five times the noise in that comparison, with the daily cycle removed first when the window holds three days or more and that leaves less noise. Returns each shift's timestamp and the levels before and after it. A change in the last 30 samples is not reported yet.
 
 **Alert noise scoring** -- identify tuning opportunities:
 ```
@@ -549,11 +541,11 @@ Uses `detect_change_points` with CUSUM algorithm. The `sensitivity` parameter (d
 ```
 Uses `score_alert_noise`. Returns a 0-100 noise score combining Shannon entropy, flap detection (alerts that clear and re-fire within 30 minutes), and repeat ratio. Includes top noisy devices/datasources and tuning recommendations.
 
-**Device health scoring** -- aggregate health into a single number:
+**Metric status and anomalies** -- how far the latest samples sit from the window:
 ```
-"Give me a health score for the stress-demo pod"
+"How far from normal are the stress-demo pod's metrics right now?"
 ```
-Uses `score_device_health`. Computes z-scores for each datapoint's latest value against its historical window, then produces a weighted composite score (0-100). Status: healthy (80+), degraded (50-79), critical (<50). Use the `weights` parameter to emphasize specific datapoints.
+Uses `analyze_metric` with `analyses=["summary", "anomalies"]`. The summary gives each datapoint's latest value, mean, standard deviation, min, max and the latest sample's signed z-score; the anomalies section gives z-score, IQR and MAD hits, each method's 20 most extreme. `health_check` runs both sections on the first instance of up to five datasources.
 
 **Availability calculation** -- SLA reporting from alert data:
 ```

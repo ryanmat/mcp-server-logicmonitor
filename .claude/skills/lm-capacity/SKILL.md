@@ -8,12 +8,7 @@ allowed-tools:
   - mcp__logicmonitor__get_device_datasources
   - mcp__logicmonitor__get_device_instances
   - mcp__logicmonitor__get_device_data
-  - mcp__logicmonitor__forecast_metric
-  - mcp__logicmonitor__classify_trend
-  - mcp__logicmonitor__detect_seasonality
-  - mcp__logicmonitor__detect_change_points
-  - mcp__logicmonitor__compare_to_baseline
-  - mcp__logicmonitor__save_baseline
+  - mcp__logicmonitor__analyze_metric
 ---
 
 # LogicMonitor Capacity Planning
@@ -94,7 +89,10 @@ Flag any resource currently above 80% utilization.
 
 For each capacity-relevant datasource/instance:
 
-1. Call `classify_trend` to determine the growth trajectory.
+1. Call `analyze_metric` once with `analyses=["trend", "seasonality", "change_points",
+   "forecast"]` and the resource's `threshold` from Step 7. Steps 4 to 7 read its
+   sections; its `trend` section gives the growth trajectory (label, slope per hour,
+   r-squared).
 
 Present trend analysis:
 
@@ -116,7 +114,7 @@ Classify each:
 
 For resources classified as volatile or increasing:
 
-1. Call `detect_seasonality` to identify periodic patterns.
+1. Read the `seasonality` section of the Step 4 analysis to identify periodic patterns.
 
 Report findings:
 - Period detected (hourly, daily, weekly)
@@ -131,7 +129,8 @@ where in the cycle the measurement falls.
 
 For resources with increasing trends:
 
-1. Call `detect_change_points` to identify abrupt shifts in utilization.
+1. Read the `change_points` section of the Step 4 analysis to identify abrupt shifts in
+   utilization.
 
 If change points are found:
 - When did the shift occur?
@@ -144,7 +143,9 @@ Change points may indicate a step-function capacity change rather than gradual g
 
 For resources with increasing trends:
 
-1. Call `forecast_metric` with appropriate thresholds:
+1. Read the `forecast` section of the Step 4 analysis, which projects each method
+   (linear and Holt-Winters) to the threshold within 30 days, in hours. The Step 4
+   call takes the threshold:
    - CPU: threshold = 90 (%)
    - Memory: threshold = 90 (%)
    - Disk: threshold = 95 (%)
@@ -168,12 +169,9 @@ Classify urgency:
 
 ### Step 8: Baseline Comparison
 
-Call `compare_to_baseline` for each resource to see how current utilization
-compares to established baselines.
-
-If no baseline exists for a resource and the current data shows a stable period,
-offer to save a baseline by calling `save_baseline`. Get explicit confirmation
-before saving.
+Call `analyze_metric` with `analyses=["baseline"]` and `baseline_hours_ago` (such as
+168 for the same window a week earlier) for each resource to see how current
+utilization compares with the earlier window.
 
 ### Step 9: Capacity Report
 
