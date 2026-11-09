@@ -1,4 +1,5 @@
 [
+  "analyze_alerts",
   "analyze_blast_radius",
   "analyze_metric",
   "audit_network_monitoring_coverage",

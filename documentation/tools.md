@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 260 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 261 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -414,6 +414,7 @@ Alert correlation and alert statistics
 |------|-------------|-------|
 | `correlate_alerts` | Correlate alerts by device, datasource, and temporal proximity. Groups alerts into clusters to identify related issues. | No |
 | `get_alert_statistics` | Aggregate alert counts by severity, device, datasource, and time bucket. Returns statistical summary over a time window. | No |
+| `analyze_alerts` | Analyze one alert window: call this for how many alerts fired and when, which alerts belong together, or how noisy alerting is over the last hours. One read of the window's active and cleared alerts, under the severity, device and group filters, feeds every section; 'statistics' gives active and cleared totals, counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included; 'clusters' groups two or more alerts by device, by datasource and by signature (datasource and datapoint), with their alert ids and first and last start times; 'noise' gives a 0 to 100 score from the entropy of alerts over datasource and datapoint (weight 40), flaps, an alert on the same device and datapoint that re-fires within 30 minutes of clearing (30), and repeats, a combination with three or more alerts (30), with the first ten flap pairs and tuning recommendations. truncated says when the 5000-alert cap cut either read short. Use get_alerts to list or page through the alerts themselves. | No |
 
 ## APM Traces
 

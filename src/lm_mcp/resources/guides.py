@@ -366,6 +366,7 @@ TOOL_CATEGORIES = {
             "tools": [
                 "correlate_alerts",
                 "get_alert_statistics",
+                "analyze_alerts",
             ],
         },
         "traces": {

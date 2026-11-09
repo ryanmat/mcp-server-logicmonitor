@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 260: 256 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 261: 257 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 155 of them, or 159 in
+multi-portal mode. With writes off, the default, `tools/list` shows 156 of them, or 160 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -39,6 +39,12 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   with `threshold`, each method's crossing within 30 days) and `baseline` (the window against one
   as long ending `baseline_hours_ago` hours ago, read with one more paged read). `analyses`
   selects sections; `hours` defaults to 168, which holds the 24-hour lag.
+- `analyze_alerts` reads one alert window, active and cleared alerts both, under `severity`,
+  `device` and `group_id` filters, and reports it by section: `statistics` (active and cleared
+  totals, counts by severity, the ten busiest devices and datasources, the volume of each hour),
+  `clusters` (two or more alerts on one device, one datasource, or one signature, the datasource
+  and datapoint) and `noise` (the 0 to 100 score from entropy, flaps and repeats, with the first ten
+  flap pairs and recommendations). `analyses` selects sections; `hours` defaults to 24.
 
 ### Removed
 

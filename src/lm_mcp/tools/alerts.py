@@ -1,6 +1,6 @@
 # Description: Alert management tools for LogicMonitor MCP server.
 # Description: Provides get_alerts, get_alert_details, acknowledge_alert, add_alert_note,
-# and paginate_alerts, the capped alert-window read the analytics tools share.
+# and paginate_alerts and read_cleared_and_active, the alert-window reads the analytics share.
 
 from __future__ import annotations
 
@@ -75,6 +75,40 @@ async def paginate_alerts(
         if not more:
             break
     return collected[:cap], more or len(collected) > cap, api_total
+
+
+async def read_cleared_and_active(
+    client: LogicMonitorClient,
+    filter_str: str,
+    path: str = "/alert/alerts",
+) -> tuple[list[dict], bool, int | None]:
+    """Read a window's active and cleared alerts as one list.
+
+    Both alert lists return active alerts only unless the filter carries
+    cleared:true, so the window takes two reads, each under the alert cap. An
+    alert that clears between the reads appears in both and is kept once, as
+    the cleared copy, which carries its endEpoch.
+
+    Args:
+        client: LogicMonitor API client.
+        filter_str: Filter string for the active read; the cleared read adds
+            cleared:true to it.
+        path: Alert list to read, as paginate_alerts takes it.
+
+    Returns:
+        The alerts, whether the cap cut either read short, and the sum of both
+        API totals, or None when either reported only a lower bound.
+    """
+    active, active_cut, active_total = await paginate_alerts(client, filter_str, path=path)
+    cleared, cleared_cut, cleared_total = await paginate_alerts(
+        client, f"{filter_str},cleared:true", path=path
+    )
+    cleared_ids = {alert["id"] for alert in cleared if alert.get("id") is not None}
+    alerts = [alert for alert in active if alert.get("id") not in cleared_ids] + cleared
+    api_total = (
+        None if active_total is None or cleared_total is None else active_total + cleared_total
+    )
+    return alerts, active_cut or cleared_cut, api_total
 
 
 def _normalize_alert_id(alert_id: str) -> str:
