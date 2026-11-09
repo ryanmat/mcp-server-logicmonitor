@@ -4890,7 +4890,7 @@ TOOLS.extend(
                 "30 samples is not reported yet, small shifts in strongly autocorrelated "
                 "noise go unfound, on a window under a day a change inflates the noise and "
                 "smaller shifts go unfound, and changes about a day apart in a few days "
-                "leave the cycle in; "
+                "leave the cycle in and go unfound; "
                 "'anomalies' gives z-score, "
                 "IQR and MAD hits, each method's 20 most extreme. Use get_device_data for "
                 "the raw samples."
