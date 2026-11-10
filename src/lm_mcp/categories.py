@@ -74,7 +74,8 @@ def categorize(tool: Tool) -> set[str]:
 
     Categories:
     - workflow: curated composite tools (triage, diagnose, ...)
-    - export: tool name starts with "export_"
+    - export: a getter that takes raw=true, returning the REST object the removed
+      export_* tools returned
     - import: tool name starts with "import_"
     - read: read-only tool that talks to LM (openWorldHint=True)
     - write: mutating tool (not read-only, not destructive, not import/export)
@@ -91,7 +92,7 @@ def categorize(tool: Tool) -> set[str]:
     if tool.name in WORKFLOW_TOOLS:
         cats.add("workflow")
 
-    if tool.name.startswith("export_"):
+    if "raw" in (tool.inputSchema or {}).get("properties", {}):
         cats.add("export")
     elif tool.name.startswith("import_"):
         cats.add("import")

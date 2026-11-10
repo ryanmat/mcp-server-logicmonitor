@@ -356,7 +356,7 @@ class TestCheckRequiredTools:
             for name, value in vars(workflows).items()
             if name.startswith("_") and name.endswith("_REQUIRED")
         }
-        assert len(lists) == 7
+        assert len(lists) == 8
         for name, required in lists.items():
             assert set(required) <= registered, f"{name}: {sorted(set(required) - registered)}"
 
@@ -1290,6 +1290,24 @@ class TestPortalOverview:
         assert routes["devices"].call_count == 1
         assert set(data) == set(PORTAL_OVERVIEW_OUTPUT_SCHEMA["properties"]) - {"warnings"}
         jsonschema.validate(data, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_only_full_mode_needs_get_alerts_and_get_devices(self, auth, lm_env, monkeypatch):
+        """Summary never calls get_alerts or get_devices, so disabling them refuses only full."""
+        from lm_mcp.config import reset_config
+
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "get_alerts,get_devices")
+        reset_config()
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        self._mock_portal()
+
+        summary = json.loads((await portal_overview(client))[0].text)
+        full = (await portal_overview(client, detail_level="full"))[0].text
+        reset_config()
+
+        assert summary["alert_statistics"]["active"] == 2
+        jsonschema.validate(summary, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+        assert "requires disabled tools: get_alerts, get_devices" in full
 
     def test_the_output_schema_refuses_an_undocumented_key(self):
         report = {

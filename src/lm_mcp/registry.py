@@ -5354,13 +5354,14 @@ TOOLS.extend(
         Tool(
             name="triage",
             description=(
-                "Triage the alerts of the last hours_back hours in one call: reads the "
-                "alert window once through analyze_alerts for its statistics, clusters (by "
-                "device, datasource and signature), noise and changes, then counts the blast "
-                "radius of up to three device clusters, largest first: the devices reached as "
-                "neighbors and dependents, how many have a critical alert open, and how many "
-                "devices' neighbors could not be read. detail_level=full adds the devices "
-                "each blast radius reached. Use analyze_alerts for bursts or one section, "
+                "Triage the alerts of the last hours_back hours in one call. Reads the alert "
+                "window once through analyze_alerts for its statistics, clusters (by device, "
+                "datasource and signature), noise and changes, then counts the blast radius "
+                "of up to three device clusters, largest first. Each count row gives the "
+                "devices reached as neighbors and as dependents, how many of them have a "
+                "critical alert open, and how many devices' neighbors could not be read; a "
+                "website cluster gets none. detail_level=full adds the devices each blast "
+                "radius reached. Use analyze_alerts for bursts or a single section, and "
                 "analyze_blast_radius for one device."
             ),
             annotations=_READ_ONLY,

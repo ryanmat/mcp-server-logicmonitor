@@ -1,5 +1,5 @@
 # Description: The LogicModule module table: endpoint, id field and projection per module type.
-# Description: Generic get, delete and create that the eight per-module tool files delegate to.
+# Description: Generic get, list, create, update and delete the eight per-module tool files call.
 
 from __future__ import annotations
 
@@ -447,7 +447,9 @@ async def create_module(
 
     With overwrite, a module already holding the definition's name is replaced in place by
     a PUT to its id; nothing is deleted first, so a failed write leaves it as it was. A
-    name no module holds is created with a POST.
+    name no module holds is created with a POST. The lookup row is taken only when its
+    name is the definition's, so a filter the portal did not apply never names the module
+    to replace.
     """
     module = MODULES[module_type]
     collection = f"/setting/{module.path}"
@@ -462,7 +464,7 @@ async def create_module(
                 params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
             )
             items = found.get("items") or []
-            if items:
+            if items and items[0].get("name") == payload["name"]:
                 existing_id = items[0]["id"]
 
         if existing_id is not None:

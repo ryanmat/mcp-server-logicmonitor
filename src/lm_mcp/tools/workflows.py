@@ -127,9 +127,9 @@ _COUNT = {"type": "integer", "minimum": 0}
 _BLAST_RADIUS_ROW = {
     "type": "object",
     "properties": {
-        "device": {"type": "string", "description": "The device cluster's key, its name."},
+        "device": {"type": "string", "description": "The device's name, the cluster's key."},
         "device_id": {"type": "integer", "description": "The device the cluster's alerts share."},
-        "total_affected_devices": {**_COUNT, "description": "Devices reached, every depth."},
+        "total_affected_devices": {**_COUNT, "description": "Devices reached at any depth."},
         "neighbor_count": {**_COUNT, "description": "Devices reached at depth 1."},
         "dependent_count": {**_COUNT, "description": "Devices reached at depth 2 and beyond."},
         "critical_alert_count": {
@@ -682,9 +682,13 @@ def _instance_warnings(ds_reports: list[dict]) -> list[str]:
 
 _PORTAL_OVERVIEW_REQUIRED = [
     "analyze_alerts",
-    "get_alerts",
     "get_collectors",
     "get_active_sdts",
+]
+
+# The tools only full mode calls, for the open-alert and dead-device lists.
+_PORTAL_OVERVIEW_FULL_REQUIRED = [
+    "get_alerts",
     "get_devices",
 ]
 
@@ -749,7 +753,10 @@ async def portal_overview(
     Returns:
         Portal overview report as TextContent list.
     """
-    blocked = check_required_tools(_PORTAL_OVERVIEW_REQUIRED)
+    required = _PORTAL_OVERVIEW_REQUIRED
+    if detail_level == "full":
+        required = required + _PORTAL_OVERVIEW_FULL_REQUIRED
+    blocked = check_required_tools(required)
     if blocked:
         return blocked
 

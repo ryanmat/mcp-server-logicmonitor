@@ -43,8 +43,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `device`, `group_id` and `datasource` filters, and reports it by section: `statistics` (active
   and cleared totals, counts by severity, the ten busiest devices and datasources, the volume of
   each hour), `clusters` (two or more alerts on one device, one datasource, or one signature, the
-  datasource and datapoint; a device cluster names the `device_id` its alerts share), `noise` (the 0 to 100 score from entropy, flaps and repeats, with the
-  first ten flap pairs and recommendations), `bursts` (windows of `window_seconds` on one
+  datasource and datapoint; a device cluster names the `device_id` its alerts share), `noise`
+  (the 0 to 100 score from entropy, flaps and repeats, with the first ten flap pairs and
+  recommendations), `bursts` (windows of `window_seconds` on one
   datasource holding `min_alerts` alerts on `min_devices` devices) and `changes` (one audit read;
   each write action paired with the first 5-minute alert spike within
   `correlation_window_minutes` after it). `analyses` selects sections; `hours` defaults to 24.
@@ -269,12 +270,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 - `create_<module>` with `overwrite=true`, for the eight LogicModule types, replaces the module
   holding the definition's name in place with a PUT to its id, where it deleted that module and
-  posted a new one; the module keeps its id, and a failed write leaves it as it was. The eight
-  types' get, list, create, update and delete read one module table of endpoint, id field and
-  summary.
+  posted a new one; the module keeps its id, and a failed write leaves it as it was. It replaces
+  the row the name lookup returns only when that row carries the definition's name, so a filter
+  the portal did not apply cannot pick another module. The eight types' get, list, create,
+  update and delete read one module table of endpoint, id field and summary.
 - `update_logicmodule` reads the module's REST object itself, where it called the type's
   `export_*` tool. `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` gate that read by the type's
   `get_<type>` name, where they gated it by the `export_<type>` name.
+- `LM_MCP_CATEGORIES=export` selects the eleven getters that take `raw`, which return the REST
+  object the `export_*` tools returned, where it selected the `export_*` tools.
 - With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 101 tools
   whose annotations say they change the portal (`readOnlyHint` false and `openWorldHint` true),
   and a call to one by name returns the write-disabled error. That includes `update_logicmodule`,
@@ -361,7 +365,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   where summary dropped the key and full returned the whole `analyze_blast_radius` result; full
   adds `affected_devices` and `critical_path_devices`. `portal_overview` in summary mode reads
   alerts, collectors and SDTs once each, and no longer reads the open critical and error alerts
-  or the dead devices, lists only full mode reports.
+  or the dead devices, which only full mode reports, so it runs with `get_alerts` and
+  `get_devices` disabled.
 - `correlate_metrics` joins the series by timestamp bucket, as wide as the coarsest series'
   median sample interval with finer series averaged into it, and reports `shared_samples` and
   `bucket_seconds` in place of `sample_count`. It paired samples by position from the newest, so
