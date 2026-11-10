@@ -52,7 +52,12 @@ def load_edwin_config() -> EdwinConfig | None:
         config = EdwinConfig()
     except ValidationError as exc:
         fields = ", ".join(f"EDWIN_{str(e['loc'][0]).upper()}" for e in exc.errors())
-        logger.warning("Edwin AI is off: %s is unusable (%s)", fields, exc.errors()[0]["msg"])
+        logger.warning(
+            "Edwin AI is off: %s is unusable (%s)",
+            fields,
+            exc.errors()[0]["msg"],
+            exc_info=True,
+        )
         return None
     if not config.client_id and not config.client_token:
         return None

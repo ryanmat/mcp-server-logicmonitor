@@ -359,7 +359,10 @@ class TestConfig:
             assert build_edwin_client("lmryanmatuszewski.logicmonitor.com") is None
 
         assert "EDWIN_HOST" in caplog.text
+        (record,) = [r for r in caplog.records if r.name == "lm_mcp.edwin_config"]
+        assert record.exc_info is not None
         assert CLIENT_SECRET not in caplog.text
+        assert "http://edwin.example.test" not in caplog.text
 
     def test_settings_come_from_the_lm_config(self, edwin_env):
         edwin_env.setenv("EDWIN_CLIENT_ID", CLIENT_ID)
