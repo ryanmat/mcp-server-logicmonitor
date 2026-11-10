@@ -369,13 +369,14 @@ _HEALTH_CHECK_NAMES = (
 )
 _HEALTH_CHECK_DATASOURCES = 5
 
-# One device datasources read lists them all: the API's largest page.
+# One device datasources read of up to 1,000 rows lists them all.
 _ALL_DATASOURCES = 1000
 
 _STRINGS = {"type": "array", "items": {"type": "string"}}
 
-# The report health_check returns, as a JSON Schema. A read that failed is null, with
-# a warning naming it; metrics is a full-mode key, whose warnings summary lifts.
+# The report health_check returns, as a JSON Schema. active_alerts and availability are
+# null when their read failed, and a failed datasource read leaves datasource_count 0,
+# each with a warning naming it; metrics is a full-mode key, whose warnings summary lifts.
 HEALTH_CHECK_OUTPUT_SCHEMA: dict = {
     "type": "object",
     "properties": {
