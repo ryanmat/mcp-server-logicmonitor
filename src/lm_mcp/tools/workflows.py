@@ -1236,6 +1236,12 @@ async def diagnose(
                 )
                 diagnostics["assigned"] = assigned.get("assigned_sources", [])
             except Exception as exc:
+                _AUDIT.warning(
+                    "diagnose: get_diagnostic_remediation_assignments failed for device %s: %s",
+                    target_device_id,
+                    exc,
+                    exc_info=True,
+                )
                 warnings.append(f"get_diagnostic_remediation_assignments failed: {exc}")
             try:
                 runs = await call_sub_tool(
@@ -1246,6 +1252,12 @@ async def diagnose(
                 )
                 diagnostics["latest_results"] = runs.get("executions", [])
             except Exception as exc:
+                _AUDIT.warning(
+                    "diagnose: get_diagnostic_remediation_results failed for device %s: %s",
+                    target_device_id,
+                    exc,
+                    exc_info=True,
+                )
                 warnings.append(f"get_diagnostic_remediation_results failed: {exc}")
             report["diagnostics"] = diagnostics
 

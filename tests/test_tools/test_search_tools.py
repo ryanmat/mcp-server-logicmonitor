@@ -116,6 +116,17 @@ async def test_a_rare_word_outweighs_a_common_one(configure):
     assert names.index("analyze_metric") < names.index("get_device")
 
 
+async def test_a_word_in_the_name_outranks_the_same_word_in_a_description(configure):
+    """'flap' is in get_link_flaps' name and only in analyze_alerts' description, the one
+    word weight for both; the name counts double, so get_link_flaps leads though the
+    registry lists analyze_alerts first and the sort keeps registry order on a tie."""
+    configure()
+
+    names = await _names("flap")
+
+    assert names.index("get_link_flaps") < names.index("analyze_alerts")
+
+
 async def test_a_plural_matches_its_singular(configure):
     """'property' finds get_device_properties and 'alerts' finds get_alert_details' alert."""
     configure()
