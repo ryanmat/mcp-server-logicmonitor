@@ -10,7 +10,10 @@ import pytest
 import respx
 
 from lm_mcp.client.edwin import build_edwin_client
+from lm_mcp.config import reset_config
+from lm_mcp.logging import log_write_operation
 from lm_mcp.tools.edwin import (
+    edwin_run_tool,
     equals,
     filter_condition,
     get_edwin_alert_volume,
@@ -18,6 +21,7 @@ from lm_mcp.tools.edwin import (
     get_edwin_insights,
     get_edwin_metadata,
     get_edwin_records,
+    get_edwin_tools,
     in_,
     list_contains,
     within,
@@ -678,3 +682,320 @@ class TestGetEdwinMetadata:
 
         assert body["error"]["code"] == "INVALID_REQUEST"
         assert "incidents" in body["error"]["message"]
+
+
+# Edwin's agent and tool catalog, from the 2026-11-10 probe of lmryanmatuszewski.dexda.ai
+# (docs/validation/probes-2026-11.md, Step 56): three of the seven agents, the
+# LMDiagnosticsAgent MCP list verbatim, the query-mcp tool list verbatim, and two of the
+# 68 mcp-server-logicmonitor tools (edwin-fullscope-mcp-mcp-server-logicmonitor-tools.json).
+AGENTS = {
+    "agents": [
+        {
+            "name": "ChitChatAgent",
+            "display_name": "General Chat Agent",
+            "customer_facing_description": "Handles simple greetings and conversational "
+            "interactions. Does not perform technical analysis or actions.",
+            "agent_route": "ws/chitchat",
+            "is_active": True,
+            "created_at": "2026-04-09T01:30:19.323948Z",
+            "updated_at": "2026-04-09T01:30:19.323948Z",
+        },
+        {
+            "name": "DynatraceDiagnosticsAgent",
+            "display_name": "Dynatrace Diagnostics",
+            "customer_facing_description": "Diagnose Dynatrace-backed alerts and problems by "
+            "inspecting problems, entities, topology, Kubernetes events, metrics, anomalies, "
+            "synthetic monitors, and vulnerability context.",
+            "agent_route": "ws/dynatrace",
+            "is_active": False,
+            "created_at": "2026-05-18T17:43:33.231286Z",
+            "updated_at": "2026-05-18T17:43:33.231286Z",
+        },
+        {
+            "name": "LMDiagnosticsAgent",
+            "display_name": "LogicMonitor Diagnostics",
+            "customer_facing_description": "Diagnose LogicMonitor-monitored systems by "
+            "inspecting alerts, collectors, services, devices, datasource coverage, and "
+            "configuration to surface actionable insights.",
+            "agent_route": "ws/lm",
+            "is_active": True,
+            "created_at": "2026-04-24T16:11:49.961621Z",
+            "updated_at": "2026-04-24T16:11:49.961621Z",
+        },
+    ],
+    "total": 7,
+}
+AGENT_MCPS = {
+    "org_id": "lmryanmatuszewski",
+    "agent_name": "LMDiagnosticsAgent",
+    "mcps": [
+        {
+            "mcp_name": "mcp-server-logicmonitor",
+            "display_name": "LogicMonitor",
+            "is_enabled": True,
+            "is_required": False,
+            "endpoint": "http://mcp-server-logicmonitor:8080/mcp",
+        },
+        {
+            "mcp_name": "query-mcp",
+            "display_name": "Query Generator",
+            "is_enabled": True,
+            "is_required": False,
+            "endpoint": "http://query-mcp:9020/mcp",
+        },
+    ],
+    "total": 2,
+}
+
+
+def _tool(mcp: str, name: str, display: str, short: str | None, created: str) -> dict:
+    return {
+        "id": f"{mcp}:{name}",
+        "mcp_name": mcp,
+        "name": name,
+        "display_name": display,
+        "short_description": short,
+        "is_active": True,
+        "created_at": created,
+    }
+
+
+_QUERY_CREATED = "2026-04-09T01:30:19.393329Z"
+QUERY_MCP_TOOLS = {
+    "mcp_name": "query-mcp",
+    "tools": [
+        _tool(
+            "query-mcp",
+            "fetch_alert_by_id",
+            "Fetch Alert By Id",
+            "Fetch a single alert record by ID.",
+            _QUERY_CREATED,
+        ),
+        _tool(
+            "query-mcp",
+            "fetch_event_by_id",
+            "Fetch Event By Id",
+            "Fetch a single event record by ID.",
+            _QUERY_CREATED,
+        ),
+        _tool(
+            "query-mcp",
+            "fetch_insight_by_id",
+            "Fetch Insight By Id",
+            "Fetch a single insight record (with its alerts) by ID.",
+            _QUERY_CREATED,
+        ),
+        _tool(
+            "query-mcp",
+            "get_alert_context",
+            "Get Alert Context",
+            "Build a structured context summary for a single alert.",
+            _QUERY_CREATED,
+        ),
+        _tool(
+            "query-mcp",
+            "get_insight_context",
+            "Get Insight Context",
+            "Build a structured context summary for an insight and its alerts.",
+            _QUERY_CREATED,
+        ),
+        _tool(
+            "query-mcp",
+            "search",
+            "Search",
+            "Search alerts, events, or insights using a natural-language question.",
+            _QUERY_CREATED,
+        ),
+    ],
+    "total": 6,
+}
+LM_MCP_TOOLS = {
+    "mcp_name": "mcp-server-logicmonitor",
+    "tools": [
+        _tool(
+            "mcp-server-logicmonitor",
+            "get_alert_details",
+            "Get Alert Details",
+            "Fetch a specific LogicMonitor alert by ID.",
+            "2026-04-24T16:11:49.961621Z",
+        ),
+        _tool(
+            "mcp-server-logicmonitor",
+            "get_alert_rule",
+            "Get Alert Rule",
+            None,
+            "2026-06-12T00:44:48.143780Z",
+        ),
+    ],
+    "total": 68,
+}
+
+# POST /api/run-tool answers from the same probe: a read tool that succeeded (content
+# cut to its first 120 characters of 86 KB) and one Edwin could not reach.
+RUN_OK = {
+    "success": True,
+    "content": '{"insight": {"genAi": {"summary": "Monitoring lost data or ping results for '
+    "three Retina agent pods. Logs show successfu",
+    "error": None,
+}
+RUN_FAILED = {
+    "success": False,
+    "content": "",
+    "error": "MCP server 'no-such-mcp' not found or not enabled for this organization",
+}
+RUN_TOOL = f"{HOST}/api/run-tool"
+
+
+@pytest.fixture
+def writable(monkeypatch):
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+    reset_config()
+
+
+class TestGetEdwinTools:
+    async def test_without_an_agent_lists_every_agent(self, client):
+        edwin, router = client
+        route = router.get(f"{HOST}/api/agents").mock(return_value=httpx.Response(200, json=AGENTS))
+
+        body = payload(await get_edwin_tools(edwin))
+
+        assert dict(route.calls.last.request.url.params) == {"active_only": "false"}
+        assert body["count"] == 3
+        assert body["agents"][1] == {
+            "name": "DynatraceDiagnosticsAgent",
+            "display_name": "Dynatrace Diagnostics",
+            "customer_facing_description": AGENTS["agents"][1]["customer_facing_description"],
+            "is_active": False,
+        }
+
+    async def test_an_agent_lists_its_mcps_and_their_active_tools(self, client):
+        edwin, router = client
+        mcps = router.get(f"{HOST}/api/org/agents/LMDiagnosticsAgent/mcps").mock(
+            return_value=httpx.Response(200, json=AGENT_MCPS)
+        )
+        lm_tools = router.get(f"{HOST}/api/mcp-servers/mcp-server-logicmonitor/tools").mock(
+            return_value=httpx.Response(200, json=LM_MCP_TOOLS)
+        )
+        query_tools = router.get(f"{HOST}/api/mcp-servers/query-mcp/tools").mock(
+            return_value=httpx.Response(200, json=QUERY_MCP_TOOLS)
+        )
+
+        body = payload(await get_edwin_tools(edwin, agent="LMDiagnosticsAgent"))
+
+        assert mcps.call_count == 1
+        for route in (lm_tools, query_tools):
+            assert dict(route.calls.last.request.url.params) == {
+                "active_only": "true",
+                "agent_name": "LMDiagnosticsAgent",
+            }
+        assert body["agent"] == "LMDiagnosticsAgent"
+        assert body["tool_count"] == 8
+        lm, query = body["mcps"]
+        assert {k: lm[k] for k in ("mcp_name", "display_name", "is_enabled")} == {
+            "mcp_name": "mcp-server-logicmonitor",
+            "display_name": "LogicMonitor",
+            "is_enabled": True,
+        }
+        assert "endpoint" not in lm
+        assert lm["tools"][1] == {
+            "name": "get_alert_rule",
+            "display_name": "Get Alert Rule",
+            "short_description": None,
+        }
+        assert [tool["name"] for tool in query["tools"]] == [
+            tool["name"] for tool in QUERY_MCP_TOOLS["tools"]
+        ]
+
+    async def test_an_unknown_agent_is_not_found_in_edwin_words(self, client):
+        edwin, router = client
+        router.get(f"{HOST}/api/org/agents/NoSuchAgent/mcps").mock(
+            return_value=httpx.Response(404, json={"detail": "Agent 'NoSuchAgent' not found"})
+        )
+
+        body = payload(await get_edwin_tools(edwin, agent="NoSuchAgent"))
+
+        assert body["error"]["code"] == "NOT_FOUND"
+        assert body["error"]["message"].startswith(
+            "Edwin AI found nothing at GET /api/org/agents/NoSuchAgent/mcps: "
+            "Agent 'NoSuchAgent' not found"
+        )
+
+    async def test_an_agent_name_with_a_slash_is_refused_before_any_request(self, client):
+        edwin, router = client
+        route = router.get(url__startswith=f"{HOST}/api/").mock(
+            return_value=httpx.Response(200, json=AGENT_MCPS)
+        )
+
+        body = payload(await get_edwin_tools(edwin, agent="LMDiagnosticsAgent/x"))
+
+        assert route.call_count == 0
+        assert body["error"]["code"] == "INVALID_REQUEST"
+
+
+class TestEdwinRunTool:
+    async def test_refused_while_writes_are_off(self, client):
+        edwin, router = client
+        route = router.post(RUN_TOOL).mock(return_value=httpx.Response(200, json=RUN_OK))
+
+        body = payload(
+            await edwin_run_tool(
+                edwin, mcp_name="query-mcp", tool_name="fetch_insight_by_id", parameters={}
+            )
+        )
+
+        assert route.call_count == 0
+        assert body["error"]["code"] == "WRITE_DISABLED"
+
+    async def test_parameters_reach_edwin_unchanged_and_content_comes_back(self, client, writable):
+        edwin, router = client
+        route = router.post(RUN_TOOL).mock(return_value=httpx.Response(200, json=RUN_OK))
+        parameters = {"insight_id": ANALYZED["_id"], "password": "pw-value-fixture"}
+
+        body = payload(
+            await edwin_run_tool(
+                edwin,
+                mcp_name="query-mcp",
+                tool_name="fetch_insight_by_id",
+                parameters=parameters,
+            )
+        )
+
+        assert json.loads(route.calls.last.request.content) == {
+            "mcp_name": "query-mcp",
+            "tool_name": "fetch_insight_by_id",
+            "parameters": parameters,
+        }
+        assert body == {
+            "mcp_name": "query-mcp",
+            "tool_name": "fetch_insight_by_id",
+            "content": RUN_OK["content"],
+        }
+
+    async def test_a_tool_edwin_reports_failed_is_rejected_by_tool(self, client, writable):
+        edwin, router = client
+        router.post(RUN_TOOL).mock(return_value=httpx.Response(200, json=RUN_FAILED))
+
+        body = payload(
+            await edwin_run_tool(edwin, mcp_name="no-such-mcp", tool_name="x", parameters={})
+        )
+
+        assert body["error"]["code"] == "REJECTED_BY_TOOL"
+        assert body["error"]["isRetryable"] is False
+        assert "no-such-mcp/x" in body["error"]["message"]
+        assert body["error"]["details"]["edwin_error"] == RUN_FAILED["error"]
+
+    def test_the_audit_line_masks_credential_named_parameter_keys(self, caplog):
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            log_write_operation(
+                "edwin_run_tool",
+                {
+                    "mcp_name": "query-mcp",
+                    "tool_name": "fetch_insight_by_id",
+                    "parameters": {"api_key": "key-value-fixture", "host": "web01"},
+                },
+                success=True,
+            )
+
+        assert "key-value-fixture" not in caplog.text
+        assert "web01" in caplog.text
+        assert "edwin_run_tool" in caplog.text

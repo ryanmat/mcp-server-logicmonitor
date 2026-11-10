@@ -1,4 +1,4 @@
-# Description: Edwin AI query tools: insights, records, alert volume, metadata, filter builder.
+# Description: Edwin AI tools: insights, records, alert volume, metadata, agent tools.
 # Description: Reads Edwin's investigations so the calling model can weigh them beside raw LM data.
 
 from __future__ import annotations
@@ -11,7 +11,12 @@ from urllib.parse import quote
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import format_response, handle_error, validation_error
+from lm_mcp.tools import (
+    format_response,
+    handle_error,
+    require_write_permission,
+    validation_error,
+)
 
 if TYPE_CHECKING:
     from lm_mcp.client.edwin import EdwinClient
@@ -403,5 +408,99 @@ async def get_edwin_metadata(
             )
         response["count"] = len(response["fields"])
         return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+# The fields of an agent and of a tool that get_edwin_tools returns; the agent's route,
+# the MCP endpoint (an address inside Edwin) and the timestamps are left out.
+_AGENT_FIELDS = ("name", "display_name", "customer_facing_description", "is_active")
+_TOOL_FIELDS = ("name", "display_name", "short_description")
+
+
+async def get_edwin_tools(client: EdwinClient, agent: str | None = None) -> list[TextContent]:
+    """List Edwin AI's agents, or one agent's MCP servers and the active tools on each.
+
+    Args:
+        client: Edwin AI client.
+        agent: Agent name, such as ``LMDiagnosticsAgent``; omit to list the agents.
+
+    Returns:
+        Without an agent: ``agents`` with name, display name, description and
+        ``is_active``. With one: ``mcps``, each with ``mcp_name``, ``display_name``,
+        ``is_enabled`` and its ``tools``, plus ``tool_count``. The ``mcp_name`` and tool
+        ``name`` pairs are what edwin_run_tool takes.
+    """
+    try:
+        if agent is None:
+            result = await client.get("/api/agents", params={"active_only": "false"})
+            agents = [
+                {key: row.get(key) for key in _AGENT_FIELDS} for row in result.get("agents", [])
+            ]
+            return format_response({"agents": agents, "count": len(agents)})
+        name = quote(agent, safe="")
+        listed = await client.get(f"/api/org/agents/{name}/mcps")
+        mcps = []
+        for mcp in listed.get("mcps", []):
+            tools = await client.get(
+                f"/api/mcp-servers/{quote(mcp['mcp_name'], safe='')}/tools",
+                params={"active_only": "true", "agent_name": agent},
+            )
+            mcps.append(
+                {
+                    "mcp_name": mcp["mcp_name"],
+                    "display_name": mcp.get("display_name"),
+                    "is_enabled": mcp.get("is_enabled"),
+                    "tools": [
+                        {key: tool.get(key) for key in _TOOL_FIELDS}
+                        for tool in tools.get("tools", [])
+                    ],
+                }
+            )
+        return format_response(
+            {
+                "agent": agent,
+                "mcps": mcps,
+                "tool_count": sum(len(mcp["tools"]) for mcp in mcps),
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def edwin_run_tool(
+    client: EdwinClient, mcp_name: str, tool_name: str, parameters: dict[str, Any]
+) -> list[TextContent]:
+    """Run one tool of one of Edwin AI's MCP servers, with the parameters passed unchanged.
+
+    Args:
+        client: Edwin AI client.
+        mcp_name: Edwin MCP server, from get_edwin_tools.
+        tool_name: Tool on that server, from get_edwin_tools.
+        parameters: The tool's arguments, sent to Edwin as given.
+
+    Returns:
+        ``mcp_name``, ``tool_name`` and the tool's ``content`` as Edwin returns it;
+        ``REJECTED_BY_TOOL`` with Edwin's error when the tool reports failure.
+    """
+    try:
+        result = await client.post(
+            "/api/run-tool",
+            json_body={"mcp_name": mcp_name, "tool_name": tool_name, "parameters": parameters},
+        )
+        if not result.get("success"):
+            return format_response(
+                {
+                    "error": True,
+                    "code": "REJECTED_BY_TOOL",
+                    "message": f"Edwin AI tool {mcp_name}/{tool_name} reported failure: "
+                    f"{result.get('error')}",
+                    "details": {"edwin_error": result.get("error")},
+                }
+            )
+        return format_response(
+            {"mcp_name": mcp_name, "tool_name": tool_name, "content": result.get("content")}
+        )
     except Exception as e:
         return handle_error(e)
