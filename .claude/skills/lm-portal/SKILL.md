@@ -1,12 +1,11 @@
 ---
 name: lm-portal
-description: "Portal-wide health overview -- alert breakdown, collector status, active SDTs, alert clusters, noise scoring, and down devices."
+description: "Portal-wide health overview -- one portal_overview call for alert volume, clusters, noise, collectors, active SDTs, open critical and error alerts and dead devices, then down collectors, the devices behind them, and the changes and bursts in the window."
 argument-hint: "[hours_back]"
 allowed-tools:
+  - mcp__logicmonitor__portal_overview
   - mcp__logicmonitor__analyze_alerts
-  - mcp__logicmonitor__get_alerts
   - mcp__logicmonitor__get_collectors
-  - mcp__logicmonitor__get_active_sdts
   - mcp__logicmonitor__get_devices
 ---
 
@@ -18,7 +17,7 @@ on-call situation reports.
 
 ## Argument Parsing
 
-- **hours_back** — Lookback window in hours (default: 4)
+- **hours_back** — lookback window in hours (default: 4)
 
 If no argument is provided, use a 4-hour window.
 
@@ -26,113 +25,89 @@ If no argument is provided, use a 4-hour window.
 
 Execute these steps in order. Present findings incrementally.
 
-### Step 1: Alert Landscape
+### Step 1: Portal Overview
 
-Get the overall alert picture.
+Call `portal_overview` with `hours_back` and `detail_level="full"`. One call returns:
 
-1. Call `analyze_alerts` for the lookback window with `analyses=["statistics", "clusters",
-   "noise"]`; Steps 4 and 5 read its other sections. `statistics.hourly` gives the
-   hour-by-hour volume.
-2. Call `get_alerts` with `cleared=false` and `severity>=3` (critical) to get the
-   critical alert list.
+- `alert_statistics` — the window's `active` and `cleared` totals, `by_severity`
+  (active and cleared together), the busiest devices and datasources, and `hourly`
+- `alert_clusters` — groups of two or more alerts by device, datasource and
+  signature (datasource and datapoint)
+- `noise` — `noise_score` from 0 to 100, the noisiest devices and datasources, and
+  `recommendations`
+- `collectors` — the first page of collectors (`id`, `hostname`, `device_count`)
+- `active_sdts` — the first page of active SDTs (`type`, `device` or `device_group`,
+  `start_time`, `end_time`, `comment`, `created_by`)
+- `critical_alerts` and `error_alerts` — up to 20 open alerts of each severity across
+  the portal, whenever they started
+- `dead_devices` — up to 20 devices whose status is `dead`
+- `warnings` — each read that failed, and an alert window cut short at its cap
 
-Present a severity breakdown:
+A null block means its read failed; report the warning and treat it as unknown.
 
-```
-| Severity | Active | Trend ({hours_back}h) |
-|----------|--------|-----------------------|
-| Critical |   N    | rising/stable/falling |
-| Error    |   N    | rising/stable/falling |
-| Warning  |   N    | rising/stable/falling |
-| Total    |   N    |                       |
-```
-
-Flag if critical count is rising or above a notable threshold.
-
-### Step 2: Collector Status
-
-Call `get_collectors` to get all collector statuses.
-
-Categorize collectors:
+### Step 2: Alert Landscape
 
 ```
-| Status   | Count | Collectors          |
-|----------|-------|---------------------|
-| Up       |   N   |                     |
-| Down     |   N   | [list if any]       |
-| Degraded |   N   | [list if any]       |
+| Severity | Alerts in window (active and cleared) | Open now, portal-wide |
+|----------|---------------------------------------|-----------------------|
+| Critical | N                                     | N (critical_alerts)   |
+| Error    | N                                     | N (error_alerts)      |
+| Warning  | N                                     | -                     |
 ```
 
-If any collectors are down, this is a high-priority finding. Down collectors
-mean monitored devices behind them are blind.
+Say whether the `hourly` counts are rising, steady or falling. Flag a rising critical
+count. When `critical_alerts` or `error_alerts` reports `has_more`, say there are more
+than 20.
 
-### Step 3: Maintenance Windows
+### Step 3: Collectors
 
-Call `get_active_sdts` to get currently active scheduled downtime windows.
-
-Present active SDTs:
-
-```
-| Type    | Target          | Started    | Ends       | Comment    |
-|---------|-----------------|------------|------------|------------|
-| Device  | [name]          | [time]     | [time]     | [comment]  |
-| Group   | [name]          | [time]     | [time]     | [comment]  |
-```
-
-Note: Alerts from SDT-covered resources are suppressed. If many critical alerts
-coincide with SDT expirations, flag potential alert storms on SDT end.
-
-### Step 4: Alert Clustering
-
-Read the `clusters` section from Step 1's `analyze_alerts` call.
-
-Present the top 5 clusters:
+The `collectors` rows cannot tell an up collector from a down one: their `status`
+reads 1 either way. Call `get_collectors` with `filter="isDown:true"` for the down
+collectors, paging with `offset` while `has_more` is true.
 
 ```
-## Top Alert Clusters
-
-1. **[common factor]** — N alerts
-   - [resource]: [alert summary]
-   - [resource]: [alert summary]
-   - Hypothesis: [likely root cause]
-
-2. ...
+| Collector | ID   | Devices behind it |
+|-----------|------|-------------------|
+| [hostname]| [id] | [device_count]    |
 ```
 
-Identify common factors: shared device, shared datasource, shared signature.
+A down collector leaves its devices unmonitored, so this is a high-priority finding.
+Those devices read `dead-collector`, not `dead`, so `dead_devices` leaves them out:
+call `get_devices` with `status="dead-collector"` to count them.
 
-If no clusters are found, note that critical alerts appear independent.
+### Step 4: Maintenance Windows
 
-### Step 5: Noise Assessment
+Present `active_sdts`. Alerts on resources under SDT are suppressed; when many
+critical alerts start as SDTs end, flag a likely alert storm at SDT expiry.
 
-Read the `noise` section from Step 1's `analyze_alerts` call.
+### Step 5: Alert Clusters
 
-Report:
-- Overall noise score (0-100)
-- Noise level: High (>70) / Moderate (40-70) / Low (<40)
-- Top noise offenders (alert rules, datasources, or device groups generating
-  the most noise)
+Present the five largest clusters from `alert_clusters.clusters`: the common factor
+(shared device, datasource, or datasource and datapoint), the alert count, and a
+root-cause hypothesis. If `cluster_count` is 0, note that the alerts look
+independent.
 
-If noise is high, recommend specific tuning actions.
+### Step 6: Noise
 
-### Step 6: Down Devices
+Report `noise.noise_score` and its level: high above 70, moderate from 40 to 70, low
+below 40. Name the noisiest devices and datasources, and pass on the
+`recommendations` when noise is high.
 
-Call `get_devices` filtered to `status=dead` (down/dead devices).
+### Step 7: Changes and Bursts
 
-Present down devices:
+Call `analyze_alerts` with `hours=hours_back` and `analyses=["changes", "bursts"]`:
+- `changes.correlated_events` pair portal changes with the alert spikes that followed
+  them, with `time_gap_minutes` and `confidence`.
+- `bursts.bursts` are the datasources that fired on several devices at once, each
+  with its `alert_count` and `device_count`.
 
-```
-| Device          | Groups            | Collector | Down Since |
-|-----------------|-------------------|-----------|------------|
-| [name]          | [group path]      | [id]      | [time]     |
-```
+### Step 8: Dead Devices
 
-Apply heuristic: if >20 devices are down AND they share a collector, flag this
-as a likely collector issue rather than individual device failures.
+Present `dead_devices` with each device's `name` and `collector_id`. When many dead
+devices share a `collector_id`, treat it as a likely collector or network problem
+rather than separate device failures. If there are none, say so.
 
-If no devices are down, report that.
-
-### Step 7: Portal Summary
+### Step 9: Portal Summary
 
 Compile a shift-handoff-ready summary:
 
@@ -142,15 +117,16 @@ Compile a shift-handoff-ready summary:
 ### Status: [GREEN / YELLOW / RED]
 
 Criteria:
-- GREEN: No critical alerts rising, all collectors up, noise < 40
-- YELLOW: Some critical alerts, or moderate noise, or degraded collectors
-- RED: Critical alerts rising, or collectors down, or noise > 70
+- GREEN: no rising critical alerts, no down collectors, noise below 40
+- YELLOW: some critical alerts, or moderate noise
+- RED: critical alerts rising, or any collector down, or noise above 70
 
 ### Key Numbers
-- Active alerts: N (C critical, E error, W warning)
-- Collectors: N up, N down, N degraded
+- Window: last [hours_back] hours; [active] active, [cleared] cleared
+- Open portal-wide: [N] critical, [N] error
+- Collectors down: N, with N devices behind them
 - Active SDTs: N
-- Down devices: N
+- Dead devices: N
 - Noise score: NN/100
 
 ### Key Concerns
