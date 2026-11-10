@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 236: 232 with
-one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 131 of them, or 135 in
-multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 236:
+232 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+`run_portal_reload` in multi-portal mode. With writes off, the default, `tools/list` shows 131 of
+them, or 135 in multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
 31 s on each CI leg, against 2,959 passing and 8 skipped in 179 to 191 s for 4.3.0, and the
@@ -73,82 +73,92 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Removed
 
-| Tool | Replacement |
-|---|---|
-| `watsonx_summarize` | None. The calling model summarizes tool results itself. |
-| `test_awx_connection` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_job_templates` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_job_template` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `launch_job` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_job_status` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_job_output` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `cancel_job` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `relaunch_job` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_inventories` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_inventory_hosts` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `launch_workflow` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_workflow_status` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_workflow_templates` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_projects` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_credentials` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_organizations` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_job_events` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `get_hosts` | None. Use the AAP API or Red Hat's AAP MCP server. |
-| `terraform_init` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_validate` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_plan` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_apply` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_destroy` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_import` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_output` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_state_list` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_state_show` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_write_config` | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `get_workflow` | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
-| `update_datasource` | `update_logicmodule` with `type="datasource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_configsource` | `update_logicmodule` with `type="configsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_eventsource` | `update_logicmodule` with `type="eventsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_propertysource` | `update_logicmodule` with `type="propertysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_logsource` | `update_logicmodule` with `type="logsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_topologysource` | `update_logicmodule` with `type="topologysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_diagnosticsource` | `update_logicmodule` with `type="diagnosticsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `update_remediationsource` | `update_logicmodule` with `type="remediationsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
-| `get_idle_resources` | `get_cost_recommendations`, with `category` set to one description from `get_cost_recommendation_categories`. The portal applied only the first category of the tool's OR filter, so it returned one category's rows, and it rejects `cloudProvider` as a filter field. |
-| `forecast_metric` | `analyze_metric` with `analyses=["forecast"]` and `threshold`: the linear and Holt-Winters crossings within 30 days and each method's slope per hour. |
-| `classify_trend` | `analyze_metric` with `analyses=["trend"]`: the label, least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation and the detrended 24-hour autocorrelation. |
-| `detect_seasonality` | `analyze_metric` with `analyses=["seasonality"]`. |
-| `detect_change_points` | `analyze_metric` with `analyses=["change_points"]`, which compares the mean of the 30 samples after each sample with the 30 before it, where the tool summed deviations from the series mean. |
-| `get_metric_anomalies` | `analyze_metric` with `analyses=["anomalies"]`, which runs z-score, IQR and MAD together at fixed fences (3, 1.5 IQR and 3.5), where the tool ran one method per datapoint, named by `method` or chosen from the data, with `threshold` setting the z-score and MAD fences. |
-| `score_device_health` | `analyze_metric` with `analyses=["summary"]`. Each datapoint's signed `z_score` takes the place of the 0 to 100 score, which no tool computes now. |
-| `save_baseline` | `analyze_metric` with `baseline_hours_ago`, which reads the earlier window when asked. Nothing is stored in the session, and the `baseline_` session variables are no longer read. |
-| `compare_to_baseline` | `analyze_metric` with `analyses=["baseline"]` and `baseline_hours_ago`. |
-| `correlate_alerts` | `analyze_alerts` with `analyses=["clusters"]`: clusters by device, datasource and signature (datasource and datapoint). The temporal-proximity clusters leave; `bursts` finds alerts bunched in time on one datasource. |
-| `get_alert_statistics` | `analyze_alerts` with `analyses=["statistics"]`: counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included. `bucket_size_hours` and `limit` leave. |
-| `score_alert_noise` | `analyze_alerts` with `analyses=["noise"]`, the same score, flap pairs and recommendations. |
-| `detect_alert_burst` | `analyze_alerts` with `analyses=["bursts"]`, `window_seconds`, `min_alerts` and `min_devices`; `datasource` in place of `datasource_pattern`, matched at the portal. |
-| `correlate_changes` | `analyze_alerts` with `analyses=["changes"]` and `correlation_window_minutes`. Only audit entries that name a change pair with spikes. |
-| `calculate_error_budget` | `calculate_availability` with `target_slo`, which adds `error_budget` over the `hours_back` window; `period_days` leaves, and the budget block carries `period_days` as `hours_back` over 24. |
-| `get_trace_services` | `get_apm_services`, which pages through `limit` and `offset` and takes `name_filter` in place of `namespace`, or `get_services`. |
-| `get_trace_service` | `get_service` with the service id. |
-| `get_trace_service_alerts` | `get_apm_service_alerts`, the same read, paged through `limit` and `offset`. |
-| `get_trace_service_datasources` | `get_device_datasources` with the service id as `device_id`. |
-| `get_trace_operations` | `get_device_instances` on the service's operations datasource. |
-| `get_trace_service_metrics` | `get_device_data` on the service-level instance. |
-| `get_trace_operation_metrics` | `get_device_data` on the operation's instance. |
-| `get_trace_service_properties` | `get_device_properties` with the service id as `device_id`. |
-| `get_login_audit` | `get_audit_logs` with `kind="login"`, which queries the portal login wordings, so a monitored database's "Login failed" line is no longer reported as a failed portal login. `username` matches exact names; `success_only` with `failed_only` is refused. |
-| `get_change_audit` | `get_audit_logs` with `kind="change"`, which reads the change type from `Action=` or the description's leading verb, where the tool kept any entry whose description held create, add, update, delete, remove or modify anywhere. |
-| `get_api_token_audit` | `get_audit_logs` with `kind="api_token"` and `token_id` or `access_id`. It matches `API token <accessId>` in the description, where the tool filtered on an `apiTokenId` field the API does not have. |
-| `export_datasource` | `get_datasource` with `raw=true`, which returns the REST object itself where the tool wrapped it in `definition` beside `datasource_id`, `name` and `format`. |
-| `export_configsource` | `get_configsource` with `raw=true`. |
-| `export_eventsource` | `get_eventsource` with `raw=true`. |
-| `export_propertysource` | `get_propertysource` with `raw=true`. |
-| `export_logsource` | `get_logsource` with `raw=true`. |
-| `export_diagnosticsource` | `get_diagnosticsource` with `raw=true`. |
-| `export_remediationsource` | `get_remediationsource` with `raw=true`. |
-| `export_dashboard` | `get_dashboard` with `raw=true`, which always includes the widgets under `widgets_full`; `include_widgets` leaves. `create_dashboard` still unwraps a file saved from this tool. |
-| `export_alert_rule` | `get_alert_rule` with `raw=true`. |
-| `export_escalation_chain` | `get_escalation_chain` with `raw=true`. |
+The table lists every 4.3.0 tool that 5.0 does not register under its 4.3.0 name. A name in the 5.0
+tool column is the same tool renamed, and the changes listed for this release apply to it under that
+name. A tool marked `removed` has no successor of its own; the last column says what to call
+instead.
+
+| 4.3.0 tool | 5.0 tool | Replacement |
+|---|---|---|
+| `watsonx_summarize` | removed | None. The calling model summarizes tool results itself. |
+| `test_awx_connection` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_templates` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_template` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `launch_job` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_status` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_output` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `cancel_job` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `relaunch_job` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_inventories` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_inventory_hosts` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `launch_workflow` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_workflow_status` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_workflow_templates` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_projects` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_credentials` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_organizations` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_job_events` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `get_hosts` | removed | None. Use the AAP API or Red Hat's AAP MCP server. |
+| `terraform_init` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_validate` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_plan` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_apply` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_destroy` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_import` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_output` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_state_list` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_state_show` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_write_config` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `get_workflow` | removed | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
+| `update_datasource` | removed | `update_logicmodule` with `type="datasource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_configsource` | removed | `update_logicmodule` with `type="configsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_eventsource` | removed | `update_logicmodule` with `type="eventsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_propertysource` | removed | `update_logicmodule` with `type="propertysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_logsource` | removed | `update_logicmodule` with `type="logsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_topologysource` | removed | `update_logicmodule` with `type="topologysource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_diagnosticsource` | removed | `update_logicmodule` with `type="diagnosticsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `update_remediationsource` | removed | `update_logicmodule` with `type="remediationsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
+| `get_idle_resources` | removed | `get_cost_recommendations`, with `category` set to one description from `get_cost_recommendation_categories`. The portal applied only the first category of the tool's OR filter, so it returned one category's rows, and it rejects `cloudProvider` as a filter field. |
+| `forecast_metric` | removed | `analyze_metric` with `analyses=["forecast"]` and `threshold`: the linear and Holt-Winters crossings within 30 days and each method's slope per hour. |
+| `classify_trend` | removed | `analyze_metric` with `analyses=["trend"]`: the label, least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation and the detrended 24-hour autocorrelation. |
+| `detect_seasonality` | removed | `analyze_metric` with `analyses=["seasonality"]`. |
+| `detect_change_points` | removed | `analyze_metric` with `analyses=["change_points"]`, which compares the mean of the 30 samples after each sample with the 30 before it, where the tool summed deviations from the series mean. |
+| `get_metric_anomalies` | removed | `analyze_metric` with `analyses=["anomalies"]`, which runs z-score, IQR and MAD together at fixed fences (3, 1.5 IQR and 3.5), where the tool ran one method per datapoint, named by `method` or chosen from the data, with `threshold` setting the z-score and MAD fences. |
+| `score_device_health` | removed | `analyze_metric` with `analyses=["summary"]`. Each datapoint's signed `z_score` takes the place of the 0 to 100 score, which no tool computes now. |
+| `save_baseline` | removed | `analyze_metric` with `baseline_hours_ago`, which reads the earlier window when asked. Nothing is stored in the session, and the `baseline_` session variables are no longer read. |
+| `compare_to_baseline` | removed | `analyze_metric` with `analyses=["baseline"]` and `baseline_hours_ago`. |
+| `correlate_alerts` | removed | `analyze_alerts` with `analyses=["clusters"]`: clusters by device, datasource and signature (datasource and datapoint). The temporal-proximity clusters leave; `bursts` finds alerts bunched in time on one datasource. |
+| `get_alert_statistics` | removed | `analyze_alerts` with `analyses=["statistics"]`: counts by severity, the ten busiest devices and datasources, and the volume of each hour, cleared alerts included. `bucket_size_hours` and `limit` leave. |
+| `score_alert_noise` | removed | `analyze_alerts` with `analyses=["noise"]`, the same score, flap pairs and recommendations. |
+| `detect_alert_burst` | removed | `analyze_alerts` with `analyses=["bursts"]`, `window_seconds`, `min_alerts` and `min_devices`; `datasource` in place of `datasource_pattern`, matched at the portal. |
+| `correlate_changes` | removed | `analyze_alerts` with `analyses=["changes"]` and `correlation_window_minutes`. Only audit entries that name a change pair with spikes. |
+| `calculate_error_budget` | removed | `calculate_availability` with `target_slo`, which adds `error_budget` over the `hours_back` window; `period_days` leaves, and the budget block carries `period_days` as `hours_back` over 24. |
+| `get_trace_services` | `get_apm_services` | The same list of deviceType 6 devices, paged through `limit` and `offset`, with `name_filter` in place of `namespace`. `get_services` lists the same devices. |
+| `get_trace_service` | removed | `get_service` with the service id. |
+| `get_trace_service_alerts` | `get_apm_service_alerts` | The same read, paged through `limit` and `offset`. |
+| `get_trace_service_datasources` | removed | `get_device_datasources` with the service id as `device_id`. |
+| `get_trace_operations` | removed | `get_device_instances` on the service's operations datasource. |
+| `get_trace_service_metrics` | removed | `get_device_data` on the service-level instance. |
+| `get_trace_operation_metrics` | removed | `get_device_data` on the operation's instance. |
+| `get_trace_service_properties` | removed | `get_device_properties` with the service id as `device_id`. |
+| `get_login_audit` | removed | `get_audit_logs` with `kind="login"`, which queries the portal login wordings, so a monitored database's "Login failed" line is no longer reported as a failed portal login. `username` matches exact names; `success_only` with `failed_only` is refused. |
+| `get_change_audit` | removed | `get_audit_logs` with `kind="change"`, which reads the change type from `Action=` or the description's leading verb, where the tool kept any entry whose description held create, add, update, delete, remove or modify anywhere. |
+| `get_api_token_audit` | removed | `get_audit_logs` with `kind="api_token"` and `token_id` or `access_id`. It matches `API token <accessId>` in the description, where the tool filtered on an `apiTokenId` field the API does not have. |
+| `export_datasource` | removed | `get_datasource` with `raw=true`, which returns the REST object itself where the tool wrapped it in `definition` beside `datasource_id`, `name` and `format`. |
+| `export_configsource` | removed | `get_configsource` with `raw=true`. |
+| `export_eventsource` | removed | `get_eventsource` with `raw=true`. |
+| `export_propertysource` | removed | `get_propertysource` with `raw=true`. |
+| `export_logsource` | removed | `get_logsource` with `raw=true`. |
+| `export_diagnosticsource` | removed | `get_diagnosticsource` with `raw=true`. |
+| `export_remediationsource` | removed | `get_remediationsource` with `raw=true`. |
+| `export_dashboard` | removed | `get_dashboard` with `raw=true`, which always includes the widgets under `widgets_full`; `include_widgets` leaves. `create_dashboard` still unwraps a file saved from this tool. |
+| `export_alert_rule` | removed | `get_alert_rule` with `raw=true`. |
+| `export_escalation_chain` | removed | `get_escalation_chain` with `raw=true`. |
+| `list_sdts` | `get_sdts` | Renamed. |
+| `list_session_history` | `get_session_history` | Renamed. |
+| `list_portals` | `get_portals` | Renamed. |
+| `current_portal` | `get_current_portal` | Renamed. |
+| `reload_portals` | `run_portal_reload` | Renamed. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -302,16 +312,16 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   whose annotations say they change the portal (`readOnlyHint` false and `openWorldHint` true),
   and a call to one by name returns the write-disabled error. That includes `update_logicmodule`,
   whose preview mode ran with writes off before. The session tools, `use_portal` and
-  `reload_portals` change only server-side state and stay listed. The Write column of
+  `run_portal_reload` change only server-side state and stay listed. The Write column of
   `documentation/tools.md` follows the same annotations, so `delete_session_variable`,
-  `use_portal` and `reload_portals` read No.
+  `use_portal` and `run_portal_reload` read No.
 - When the API reports a page with a negative total, its sign that more rows exist than it
   counted, a list tool leaves `total` out of the response rather than reporting that number as a
   lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
   exact. This covers the 54 list tools on the shared pagination helper, `get_devices`,
   `get_alerts` and `get_audit_logs` among them.
 - `get_device_groups`, `get_collector_groups`, `get_website_groups`, `get_dashboard_widgets`,
-  `list_sdts`, `get_active_sdts`, `get_upcoming_sdts`, `get_roles`, `get_report_groups`,
+  `get_sdts`, `get_active_sdts`, `get_upcoming_sdts`, `get_roles`, `get_report_groups`,
   `get_scheduled_reports`, `get_escalation_chains`, `get_recipient_groups`, `get_integrations`,
   `get_action_chains`, `get_action_rules`, `get_device_datasources`, `get_device_instances`,
   `get_device_eventsources`, `get_device_logsources`, `get_batchjobs`, `get_device_batchjobs`,
@@ -347,7 +357,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `use_portal` while it runs leaves its client, its `portal_url` links, its write permission and
   its audit line on that portal. Every result object carries that portal's name as `portal`, and
   an error envelope carries it as `details.portal`, `null` before a portal is selected. The four
-  portal tools' results are unchanged, since `use_portal` and `current_portal` already carry the
+  portal tools' results are unchanged, since `use_portal` and `get_current_portal` already carry the
   vault host as `portal`. The audit line for a `use_portal` names the portal the call started on;
   its arguments name the one it switched to. Code that calls a write-gated handler or
   `portal_url` outside `execute_tool` in multi-portal mode gets a `RuntimeError`; an audit line

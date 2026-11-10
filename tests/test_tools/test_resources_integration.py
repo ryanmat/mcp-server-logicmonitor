@@ -43,7 +43,7 @@ class TestSdtLifecycle:
 
         reload(lm_mcp.config)
 
-        from lm_mcp.tools.sdts import create_sdt, delete_sdt, list_sdts
+        from lm_mcp.tools.sdts import create_sdt, delete_sdt, get_sdts
 
         # Mock: Create SDT
         respx.post("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
@@ -82,7 +82,7 @@ class TestSdtLifecycle:
         sdt_id = create_data["sdt_id"]
 
         # Step 2: Verify SDT exists
-        list_result = await list_sdts(client)
+        list_result = await get_sdts(client)
         list_data = json.loads(list_result[0].text)
         assert list_data["total"] >= 1
 

@@ -20,7 +20,7 @@ _CLOSED_WORLD_WRITES = {
     "delete_session_variable",
     "clear_session_context",
     "use_portal",
-    "reload_portals",
+    "run_portal_reload",
 }
 
 
@@ -162,7 +162,7 @@ async def test_writes_off_lists_no_tool_that_changes_the_portal(single_portal):
 
 
 async def test_writes_off_keeps_portal_selection_in_multi_portal(monkeypatch, tmp_path):
-    """use_portal and reload_portals stay listed with writes off; they change no portal."""
+    """use_portal and run_portal_reload stay listed with writes off; they change no portal."""
     from lm_mcp.server import list_tools
 
     portals = tmp_path / "portals.json"
@@ -174,7 +174,7 @@ async def test_writes_off_keeps_portal_selection_in_multi_portal(monkeypatch, tm
 
     names = {tool.name for tool in await list_tools()}
 
-    assert {"use_portal", "reload_portals", "list_portals", "current_portal"} <= names
+    assert {"use_portal", "run_portal_reload", "get_portals", "get_current_portal"} <= names
     assert "acknowledge_alert" not in names
 
 

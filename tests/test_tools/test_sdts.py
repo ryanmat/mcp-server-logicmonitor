@@ -31,12 +31,12 @@ def client(auth):
 
 
 class TestListSdts:
-    """Tests for list_sdts tool."""
+    """Tests for get_sdts tool."""
 
     @respx.mock
     async def test_list_sdts_returns_formatted_response(self, client):
-        """list_sdts returns properly formatted SDT list."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts returns properly formatted SDT list."""
+        from lm_mcp.tools.sdts import get_sdts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(
@@ -57,7 +57,7 @@ class TestListSdts:
             )
         )
 
-        result = await list_sdts(client)
+        result = await get_sdts(client)
 
         assert len(result) == 1
         data = json.loads(result[0].text)
@@ -66,27 +66,27 @@ class TestListSdts:
 
     @respx.mock
     async def test_list_sdts_with_limit(self, client):
-        """list_sdts passes size parameter to API."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts passes size parameter to API."""
+        from lm_mcp.tools.sdts import get_sdts
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await list_sdts(client, limit=10)
+        await get_sdts(client, limit=10)
 
         assert route.calls[0].request.url.params.get("size") == "10"
 
     @respx.mock
     async def test_list_sdts_with_raw_filter(self, client):
-        """list_sdts passes raw filter expression to API."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts passes raw filter expression to API."""
+        from lm_mcp.tools.sdts import get_sdts
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await list_sdts(client, filter="type:DeviceSDT,admin~john")
+        await get_sdts(client, filter="type:DeviceSDT,admin~john")
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
@@ -94,14 +94,14 @@ class TestListSdts:
 
     @respx.mock
     async def test_list_sdts_with_device_filter(self, client):
-        """list_sdts filters by device ID."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts filters by device ID."""
+        from lm_mcp.tools.sdts import get_sdts
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await list_sdts(client, device_id=123)
+        await get_sdts(client, device_id=123)
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
@@ -109,14 +109,14 @@ class TestListSdts:
 
     @respx.mock
     async def test_list_sdts_with_type_filter(self, client):
-        """list_sdts filters by SDT type."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts filters by SDT type."""
+        from lm_mcp.tools.sdts import get_sdts
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await list_sdts(client, sdt_type="DeviceGroupSDT")
+        await get_sdts(client, sdt_type="DeviceGroupSDT")
 
         params = dict(route.calls[0].request.url.params)
         assert "filter" in params
@@ -603,7 +603,7 @@ class TestUpdateSdt:
 
 # (handler name, endpoint path, extra required arguments)
 _SDTS_LISTS = [
-    ("list_sdts", "/sdt/sdts", {}),
+    ("get_sdts", "/sdt/sdts", {}),
     ("get_active_sdts", "/sdt/sdts", {}),
     ("get_upcoming_sdts", "/sdt/sdts", {}),
 ]

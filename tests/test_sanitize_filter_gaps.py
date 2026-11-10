@@ -160,14 +160,14 @@ class TestSdtsSanitizeGaps:
 
     @respx.mock
     async def test_list_sdts_sdt_type_wildcard_stripped(self, client):
-        """list_sdts strips wildcards from sdt_type filter."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts strips wildcards from sdt_type filter."""
+        from lm_mcp.tools.sdts import get_sdts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        result = await list_sdts(client, sdt_type="Device*")
+        result = await get_sdts(client, sdt_type="Device*")
 
         data = json.loads(result[0].text)
         assert "note" in data
@@ -175,14 +175,14 @@ class TestSdtsSanitizeGaps:
 
     @respx.mock
     async def test_list_sdts_sdt_type_clean_no_note(self, client):
-        """list_sdts does not add note for clean sdt_type."""
-        from lm_mcp.tools.sdts import list_sdts
+        """get_sdts does not add note for clean sdt_type."""
+        from lm_mcp.tools.sdts import get_sdts
 
         respx.get("https://test.logicmonitor.com/santaba/rest/sdt/sdts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        result = await list_sdts(client, sdt_type="DeviceSDT")
+        result = await get_sdts(client, sdt_type="DeviceSDT")
 
         data = json.loads(result[0].text)
         assert "note" not in data

@@ -1,5 +1,5 @@
 # Description: Multi-portal switching tools for the LogicMonitor MCP server.
-# Description: list_portals / use_portal / current_portal let one server target many
+# Description: get_portals / use_portal / get_current_portal let one server target many
 # customer portals, selecting the active one at runtime. Credentials come from the
 # portal registry (age vault); no token is ever returned by these tools.
 from __future__ import annotations
@@ -10,7 +10,7 @@ from lm_mcp import portals
 from lm_mcp.tools import format_response, handle_error, validation_error
 
 
-async def list_portals() -> list[TextContent]:
+async def get_portals() -> list[TextContent]:
     """List the customer portals available in this multi-portal server."""
     try:
         rows = portals.names()
@@ -31,7 +31,7 @@ async def use_portal(customer: str) -> list[TextContent]:
         return handle_error(e)
 
 
-async def current_portal() -> list[TextContent]:
+async def get_current_portal() -> list[TextContent]:
     """Show which customer portal is currently active."""
     try:
         return format_response(portals.active())
@@ -39,7 +39,7 @@ async def current_portal() -> list[TextContent]:
         return handle_error(e)
 
 
-async def reload_portals() -> list[TextContent]:
+async def run_portal_reload() -> list[TextContent]:
     """Re-read the vault so portals added/removed since startup take effect (no restart)."""
     try:
         return format_response(await portals.reload())

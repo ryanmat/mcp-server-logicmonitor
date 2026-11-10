@@ -162,7 +162,7 @@ async def clear_session_context() -> list[TextContent]:
         return handle_error(e)
 
 
-async def list_session_history(
+async def get_session_history(
     limit: int = 10,
 ) -> list[TextContent]:
     """List recent tool call history.

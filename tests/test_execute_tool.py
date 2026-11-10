@@ -246,7 +246,7 @@ class TestPortalToolGating:
 
         from lm_mcp.server import execute_tool
 
-        for name, args in (("use_portal", {"customer": "x"}), ("list_portals", {})):
+        for name, args in (("use_portal", {"customer": "x"}), ("get_portals", {})):
             result = await execute_tool(name, args)
             assert is_error_result(result)
             assert "multi-portal" in result[0].text
@@ -272,7 +272,7 @@ class TestMultiPortalDispatch:
 
         from lm_mcp.server import execute_tool
 
-        result = await execute_tool("current_portal", {})
+        result = await execute_tool("get_current_portal", {})
         data = json.loads(result[0].text)
         assert "active" in data
 
@@ -311,7 +311,7 @@ class TestMultiPortalDispatch:
         monkeypatch.setattr(session_module, "_sessions", {})
         await execute_tool("use_portal", {"customer": "acme"})
         await execute_tool("use_portal", {"customer": "acme"})
-        result = await execute_tool("list_session_history", {})
+        result = await execute_tool("get_session_history", {})
 
         history = json.loads(result[0].text)["history"]
         assert [entry["tool"] for entry in history] == ["use_portal"]
