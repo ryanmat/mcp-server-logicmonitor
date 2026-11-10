@@ -1,8 +1,10 @@
-# Description: Edwin AI tools: insights, records, alert volume, metadata, agent tools.
+# Description: Edwin AI tools: insights, records, alert volume, metadata, agent tools, Ask Edwin.
 # Description: Reads Edwin's investigations so the calling model can weigh them beside raw LM data.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
@@ -10,7 +12,10 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from mcp.types import TextContent
+from websockets.exceptions import ConnectionClosedError
 
+from lm_mcp.client.edwin import CREDENTIAL_HINT
+from lm_mcp.exceptions import AuthenticationError
 from lm_mcp.tools import (
     format_response,
     handle_error,
@@ -24,6 +29,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MAX_INSIGHTS = 50
+
+# Longest ask_edwin waits for Edwin's response_end before returning what it has.
+ASK_BUDGET_SECONDS = 120.0
+# The LMDiagnosticsAgent route Ask Edwin answers on.
+_ASK_ROUTE = "/ws/lm"
+# The close code Edwin sends when it refuses the token on the websocket.
+_POLICY_VIOLATION = 1008
 _MAX_RECORDS = 50
 
 # The field each record source carries its creation time on; events have no
@@ -502,5 +514,82 @@ async def edwin_run_tool(
         return format_response(
             {"mcp_name": mcp_name, "tool_name": tool_name, "content": result.get("content")}
         )
+    except Exception as e:
+        return handle_error(e)
+
+
+async def ask_edwin(
+    client: EdwinClient, question: str, conversation_id: str | None = None
+) -> list[TextContent]:
+    """Ask Edwin AI a question in an Ask Edwin conversation and wait for its answer.
+
+    Args:
+        client: Edwin AI client.
+        question: The question, in plain words.
+        conversation_id: A conversation to continue; omit to start one.
+
+    Returns:
+        ``answer`` (Edwin's final text), ``reasoning`` (its tool-call narration and
+        interim text), ``conversation_id``, ``langfuseTraceId`` and ``truncated``, true
+        when the answer stopped before Edwin's end frame (an early close or the
+        ``ASK_BUDGET_SECONDS`` budget); ``unreadable`` lists frames that could not be read.
+    """
+    try:
+        if conversation_id is None:
+            created = await client.post("/api/conversations", json_body={})
+            conversation_id = str(created["conversationId"])
+        answer: list[str] = []
+        reasoning: list[str] = []
+        unreadable: list[Any] = []
+        trace_id = None
+        truncated = True
+        async with client.websocket(_ASK_ROUTE) as ws:
+            await ws.send(json.dumps({"conversationId": conversation_id, "message": question}))
+            try:
+                async with asyncio.timeout(ASK_BUDGET_SECONDS):
+                    async for raw in ws:
+                        try:
+                            frame = json.loads(raw)
+                            kind = frame["type"]
+                        except (ValueError, TypeError, KeyError):
+                            logger.warning("Edwin frame unreadable: %r", raw, exc_info=True)
+                            unreadable.append(raw)
+                            continue
+                        trace_id = frame.get("langfuseTraceId") or trace_id
+                        if kind == "response_end":
+                            truncated = False
+                            break
+                        if kind == "answer_token":
+                            answer.append(frame.get("message") or "")
+                        elif kind == "answer_thought":
+                            reasoning.append(frame.get("message") or "")
+                    else:
+                        logger.warning(
+                            "Edwin closed the conversation with %s before response_end",
+                            ws.close_code,
+                        )
+            except TimeoutError:
+                logger.warning(
+                    "ask_edwin stopped at its %s s budget", ASK_BUDGET_SECONDS, exc_info=True
+                )
+            except ConnectionClosedError as e:
+                code = e.rcvd.code if e.rcvd is not None else None
+                if code == _POLICY_VIOLATION:
+                    raise AuthenticationError(
+                        f"Edwin AI closed the conversation with {code} (policy violation): "
+                        "it refused the token",
+                        suggestion=CREDENTIAL_HINT,
+                    ) from e
+                logger.warning("Edwin closed the conversation early: %s", e, exc_info=True)
+        result: dict[str, Any] = {
+            "answer": "".join(answer),
+            "reasoning": "".join(reasoning),
+            "conversation_id": conversation_id,
+            "langfuseTraceId": trace_id,
+            "truncated": truncated,
+        }
+        if unreadable:
+            result["unreadable"] = unreadable
+        return format_response(result)
     except Exception as e:
         return handle_error(e)

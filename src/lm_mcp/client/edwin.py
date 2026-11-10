@@ -1,13 +1,18 @@
-# Description: Async HTTP client for the Edwin AI API at <portal>.dexda.ai.
+# Description: Async HTTP and websocket client for the Edwin AI API at <portal>.dexda.ai.
 # Description: Exchanges the client credential for a cached JWT and maps Edwin's errors.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
+from collections.abc import AsyncIterator
 from time import monotonic
 from typing import Any
 
 import httpx
+from websockets.asyncio.client import ClientConnection, connect
+from websockets.typing import Subprotocol
 
 from lm_mcp.client import _retry
 from lm_mcp.client._retry import DEFAULT_RETRY_AFTER_CAP, retry_after_seconds
@@ -37,9 +42,21 @@ SCOPE_TABLE: tuple[tuple[str, str], ...] = (
     ("/ui/query/record/", "query_record"),
 )
 
-_CREDENTIAL_HINT = (
+CREDENTIAL_HINT = (
     "Check EDWIN_CLIENT_ID and EDWIN_CLIENT_TOKEN; an Edwin API credential can expire."
 )
+
+
+# The websockets library logs every handshake header at DEBUG, and the JWT travels in
+# Sec-WebSocket-Protocol; this logger stops at INFO whatever level the root is set to.
+_ws_logger = logging.getLogger("lm_mcp.client.edwin.websocket")
+_ws_logger.setLevel(logging.INFO)
+
+
+def websocket_url(host: str, path: str) -> str:
+    """The websocket URL for ``path`` on an Edwin host: wss for https, ws for http."""
+    scheme, rest = host.split("://", 1)
+    return f"{'wss' if scheme == 'https' else 'ws'}://{rest}{path}"
 
 
 def required_scope(path: str) -> str | None:
@@ -164,7 +181,7 @@ class EdwinClient:
             raise AuthenticationError(
                 f"Edwin AI refused the client credential at POST /auth/token "
                 f"({response.status_code} {_edwin_message(response)})",
-                suggestion=_CREDENTIAL_HINT,
+                suggestion=CREDENTIAL_HINT,
             )
         if response.status_code >= 400:
             self._raise_for_status("POST", "/auth/token", response)
@@ -190,7 +207,7 @@ class EdwinClient:
         if status == 401:
             raise AuthenticationError(
                 f"Edwin AI refused the token for {where} after one refresh",
-                suggestion=_CREDENTIAL_HINT,
+                suggestion=CREDENTIAL_HINT,
                 details=message,
             )
         if status == 403:
@@ -267,6 +284,26 @@ class EdwinClient:
         if response.status_code >= 400:
             self._raise_for_status(method, path, response)
         return response.json()
+
+    @contextlib.asynccontextmanager
+    async def websocket(self, path: str) -> AsyncIterator[ClientConnection]:
+        """Open a websocket to ``path`` with the JWT as its only subprotocol.
+
+        Edwin reads the token from ``Sec-WebSocket-Protocol`` and echoes it; no
+        Authorization header is sent.
+
+        Raises:
+            ValidationError: If a path segment could escape its resource.
+            AuthenticationError: If Edwin refuses the credential at the exchange.
+        """
+        _check_path(path)
+        token = await self._access_token()
+        async with connect(
+            websocket_url(self.host, path),
+            subprotocols=[Subprotocol(token)],
+            logger=_ws_logger,
+        ) as ws:
+            yield ws
 
     async def get(self, path: str, params: dict | None = None) -> Any:
         """Make a GET request."""
