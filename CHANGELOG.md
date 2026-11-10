@@ -14,7 +14,7 @@ Against 4.3.0, the removals, renames and additions below take the server from 30
 them, or 135 in multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
-Windows-only. The Python under `src/` is 32,170 lines, down from 40,839. The eight LogicModule
+Windows-only. The Python under `src/` is 32,170 lines, down from 40,839; the eight LogicModule
 tool modules hold 1,738 of those lines and the module table they share (`tools/logicmodules.py`)
 530, 2,268 together, where the eight held 2,785 in 4.3.0. The test suite runs 3,445 tests; the
 CI runs on main after #149 to #153 merged, at 2,893 to 3,404 tests, finished the test step in
