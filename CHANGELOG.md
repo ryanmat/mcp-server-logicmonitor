@@ -243,8 +243,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - `get_collector_health` with `include_history` returns `collector_down_history: null` and a
   `history_warning` when the alert read fails, where it returned an empty list that looked like a
   quiet collector. It no longer sends the `alertType` clause the API ignores. The rows are still
-  every alert on a device named for the collector, since no alert type marks a collector going
-  down.
+  every alert on a device named for the collector, since a probe found no alert type that marks
+  a collector going down.
 - `execute_diagnostic` and `execute_remediation` refuse a `dead-collector` device as they refuse a
   `dead` one, and name the device's status word in the refusal.
 - Signature parameters, such as `X-Amz-Signature` and an Azure SAS `sig`, are masked in logged

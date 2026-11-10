@@ -309,8 +309,9 @@ async def _collector_down_history(
 ) -> tuple[list[dict] | None, str | None]:
     """Fetch recent alerts on a device named for a collector hostname.
 
-    No alert type marks a collector going down (probe of 2026-11-06, probes-2026-10.md
-    section f), so rows are not limited to one; each row's alert_type names what it is.
+    A probe of 2026-11-06 (probes-2026-10.md section f) found no alert type that marks a
+    collector going down, so rows are not limited to one; each row's alert_type names
+    what it is.
     A failed read is unknown, not an empty history: it returns None and a warning.
     """
     start_epoch = int(time.time()) - (history_days * 86400)
