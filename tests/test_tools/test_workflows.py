@@ -19,12 +19,17 @@ from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import call_sub_tool, validation_error
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
 from lm_mcp.tools.workflows import (
+    CAPACITY_PLAN_OUTPUT_SCHEMA,
+    DETECT_SITE_OUTAGE_OUTPUT_SCHEMA,
+    DIAGNOSE_OUTPUT_SCHEMA,
+    HEALTH_CHECK_OUTPUT_SCHEMA,
     PORTAL_OVERVIEW_OUTPUT_SCHEMA,
     TRIAGE_OUTPUT_SCHEMA,
     _resolve_device,
     _trim_detail,
     capacity_plan,
     check_required_tools,
+    detect_site_outage,
     diagnose,
     health_check,
     portal_overview,
@@ -32,6 +37,7 @@ from lm_mcp.tools.workflows import (
     triage,
 )
 from tests.alert_pages import alert_lists
+from tests.test_tools.test_diagnostic_remediation import _assigned_source, _execution
 
 
 @pytest.fixture
@@ -65,6 +71,18 @@ def _mock_text(data: dict) -> list:
 def _patch_sub(module_path: str, data: dict) -> patch:
     """Return an AsyncMock patch that returns TextContent wrapping *data*."""
     return patch(module_path, new_callable=AsyncMock, return_value=_mock_text(data))
+
+
+def _patch_no_diagnostics() -> ExitStack:
+    """Patch diagnose's two ADR reads to answer that nothing is assigned or has run."""
+    stack = ExitStack()
+    for name, data in (
+        ("assignments", {"total": 0, "count": 0, "assigned_sources": []}),
+        ("results", {"total": 0, "count": 0, "executions": []}),
+    ):
+        path = f"lm_mcp.tools.diagnostic_remediation.get_diagnostic_remediation_{name}"
+        stack.enter_context(_patch_sub(path, data))
+    return stack
 
 
 def _patch_window(**sections: dict) -> patch:
@@ -412,6 +430,25 @@ class TestCheckRequiredTools:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        HEALTH_CHECK_OUTPUT_SCHEMA,
+        CAPACITY_PLAN_OUTPUT_SCHEMA,
+        DIAGNOSE_OUTPUT_SCHEMA,
+        DETECT_SITE_OUTAGE_OUTPUT_SCHEMA,
+    ],
+    ids=["health_check", "capacity_plan", "diagnose", "detect_site_outage"],
+)
+def test_the_part_two_output_schemas_refuse_an_undocumented_key(schema):
+    """Step 80 serves these as outputSchema: each is valid and closed to keys it does not
+    document, a health_score among them."""
+    jsonschema.Draft202012Validator.check_schema(schema)
+    assert schema["additionalProperties"] is False
+    with pytest.raises(jsonschema.ValidationError, match="health_score"):
+        jsonschema.validate({"health_score": 80}, {**schema, "required": []})
+
+
 class TestResolveDevice:
     """Tests for _resolve_device utility."""
 
@@ -462,6 +499,28 @@ class TestTrimDetail:
         report = {"a": 1, "b": 2, "c": 3}
         trimmed = _trim_detail(report, "full", {"b", "c"})
         assert trimmed == report
+
+    def test_summary_lifts_the_warnings_of_trimmed_keys(self):
+        """A trimmed key's nested warnings, list or string, reach the top-level warnings,
+        named by the datasource and instance around them, or by the key."""
+        report = {
+            "a": 1,
+            "metrics": [
+                {"datasource": "CPU", "instance": "cpu0", "analysis": {"warnings": ["w1"]}},
+                {"datasource": "Disk", "instances": [{"instance": "vol0", "warnings": ["w2"]}]},
+            ],
+            "blast_radius": {"warning": "w3", "counts": {"n": 1}},
+            "warnings": ["w0"],
+        }
+        trimmed = _trim_detail(report, "summary", {"metrics", "blast_radius"})
+        assert trimmed == {
+            "a": 1,
+            "warnings": ["w0", "CPU/cpu0: w1", "Disk/vol0: w2", "blast_radius: w3"],
+        }
+
+    def test_summary_adds_no_warnings_key_when_none_are_nested(self):
+        trimmed = _trim_detail({"a": 1, "b": {"c": [{"d": 2}]}}, "summary", {"b"})
+        assert trimmed == {"a": 1}
 
 
 # blast-radius rows _mock_blast_portal yields for core-sw and edge-fw
@@ -849,6 +908,123 @@ class TestHealthCheck:
         assert data["metrics"] == []
         assert data["warnings"] == ["instance fetch for CPU failed: instances down"]
 
+    @staticmethod
+    def _subs_but_datasources() -> ExitStack:
+        """Patch the sub-tools around the datasource list, which a test serves through respx."""
+        stack = ExitStack()
+        for path, data in (
+            ("lm_mcp.tools.devices.get_device", {"id": 1, "displayName": "server-01"}),
+            (
+                "lm_mcp.tools.metrics.get_device_instances",
+                {"instances": [{"id": 100, "name": "inst100"}]},
+            ),
+            ("lm_mcp.tools.alerts.get_alerts", {"total": 0, "alerts": []}),
+            ("lm_mcp.tools.scoring.calculate_availability", {"availability_percent": 99.99}),
+        ):
+            stack.enter_context(_patch_sub(path, data))
+        return stack
+
+    @respx.mock
+    async def test_picks_datasources_by_name_not_position(self, auth, lm_env):
+        """R2.3: CPU, memory and disk datasources by name, one of each in turn and
+        alphabetical within each; the API's order and a datasource with no instances count
+        for nothing, and every datasource is listed in one read.
+
+        Names from a read-only probe of a Windows host on lmryanmatuszewski (2026-11-09),
+        where Microsoft_Windows_CPU sat 16th of 102 datasources by position.
+        """
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        rows = [
+            ("Ping", 1),
+            ("HTTP-", 1),
+            ("dns", 1),
+            ("Port-", 1),
+            ("HostStatus", 1),
+            ("WinVolumeUsage-", 2),
+            ("Win2k12_HyperV_HypervisorMemory", 0),
+            ("WinMemory64", 1),
+            ("Win_HyperV_CPU", 1),
+            ("Microsoft_Windows_CPU", 1),
+        ]
+        listing = respx.get(_DS_URL).mock(
+            return_value=_ok(
+                {
+                    "items": [
+                        {"id": i, "dataSourceName": name, "instanceNumber": count}
+                        for i, (name, count) in enumerate(rows, start=1)
+                    ],
+                    "total": len(rows),
+                }
+            )
+        )
+        reads = {
+            ds_id: respx.get(f"{_DS_URL}/{ds_id}/instances/100/data").mock(
+                return_value=_steady_cpu_and_mem()
+            )
+            for ds_id in (6, 8, 9, 10)
+        }
+
+        with self._subs_but_datasources():
+            result = await health_check(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert listing.calls.last.request.url.params["size"] == "1000"
+        assert data["datasource_count"] == 10
+        assert [row["datasource"] for row in data["metrics"]] == [
+            "Microsoft_Windows_CPU",
+            "WinMemory64",
+            "WinVolumeUsage-",
+            "Win_HyperV_CPU",
+        ]
+        assert all(read.call_count == 1 for read in reads.values())
+        jsonschema.validate(data, HEALTH_CHECK_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_a_device_without_cpu_memory_or_disk_datasources_is_a_warning(self, auth, lm_env):
+        """No positional stand-in: the device's other datasources are not analyzed."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        respx.get(_DS_URL).mock(
+            return_value=_ok(
+                {
+                    "items": [
+                        {"id": 1, "dataSourceName": "Ping", "instanceNumber": 1},
+                        {"id": 2, "dataSourceName": "HostStatus", "instanceNumber": 1},
+                    ],
+                    "total": 2,
+                }
+            )
+        )
+
+        with self._subs_but_datasources():
+            result = await health_check(client, device_id=1, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert data["metrics"] == []
+        assert data["warnings"] == [
+            "None of the device's 2 datasources names CPU, memory or disk with an "
+            "instance; metrics is empty."
+        ]
+        jsonschema.validate(data, HEALTH_CHECK_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_summary_lifts_the_metric_warnings(self, auth, lm_env):
+        """A capped read's warnings reach the summary, which trims metrics, one per datapoint."""
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        respx.get(f"{_DS_URL}/10/instances/100/data").mock(side_effect=_capped_read())
+
+        with self._subs({"id": 10, "name": "CPU"}):
+            result = await health_check(client, device_id=1, detail_level="summary")
+
+        data = json.loads(result[0].text)
+        assert "metrics" not in data
+        cpu, mem = data["warnings"]
+        assert cpu.startswith("CPU/cpu100: cpu: ")
+        assert mem.startswith("CPU/cpu100: mem: ")
+        assert f"{MAX_SERIES_PAGES}-page cap" in cpu
+        jsonschema.validate(data, HEALTH_CHECK_OUTPUT_SCHEMA)
+
     @respx.mock
     @pytest.mark.parametrize("disabled", ["get_device_datasources", "analyze_metric"])
     async def test_required_tool_blocked(self, client, monkeypatch, disabled):
@@ -991,6 +1167,34 @@ class TestCapacityPlan:
         (failed,) = data["warnings"]
         assert failed.startswith("analyze_metric for CPU/cpu101 failed:")
         assert "portal unavailable" in failed
+
+    @respx.mock
+    async def test_threshold_sets_each_instance_breach_eta(self, auth, lm_env):
+        """R2.3: threshold reaches analyze_metric's forecast, and each summary row carries
+        the breach ETA in epoch seconds beside the hours.
+
+        cpu100 climbs 120 an hour to 50 at its last sample, 40 minutes ago, so 60 is five
+        minutes past that sample; mem has one sample and no forecast.
+        """
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _rising_cpu_and_sparse_mem()})
+
+        before = int(time.time())
+        summary = json.loads((await capacity_plan(client, device_id=1, threshold=60))[0].text)
+        full = json.loads(
+            (await capacity_plan(client, device_id=1, threshold=60, detail_level="full"))[0].text
+        )
+
+        assert summary["threshold"] == 60
+        cpu, mem = summary["forecast_summary"]
+        assert cpu["hours_until_breach"]["linear"] == pytest.approx(1 / 12, abs=1e-3)
+        assert abs(cpu["breach_eta"]["linear"] - (before - 2400 + 300)) <= 2
+        assert cpu["breach_eta"]["holt_winters"] is None
+        assert "breach_eta" not in mem
+        forecast = full["datasources"][0]["instances"][0]["analysis"]["datapoints"]["cpu"]
+        assert forecast["forecast"]["threshold"] == 60
+        jsonschema.validate(summary, CAPACITY_PLAN_OUTPUT_SCHEMA)
+        jsonschema.validate(full, CAPACITY_PLAN_OUTPUT_SCHEMA)
 
     @respx.mock
     async def test_summary_carries_truncation_warnings_once_per_datapoint(self, auth, lm_env):
@@ -1386,6 +1590,7 @@ class TestDiagnose:
             _patch_sub("lm_mcp.tools.resources.get_device_properties", props_data),
             _patch_window(clusters=corr_data, changes=changes_data),
             _patch_sub("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast_data),
+            _patch_no_diagnostics(),
         ):
             result = await diagnose(client, alert_id="LMA123", detail_level="full")
 
@@ -1426,6 +1631,7 @@ class TestDiagnose:
             _patch_sub("lm_mcp.tools.resources.get_device_properties", props_data),
             _patch_window(clusters=corr_data, changes=changes_data),
             _patch_sub("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast_data),
+            _patch_no_diagnostics(),
         ):
             result = await diagnose(client, device_name="db-01", detail_level="full")
 
@@ -1462,6 +1668,104 @@ class TestDiagnose:
         text = result[0].text
         assert "REQUIRED_TOOLS_DISABLED" in text or "analyze_blast_radius" in text
         reset_config()
+
+    @staticmethod
+    def _context_subs(blast: dict) -> ExitStack:
+        """Patch the alert, device, window and blast-radius reads for alert DS362333940 on
+        host 1786, the ids of the ADR fixtures; the ADR reads go through respx."""
+        stack = ExitStack()
+        for path, data in (
+            (
+                "lm_mcp.tools.alerts.get_alert_details",
+                {"id": "DS362333940", "severity": 4, "monitorObjectId": 1786},
+            ),
+            ("lm_mcp.tools.devices.get_device", {"id": 1786, "displayName": "web-01"}),
+            ("lm_mcp.tools.resources.get_device_properties", {"properties": []}),
+            ("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast),
+        ):
+            stack.enter_context(_patch_sub(path, data))
+        stack.enter_context(
+            _patch_window(clusters={"clusters": [], "cluster_count": 0}, changes={})
+        )
+        return stack
+
+    @respx.mock
+    async def test_reads_the_assigned_diagnostics_and_their_latest_results(self, auth, lm_env):
+        """rul-43402c07ec: the device's assigned DiagnosticSources and the latest results of
+        the alert's diagnostic runs, read and never run; the summary lifts the trimmed blast
+        radius' warning."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        assigned = respx.get(f"{_BASE}/setting/diagnosticRemediation/list").mock(
+            return_value=_ok({"items": [_assigned_source()], "total": 1})
+        )
+        results = respx.get(f"{_BASE}/setting/diagnosticRemediation/executionResults").mock(
+            return_value=_ok({"items": [_execution()], "total": 1})
+        )
+        blast = {"neighbor_count": 0, "dependent_count": 0, "unreadable": [9], "warning": "w"}
+
+        with self._context_subs(blast):
+            result = await diagnose(client, alert_id="DS362333940")
+
+        data = json.loads(result[0].text)
+        assert dict(assigned.calls.last.request.url.params) == {
+            "resourceId": "1786",
+            "moduleType": "diagnosticsource",
+        }
+        results_params = results.calls.last.request.url.params
+        assert results_params["alertId"] == "DS362333940"
+        assert results_params["moduleType"] == "diagnostic"
+        assert "hostId" not in results_params
+        assert {call.request.method for call in respx.calls} == {"GET"}
+        diagnostics = data["diagnostics"]
+        assert [s["name"] for s in diagnostics["assigned"]] == ["Top CPU Processes"]
+        (run,) = diagnostics["latest_results"]
+        assert (run["status"], run["output"]) == ("COMPLETED", "PID 4242 java 93%")
+        assert "blast_radius" not in data
+        assert data["warnings"] == ["blast_radius: w"]
+        jsonschema.validate(data, DIAGNOSE_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_a_failed_diagnostics_read_is_a_warning(self, auth, lm_env, caplog):
+        """A portal without ADR, or a failed read, leaves that list null and names it, and
+        the failure is logged with its traceback."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        respx.get(f"{_BASE}/setting/diagnosticRemediation/list").mock(return_value=_portal_error())
+        respx.get(f"{_BASE}/setting/diagnosticRemediation/executionResults").mock(
+            return_value=_portal_error()
+        )
+
+        with self._context_subs({"neighbor_count": 0, "dependent_count": 0, "unreadable": []}):
+            result = await diagnose(client, alert_id="DS362333940", detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert data["diagnostics"] == {"assigned": None, "latest_results": None}
+        assigned_warning, results_warning = data["warnings"]
+        assert assigned_warning.startswith("get_diagnostic_remediation_assignments failed:")
+        assert results_warning.startswith("get_diagnostic_remediation_results failed:")
+        jsonschema.validate(data, DIAGNOSE_OUTPUT_SCHEMA)
+        logged = [r for r in caplog.records if r.name == "lm_mcp.audit" and r.exc_info]
+        assert [r.getMessage().split(" failed")[0] for r in logged] == [
+            "diagnose: get_diagnostic_remediation_assignments",
+            "diagnose: get_diagnostic_remediation_results",
+        ]
+
+    def test_the_description_says_no_health_score_is_computed(self):
+        """R2.3: diagnose stops promising a health score and says it computes none."""
+        from lm_mcp.registry import TOOLS
+
+        (tool,) = [t for t in TOOLS if t.name == "diagnose"]
+        assert "computes no health score" in tool.description
+        assert "health_score" not in DIAGNOSE_OUTPUT_SCHEMA["properties"]
+
+    def test_nothing_offers_the_removed_health_score(self):
+        """Step 33 removed score_device_health: a tool description or best practice names
+        the health score only as absent or removed."""
+        from lm_mcp.registry import TOOLS
+        from lm_mcp.resources.best_practices import BEST_PRACTICES
+
+        for text in [t.description for t in TOOLS] + [json.dumps(BEST_PRACTICES)]:
+            for match in re.finditer(r"health scores?", text):
+                assert text[: match.start()].endswith(("no ", "removed 0 to 100 ")), text
 
     @respx.mock
     async def test_reads_the_alert_window_once(self, auth, lm_env):
@@ -2162,6 +2466,55 @@ class TestDetectSiteOutage:
             "burst_count": 1,
             "weight": 25,
         }
+
+    @respx.mock
+    @pytest.mark.parametrize("detail_level", ["summary", "full"])
+    async def test_reports_validate_against_the_output_schema(self, auth, detail_level):
+        """R2.3: the documented keys cover a reduced-confidence report, and full mode
+        carries every one of them."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_site_portal(
+            devices=_site_devices(5, "dead"),
+            collector=_collector_record(True),
+            burst=_portal_error(),
+            power=_alert_window(_power_alert()),
+        )
+
+        result = await detect_site_outage(client, group_id=42, detail_level=detail_level)
+
+        data = json.loads(result[0].text)
+        assert data["confidence_level"] == "reduced"
+        jsonschema.validate(data, DETECT_SITE_OUTAGE_OUTPUT_SCHEMA)
+        if detail_level == "full":
+            assert set(data) == set(DETECT_SITE_OUTAGE_OUTPUT_SCHEMA["properties"])
+
+    def test_the_output_schema_refuses_an_unknown_signal_state(self):
+        """A signal entry takes only the documented fields, and the verdict its four values."""
+        report = {
+            "verdict": "no_outage_signature",
+            "confidence": 0,
+            "group_id": 42,
+            "window_seconds": 300,
+            "hours_back": 1,
+            "scope": {"devices_in_group": 1, "dead_devices": 0, "collectors_serving_group": 1},
+            "signals": {
+                "collector_down": {"triggered": False, "count": 0},
+                "interface_burst": {"triggered": False, "burst_count": 0},
+                "power_events": {"triggered": False, "count": 0},
+                "device_silence": {"triggered": False, "dead_devices": 0, "threshold": 3},
+            },
+            "recommendations": [],
+            "warnings": [],
+        }
+        jsonschema.validate(report, DETECT_SITE_OUTAGE_OUTPUT_SCHEMA)
+        signals = report["signals"]
+        for bad in (
+            {**report, "verdict": "outage"},
+            {**report, "signals": {**signals, "power_events": {"triggered": "maybe"}}},
+            {**report, "signals": {**signals, "device_silence": {"triggered": False, "x": 1}}},
+        ):
+            with pytest.raises(jsonschema.ValidationError):
+                jsonschema.validate(bad, DETECT_SITE_OUTAGE_OUTPUT_SCHEMA)
 
     async def test_required_tools_disabled_blocks_composite(self, client, monkeypatch):
         """LM_DISABLED_TOOLS matching a required sub-tool blocks execution."""

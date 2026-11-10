@@ -41,7 +41,10 @@ BEST_PRACTICES: dict[str, dict] = {
         ],
     },
     "device_health_low": {
-        "condition": "Device health score below 50",
+        "condition": (
+            "Mean |z_score| across the device's health_check metrics above 3.33, "
+            "the point where the removed 0 to 100 health score fell below 50"
+        ),
         "recommended_actions": [
             {
                 "action": "Verify collector connectivity and version",
@@ -63,15 +66,15 @@ BEST_PRACTICES: dict[str, dict] = {
                 "action": "Review active alerts for root cause indicators",
                 "how": (
                     "Use get_alerts filtered to the device to see what is currently "
-                    "alerting and correlate with health score contributors"
+                    "alerting and correlate with the datapoints whose z_score is largest"
                 ),
                 "priority": "medium",
             },
         ],
         "anti_patterns": [
             "Do not restart services without diagnosing the root cause",
-            "Do not ignore low health scores on non-production devices",
-            "Do not disable monitoring to improve the health score",
+            "Do not ignore large z-scores on non-production devices",
+            "Do not disable monitoring to bring the z-scores down",
         ],
     },
     "availability_low": {

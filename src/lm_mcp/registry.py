@@ -5392,10 +5392,12 @@ TOOLS.extend(
         Tool(
             name="health_check",
             description=(
-                "Composite health check: resolves a device, reads the first instance "
-                "of up to five datasources through analyze_metric (summary and "
-                "anomalies over 24 hours), checks alerts, and calculates "
-                "availability. Returns a single device health report."
+                "Composite health check: resolves a device, picks up to five of its "
+                "datasources whose names mention CPU, memory or disk (drive, volume, "
+                "filesystem), reads the first instance of each through analyze_metric "
+                "(summary and anomalies over 24 hours), checks open alerts, and "
+                "calculates 30-day availability. A device with none of those "
+                "datasources gets an empty metrics list and a warning."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -5420,8 +5422,9 @@ TOOLS.extend(
             description=(
                 "Composite capacity planning: reads each instance once through "
                 "analyze_metric to classify its trend, detect seasonality and change "
-                "points, and forecast when it crosses 90. Returns per-datasource "
-                "capacity projections."
+                "points, and forecast when it crosses threshold (default 90). Summary "
+                "rows carry each forecast method's breach_eta (epoch seconds) and "
+                "hours_until_breach per datapoint."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -5440,6 +5443,13 @@ TOOLS.extend(
                         "type": "integer",
                         "default": 168,
                         "description": "Hours of historical data (default: 168 = 1 week)",
+                    },
+                    "threshold": {
+                        "type": "number",
+                        "default": 90,
+                        "description": (
+                            "Level each forecast reaches for, in the datapoint's unit (default: 90)"
+                        ),
                     },
                     "detail_level": {
                         "type": "string",
@@ -5480,10 +5490,13 @@ TOOLS.extend(
         Tool(
             name="diagnose",
             description=(
-                "Composite diagnosis: given an alert or device, gathers alert "
-                "details, device context, correlated alerts, recent changes, "
-                "blast radius, and health score. Returns a diagnosis report "
-                "with probable root cause and recommendations."
+                "Composite diagnosis: given an alert, or a device's latest open "
+                "critical alert, gathers the alert details, device context, alerts "
+                "clustered and audit changes in the last four hours, blast radius, "
+                "and the device's assigned DiagnosticSources with the latest results "
+                "of the alert's diagnostic runs. It reads those results and never runs "
+                "a DiagnosticSource. It computes no health score or root cause; "
+                "health_check reports each metric's z-score."
             ),
             annotations=_READ_ONLY,
             inputSchema={
