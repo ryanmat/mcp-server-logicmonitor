@@ -102,7 +102,8 @@ From `trend`:
 The `label` is the first of these that holds, and `confidence` is the figure behind it:
 - `volatile`: the spread is above half the mean (`coefficient_of_variation` above
   0.5). Read the seasonality and change points before trusting the forecast.
-- `cyclic`: the series repeats daily (detrended 24-hour autocorrelation above 0.7).
+- `cyclic`: the series repeats daily (detrended 24-hour autocorrelation above 0.7 in
+  magnitude).
   Read the seasonality before the forecast.
 - `increasing`: a rising line fits the window (`r_squared` above 0.5). Read the
   forecast.
@@ -165,8 +166,9 @@ Classify urgency by the earlier crossing:
 For each resource, call `analyze_metric` on the same instance with
 `analyses=["baseline"]`, the same `hours`, and `baseline_hours_ago=168`. Report the
 mean's `deviation_percent` against the week before and its `status` (`normal`,
-`elevated`, `reduced` or `anomalous`). `deviation_percent` carries no sign; compare
-`current.mean` with `baseline.mean` for the direction.
+`elevated`, `reduced`, `anomalous`, or `no_data` when a window holds no samples).
+`deviation_percent` carries no sign; compare `current.mean` with `baseline.mean` for the
+direction.
 
 ### Step 10: Capacity report
 

@@ -50,10 +50,13 @@ window's alerts once, active and cleared, and returns:
   (`correlated_events`, each with `time_gap_minutes` and `confidence`)
 - `blast_radius`: for up to three device clusters, largest first, their `neighbor_count`,
   `dependent_count`, `critical_alert_count` and `unreadable_count`
-- `warnings`: each read that failed, and a window cut short at the 5,000-alert cap
+- `warnings`: an alert window read or a blast-radius read that failed, and a window cut
+  short at the 5,000-alert cap
 
-A section is null when its read failed; report the warning and treat that section as
-unknown.
+The four alert sections are null when the window read failed; report the warning and
+treat them as unknown. The audit log is read on its own: when that read fails,
+`changes.audit_read_failed` is true, `changes.warning` says so, and `total_changes`
+reads 0 whether or not anything changed.
 
 Present the situation:
 
@@ -127,7 +130,9 @@ Read `changes.correlated_events`. For each:
 - The spike that followed, `time_gap_minutes` later, and the pair's `confidence`
 - Whether the change plausibly caused the alerts
 
-If `total_changes` is 0, say so and suggest checking external change management.
+If `changes.audit_read_failed` is true, say the audit log could not be read and the
+changes are unknown. Otherwise, if `total_changes` is 0, say so and suggest checking
+external change management.
 
 ### Step 8: Recommended actions
 
