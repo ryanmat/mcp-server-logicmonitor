@@ -54,12 +54,13 @@ class ConfigurationError(LMError):
 class AuthenticationError(LMError):
     """Raised when authentication fails."""
 
-    def __init__(self, message: str, suggestion: str | None = None):
+    def __init__(self, message: str, suggestion: str | None = None, details: str | None = None):
         super().__init__(
             message=message,
             code="AUTH_FAILED",
             suggestion=suggestion
             or "Check your LM_ACCESS_ID/LM_ACCESS_KEY or LM_BEARER_TOKEN credentials.",
+            details=details,
         )
 
 
@@ -72,6 +73,29 @@ class LMPermissionError(LMError):
             code="PERMISSION_DENIED",
             suggestion=suggestion
             or "Your API token may lack required permissions. Contact your LM admin.",
+        )
+
+
+class ScopeMissingError(LMError):
+    """Raised when Edwin AI refuses a request its credential's scopes do not cover.
+
+    ``scope`` names the scope the endpoint needs when the Edwin client's scope
+    table knows it, and is None otherwise.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        scope: str | None,
+        suggestion: str | None = None,
+        details: str | None = None,
+    ):
+        self.scope = scope
+        super().__init__(
+            message=message,
+            code="SCOPE_MISSING",
+            suggestion=suggestion,
+            details=details,
         )
 
 
