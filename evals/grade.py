@@ -24,7 +24,7 @@ PASS_RATE = 0.9
 # The two configs graded: the default surface, with the write gate off and on.
 CONFIGS = {"read-only": "false", "write-enabled": "true"}
 
-# Settings that would narrow the surface away from the default; the grade clears them.
+# Settings that would change the surface from the default; the grade clears them.
 _FILTER_SETTINGS = (
     "LM_ENABLED_TOOLS",
     "LM_DISABLED_TOOLS",
