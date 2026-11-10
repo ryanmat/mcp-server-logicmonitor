@@ -519,6 +519,10 @@
           "description": "Optional device ID filter",
           "type": "integer"
         },
+        "device_name": {
+          "description": "Exact device display name; pass it or device_id, not group_id",
+          "type": "string"
+        },
         "group_id": {
           "description": "Optional device group ID filter; not with device_id or device_name",
           "type": "integer"
@@ -2647,7 +2651,7 @@
   },
   "execute_remediation": {
     "annotations": {
-      "destructiveHint": false,
+      "destructiveHint": true,
       "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": false,
@@ -2713,6 +2717,10 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by group name (substring match)",
+          "type": "string"
         },
         "offset": {
           "default": 0,
@@ -2924,9 +2932,17 @@
           "description": "Max results",
           "type": "integer"
         },
+        "name_filter": {
+          "description": "Filter by rule name (substring match)",
+          "type": "string"
+        },
         "offset": {
           "default": 0,
           "description": "Pagination offset",
+          "type": "integer"
+        },
+        "priority_filter": {
+          "description": "Only rules of this priority",
           "type": "integer"
         }
       },
@@ -3277,10 +3293,18 @@
           "description": "Max results",
           "type": "integer"
         },
+        "name_filter": {
+          "description": "Filter by job name (substring match)",
+          "type": "string"
+        },
         "offset": {
           "default": 0,
           "description": "Pagination offset",
           "type": "integer"
+        },
+        "status": {
+          "description": "Only jobs with this status (active, inactive)",
+          "type": "string"
         }
       },
       "type": "object"
@@ -3663,6 +3687,10 @@
           "description": "Max results",
           "type": "integer"
         },
+        "name_filter": {
+          "description": "Filter by group name (substring match)",
+          "type": "string"
+        },
         "offset": {
           "default": 0,
           "description": "Pagination offset",
@@ -4029,6 +4057,10 @@
           "description": "Max results",
           "type": "integer"
         },
+        "name_filter": {
+          "description": "Filter by DataSource name (substring match)",
+          "type": "string"
+        },
         "offset": {
           "default": 0,
           "description": "Pagination offset",
@@ -4151,6 +4183,10 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by instance name (substring match)",
+          "type": "string"
         },
         "offset": {
           "default": 0,
@@ -4587,6 +4623,10 @@
           "description": "Max results",
           "type": "integer"
         },
+        "name_filter": {
+          "description": "Filter by chain name (substring match)",
+          "type": "string"
+        },
         "offset": {
           "default": 0,
           "description": "Pagination offset",
@@ -4936,6 +4976,10 @@
           "description": "Max results",
           "type": "integer"
         },
+        "name_filter": {
+          "description": "Filter by netscan name (substring match)",
+          "type": "string"
+        },
         "offset": {
           "default": 0,
           "description": "Pagination offset",
@@ -5046,7 +5090,8 @@
       "properties": {
         "note_id": {
           "description": "Ops note ID",
-          "type": "integer"
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
         }
       },
       "required": [
@@ -5075,6 +5120,10 @@
           "default": 0,
           "description": "Pagination offset",
           "type": "integer"
+        },
+        "tag_filter": {
+          "description": "Filter by tag (substring match)",
+          "type": "string"
         }
       },
       "type": "object"
@@ -6104,6 +6153,10 @@
           "default": 50,
           "description": "Max results",
           "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by group name (substring match)",
+          "type": "string"
         },
         "offset": {
           "default": 0,

@@ -257,3 +257,60 @@ if __name__ == "__main__":
     readonly = readonly_tool_names()
     READONLY_FIXTURE.write_text(json.dumps(readonly, indent=2) + "\n")
     print(f"wrote {READONLY_FIXTURE} ({len(readonly)} tools)")
+
+
+# POST paths whose call runs a script that changes a monitored host (rul-43402c07ec).
+_DESTRUCTIVE_POSTS = ("/setting/remediationsources/executemanually",)
+
+
+def _handler_sources(tool_name: str) -> str:
+    """The handler's source and that of each function its module holds that it calls by name."""
+    import inspect
+    import re
+
+    from lm_mcp.registry import get_tool_handler
+
+    handler = get_tool_handler(tool_name)
+    source = inspect.getsource(handler)
+    called = set(re.findall(r"\b([A-Za-z_]\w*)\(", source))
+    module = vars(inspect.getmodule(handler))
+    helpers = [
+        inspect.getsource(module[name])
+        for name in sorted(called)
+        if name in module and inspect.isfunction(module[name]) and module[name] is not handler
+    ]
+    return "\n".join([source, *helpers])
+
+
+@pytest.mark.parametrize("tool", TOOLS, ids=lambda t: t.name)
+def test_a_tool_that_deletes_or_runs_a_remediation_is_destructive(tool):
+    """R2.9: a handler that issues a DELETE, itself or through a helper of its module, or
+    POSTs a remediation run carries destructiveHint=true."""
+    source = _handler_sources(tool.name)
+
+    if "client.delete(" in source or any(path in source for path in _DESTRUCTIVE_POSTS):
+        assert tool.annotations is not None
+        assert tool.annotations.destructiveHint is True, tool.name
+
+
+def test_execute_remediation_is_destructive_and_execute_diagnostic_is_not():
+    """rul-43402c07ec: a remediation changes the host, so elicitation can ask first; a
+    diagnostic reads it."""
+    tools = {tool.name: tool for tool in TOOLS}
+
+    assert tools["execute_remediation"].annotations.destructiveHint is True
+    assert tools["execute_diagnostic"].annotations.destructiveHint is False
+
+
+def test_no_tool_declares_a_confirm_flag():
+    """R2.9: destructiveHint and elicitation stand where a model-set confirm flag stood."""
+    assert [t.name for t in TOOLS if "confirm" in t.inputSchema.get("properties", {})] == []
+
+
+def test_ops_note_ids_are_strings_on_every_tool():
+    """R2.9: ops note ids carry letters, so get_ops_note takes the string the others take."""
+    for name in ("get_ops_note", "update_ops_note", "delete_ops_note"):
+        (tool,) = [t for t in TOOLS if t.name == name]
+        note_id = tool.inputSchema["properties"]["note_id"]
+        assert note_id["type"] == "string", name
+        assert "pattern" in note_id, name
