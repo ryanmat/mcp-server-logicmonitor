@@ -144,13 +144,24 @@ class TestCategoryFilter:
         expected = WORKFLOW_TOOLS & {t.name for t in TOOLS}
         assert names == expected
 
-    def test_categories_export_only(self):
+    def test_categories_export_selects_the_raw_getters(self):
+        """export selects the getters that take raw=true, which return the object's full REST
+        definition."""
         config = _MockConfig(mcp_categories="export")
-        result = _filter_tools(TOOLS, config)
-        for tool in result:
-            assert tool.name.startswith("export_"), (
-                f"{tool.name} appeared in export filter but doesn't start with export_"
-            )
+        names = {tool.name for tool in _filter_tools(TOOLS, config)}
+        assert names == {
+            "get_alert_rule",
+            "get_configsource",
+            "get_dashboard",
+            "get_datasource",
+            "get_diagnosticsource",
+            "get_escalation_chain",
+            "get_eventsource",
+            "get_logsource",
+            "get_propertysource",
+            "get_remediationsource",
+            "get_topologysource",
+        }
 
     def test_categories_intersect_with_enabled_tools(self):
         """LM_MCP_CATEGORIES narrows further; never expands."""

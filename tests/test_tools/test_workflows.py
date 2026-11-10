@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import jsonschema
 import pytest
 import respx
 
@@ -17,6 +19,8 @@ from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import call_sub_tool, validation_error
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
 from lm_mcp.tools.workflows import (
+    PORTAL_OVERVIEW_OUTPUT_SCHEMA,
+    TRIAGE_OUTPUT_SCHEMA,
     _resolve_device,
     _trim_detail,
     capacity_plan,
@@ -106,8 +110,56 @@ def _one_alert_per_device(n: int) -> list[dict]:
     ]
 
 
+def _device_alert(alert_id: int, device: str, object_id: int, object_type: str = "device") -> dict:
+    """An open window alert with the monitorObjectId and monitorObjectType every live row
+    carries (probe of lmryanmatuszewski, 2026-11-09)."""
+    return {
+        "id": f"LMA{alert_id}",
+        "severity": 4,
+        "monitorObjectName": device,
+        "monitorObjectId": object_id,
+        "monitorObjectType": object_type,
+        "resourceTemplateName": "Ping",
+        "dataPointName": "PingLossPercent",
+        "startEpoch": int(time.time()) - 600 - alert_id,
+        "endEpoch": 0,
+        "cleared": False,
+    }
+
+
 def _ok(payload: dict) -> httpx.Response:
     return httpx.Response(200, json=payload)
+
+
+def _alerts_by_read(active: list[dict], device_alerts: dict[int, list[dict]]):
+    """Serve window reads from active, and analyze_blast_radius' open-alert check of one
+    device (filter monitorObjectId:<id>,cleared:false) from device_alerts."""
+    window = alert_lists(active)
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        clauses = request.url.params.get("filter", "")
+        if clauses.startswith("monitorObjectId:"):
+            rows = device_alerts.get(int(clauses.split(",")[0].split(":")[1]), [])
+            return _ok({"items": rows, "total": len(rows)})
+        return window(request)
+
+    return respond
+
+
+_NEIGHBORS = re.compile(rf"{re.escape(_BASE)}/(topology|device)/devices/\d+/neighbors")
+
+
+def _topology(graph: dict[int, list[dict]], unreadable: set[int]):
+    """Serve both neighbor paths from graph; a device in unreadable answers 404 on each."""
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        device_id = int(request.url.path.split("/")[-2])
+        if device_id in unreadable:
+            return httpx.Response(404, json={"errorMessage": "not found", "errorCode": 1400})
+        rows = graph.get(device_id, [])
+        return _ok({"items": rows, "total": len(rows)})
+
+    return respond
 
 
 def _portal_error() -> httpx.Response:
@@ -304,7 +356,7 @@ class TestCheckRequiredTools:
             for name, value in vars(workflows).items()
             if name.startswith("_") and name.endswith("_REQUIRED")
         }
-        assert len(lists) == 7
+        assert len(lists) == 8
         for name, required in lists.items():
             assert set(required) <= registered, f"{name}: {sorted(set(required) - registered)}"
 
@@ -412,6 +464,31 @@ class TestTrimDetail:
         assert trimmed == report
 
 
+# blast-radius rows _mock_blast_portal yields for core-sw and edge-fw
+_CORE_SW_COUNTS = {
+    "device": "core-sw",
+    "device_id": 100,
+    "total_affected_devices": 1,
+    "neighbor_count": 1,
+    "dependent_count": 0,
+    "critical_alert_count": 1,
+    "unreadable_count": 0,
+}
+_EDGE_FW_COUNTS = {
+    "device": "edge-fw",
+    "device_id": 101,
+    "total_affected_devices": 0,
+    "neighbor_count": 0,
+    "dependent_count": 0,
+    "critical_alert_count": 0,
+    "unreadable_count": 1,
+    "warning": (
+        "Neighbors of 1 device(s) could not be read on either topology path; the counts "
+        "cover only the devices read."
+    ),
+}
+
+
 # ---------------------------------------------------------------------------
 # TestTriage
 # ---------------------------------------------------------------------------
@@ -443,8 +520,8 @@ class TestTriage:
         data = json.loads(result[0].text)
         assert data["statistics"] == stats_data
         assert data["noise"] == noise_data
-        # blast_radius stripped in summary mode
-        assert "blast_radius" not in data
+        # blast-radius counts stay in summary mode; no device cluster, no rows
+        assert data["blast_radius"] == []
         reset_config()
 
     async def test_happy_path_full(self, client, monkeypatch):
@@ -509,6 +586,7 @@ class TestTriage:
             assert data[key] is None
         assert data["blast_radius"] == []
         assert data["warnings"] == ["analyze_alerts failed: API timeout"]
+        jsonschema.validate(data, TRIAGE_OUTPUT_SCHEMA)
         reset_config()
 
     @respx.mock
@@ -519,8 +597,7 @@ class TestTriage:
         alerts = respx.get(_ALERTS_URL).mock(side_effect=alert_lists(_one_alert_per_device(3)))
         audit = respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
 
-        with _patch_sub("lm_mcp.tools.devices.get_devices", {"devices": []}):
-            result = await triage(client, severity="critical", hours_back=2, detail_level="full")
+        result = await triage(client, severity="critical", hours_back=2, detail_level="full")
 
         data = json.loads(result[0].text)
         reads = _window_reads(alerts)
@@ -542,11 +619,121 @@ class TestTriage:
         )
         respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
 
-        with _patch_sub("lm_mcp.tools.devices.get_devices", {"devices": []}):
-            result = await triage(client, detail_level="full")
+        result = await triage(client, detail_level="full")
 
         data = json.loads(result[0].text)
         assert data["warnings"] == [ALERT_WINDOW_TRUNCATED_WARNING]
+
+    @staticmethod
+    def _mock_blast_portal() -> tuple[respx.Route, respx.Route]:
+        """Two device clusters and a website cluster: core-sw (100) reaches access-1 (200),
+        which has a critical alert open; edge-fw's (101) neighbors answer 404 on both paths."""
+        active = [
+            _device_alert(1, "core-sw", 100),
+            _device_alert(2, "core-sw", 100),
+            _device_alert(3, "edge-fw", 101),
+            _device_alert(4, "edge-fw", 101),
+            _device_alert(5, "shop", 7, "website"),
+            _device_alert(6, "shop", 7, "website"),
+        ]
+        alerts = respx.get(_ALERTS_URL).mock(
+            side_effect=_alerts_by_read(active, {200: [{"severity": 4}]})
+        )
+        respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+        respx.get(url__regex=_NEIGHBORS).mock(
+            side_effect=_topology({100: [{"id": 200, "displayName": "access-1"}]}, {101})
+        )
+        devices = respx.get(f"{_BASE}/device/devices").mock(
+            return_value=_ok({"items": [], "total": 0})
+        )
+        return alerts, devices
+
+    @respx.mock
+    async def test_summary_reports_blast_radius_counts_by_cluster_device_id(self, auth, lm_env):
+        """R2.3: the window is read once, each device cluster's id goes to analyze_blast_radius
+        with no device search, the website cluster gets none, and an unreadable neighbor
+        read is counted rather than reported as zero reach."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        alerts, devices = self._mock_blast_portal()
+
+        data = json.loads((await triage(client))[0].text)
+
+        assert len(_window_reads(alerts)) == 2
+        assert alerts.call_count == 3  # the two window reads and access-1's open-alert check
+        assert devices.call_count == 0
+        assert data["blast_radius"] == [_CORE_SW_COUNTS, _EDGE_FW_COUNTS]
+        device_keys = {c["key"] for c in data["clusters"]["clusters"] if c["type"] == "device"}
+        assert device_keys == {"core-sw", "edge-fw", "shop"}
+        assert data["noise"]["total_alerts"] == 6
+        assert "warnings" not in data
+        jsonschema.validate(data, TRIAGE_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_full_adds_the_devices_reached(self, auth, lm_env):
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        self._mock_blast_portal()
+
+        data = json.loads((await triage(client, detail_level="full"))[0].text)
+
+        core, edge = data["blast_radius"]
+        assert core == {
+            **_CORE_SW_COUNTS,
+            "affected_devices": [
+                {
+                    "device_id": 200,
+                    "device_name": "access-1",
+                    "depth": 1,
+                    "active_alert_count": 1,
+                    "has_critical": True,
+                }
+            ],
+            "critical_path_devices": [],
+        }
+        assert edge == {**_EDGE_FW_COUNTS, "affected_devices": [], "critical_path_devices": []}
+        assert set(data) == set(TRIAGE_OUTPUT_SCHEMA["properties"]) - {"warnings"}
+        jsonschema.validate(data, TRIAGE_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_counts_at_most_three_device_clusters_past_a_website(self, auth, lm_env):
+        """The busiest cluster is a website, which takes no slot; of four device clusters the
+        three largest are read and the fourth is not."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        active = [_device_alert(i, "shop", 7, "website") for i in range(1, 6)]
+        # 4, 3, 2 and 2 alerts: clusters sort largest first, ties in the order they appear
+        for device_id, size in ((100, 4), (101, 3), (102, 2), (103, 2)):
+            active += [
+                _device_alert(10 * device_id + k, f"dev-{device_id}", device_id)
+                for k in range(size)
+            ]
+        respx.get(_ALERTS_URL).mock(side_effect=_alerts_by_read(active, {}))
+        respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+        topology = respx.get(url__regex=_NEIGHBORS).mock(side_effect=_topology({}, set()))
+
+        data = json.loads((await triage(client))[0].text)
+
+        assert [row["device_id"] for row in data["blast_radius"]] == [100, 101, 102]
+        assert sorted(int(c.request.url.path.split("/")[-2]) for c in topology.calls) == [
+            100,
+            101,
+            102,
+        ]
+
+    def test_the_output_schema_refuses_an_undocumented_key(self):
+        report = {
+            "hours_back": 4,
+            "detail_level": "summary",
+            "statistics": None,
+            "clusters": None,
+            "noise": None,
+            "changes": None,
+            "blast_radius": [],
+        }
+        jsonschema.validate(report, TRIAGE_OUTPUT_SCHEMA)
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate({**report, "health_score": 80}, TRIAGE_OUTPUT_SCHEMA)
+        with pytest.raises(jsonschema.ValidationError):
+            row = {**_CORE_SW_COUNTS, "score": 40}
+            jsonschema.validate({**report, "blast_radius": [row]}, TRIAGE_OUTPUT_SCHEMA)
 
 
 # ---------------------------------------------------------------------------
@@ -1031,29 +1218,136 @@ class TestPortalOverview:
         assert "REQUIRED_TOOLS_DISABLED" in text or "get_collectors" in text
         reset_config()
 
+    @staticmethod
+    def _mock_portal() -> dict[str, respx.Route]:
+        return {
+            "alerts": respx.get(_ALERTS_URL).mock(
+                side_effect=alert_lists(_one_alert_per_device(2))
+            ),
+            "audit": respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []})),
+            "collectors": respx.get(f"{_BASE}/setting/collector/collectors").mock(
+                return_value=_ok({"items": [{"id": 1, "hostname": "coll-1"}], "total": 1})
+            ),
+            "sdts": respx.get(f"{_BASE}/sdt/sdts").mock(
+                return_value=_ok({"items": [], "total": 0})
+            ),
+            "devices": respx.get(f"{_BASE}/device/devices").mock(
+                return_value=_ok({"items": [{"id": 5, "displayName": "dead-1"}], "total": 1})
+            ),
+        }
+
     @respx.mock
-    async def test_reads_the_alert_window_once(self, auth, lm_env):
-        """R2.2: one active read and one cleared read feed statistics, clusters and noise;
-        no audit read."""
+    async def test_summary_reads_alerts_collectors_and_sdts_once(self, auth, lm_env):
+        """R2.3: summary reads the alert window once (one active and one
+        cleared request), collectors once and SDTs once, and skips the open-alert and
+        dead-device reads whose lists it does not report."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        alerts = respx.get(_ALERTS_URL).mock(side_effect=alert_lists(_one_alert_per_device(2)))
-        audit = respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
+        routes = self._mock_portal()
 
-        with (
-            _patch_sub("lm_mcp.tools.alerts.get_alerts", {"total": 0, "alerts": []}),
-            _patch_sub("lm_mcp.tools.collectors.get_collectors", {"collectors": []}),
-            _patch_sub("lm_mcp.tools.sdts.get_active_sdts", {"active_sdts": []}),
-            _patch_sub("lm_mcp.tools.devices.get_devices", {"devices": []}),
-        ):
-            result = await portal_overview(client, hours_back=8)
+        data = json.loads((await portal_overview(client, hours_back=8))[0].text)
 
-        data = json.loads(result[0].text)
-        assert len(_window_reads(alerts)) == 2
-        assert alerts.call_count == 2
-        assert audit.call_count == 0
+        assert len(_window_reads(routes["alerts"])) == 2
+        assert routes["alerts"].call_count == 2
+        assert routes["collectors"].call_count == 1
+        assert routes["sdts"].call_count == 1
+        assert routes["devices"].call_count == 0
+        assert routes["audit"].call_count == 0
         assert data["alert_statistics"]["active"] == 2
         assert data["alert_clusters"]["cluster_count"] == 2
         assert data["noise"]["total_alerts"] == 2
+        assert set(data) == {
+            "hours_back",
+            "detail_level",
+            "alert_statistics",
+            "alert_clusters",
+            "noise",
+            "collectors",
+            "active_sdts",
+        }
+        jsonschema.validate(data, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_full_adds_the_open_alert_and_dead_device_reads(self, auth, lm_env):
+        """Full keeps the portal-wide open critical and error lists, read once each."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        routes = self._mock_portal()
+
+        data = json.loads((await portal_overview(client, detail_level="full"))[0].text)
+
+        open_reads = [
+            c.request.url.params["filter"].split(",")
+            for c in routes["alerts"].calls
+            if "startEpoch>:" not in c.request.url.params.get("filter", "")
+        ]
+        assert len(_window_reads(routes["alerts"])) == 2
+        assert sorted(next(x for x in r if x.startswith("severity:")) for r in open_reads) == [
+            "severity:3",
+            "severity:4",
+        ]
+        assert all("cleared:false" in r for r in open_reads)
+        assert routes["collectors"].call_count == 1
+        assert routes["sdts"].call_count == 1
+        assert routes["devices"].call_count == 1
+        assert set(data) == set(PORTAL_OVERVIEW_OUTPUT_SCHEMA["properties"]) - {"warnings"}
+        jsonschema.validate(data, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+
+    @respx.mock
+    async def test_only_full_mode_needs_get_alerts_and_get_devices(self, auth, lm_env, monkeypatch):
+        """Summary never calls get_alerts or get_devices, so disabling them refuses only full."""
+        from lm_mcp.config import reset_config
+
+        monkeypatch.setenv("LM_DISABLED_TOOLS", "get_alerts,get_devices")
+        reset_config()
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        self._mock_portal()
+
+        summary = json.loads((await portal_overview(client))[0].text)
+        full = (await portal_overview(client, detail_level="full"))[0].text
+        reset_config()
+
+        assert summary["alert_statistics"]["active"] == 2
+        jsonschema.validate(summary, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+        assert "requires disabled tools: get_alerts, get_devices" in full
+
+    async def test_a_report_of_failed_reads_validates_against_the_schema(self, client, lm_env):
+        """Every read failing leaves each key null with one warning per tool, in full mode."""
+        failing = {
+            name: patch(name, new_callable=AsyncMock, side_effect=RuntimeError("API timeout"))
+            for name in (
+                "lm_mcp.tools.analyze_alerts.analyze_alerts",
+                "lm_mcp.tools.collectors.get_collectors",
+                "lm_mcp.tools.sdts.get_active_sdts",
+                "lm_mcp.tools.alerts.get_alerts",
+                "lm_mcp.tools.devices.get_devices",
+            )
+        }
+        with ExitStack() as stack:
+            for patcher in failing.values():
+                stack.enter_context(patcher)
+            data = json.loads((await portal_overview(client, detail_level="full"))[0].text)
+
+        null_keys = set(PORTAL_OVERVIEW_OUTPUT_SCHEMA["properties"]) - {
+            "hours_back",
+            "detail_level",
+            "warnings",
+        }
+        assert {key: data[key] for key in null_keys} == dict.fromkeys(null_keys)
+        assert len(data["warnings"]) == 5
+        jsonschema.validate(data, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+
+    def test_the_output_schema_refuses_an_undocumented_key(self):
+        report = {
+            "hours_back": 4,
+            "detail_level": "summary",
+            "alert_statistics": None,
+            "alert_clusters": None,
+            "noise": None,
+            "collectors": None,
+            "active_sdts": None,
+        }
+        jsonschema.validate(report, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate({**report, "top_talkers": []}, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
 
 
 # ---------------------------------------------------------------------------

@@ -130,7 +130,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Reports | List, view, run, and schedule reports |
 | Escalations | Full CRUD for escalation chains and recipient groups |
 | Users and audit | Users, roles, access groups, API tokens, audit logs, ops notes, login and change audits |
-| LogicModules | Query, create, update, delete, export, and import data, config, event, property, topology, log, diagnostic, and remediation sources (topology sources have no export, and remediation sources have no import), plus Config Archive retrieval, diffs, and on-demand collection |
+| LogicModules | Query, create, update, delete, and import data, config, event, property, topology, log, diagnostic, and remediation sources, and read any of them as its full REST object with `raw=true` (remediation sources have no import), plus Config Archive retrieval, diffs, and on-demand collection |
 | Diagnostics and remediation | Assigned-source resolution, structured execution results with script output, manual execution, action chains and rules |
 | APM traces | Service discovery, per-operation RED metrics, service alerts, and OTel properties |
 | Network | Neighbors, interfaces, flows, connections, top talkers, link flaps, and outage detection. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |

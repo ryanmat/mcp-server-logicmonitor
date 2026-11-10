@@ -42,9 +42,15 @@ def _make_alert(
     start_epoch=None,
     end_epoch=0,
     cleared=False,
+    object_id=None,
+    object_type=None,
 ):
-    """An /alert/alerts row in the live shape: cleared is a boolean, endEpoch 0 while open."""
-    return {
+    """An /alert/alerts row in the live shape: cleared is a boolean, endEpoch 0 while open.
+
+    object_id and object_type add monitorObjectId and monitorObjectType, which every live
+    row carries (probe of lmryanmatuszewski, 2026-11-09); a row without them is left bare.
+    """
+    row = {
         "id": f"LMA{alert_id}",
         "severity": severity,
         "monitorObjectName": device,
@@ -55,6 +61,11 @@ def _make_alert(
         "endEpoch": end_epoch,
         "cleared": cleared,
     }
+    if object_id is not None:
+        row["monitorObjectId"] = object_id
+    if object_type is not None:
+        row["monitorObjectType"] = object_type
+    return row
 
 
 def _cleared(alert_id, device, datasource, datapoint="value", start_epoch=None, **kwargs):
@@ -328,6 +339,28 @@ class TestClusters:
         clusters = _body(await _analyze(client, analyses=["clusters"]))["clusters"]
 
         assert clusters == {"cluster_count": 0, "clusters": []}
+
+    @respx.mock
+    async def test_a_device_cluster_names_the_device_its_alerts_share(self, client):
+        """device_id is the one monitorObjectId of a cluster whose alerts are all device rows;
+        a website, two ids under one name, or rows without the fields give null."""
+        active = [
+            _make_alert(1, "web-01", "CPU", object_id=101, object_type="device"),
+            _make_alert(2, "web-01", "Disk", object_id=101, object_type="device"),
+            _make_alert(3, "site-a", "HTTP", object_id=7, object_type="website"),
+            _make_alert(4, "site-a", "Ping", object_id=7, object_type="website"),
+            _make_alert(5, "twin", "CPU", object_id=201, object_type="device"),
+            _make_alert(6, "twin", "Disk", object_id=202, object_type="device"),
+            _make_alert(7, "bare", "CPU"),
+            _make_alert(8, "bare", "Disk"),
+        ]
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(active))
+
+        clusters = _body(await _analyze(client, analyses=["clusters"]))["clusters"]["clusters"]
+
+        ids = {c["key"]: c["device_id"] for c in clusters if c["type"] == "device"}
+        assert ids == {"web-01": 101, "site-a": None, "twin": None, "bare": None}
+        assert not [c for c in clusters if c["type"] != "device" and "device_id" in c]
 
 
 class TestNoise:

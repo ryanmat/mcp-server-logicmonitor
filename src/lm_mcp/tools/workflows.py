@@ -111,10 +111,112 @@ def _trim_detail(report: dict, detail_level: str, full_keys: set[str]) -> dict:
 # ---------------------------------------------------------------------------
 
 _TRIAGE_REQUIRED = [
-    "get_alerts",
     "analyze_alerts",
     "analyze_blast_radius",
 ]
+
+# Device clusters, largest first, whose blast radius triage reads.
+_TRIAGE_BLAST_CLUSTERS = 3
+
+_OBJECT_OR_NULL = {"type": ["object", "null"]}
+
+_DETAIL_LEVEL = {"type": "string", "enum": ["summary", "full"]}
+
+_COUNT = {"type": "integer", "minimum": 0}
+
+_BLAST_RADIUS_ROW = {
+    "type": "object",
+    "properties": {
+        "device": {"type": "string", "description": "The device's name, the cluster's key."},
+        "device_id": {"type": "integer", "description": "The device the cluster's alerts share."},
+        "total_affected_devices": {**_COUNT, "description": "Devices reached at any depth."},
+        "neighbor_count": {**_COUNT, "description": "Devices reached at depth 1."},
+        "dependent_count": {**_COUNT, "description": "Devices reached at depth 2 and beyond."},
+        "critical_alert_count": {
+            **_COUNT,
+            "description": "Devices reached with a critical alert open.",
+        },
+        "unreadable_count": {
+            **_COUNT,
+            "description": "Devices whose neighbors neither topology path answered.",
+        },
+        "warning": {"type": "string", "description": "Present when unreadable_count is not 0."},
+        "degraded_detail": {
+            "type": "string",
+            "description": "Present when an alert check failed; critical counts may be low.",
+        },
+        "affected_devices": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "Full: each device reached, with its depth and open alerts.",
+        },
+        "critical_path_devices": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "Full: devices reached from two or more others.",
+        },
+    },
+    "required": [
+        "device",
+        "device_id",
+        "total_affected_devices",
+        "neighbor_count",
+        "dependent_count",
+        "critical_alert_count",
+        "unreadable_count",
+    ],
+    "additionalProperties": False,
+}
+
+# The report triage returns, as a JSON Schema. An analyze_alerts section is null when
+# the window read failed, with a warning naming the failure.
+TRIAGE_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "hours_back": {"type": "integer", "description": "Hours the alert window reaches back."},
+        "detail_level": _DETAIL_LEVEL,
+        "statistics": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'statistics'."},
+        "clusters": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'clusters'."},
+        "noise": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'noise'."},
+        "changes": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'changes'."},
+        "blast_radius": {
+            "type": "array",
+            "items": _BLAST_RADIUS_ROW,
+            "description": "One row per device cluster read, up to three.",
+        },
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "hours_back",
+        "detail_level",
+        "statistics",
+        "clusters",
+        "noise",
+        "changes",
+        "blast_radius",
+    ],
+    "additionalProperties": False,
+}
+
+
+def _blast_radius_row(cluster: dict, radius: dict, detail_level: str) -> dict:
+    """Project an analyze_blast_radius result onto its counts, with the device lists in full."""
+    row = {
+        "device": cluster["key"],
+        "device_id": cluster["device_id"],
+        "total_affected_devices": radius["total_affected_devices"],
+        "neighbor_count": radius["neighbor_count"],
+        "dependent_count": radius["dependent_count"],
+        "critical_alert_count": radius["critical_alert_count"],
+        "unreadable_count": len(radius["unreadable"]),
+    }
+    for key in ("warning", "degraded_detail"):
+        if key in radius:
+            row[key] = radius[key]
+    if detail_level == "full":
+        row["affected_devices"] = radius["affected_devices"]
+        row["critical_path_devices"] = radius["critical_path_devices"]
+    return row
 
 
 async def triage(
@@ -125,11 +227,13 @@ async def triage(
     hours_back: int = 4,
     detail_level: str = "summary",
 ) -> list[TextContent]:
-    """Composite triage: correlate, cluster, score, and assess alerts.
+    """Composite triage: one alert window read, then blast-radius counts.
 
     Reads the alert window once through analyze_alerts for its statistics,
-    clusters, noise and changes, then analyzes blast radius for the busiest
-    device clusters.
+    clusters, noise and changes, then counts the blast radius of up to three
+    device clusters, largest first, by the device_id the cluster names; a
+    cluster without one (a website) is passed over. TRIAGE_OUTPUT_SCHEMA
+    documents the report.
 
     Args:
         client: LogicMonitor API client.
@@ -137,10 +241,10 @@ async def triage(
         device: Filter by device name.
         group_id: Filter by device group ID.
         hours_back: Hours to look back (default: 4).
-        detail_level: 'summary' or 'full' (default: summary).
+        detail_level: 'summary' or 'full'; full adds each blast radius' devices.
 
     Returns:
-        Prioritized incident report as TextContent list.
+        Incident report as TextContent list.
     """
     blocked = check_required_tools(_TRIAGE_REQUIRED)
     if blocked:
@@ -169,58 +273,30 @@ async def triage(
             warnings.append(f"analyze_alerts failed: {exc}")
         if window.get("truncated"):
             warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
-        report["statistics"] = window.get("statistics")
-        report["clusters"] = window.get("clusters")
-        report["noise"] = window.get("noise")
+        for section in ("statistics", "clusters", "noise", "changes"):
+            report[section] = window.get(section)
 
-        # 2. Blast radius for critical clusters (up to 3 devices)
-        blast_results: list[dict] = []
-        clusters_data = window.get("clusters") or {}
-        clusters = clusters_data.get("clusters", [])
-        device_clusters = [c for c in clusters if c.get("type") == "device"]
-        for cluster in device_clusters[:3]:
-            device_key = cluster.get("key", "")
-            # Resolve device name to ID via search
+        # 2. Blast-radius counts for the largest device clusters that name their device
+        clusters = (window.get("clusters") or {}).get("clusters", [])
+        devices = [
+            c for c in clusters if c.get("type") == "device" and c.get("device_id") is not None
+        ]
+        blast_rows: list[dict] = []
+        for cluster in devices[:_TRIAGE_BLAST_CLUSTERS]:
             try:
-                from lm_mcp.tools.devices import get_devices
-
-                dev_data = await call_sub_tool(
-                    get_devices,
-                    client,
-                    name_filter=device_key,
-                    limit=1,
+                radius = await call_sub_tool(
+                    analyze_blast_radius, client, device_id=cluster["device_id"]
                 )
-                devs = dev_data.get("devices", [])
-                if devs:
-                    br = await call_sub_tool(
-                        analyze_blast_radius,
-                        client,
-                        device_id=devs[0]["id"],
-                    )
-                    blast_results.append(
-                        {
-                            "device": device_key,
-                            "blast_radius": br,
-                        }
-                    )
+                blast_rows.append(_blast_radius_row(cluster, radius, detail_level))
             except Exception as exc:
                 _AUDIT.warning(
-                    "triage: blast radius failed for %s: %s", device_key, exc, exc_info=True
+                    "triage: blast radius failed for %s: %s", cluster["key"], exc, exc_info=True
                 )
-                warnings.append(f"blast_radius for {device_key} failed: {exc}")
-        report["blast_radius"] = blast_results
-
-        # 3. Changes paired to spikes, from the same window read
-        report["changes"] = window.get("changes")
+                warnings.append(f"blast_radius for {cluster['key']} failed: {exc}")
+        report["blast_radius"] = blast_rows
 
         if warnings:
             report["warnings"] = warnings
-
-        # Trim for summary mode
-        full_keys = {
-            "blast_radius",
-        }
-        report = _trim_detail(report, detail_level, full_keys)
 
         return format_response(report)
     except Exception as e:
@@ -606,11 +682,54 @@ def _instance_warnings(ds_reports: list[dict]) -> list[str]:
 
 _PORTAL_OVERVIEW_REQUIRED = [
     "analyze_alerts",
-    "get_alerts",
     "get_collectors",
     "get_active_sdts",
+]
+
+# The tools only full mode calls, for the open-alert and dead-device lists.
+_PORTAL_OVERVIEW_FULL_REQUIRED = [
+    "get_alerts",
     "get_devices",
 ]
+
+# The report portal_overview returns, as a JSON Schema. A key whose read failed is null,
+# with a warning naming the failure. critical_alerts, error_alerts and dead_devices are
+# full-mode keys: summary does not read them.
+PORTAL_OVERVIEW_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "hours_back": {"type": "integer", "description": "Hours the alert window reaches back."},
+        "detail_level": _DETAIL_LEVEL,
+        "alert_statistics": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'statistics'."},
+        "alert_clusters": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'clusters'."},
+        "noise": {**_OBJECT_OR_NULL, "description": "analyze_alerts 'noise'."},
+        "collectors": {**_OBJECT_OR_NULL, "description": "get_collectors' first page."},
+        "active_sdts": {**_OBJECT_OR_NULL, "description": "get_active_sdts' first page."},
+        "critical_alerts": {
+            **_OBJECT_OR_NULL,
+            "description": "Full: up to 20 open critical alerts, portal-wide (get_alerts).",
+        },
+        "error_alerts": {
+            **_OBJECT_OR_NULL,
+            "description": "Full: up to 20 open error alerts, portal-wide (get_alerts).",
+        },
+        "dead_devices": {
+            **_OBJECT_OR_NULL,
+            "description": "Full: up to 20 dead devices (get_devices status=dead).",
+        },
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "hours_back",
+        "detail_level",
+        "alert_statistics",
+        "alert_clusters",
+        "noise",
+        "collectors",
+        "active_sdts",
+    ],
+    "additionalProperties": False,
+}
 
 
 async def portal_overview(
@@ -620,8 +739,11 @@ async def portal_overview(
 ) -> list[TextContent]:
     """Composite portal overview for shift-handoff reporting.
 
-    Aggregates alert statistics, clusters and noise from one analyze_alerts
-    read, collector health, maintenance windows, and dead/unmonitored devices.
+    Reads the alert window once through analyze_alerts for its statistics,
+    clusters and noise, collectors once and active SDTs once. Full mode adds
+    the open critical and error alerts across the portal and the dead
+    devices, reads summary mode skips. PORTAL_OVERVIEW_OUTPUT_SCHEMA documents
+    the report.
 
     Args:
         client: LogicMonitor API client.
@@ -631,7 +753,10 @@ async def portal_overview(
     Returns:
         Portal overview report as TextContent list.
     """
-    blocked = check_required_tools(_PORTAL_OVERVIEW_REQUIRED)
+    required = _PORTAL_OVERVIEW_REQUIRED
+    if detail_level == "full":
+        required = required + _PORTAL_OVERVIEW_FULL_REQUIRED
+    blocked = check_required_tools(required)
     if blocked:
         return blocked
 
@@ -659,63 +784,48 @@ async def portal_overview(
         if window.get("truncated"):
             warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
         report["alert_statistics"] = window.get("statistics")
+        report["alert_clusters"] = window.get("clusters")
+        report["noise"] = window.get("noise")
 
-        # 2. High-severity active alerts (critical + error)
+        # 2. Collector health
         try:
-            crit_alerts = await call_sub_tool(
-                get_alerts,
-                client,
-                severity="critical",
-                cleared=False,
-                limit=20,
-            )
-            err_alerts = await call_sub_tool(
-                get_alerts,
-                client,
-                severity="error",
-                cleared=False,
-                limit=20,
-            )
-            report["critical_alerts"] = crit_alerts
-            report["error_alerts"] = err_alerts
-        except Exception as exc:
-            warnings.append(f"get_alerts failed: {exc}")
-            report["critical_alerts"] = None
-            report["error_alerts"] = None
-
-        # 3. Collector health
-        try:
-            coll_data = await call_sub_tool(get_collectors, client)
-            report["collectors"] = coll_data
+            report["collectors"] = await call_sub_tool(get_collectors, client)
         except Exception as exc:
             warnings.append(f"get_collectors failed: {exc}")
             report["collectors"] = None
 
-        # 4. Active SDTs
+        # 3. Active SDTs
         try:
-            sdt_data = await call_sub_tool(get_active_sdts, client)
-            report["active_sdts"] = sdt_data
+            report["active_sdts"] = await call_sub_tool(get_active_sdts, client)
         except Exception as exc:
             warnings.append(f"get_active_sdts failed: {exc}")
             report["active_sdts"] = None
 
-        # 5. Alert clusters and noise, from the window read in step 1
-        report["alert_clusters"] = window.get("clusters")
-        report["noise"] = window.get("noise")
+        if detail_level == "full":
+            # 4. Open critical and error alerts across the portal, not only the window
+            try:
+                report["critical_alerts"] = await call_sub_tool(
+                    get_alerts, client, severity="critical", cleared=False, limit=20
+                )
+                report["error_alerts"] = await call_sub_tool(
+                    get_alerts, client, severity="error", cleared=False, limit=20
+                )
+            except Exception as exc:
+                warnings.append(f"get_alerts failed: {exc}")
+                report["critical_alerts"] = None
+                report["error_alerts"] = None
 
-        # 7. Dead/unmonitored devices
-        try:
-            dead = await call_sub_tool(get_devices, client, status="dead", limit=20)
-            report["dead_devices"] = dead
-        except Exception as exc:
-            warnings.append(f"get_devices (dead) failed: {exc}")
-            report["dead_devices"] = None
+            # 5. Dead devices
+            try:
+                report["dead_devices"] = await call_sub_tool(
+                    get_devices, client, status="dead", limit=20
+                )
+            except Exception as exc:
+                warnings.append(f"get_devices (dead) failed: {exc}")
+                report["dead_devices"] = None
 
         if warnings:
             report["warnings"] = warnings
-
-        full_keys = {"critical_alerts", "error_alerts", "dead_devices"}
-        report = _trim_detail(report, detail_level, full_keys)
 
         return format_response(report)
     except Exception as e:

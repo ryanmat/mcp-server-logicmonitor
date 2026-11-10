@@ -201,6 +201,34 @@ class TestRoutedThroughTheTable:
         assert data[module_type]["id"] == 501
         assert "created" in data["message"]
 
+    @respx.mock
+    async def test_overwrite_never_replaces_a_module_of_another_name(
+        self, client, writes_on, module_type
+    ):
+        """A lookup row under another name, as a filter the portal did not apply returns, is
+        not the module to replace: the definition is posted and nothing is put."""
+        _, path, _, _ = _TYPES[module_type]
+        respx.get(f"{BASE}/setting/{path}").mock(
+            return_value=httpx.Response(
+                200, json={"items": [{"id": 500, "name": "Other"}], "total": 40}
+            )
+        )
+        put = respx.put(url__startswith=f"{BASE}/setting/{path}/").mock(
+            return_value=httpx.Response(200, json={"id": 500, "name": "M"})
+        )
+        posted = respx.post(f"{BASE}/setting/{path}").mock(
+            return_value=httpx.Response(200, json={"id": 501, "name": "M"})
+        )
+
+        result = await _handler(module_type, "create")(
+            client, definition={"name": "M"}, overwrite=True
+        )
+
+        data = json.loads(result[0].text)
+        assert (put.call_count, posted.call_count) == (0, 1)
+        assert data[module_type]["id"] == 501
+        assert "created" in data["message"]
+
 
 class TestOverwriteNeverDeletes:
     """R2.4 acceptance: a failed write under overwrite=true leaves the original in place."""
