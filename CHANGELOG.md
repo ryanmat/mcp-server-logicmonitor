@@ -43,7 +43,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `device`, `group_id` and `datasource` filters, and reports it by section: `statistics` (active
   and cleared totals, counts by severity, the ten busiest devices and datasources, the volume of
   each hour), `clusters` (two or more alerts on one device, one datasource, or one signature, the
-  datasource and datapoint), `noise` (the 0 to 100 score from entropy, flaps and repeats, with the
+  datasource and datapoint; a device cluster names the `device_id` its alerts share), `noise` (the 0 to 100 score from entropy, flaps and repeats, with the
   first ten flap pairs and recommendations), `bursts` (windows of `window_seconds` on one
   datasource holding `min_alerts` alerts on `min_devices` devices) and `changes` (one audit read;
   each write action paired with the first 5-minute alert spike within
@@ -353,6 +353,15 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `alert_statistics`, `alert_clusters` and `noise`, and `diagnose` reads the last four hours once
   for `correlated_alerts` and `changes`. Each window now holds cleared alerts beside the active
   ones, and a window the 5000-alert cap cut short adds a warning.
+- `triage` counts the blast radius of up to three device clusters through the `device_id` each
+  cluster names, and passes over a website cluster. It looked each device up by a substring
+  match on its name and kept the first result, which could be another device whose name
+  contains it. Each `blast_radius` row carries `total_affected_devices`, `neighbor_count`,
+  `dependent_count`, `critical_alert_count` and `unreadable_count` in summary and full mode,
+  where summary dropped the key and full returned the whole `analyze_blast_radius` result; full
+  adds `affected_devices` and `critical_path_devices`. `portal_overview` in summary mode reads
+  alerts, collectors and SDTs once each, and no longer reads the open critical and error alerts
+  or the dead devices, lists only full mode reports.
 - `correlate_metrics` joins the series by timestamp bucket, as wide as the coarsest series'
   median sample interval with finer series averaged into it, and reports `shared_samples` and
   `bucket_seconds` in place of `sample_count`. It paired samples by position from the newest, so

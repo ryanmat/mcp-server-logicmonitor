@@ -155,13 +155,32 @@ def statistics_section(alerts: list[dict], start_epoch: int, hours: int) -> dict
     }
 
 
+def _shared_device_id(members: list[dict]) -> int | None:
+    """The monitorObjectId every member shares when each is a device row, else None.
+
+    A website row, two ids under one name, or a row without the fields gives None, so a
+    caller never reads a website or the wrong device as the cluster's device.
+    """
+    if any(a.get("monitorObjectType") != "device" for a in members):
+        return None
+    ids = {a.get("monitorObjectId") for a in members}
+    if len(ids) != 1:
+        return None
+    (device_id,) = ids
+    return device_id if isinstance(device_id, int) else None
+
+
 def _clusters(
     alerts: list[dict],
     kind: str,
     key_of: Callable[[dict], str],
     list_devices: bool,
+    name_device: bool = False,
 ) -> list[dict]:
-    """Group alerts by key_of and report each group of two or more, largest first."""
+    """Group alerts by key_of and report each group of two or more, largest first.
+
+    name_device adds device_id, the device the group's alerts share (_shared_device_id).
+    """
     groups: dict[str, list[dict]] = defaultdict(list)
     for alert in alerts:
         groups[key_of(alert)].append(alert)
@@ -172,6 +191,8 @@ def _clusters(
             continue
         epochs = [a.get("startEpoch", 0) for a in members]
         cluster: dict[str, Any] = {"type": kind, "key": key, "count": len(members)}
+        if name_device:
+            cluster["device_id"] = _shared_device_id(members)
         if list_devices:
             cluster["devices"] = sorted({a.get("monitorObjectName", "") for a in members})
         cluster["alert_ids"] = [a.get("id") for a in members]
@@ -182,8 +203,10 @@ def _clusters(
 
 
 def cluster_by_device(alerts: list[dict]) -> list[dict]:
-    """Clusters of two or more alerts on one device."""
-    return _clusters(alerts, "device", lambda a: a.get("monitorObjectName", "unknown"), False)
+    """Clusters of two or more alerts on one device, each with the device_id they share."""
+    return _clusters(
+        alerts, "device", lambda a: a.get("monitorObjectName", "unknown"), False, name_device=True
+    )
 
 
 def cluster_by_datasource(alerts: list[dict]) -> list[dict]:

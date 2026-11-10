@@ -4214,7 +4214,9 @@ TOOLS.extend(
                 "devices and datasources, and the volume of each hour, cleared alerts "
                 "included; 'clusters' groups two or more alerts by device, by datasource "
                 "and by signature (datasource and datapoint), with their alert ids and "
-                "first and last start times; 'noise' gives a 0 to 100 score from the "
+                "first and last start times, and a device cluster names the device_id its "
+                "alerts share, null for a website or two devices under one name; 'noise' "
+                "gives a 0 to 100 score from the "
                 "entropy of alerts over datasource and datapoint (weight 40), flaps, an "
                 "alert on the same device and datapoint that re-fires within 30 minutes "
                 "of clearing (30), and repeats, a combination with three or more alerts "
@@ -5352,9 +5354,14 @@ TOOLS.extend(
         Tool(
             name="triage",
             description=(
-                "Composite triage: correlates alerts, clusters by device/time, "
-                "scores noise, assesses blast radius, and checks recent changes. "
-                "Returns a prioritized incident report."
+                "Triage the alerts of the last hours_back hours in one call: reads the "
+                "alert window once through analyze_alerts for its statistics, clusters (by "
+                "device, datasource and signature), noise and changes, then counts the blast "
+                "radius of up to three device clusters, largest first: the devices reached as "
+                "neighbors and dependents, how many have a critical alert open, and how many "
+                "devices' neighbors could not be read. detail_level=full adds the devices "
+                "each blast radius reached. Use analyze_alerts for bursts or one section, "
+                "analyze_blast_radius for one device."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -5445,9 +5452,11 @@ TOOLS.extend(
         Tool(
             name="portal_overview",
             description=(
-                "Composite portal overview: aggregates alert statistics, collector "
-                "health, maintenance windows, noise scores, and dead devices into "
-                "a shift-handoff report."
+                "Shift-handoff overview of the portal: reads the alert window of the last "
+                "hours_back hours once for statistics, clusters and noise, and lists the "
+                "collectors and the active SDTs. detail_level=full adds up to 20 open "
+                "critical and 20 open error alerts from across the portal, not only the "
+                "window, and up to 20 dead devices; summary does not read them."
             ),
             annotations=_READ_ONLY,
             inputSchema={
