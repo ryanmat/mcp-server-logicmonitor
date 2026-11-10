@@ -238,7 +238,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   window, up to 25, where they read only the newest page, which held at most 500 samples. All
   three add `truncated`, and a `warning` when the page cap stops the read. A `start_time` given
   without an `end_time` is sent with the end set to now, where the portal answered it with its
-  last hour. This closes the 4.3.0 known limit for the two of its seven tools that 5.0 keeps.
+  last hour. This closes the 4.3.0 known limit for `get_device_data` and
+  `get_interface_metrics`, the two of its seven tools that 5.0 keeps.
 - `get_collector_health` with `include_history` returns `collector_down_history: null` and a
   `history_warning` when the alert read fails, where it returned an empty list that looked like a
   quiet collector. It no longer sends the `alertType` clause the API ignores. The rows are still
