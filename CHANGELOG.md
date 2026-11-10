@@ -233,7 +233,7 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - `analyze_metric`, and through it `health_check` and `capacity_plan`, read the whole window
   they ask for. A window ending now was sent as a start alone, which the portal answers with
   its last hour, so a 24-hour read came back as 60 one-minute samples; on the sandbox portal it
-  now returns 1,440 over 24 hours.
+  now returns 1,440 one-minute samples across the 24-hour window.
 - `get_device_data`, `get_interface_metrics` and `get_website_data` read every page of their
   window, up to 25, where they read only the newest page, which held at most 500 samples. All
   three add `truncated`, and a `warning` when the page cap stops the read. A `start_time` given
