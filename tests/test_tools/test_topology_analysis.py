@@ -31,6 +31,8 @@ def client(auth):
 
 BASE_URL = "https://test.logicmonitor.com/santaba/rest"
 ALERT_URL = f"{BASE_URL}/alert/alerts"
+# One device's alert list; /alert/alerts ignores a monitorObjectId filter.
+DEVICE_ALERTS = rf"{BASE_URL}/device/devices/\d+/alerts"
 
 
 class TestAnalyzeBlastRadius:
@@ -53,7 +55,9 @@ class TestAnalyzeBlastRadius:
             )
         )
         # Alert checks for each neighbor
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(url__regex=DEVICE_ALERTS).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
@@ -81,7 +85,9 @@ class TestAnalyzeBlastRadius:
                 json={"items": [{"id": 3, "displayName": "server-01"}]},
             )
         )
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(url__regex=DEVICE_ALERTS).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         result = await analyze_blast_radius(client, device_id=1, depth=2)
 
@@ -119,7 +125,9 @@ class TestAnalyzeBlastRadius:
             return_value=httpx.Response(200, json={"items": [{"id": 2, "displayName": "sw"}]})
         )
         # The per-device alert query fails -> the device's alert status is unknown.
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(500, json={"errorMessage": "boom"}))
+        respx.get(url__regex=DEVICE_ALERTS).mock(
+            return_value=httpx.Response(500, json={"errorMessage": "boom"})
+        )
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
@@ -155,7 +163,7 @@ class TestAnalyzeBlastRadius:
                 json={"items": [{"id": 2, "displayName": "switch-01"}]},
             )
         )
-        respx.get(ALERT_URL).mock(
+        respx.get(url__regex=DEVICE_ALERTS).mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -169,6 +177,35 @@ class TestAnalyzeBlastRadius:
 
         data = json.loads(result[0].text)
         assert data["critical_alert_count"] == 1
+
+    @respx.mock
+    async def test_each_device_is_read_from_its_own_alert_list(self, client):
+        """A critical alert elsewhere on the portal does not count against a neighbor."""
+        from lm_mcp.tools.topology_analysis import analyze_blast_radius
+
+        respx.get(f"{BASE_URL}/topology/devices/1/neighbors").mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": [{"id": 2, "displayName": "switch-01"}]},
+            )
+        )
+        portal = respx.get(ALERT_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": [{"id": "LMA9", "severity": 4, "cleared": False}], "total": 1},
+            )
+        )
+        device = respx.get(f"{BASE_URL}/device/devices/2/alerts").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+
+        result = await analyze_blast_radius(client, device_id=1, depth=1)
+
+        data = json.loads(result[0].text)
+        assert data["critical_alert_count"] == 0
+        assert not portal.called
+        assert device.called
+        assert dict(device.calls[0].request.url.params)["filter"] == "cleared:false"
 
     @respx.mock
     async def test_avoids_revisiting_source_device(self, client):
@@ -186,7 +223,9 @@ class TestAnalyzeBlastRadius:
                 },
             )
         )
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(url__regex=DEVICE_ALERTS).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
@@ -231,7 +270,9 @@ class TestAnalyzeBlastRadius:
                 json={"items": [{"id": 2, "displayName": "neighbor-01"}]},
             )
         )
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(url__regex=DEVICE_ALERTS).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         result = await analyze_blast_radius(client, device_id=1, depth=1)
 
@@ -303,7 +344,9 @@ class TestBlastRadiusUnreadable:
         respx.get(f"{BASE_URL}/device/devices/3/neighbors").mock(
             return_value=httpx.Response(500, json={"errorMessage": "boom"})
         )
-        respx.get(ALERT_URL).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+        respx.get(url__regex=DEVICE_ALERTS).mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
 
         result = await analyze_blast_radius(client, device_id=1, depth=2)
 

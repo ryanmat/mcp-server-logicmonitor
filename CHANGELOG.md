@@ -243,6 +243,15 @@ instead.
 
 ### Fixed
 
+- `get_alerts` with `device_id` reads that device's own alert list. It sent the id as a
+  `monitorObjectId` filter, which `/alert/alerts` ignores, so it returned alerts from every
+  device; an id that matches no device now answers `NOT_FOUND`. `group_id` beside `device_id` is
+  refused as `INVALID_REQUEST`, since the device's alert list ignores the group filter.
+- `analyze_blast_radius`, and through it `triage`, reads the open alerts of each device it
+  reaches from that device's alert list. It read the first five open alerts of the whole portal
+  for every device, so `has_critical` and `critical_alert_count` gave every device the same
+  answer. `lm://filters/alerts` says `/alert/alerts` ignores `monitorObjectId` and gives no
+  example of it.
 - `analyze_metric`, and through it `health_check` and `capacity_plan`, read the whole window
   they ask for. A window ending now was sent as a start alone, which the portal answers with
   its last hour, so a 24-hour read came back as 60 one-minute samples; on the sandbox portal it

@@ -6,7 +6,6 @@
 # through quote_filter_value instead. Print the current hits with
 # `uv run python tests/test_filter_invariant.py`.
 alert_rules.py: priority_filter
-alerts.py: device_id
 alerts.py: end_epoch
 alerts.py: SEVERITY_MAP[severity.lower()]
 alerts.py: start_epoch
@@ -35,7 +34,6 @@ sdts.py: device_group_id
 sdts.py: device_id
 sdts.py: future
 sdts.py: now
-topology_analysis.py: dev['device_id']
 topology.py: device_id
 traces.py: SEVERITY_MAP[severity.lower()]
 websites.py: group_id
