@@ -5,21 +5,13 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
 from lm_mcp.tools import call_sub_tool, format_response, handle_error
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
-from lm_mcp.tools.configsources import update_configsource
-from lm_mcp.tools.datasources import update_datasource
-from lm_mcp.tools.diagnosticsources import update_diagnosticsource
-from lm_mcp.tools.eventsources import update_eventsource
-from lm_mcp.tools.logsources import update_logsource
-from lm_mcp.tools.propertysources import update_propertysource
-from lm_mcp.tools.remediationsources import update_remediationsource
-from lm_mcp.tools.topologysources import update_topologysource
+from lm_mcp.tools.logicmodules import MODULES, update_module
 
 # Audit logger for write workflows. Configured via standard logging; if no
 # handler is attached, records propagate to the root logger.
@@ -1046,44 +1038,15 @@ async def search_tools(
 # Composite tool: update_logicmodule (safe read-modify-update for source types)
 # ---------------------------------------------------------------------------
 
-# Map of LogicModule type -> (settings path the full definition is read from, full-replace
-# PUT handler, id argument name, fields the merged definition must keep). The read and the
-# PUT handlers are internal, not registered tools; LM_ENABLED_TOOLS and LM_DISABLED_TOOLS
-# patterns on the type's get_<type> name gate the read. Only DataSource and ConfigSource
-# bodies carry displayName.
-_LogicModuleRow = tuple[str, Callable[..., Awaitable[list[TextContent]]], str, tuple[str, ...]]
-_NAME_AND_DISPLAY_NAME = ("name", "displayName")
-_NAME = ("name",)
-_LM_TYPES: dict[str, _LogicModuleRow] = {
-    "configsource": (
-        "configsources",
-        update_configsource,
-        "configsource_id",
-        _NAME_AND_DISPLAY_NAME,
-    ),
-    "datasource": ("datasources", update_datasource, "datasource_id", _NAME_AND_DISPLAY_NAME),
-    "eventsource": ("eventsources", update_eventsource, "eventsource_id", _NAME),
-    "logsource": ("logsources", update_logsource, "logsource_id", _NAME),
-    "propertysource": ("propertyrules", update_propertysource, "propertysource_id", _NAME),
-    "topologysource": ("topologysources", update_topologysource, "topologysource_id", _NAME),
-    "diagnosticsource": (
-        "diagnosticsources",
-        update_diagnosticsource,
-        "diagnosticsource_id",
-        _NAME,
-    ),
-    "remediationsource": (
-        "remediationsources",
-        update_remediationsource,
-        "remediationsource_id",
-        _NAME,
-    ),
-}
+# update_logicmodule reads and PUTs through the module table: MODULES names each type's
+# settings path and the fields the merged definition must keep. The read and update_module
+# are internal, not registered tools; LM_ENABLED_TOOLS and LM_DISABLED_TOOLS patterns on the
+# type's get_<type> name gate the read.
 
 
 async def _get_module_raw(client: LogicMonitorClient, module_type: str, module_id: int) -> dict:
     """Read one LogicModule's full REST object, the body its full-replace PUT takes back."""
-    path = _LM_TYPES[module_type][0]
+    path = MODULES[module_type].path
     result: dict = await client.get(f"/setting/{path}/{module_id}")
     return result
 
@@ -1185,12 +1148,12 @@ async def update_logicmodule(
         TextContent with diff preview or apply result; or error info.
     """
     try:
-        if type not in _LM_TYPES:
+        if type not in MODULES:
             return format_response(
                 {
                     "error": True,
                     "code": "INVALID_REQUEST",
-                    "message": f"type must be one of {sorted(_LM_TYPES)}",
+                    "message": f"type must be one of {sorted(MODULES)}",
                 }
             )
         if mode not in ("preview", "apply"):
@@ -1210,8 +1173,6 @@ async def update_logicmodule(
                 }
             )
 
-        _path, update_handler, id_arg, required_fields = _LM_TYPES[type]
-
         blocked = check_required_tools([f"get_{type}"])
         if blocked:
             return blocked
@@ -1220,7 +1181,7 @@ async def update_logicmodule(
 
         merged, merge_warnings = _deep_merge(base, changes)
 
-        for required in required_fields:
+        for required in MODULES[type].required:
             if not merged.get(required):
                 return format_response(
                     {
@@ -1262,7 +1223,12 @@ async def update_logicmodule(
         )
         try:
             result = await call_sub_tool(
-                update_handler, client, **{id_arg: id, "definition": merged, "confirm": True}
+                update_module,
+                client,
+                module_type=type,
+                module_id=id,
+                definition=merged,
+                confirm=True,
             )
         except Exception as exc:
             _AUDIT.error("update_logicmodule failed type=%s id=%s error=%s", type, id, exc)

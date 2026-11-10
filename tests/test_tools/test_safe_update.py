@@ -15,8 +15,8 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from lm_mcp.tools.logicmodules import MODULES
 from lm_mcp.tools.workflows import (
-    _LM_TYPES,
     _deep_merge,
     _diff,
     update_logicmodule,
@@ -111,7 +111,7 @@ class TestDiff:
 
 @pytest.fixture
 def patched_handlers(monkeypatch):
-    """Patch the internal raw read to a mock, and every type's PUT to a mock.
+    """Patch the internal raw read and the generic update_module PUT to mocks.
 
     Also configures the env so check_required_tools can build LMConfig
     without raising on missing portal/auth.
@@ -132,8 +132,7 @@ def patched_handlers(monkeypatch):
     import lm_mcp.tools.workflows as workflows
 
     monkeypatch.setattr(workflows, "_get_module_raw", read_mock)
-    for module_type, (path, _, id_arg, required) in list(_LM_TYPES.items()):
-        monkeypatch.setitem(_LM_TYPES, module_type, (path, update_mock, id_arg, required))
+    monkeypatch.setattr(workflows, "update_module", update_mock)
     yield read_mock, update_mock
     reset_config()
 
@@ -211,7 +210,7 @@ class TestUpdateLogicmodule:
         assert update_mock.await_count == 1
         # Verify the merged definition was passed to the update handler
         call_kwargs = update_mock.await_args.kwargs
-        assert call_kwargs["datasource_id"] == 1
+        assert (call_kwargs["module_type"], call_kwargs["module_id"]) == ("datasource", 1)
         assert call_kwargs["definition"]["displayName"] == "New"
         assert call_kwargs["definition"]["name"] == "DS"  # preserved from base
 
@@ -305,7 +304,7 @@ class TestUpdateLogicmodule:
 
     async def test_lm_types_covers_all_six_sources(self):
         """Sanity check: all 6 supported types are wired."""
-        assert set(_LM_TYPES) == {
+        assert set(MODULES) == {
             "configsource",
             "datasource",
             "diagnosticsource",

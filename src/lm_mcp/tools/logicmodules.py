@@ -29,15 +29,20 @@ class Module:
     """One LogicModule type: where it lives and how its tools report it.
 
     path is the collection under /setting; id_field is the id argument delete_<module>
-    takes and reports; label names the type in messages; project maps the REST object
-    onto the get_<module> summary; keep names REST fields normalization leaves alone.
+    and update_<module> take and report; label names the type in messages; project maps
+    the REST object onto the get_<module> summary and list_row one list item onto the
+    get_<modules> row; reports_display_name says whether the create and update replies
+    carry display_name; required names the fields a full-replace PUT must keep; keep
+    names REST fields normalization leaves alone.
     """
 
     path: str
     id_field: str
     label: str
     project: Callable[[dict], dict]
-    create_reports_display_name: bool = True
+    list_row: Callable[[dict], dict]
+    reports_display_name: bool = True
+    required: tuple[str, ...] = ("name",)
     keep: frozenset[str] = field(default_factory=frozenset)
 
 
@@ -216,38 +221,160 @@ def _project_remediationsource(result: dict) -> dict:
     }
 
 
+def _list_row_datasource(item: dict) -> dict:
+    """The get_datasources row of one DataSource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "group": item.get("group"),
+        "collect_method": item.get("collectMethod"),
+        "has_multi_instances": item.get("hasMultiInstances"),
+    }
+
+
+def _list_row_configsource(item: dict) -> dict:
+    """The get_configsources row of one ConfigSource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "technology": item.get("technology"),
+        "collect_method": item.get("collectMethod"),
+        "collect_interval": item.get("collectInterval"),
+        "version": item.get("version"),
+    }
+
+
+def _list_row_eventsource(item: dict) -> dict:
+    """The get_eventsources row of one EventSource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "technology": item.get("technology"),
+        "group": item.get("group"),
+        "version": item.get("version"),
+    }
+
+
+def _list_row_propertysource(item: dict) -> dict:
+    """The get_propertysources row of one PropertySource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "technology": item.get("technology"),
+        "group": item.get("group"),
+        "version": item.get("version"),
+    }
+
+
+def _list_row_logsource(item: dict) -> dict:
+    """The get_logsources row of one LogSource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "group": item.get("group"),
+        "log_type": item.get("logType"),
+        "collect_method": item.get("collectMethod"),
+        "version": item.get("version"),
+    }
+
+
+def _list_row_topologysource(item: dict) -> dict:
+    """The get_topologysources row of one TopologySource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "technology": item.get("technology"),
+        "group": item.get("group"),
+        "version": item.get("version"),
+    }
+
+
+def _list_row_diagnosticsource(item: dict) -> dict:
+    """The get_diagnosticsources row of one DiagnosticSource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "group": item.get("group"),
+        "collect_method": item.get("collectMethod"),
+        "tags": item.get("tags", []),
+        "technical_notes": item.get("technicalNotes"),
+    }
+
+
+def _list_row_remediationsource(item: dict) -> dict:
+    """The get_remediationsources row of one RemediationSource."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "display_name": item.get("displayName"),
+        "description": item.get("description"),
+        "applies_to": item.get("appliesTo"),
+        "group": item.get("group"),
+        "collect_method": item.get("collectMethod"),
+        "tags": item.get("tags", []),
+        "technical_notes": item.get("technicalNotes"),
+    }
+
+
 MODULES: dict[str, Module] = {
     "datasource": Module(
         path="datasources",
         id_field="datasource_id",
         label="DataSource",
         project=_project_datasource,
+        list_row=_list_row_datasource,
+        required=("name", "displayName"),
     ),
     "configsource": Module(
         path="configsources",
         id_field="configsource_id",
         label="ConfigSource",
         project=_project_configsource,
+        list_row=_list_row_configsource,
+        required=("name", "displayName"),
     ),
     "eventsource": Module(
         path="eventsources",
         id_field="eventsource_id",
         label="EventSource",
         project=_project_eventsource,
+        list_row=_list_row_eventsource,
     ),
     "propertysource": Module(
         path="propertyrules",
         id_field="propertysource_id",
         label="PropertySource",
         project=_project_propertysource,
-        create_reports_display_name=False,
+        list_row=_list_row_propertysource,
+        reports_display_name=False,
     ),
     "logsource": Module(
         path="logsources",
         id_field="logsource_id",
         label="LogSource",
         project=_project_logsource,
-        create_reports_display_name=False,
+        list_row=_list_row_logsource,
+        reports_display_name=False,
         keep=_COLLECTION_METHOD,
     ),
     "topologysource": Module(
@@ -255,6 +382,7 @@ MODULES: dict[str, Module] = {
         id_field="topologysource_id",
         label="TopologySource",
         project=_project_topologysource,
+        list_row=_list_row_topologysource,
         keep=_COLLECTION_METHOD,
     ),
     "diagnosticsource": Module(
@@ -262,12 +390,14 @@ MODULES: dict[str, Module] = {
         id_field="diagnosticsource_id",
         label="DiagnosticSource",
         project=_project_diagnosticsource,
+        list_row=_list_row_diagnosticsource,
     ),
     "remediationsource": Module(
         path="remediationsources",
         id_field="remediationsource_id",
         label="RemediationSource",
         project=_project_remediationsource,
+        list_row=_list_row_remediationsource,
     ),
 }
 
@@ -342,15 +472,57 @@ async def create_module(
             result = await client.post(collection, json_body=payload)
             done = "created successfully"
 
-        created: dict[str, Any] = {"id": result.get("id"), "name": result.get("name")}
-        if module.create_reports_display_name:
-            created["display_name"] = result.get("displayName")
-        return format_response(
-            {
-                "success": True,
-                "message": f"{module.label} '{result.get('name')}' {done}",
-                module_type: created,
-            }
-        )
+        return _write_reply(module_type, result, done)
     except Exception as e:
         return handle_error(e)
+
+
+async def update_module(
+    client: LogicMonitorClient,
+    module_type: str,
+    module_id: int,
+    definition: dict,
+    confirm: bool = False,
+) -> list[TextContent]:
+    """Replace one module's definition (full replace); refused unless confirm is true.
+
+    The LM PUT blanks any field the definition leaves out, scripts included, so the caller
+    passes the full definition; update_logicmodule merges a partial change onto the
+    current one first.
+    """
+    module = MODULES[module_type]
+    if not confirm:
+        return format_response(
+            {
+                "error": True,
+                "code": "INVALID_REQUEST",
+                "message": (
+                    f"update_{module_type} is full-replace -- any field omitted from "
+                    "`definition` will be BLANKED, including any script. Set confirm=true to "
+                    f"proceed, OR use update_logicmodule(type='{module_type}', id, changes, "
+                    "mode='preview') for a safe partial update with diff preview."
+                ),
+            }
+        )
+    try:
+        payload = normalize_definition_fields(definition, keep=module.keep)
+        payload.pop("id", None)
+        result = await client.put(f"/setting/{module.path}/{module_id}", json_body=payload)
+        return _write_reply(module_type, result, "updated successfully")
+    except Exception as e:
+        return handle_error(e)
+
+
+def _write_reply(module_type: str, result: dict, done: str) -> list[TextContent]:
+    """The create and update reply: what happened, and the module's id and name."""
+    module = MODULES[module_type]
+    written: dict[str, Any] = {"id": result.get("id"), "name": result.get("name")}
+    if module.reports_display_name:
+        written["display_name"] = result.get("displayName")
+    return format_response(
+        {
+            "success": True,
+            "message": f"{module.label} '{result.get('name')}' {done}",
+            module_type: written,
+        }
+    )
