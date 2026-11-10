@@ -10,7 +10,7 @@ import pytest
 import respx
 
 from lm_mcp.client import edwin
-from lm_mcp.client.edwin import EdwinClient, build_edwin_client, required_scope
+from lm_mcp.client.edwin import EdwinClient, build_edwin_client, required_scope, websocket_url
 from lm_mcp.edwin_config import load_edwin_config
 from lm_mcp.exceptions import (
     AuthenticationError,
@@ -370,3 +370,15 @@ class TestConfig:
 
         assert client is not None
         assert client.max_retries == 5
+
+
+class TestWebsocketUrl:
+    @pytest.mark.parametrize(
+        ("host", "url"),
+        [
+            ("https://lmryanmatuszewski.dexda.ai", "wss://lmryanmatuszewski.dexda.ai/ws/lm"),
+            ("http://127.0.0.1:8765", "ws://127.0.0.1:8765/ws/lm"),
+        ],
+    )
+    def test_an_https_host_answers_on_wss(self, host, url):
+        assert websocket_url(host, "/ws/lm") == url
