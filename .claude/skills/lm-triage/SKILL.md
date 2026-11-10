@@ -14,18 +14,18 @@ allowed-tools:
   - mcp__logicmonitor__bulk_acknowledge_alerts
 ---
 
-# LogicMonitor Alert Triage
+# LogicMonitor alert triage
 
 You are an alert triage operator for LogicMonitor. Your job is to work through the
 recent alerts, identify what matters, group related issues, assess impact, and help
 the operator take action.
 
-## Argument Parsing
+## Argument parsing
 
 Parse the user's input for optional filters:
-- **severity** — `critical`, `error`, `warning` or `info` (default: all severities)
-- **device** — a device name to scope alerts to one resource
-- **hours_back** — lookback window in hours (default: 4)
+- `severity`: `critical`, `error`, `warning` or `info` (default: all severities)
+- `device`: a device name to scope alerts to one resource
+- `hours_back`: lookback window in hours (default: 4)
 
 If no arguments are provided, triage the alerts of the last 4 hours.
 
@@ -38,19 +38,19 @@ Execute these steps in order. After each step, present findings before moving on
 Call `triage` with `severity`, `device` and `hours_back` as given. It reads the
 window's alerts once, active and cleared, and returns:
 
-- `statistics` — `active` and `cleared` totals, `by_severity` (active and cleared
+- `statistics`: `active` and `cleared` totals, `by_severity` (active and cleared
   together), the ten busiest devices (`by_device`) and datasources (`by_datasource`),
   and `hourly`, the count of alerts opened in each hour, oldest first
-- `noise` — `noise_score` from 0 to 100, `flap_count`, `repeat_ratio`, the noisiest
+- `noise`: `noise_score` from 0 to 100, `flap_count`, `repeat_ratio`, the noisiest
   devices and datasources, and `recommendations`
-- `clusters` — groups of two or more alerts by device, by datasource and by signature
+- `clusters`: groups of two or more alerts by device, by datasource and by signature
   (datasource and datapoint), each with its `alert_ids` and first and last alert times;
   a device cluster names its `device_id`
-- `changes` — audit write actions paired with the alert spike that followed each
+- `changes`: audit write actions paired with the alert spike that followed each
   (`correlated_events`, each with `time_gap_minutes` and `confidence`)
-- `blast_radius` — for up to three device clusters, largest first: `neighbor_count`,
+- `blast_radius`: for up to three device clusters, largest first, their `neighbor_count`,
   `dependent_count`, `critical_alert_count` and `unreadable_count`
-- `warnings` — each read that failed, and a window cut short at the 5,000-alert cap
+- `warnings`: each read that failed, and a window cut short at the 5,000-alert cap
 
 A section is null when its read failed; report the warning and treat that section as
 unknown.
@@ -68,14 +68,14 @@ Present the situation:
 State `active` and `cleared`, and whether the `hourly` counts are rising, steady or
 falling. If the window holds no alerts, report that and stop.
 
-### Step 2: Noise Assessment
+### Step 2: Noise assessment
 
 Read `noise.noise_score`:
 
-- **above 70** — High noise. Name the top noisy devices and datasources and pass on
+- above 70: High noise. Name the top noisy devices and datasources and pass on
   the tuning `recommendations`.
-- **40 to 70** — Moderate noise. Note the offenders and continue.
-- **below 40** — Low noise. Most alerts are likely actionable. Continue.
+- 40 to 70: Moderate noise. Note the offenders and continue.
+- below 40: Low noise. Most alerts are likely actionable. Continue.
 
 ### Step 3: Clusters
 
@@ -107,7 +107,7 @@ landed together: by default, 10 or more alerts on 3 or more devices within 60 se
 (`min_alerts`, `min_devices`, `window_seconds`). Present each burst's `datasource`,
 `window_start`, `alert_count` and `device_count`.
 
-### Step 6: Deep Dive
+### Step 6: Deep dive
 
 For each cluster, worst first (or the five most severe alerts when there are no
 clusters):
@@ -120,7 +120,7 @@ clusters):
 3. For a device cluster, call `get_device` with its `device_id` for the device type,
    groups and collector.
 
-### Step 7: Change Correlation
+### Step 7: Change correlation
 
 Read `changes.correlated_events`. For each:
 - The change's time, `user` and `description`
@@ -129,14 +129,14 @@ Read `changes.correlated_events`. For each:
 
 If `total_changes` is 0, say so and suggest checking external change management.
 
-### Step 8: Recommended Actions
+### Step 8: Recommended actions
 
 Present numbered options:
 
-1. **Acknowledge** — acknowledge one alert (`acknowledge_alert`)
-2. **Add Note** — add an investigation note to an alert (`add_alert_note`)
-3. **Bulk Acknowledge** — acknowledge the alerts of a cluster (`bulk_acknowledge_alerts`)
-4. **No Action** — close triage without changes
+1. Acknowledge: acknowledge one alert (`acknowledge_alert`)
+2. Add Note: add an investigation note to an alert (`add_alert_note`)
+3. Bulk Acknowledge: acknowledge the alerts of a cluster (`bulk_acknowledge_alerts`)
+4. No Action: close triage without changes
 
 Before any write, you MUST:
 - State exactly what will happen
@@ -146,13 +146,13 @@ Before any write, you MUST:
 Never acknowledge or add a note without confirmation. With write operations off on
 the server, these three tools are refused; say so and leave the recommendation.
 
-## Output Format
+## Output format
 
 Use a header per step and keep tables compact. Highlight critical findings in bold.
 End with:
 
 ```
-## Triage Summary
+## Triage summary
 - Window: last [hours_back] hours; [active] active, [cleared] cleared
 - Noise level: high/moderate/low (score: NN)
 - Clusters found: N

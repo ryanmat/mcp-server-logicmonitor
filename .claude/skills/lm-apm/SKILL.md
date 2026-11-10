@@ -14,7 +14,7 @@ allowed-tools:
   - mcp__logicmonitor__get_alert_details
 ---
 
-# LogicMonitor APM Trace Investigation
+# LogicMonitor APM trace investigation
 
 You are an APM performance analyst for LogicMonitor. Your job is to investigate
 traced services, analyze operation-level performance, read their alerts, and
@@ -24,17 +24,17 @@ APM services in LogicMonitor are devices with `deviceType` 6. Their datasources,
 operations, metrics and properties are read with the device tools, passing the
 service id as `device_id`.
 
-## Argument Parsing
+## Argument parsing
 
 Optional:
-- **service** — APM service name (string) or service ID (numeric)
-- **operation** — one operation name to drill into
+- `service`: APM service name (string) or service ID (numeric)
+- `operation`: one operation name to drill into
 
 If no arguments are provided, run in discovery mode (end of this file).
 
 ## Workflow
 
-### Step 1: Service Discovery
+### Step 1: Service discovery
 
 Call `get_apm_services`. Each row has the service's `id`, `name`, `hostname` and
 `host_group_ids`; page with `offset` while `has_more` is true.
@@ -54,14 +54,14 @@ list is long, ask which service to investigate.
 | [name]  | [id] | [hostname] | N           |
 ```
 
-### Step 2: Service Profile
+### Step 2: Service profile
 
 1. Call `get_device` with the service id for its status (`hostStatus`), groups and
    collector.
 2. Call `get_device_properties` with the service id and present what it says about
    the service, such as its language, framework or environment where present.
 
-### Step 3: Service Datasources
+### Step 3: Service datasources
 
 Call `get_device_datasources` with the service id. Each row has its `id` (the
 `device_datasource_id`), `name` and `instance_count`. Tell apart:
@@ -70,7 +70,7 @@ Call `get_device_datasources` with the service id. Each row has its `id` (the
 
 Report any datasource with no instances, a gap in what is collected for the service.
 
-### Step 4: Service-Level Metrics
+### Step 4: Service-level metrics
 
 Call `get_device_instances` on the service-level datasource for its instance, then
 `analyze_metric` on that instance with `hours=24` and
@@ -80,22 +80,22 @@ Present each datapoint (request rate, latency, error rate, as the datasource nam
 them):
 
 ```
-| Datapoint | Latest | 24h mean | 24h max | Trend   | vs last week |
-|-----------|--------|----------|---------|---------|--------------|
-| [name]    | N      | N        | N       | [label] | [+NN%]       |
+| Datapoint | Latest | 24h mean | 24h max | Trend   | vs last week  |
+|-----------|--------|----------|---------|---------|---------------|
+| [name]    | N      | N        | N       | [label] | [NN% up/down] |
 ```
 
 Flag:
 - An error-rate datapoint above 5 percent
 - A latency datapoint whose latest sample sits far above its mean (`z_score` above 3)
-- A request-rate datapoint more than 50 percent below last week (`deviation_percent`
-  below -50)
+- A request-rate datapoint more than 50 percent below last week: `baseline.status` is
+  `anomalous` and `baseline.current.mean` is below `baseline.baseline.mean`
 
 `analyze_metric` gives no percentiles. Where the datasource carries percentile
 datapoints (p95, p99), read them like any other; otherwise call `get_device_data` for
 the raw samples of the window you need and say the percentiles were computed from them.
 
-### Step 5: Operation Breakdown
+### Step 5: Operation breakdown
 
 Call `get_device_instances` on the operations datasource to list the traced operations
 (each instance's `name`). For each, or the top ones by request rate when there are
@@ -133,23 +133,23 @@ For each critical or error alert, call `get_alert_details` with its id for the
 datasource, thresholds and start time. Check whether the alerts match the metric
 findings of Steps 4 and 5.
 
-### Step 7: APM Investigation Report
+### Step 7: APM investigation report
 
 ```
-## APM Investigation: [service_name]
+## APM investigation: [service_name]
 
-### Service Overview
+### Service overview
 - ID: [id] | Status: [hostStatus]
 - Framework: [from properties]
 - Host: [hostname]
 
-### Performance Summary
-| Datapoint    | Latest | 24h mean | vs last week | Status    |
-|--------------|--------|----------|--------------|-----------|
-| [name]       | N      | N        | [+NN%]       | [ok/warn] |
+### Performance summary
+| Datapoint    | Latest | 24h mean | vs last week  | Status    |
+|--------------|--------|----------|---------------|-----------|
+| [name]       | N      | N        | [NN% up/down] | [ok/warn] |
 
-### Problem Operations
-1. **[operation]** — [the issue]
+### Problem operations
+1. **[operation]**: [the issue]
    - Latency: [latest] against [mean]
    - Error rate: [latest]
    - Shift: [when, before and after], if any
@@ -157,17 +157,17 @@ findings of Steps 4 and 5.
 ### Alerts
 - [count] open ([by severity])
 
-### Root Cause Hypothesis
+### Root cause hypothesis
 1. [Most likely cause, with the evidence]
 2. [Alternative]
 
 ### Recommendations
-1. **Immediate** — [actions to mitigate]
-2. **Investigation** — [analysis to confirm the cause]
-3. **Prevention** — [longer-term improvements]
+1. **Immediate**: [actions to mitigate]
+2. **Investigation**: [analysis to confirm the cause]
+3. **Prevention**: [longer-term improvements]
 ```
 
-## Discovery Mode
+## Discovery mode
 
 When invoked without arguments (`/lm-apm`):
 
