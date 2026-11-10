@@ -28,9 +28,12 @@ RECORDS = f"{HOST}/ui/query/records"
 METRICS = f"{HOST}/ui/query/metrics"
 
 # Insight rows from POST /ui/query/records on lmryanmatuszewski.dexda.ai, 2026-11-10
-# (docs/validation/probes-2026-11.md, Step 54). Kept fields only; strings over 90
-# characters are cut to their first 90. ANALYZED carries Edwin's genAi analysis,
-# PLAIN is the newest insight in the window and has none yet.
+# (docs/validation/probes-2026-11.md, Step 54): 26 of the 52 live fields of ANALYZED and
+# 16 of the 30 of PLAIN. Each keeps the fields get_edwin_insights projects plus some it
+# drops (genAi.logs_summary, meta.alertCurrentSeverities, ml.uiResult), so the tests see
+# them removed. Every string value over 90 characters is cut to its first 90 except
+# meta.link, kept whole. ANALYZED carries Edwin's genAi analysis; PLAIN is the newest
+# insight in the window and has none yet.
 ANALYZED = {
     "_id": "correlation_36fa3f53-e608-4192-aeca-e0097d2a1e94_1794020047392",
     "genAi.contributing_factors": '["Successful scheduling and container starts for two pods '
