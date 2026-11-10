@@ -569,7 +569,9 @@ async def ask_edwin(
                             ws.close_code,
                         )
             except TimeoutError:
-                logger.warning("ask_edwin stopped at its %s s budget", ASK_BUDGET_SECONDS)
+                logger.warning(
+                    "ask_edwin stopped at its %s s budget", ASK_BUDGET_SECONDS, exc_info=True
+                )
             except ConnectionClosedError as e:
                 code = e.rcvd.code if e.rcvd is not None else None
                 if code == _POLICY_VIOLATION:

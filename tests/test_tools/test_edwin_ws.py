@@ -167,12 +167,17 @@ async def test_an_early_close_returns_the_text_so_far(edwin_server, client, capl
     assert "1000" in warning.getMessage()
 
 
-async def test_the_budget_truncates(edwin_server, client, monkeypatch):
+async def test_the_budget_truncates(edwin_server, client, monkeypatch, caplog):
     edwin, _ = client
     monkeypatch.setattr(edwin_tools, "ASK_BUDGET_SECONDS", 0.2)
     edwin_server.frames = FRAMES[:_THIRD_TOKEN]
 
-    body = payload(await asyncio.wait_for(ask_edwin(edwin, question=QUESTION), timeout=5))
+    with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.edwin"):
+        body = payload(await asyncio.wait_for(ask_edwin(edwin, question=QUESTION), timeout=5))
+
+    (warning,) = [r for r in caplog.records if r.name == "lm_mcp.tools.edwin"]
+    assert "budget" in warning.getMessage()
+    assert warning.exc_info is not None
 
     assert body["truncated"] is True
     assert body["answer"] == "".join(
