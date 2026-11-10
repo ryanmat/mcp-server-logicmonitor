@@ -555,6 +555,22 @@ PAGE_CAP_WARNING = (
 )
 
 
+def window_params(start_time: int | None, end_time: int | None) -> dict[str, int]:
+    """The start and end query of a caller-named data window.
+
+    A start without an end is sent with end=now: the device instance and website
+    checkpoint data endpoints answer a start alone with their last hour (probe of
+    2026-11-09). With neither, nothing is sent and the endpoint's last hour is read.
+    """
+    params: dict[str, int] = {}
+    if start_time:
+        params["start"] = start_time
+        params["end"] = end_time or int(time.time())
+    elif end_time:
+        params["end"] = end_time
+    return params
+
+
 async def fetch_metric_pages(
     client: LogicMonitorClient, path: str, params: dict[str, Any]
 ) -> tuple[list[str], list[Any], list[Any], bool]:

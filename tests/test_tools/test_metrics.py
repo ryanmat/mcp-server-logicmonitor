@@ -164,18 +164,28 @@ class TestGetDeviceData:
 
     @respx.mock
     async def test_a_day_of_minutes_is_read_in_both_pages(self, client):
-        """R2.10: 1,440 samples over two pages all arrive, newest first, as the API orders them."""
+        """R2.10: 1,440 samples over two pages all arrive, newest first, as the API orders them.
+
+        A start with no end is sent with end=now: the endpoint answers a start alone with
+        its last hour (probe of lmryanmatuszewski, 2026-11-09).
+        """
+        import time
+
         from lm_mcp.tools.metrics import get_device_data
         from tests.metric_pages import day_of_minutes
 
         pages = day_of_minutes()
         route = respx.get(self._DATA).mock(side_effect=pages)
 
+        before = int(time.time())
         result = await get_device_data(
             client, device_id=100, device_datasource_id=1001, instance_id=5001, start_time=1
         )
 
         data = json.loads(result[0].text)
+        first = route.calls[0].request.url.params
+        assert first["start"] == "1"
+        assert before <= int(first["end"]) <= int(time.time())
         assert route.call_count == 2
         next_page = json.loads(pages[0].content)["nextPageParams"]
         assert dict(route.calls[1].request.url.params) == dict(

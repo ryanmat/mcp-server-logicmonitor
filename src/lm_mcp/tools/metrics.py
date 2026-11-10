@@ -13,7 +13,7 @@ from lm_mcp.tools import (
     list_tool,
     require_write_permission,
 )
-from lm_mcp.tools.stats_helpers import PAGE_CAP_WARNING, fetch_metric_pages
+from lm_mcp.tools.stats_helpers import PAGE_CAP_WARNING, fetch_metric_pages, window_params
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -130,14 +130,9 @@ async def get_device_data(
         List of TextContent with metric data or error.
     """
     try:
-        params: dict = {}
-
+        params: dict = window_params(start_time, end_time)
         if datapoints:
             params["datapoints"] = datapoints
-        if start_time:
-            params["start"] = start_time
-        if end_time:
-            params["end"] = end_time
 
         dp_names, times, values, truncated = await fetch_metric_pages(
             client,
