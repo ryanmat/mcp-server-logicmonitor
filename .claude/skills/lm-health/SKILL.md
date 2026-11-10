@@ -96,7 +96,8 @@ For each Degraded or Unhealthy datasource, call `analyze_metric` on the same ins
 - `change_points.points` say when it shifted, with the levels before and after.
 - `baseline` compares the day with the same day a week earlier: `deviation_percent`,
   which carries no sign (compare `current.mean` with `baseline.mean` for the
-  direction), and `status` (`normal`, `elevated`, `reduced` or `anomalous`).
+  direction), and `status` (`normal`, `elevated`, `reduced`, `anomalous`, or `no_data`
+  when a window holds no samples).
 
 `health_check` reads only CPU, memory and disk. When the user asks about another
 resource, such as a network interface, find it with `get_device_datasources` and
@@ -122,9 +123,11 @@ findings point to.
 
 ### Step 8: Topology context
 
-Call `get_device_neighbors` with `depth=1`. Present the neighbor count and each
-neighbor's `display_name`, `device_type` and `connection_type`. The neighbors carry no
-alert state; when one matters to the findings, run this skill on it.
+Call `get_device_neighbors` with `depth=1`. Some portals do not serve its neighbor
+route, and the call then fails; report the topology as unknown, not as a device with no
+neighbors. Otherwise present the neighbor count and each neighbor's `display_name`,
+`device_type` and `connection_type`. The neighbors carry no alert state; when one
+matters to the findings, run this skill on it.
 
 ### Step 9: Summary report
 
