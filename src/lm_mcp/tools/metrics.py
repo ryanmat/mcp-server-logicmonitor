@@ -13,6 +13,7 @@ from lm_mcp.tools import (
     list_tool,
     require_write_permission,
 )
+from lm_mcp.tools.stats_helpers import PAGE_CAP_WARNING, fetch_metric_pages, window_params
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -129,30 +130,28 @@ async def get_device_data(
         List of TextContent with metric data or error.
     """
     try:
-        params: dict = {}
-
+        params: dict = window_params(start_time, end_time)
         if datapoints:
             params["datapoints"] = datapoints
-        if start_time:
-            params["start"] = start_time
-        if end_time:
-            params["end"] = end_time
 
-        result = await client.get(
+        dp_names, times, values, truncated = await fetch_metric_pages(
+            client,
             f"/device/devices/{device_id}/devicedatasources/{device_datasource_id}/instances/{instance_id}/data",
-            params=params if params else None,
+            params,
         )
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "device_datasource_id": device_datasource_id,
-                "instance_id": instance_id,
-                "datapoints": result.get("dataPoints", []),
-                "values": result.get("values", {}),
-                "time": result.get("time", []),
-            }
-        )
+        response = {
+            "device_id": device_id,
+            "device_datasource_id": device_datasource_id,
+            "instance_id": instance_id,
+            "datapoints": dp_names,
+            "values": values,
+            "time": times,
+            "truncated": truncated,
+        }
+        if truncated:
+            response["warning"] = PAGE_CAP_WARNING
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

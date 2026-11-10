@@ -329,6 +329,34 @@ class TestFetchMetricSeries:
         assert len(series["cpu"]["timestamps"]) == 3
 
     @respx.mock
+    async def test_a_window_ending_now_sends_its_end(self, client):
+        """The endpoint answers start alone with its last hour: a read of lmryanmatuszewski
+        on 2026-11-09 returned 60 one-minute rows for start=now-24h, on a Linux and a
+        Windows host, and 500 rows naming a next page with end=now added."""
+        import time
+
+        from lm_mcp.tools.stats_helpers import fetch_metric_series
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest"
+            "/device/devices/1/devicedatasources/10/instances/100/data"
+        ).mock(
+            return_value=httpx.Response(
+                200, json={"dataPoints": ["cpu"], "values": [], "time": [], "nextPageParams": ""}
+            )
+        )
+
+        before = int(time.time())
+        await fetch_metric_series(
+            client, device_id=1, device_datasource_id=10, instance_id=100, hours_back=24
+        )
+        after = int(time.time())
+
+        params = route.calls[0].request.url.params
+        assert before <= int(params["end"]) <= after
+        assert int(params["end"]) - int(params["start"]) == 24 * 3600
+
+    @respx.mock
     async def test_no_data_filtering(self, client):
         """'No Data' sentinel values are filtered out."""
         from lm_mcp.tools.stats_helpers import fetch_metric_series

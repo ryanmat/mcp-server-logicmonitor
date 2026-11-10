@@ -314,3 +314,19 @@ def test_ops_note_ids_are_strings_on_every_tool():
         note_id = tool.inputSchema["properties"]["note_id"]
         assert note_id["type"] == "string", name
         assert "pattern" in note_id, name
+
+
+def test_no_tool_text_carries_an_em_or_en_dash():
+    """Descriptions and parameter descriptions are public text, which the house style
+    writes without em or en dashes."""
+    hits = [
+        (tool.name, where)
+        for tool in TOOLS
+        for where, text in [("description", tool.description or "")]
+        + [
+            (name, prop.get("description", ""))
+            for name, prop in tool.inputSchema.get("properties", {}).items()
+        ]
+        if "\N{EM DASH}" in text or "\N{EN DASH}" in text
+    ]
+    assert hits == []

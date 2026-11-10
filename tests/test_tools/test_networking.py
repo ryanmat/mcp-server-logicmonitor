@@ -34,6 +34,32 @@ BASE = "https://test.logicmonitor.com/santaba/rest"
 
 class TestGetInterfaceMetrics:
     @respx.mock
+    async def test_a_day_of_minutes_is_read_in_both_pages(self, client):
+        """R2.10: the interface's 1,440 samples over two pages all arrive."""
+        from lm_mcp.tools.networking import get_interface_metrics
+        from tests.metric_pages import day_of_minutes
+
+        respx.get(f"{BASE}/device/devices/123/devicedatasources").mock(
+            return_value=httpx.Response(
+                200,
+                json={"items": [{"id": 9001, "dataSourceName": "SNMP_Network_Interfaces"}]},
+            )
+        )
+        respx.get(f"{BASE}/device/devices/123/devicedatasources/9001/instances").mock(
+            return_value=httpx.Response(200, json={"items": [{"id": 1, "displayName": "Gi0/1"}]})
+        )
+        route = respx.get(
+            f"{BASE}/device/devices/123/devicedatasources/9001/instances/1/data"
+        ).mock(side_effect=day_of_minutes())
+
+        result = await get_interface_metrics(client, device_id=123, interface="Gi0/1")
+
+        data = json.loads(result[0].text)
+        assert route.call_count == 2
+        assert len(data["time"]) == len(data["values"]) == 1440
+        assert data["truncated"] is False
+
+    @respx.mock
     async def test_returns_metrics_for_matching_interface(self, client):
         from lm_mcp.tools.networking import get_interface_metrics
 

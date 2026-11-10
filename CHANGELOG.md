@@ -230,6 +230,25 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Fixed
 
+- `analyze_metric`, and through it `health_check` and `capacity_plan`, read the whole window
+  they ask for. A window ending now was sent as a start alone, which the portal answers with
+  its last hour, so a 24-hour read came back as 60 one-minute samples; on the sandbox portal it
+  now returns 1,440 one-minute samples across the 24-hour window.
+- `get_device_data`, `get_interface_metrics` and `get_website_data` read every page of their
+  window, up to 25, where they read only the newest page, which held at most 500 samples. All
+  three add `truncated`, and a `warning` when the page cap stops the read. A `start_time` given
+  without an `end_time` is sent with the end set to now, where the portal answered it with its
+  last hour. This closes the 4.3.0 known limit for `get_device_data` and
+  `get_interface_metrics`, the two of its seven tools that 5.0 keeps.
+- `get_collector_health` with `include_history` returns `collector_down_history: null` and a
+  `history_warning` when the alert read fails, where it returned an empty list that looked like a
+  quiet collector. It no longer sends the `alertType` clause the API ignores. The rows are still
+  every alert on a device named for the collector, since a probe found no alert type that marks
+  a collector going down.
+- `execute_diagnostic` and `execute_remediation` refuse a `dead-collector` device as they refuse a
+  `dead` one, and name the device's status word in the refusal.
+- Signature parameters, such as `X-Amz-Signature` and an Azure SAS `sig`, are masked in logged
+  arguments and in the URLs they carry.
 - `get_link_flaps` and `get_power_events` read an alert's datasource from `resourceTemplateName`.
   They read `dataSourceName`, which alert rows do not carry, so on a live portal link flaps matched
   no interface and power events matched no datasource.
@@ -360,8 +379,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   instance whose read fails carries one `analysis_error`.
 - `diagnose` adds `diagnostics`: the DiagnosticSources assigned to the alert's device and the
   latest results of the alert's diagnostic runs, read through
-  `get_diagnostic_remediation_assignments` and `get_diagnostic_remediation_results`, which join
-  the tools it needs enabled. It never runs a DiagnosticSource. Its description no longer
+  `get_diagnostic_remediation_assignments` and `get_diagnostic_remediation_results`, so it now
+  needs both of those tools enabled. It never runs a DiagnosticSource. Its description no longer
   promises a health score or a probable root cause, neither of which it computed. In summary
   mode `diagnose` and `detect_site_outage` carry the warnings of the keys they trim, such as
   the blast radius' warning about devices whose neighbors could not be read.

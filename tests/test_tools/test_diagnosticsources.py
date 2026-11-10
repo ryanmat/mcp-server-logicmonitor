@@ -177,6 +177,19 @@ class TestExecuteDiagnostic:
         assert "is dead (hostStatus=dead)" in result[0].text
 
     @respx.mock
+    async def test_execute_diagnostic_blocks_a_dead_collector_device(self, client, enable_writes):
+        """R2.10: a device whose collector is down is as unreachable as a dead one."""
+        from lm_mcp.tools.diagnosticsources import execute_diagnostic
+
+        _mock_execute_prechecks(host_status="dead-collector")
+        run = respx.post(f"{BASE_URL}/setting/diagnosticsources/executemanually")
+
+        result = await execute_diagnostic(client, host_id=1786, diagnostic_source_id=12)
+
+        assert "is dead (hostStatus=dead-collector)" in result[0].text
+        assert run.call_count == 0
+
+    @respx.mock
     async def test_execute_diagnostic_blocks_old_collector(self, client, enable_writes):
         """execute_diagnostic refuses when collector build < 39.200."""
         from lm_mcp.tools.diagnosticsources import execute_diagnostic

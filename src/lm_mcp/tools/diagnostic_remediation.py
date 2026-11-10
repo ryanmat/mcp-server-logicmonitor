@@ -21,7 +21,7 @@ _MIN_COLLECTOR_BUILD = 39.200
 
 # The v3 API returns hostStatus as a word, and "dead" is the word for a dead device.
 # A number is not a v3 hostStatus value, so it never counts as dead.
-_DEAD_HOST_STATUS = {"dead"}
+_DEAD_HOST_STATUS = {"dead", "dead-collector"}
 
 _MUTATION_KEYWORDS = [
     "restart",
@@ -41,7 +41,7 @@ _SOURCE_PATHS = {
 
 
 def _is_dead_host_status(value: object) -> bool:
-    """True when a device's hostStatus is exactly the word "dead"."""
+    """True when a device's hostStatus is "dead" or "dead-collector": nothing can reach it."""
     return isinstance(value, str) and value in _DEAD_HOST_STATUS
 
 
@@ -87,7 +87,8 @@ async def run_pre_execution_checks(
                 "error": True,
                 "code": "REJECTED_BY_TOOL",
                 "message": (
-                    f"Device {host_id} is dead (hostStatus=dead). Cannot execute {source_kind}."
+                    f"Device {host_id} is dead (hostStatus={device['hostStatus']}). "
+                    f"Cannot execute {source_kind}."
                 ),
                 "suggestion": f"Verify device connectivity before executing {source_kind}.",
             },

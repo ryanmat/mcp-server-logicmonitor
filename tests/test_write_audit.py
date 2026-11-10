@@ -435,3 +435,21 @@ class TestRedactCredentialsInsideStrings:
         assert [record.levelno for record in caplog.records] == [level]
         assert "s3cret" not in caplog.text
         assert "https://***@host/?password=***" in caplog.text
+
+
+@pytest.mark.parametrize("key", ["signature", "X-Amz-Signature", "sig"])
+def test_signature_keys_are_redacted(key):
+    """R2.10: a request signature is a credential, under its own name or a URL's."""
+    from lm_mcp.logging import redact_arguments
+
+    assert redact_arguments({key: "value"}) == {key: "***"}
+
+
+def test_a_signed_url_masks_its_signatures_and_keeps_its_other_parameters():
+    from lm_mcp.logging import redact_arguments
+
+    url = "https://b.s3.amazonaws.com/o?X-Amz-Date=20261109&X-Amz-Signature=abc123&sig=zz"
+
+    assert redact_arguments({"url": url}) == {
+        "url": "https://b.s3.amazonaws.com/o?X-Amz-Date=20261109&X-Amz-Signature=***&sig=***"
+    }

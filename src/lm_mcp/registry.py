@@ -322,7 +322,7 @@ TOOLS.extend(
                 "Get open or cleared alerts from LogicMonitor, optionally filtered by "
                 "severity (critical, error, warning), device, group, datasource or time"
                 "\n\nFor Kubernetes clusters, use group_id (from "
-                "get_device_groups) instead of device — the device name "
+                "get_device_groups) instead of device; the device name "
                 "filter does not work reliably for K8s resources."
                 "\n\nCommon mistakes: startEpoch/endEpoch use SECONDS not "
                 "milliseconds. String filter values need double quotes "
@@ -1008,8 +1008,8 @@ TOOLS.extend(
             description=(
                 "Get the raw metric values (samples) of a device/resource datasource "
                 "instance, such as CPU, memory or disk usage"
-                "\n\nCommon mistakes: Returns most recent data unless "
-                "period/start/end specified. Requires device_datasource_id "
+                "\n\nCommon mistakes: Returns the last hour unless start_time or "
+                "end_time is given. Requires device_datasource_id "
                 "(from get_device_datasources) not the datasource definition ID."
             ),
             annotations=_READ_ONLY,
@@ -5905,7 +5905,8 @@ TOOLS.extend(
                             "Include recent alerts on a device named for the collector's "
                             "hostname. A collector with no such device returns an empty "
                             "list, which does not show it stayed up. The API cannot narrow "
-                            "rows to CollectorDown; each row's alert_type names what it is."
+                            "rows to CollectorDown; each row's alert_type names what it is. "
+                            "A failed read is null with history_warning, not an empty list."
                         ),
                     },
                     "history_days": {
@@ -6003,8 +6004,8 @@ TOOLS.extend(
             description=(
                 "Portal audit that counts UPS/PDU devices onboarded, interface "
                 "DataSources applied, SNMP credentials configured, and NetFlow exporters "
-                "set up. Returns a prioritized gap list with onboarding recommendations "
-                "— turns 'you can't detect X' into 'here's how to enable detection of X.'"
+                "set up. Returns a prioritized gap list, each gap with the onboarding step "
+                "that would let the portal detect what it cannot detect today."
             ),
             annotations=_READ_ONLY,
             inputSchema={

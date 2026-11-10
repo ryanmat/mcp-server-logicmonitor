@@ -947,27 +947,28 @@ class TestHostStatusFilterForm:
 
         assert route.calls[0].request.url.params["filter"] == f'hostStatus:"{status}"'
 
-    def test_dead_guard_accepts_the_word(self):
+    @pytest.mark.parametrize("word", ["dead", "dead-collector"])
+    def test_dead_guard_accepts_the_words(self, word):
+        """R2.10: a device whose collector is down is as unreachable as a dead one."""
         from lm_mcp.tools.diagnostic_remediation import _is_dead_host_status
 
-        assert _is_dead_host_status("dead")
+        assert _is_dead_host_status(word)
 
     @pytest.mark.parametrize(
         "value",
-        [1, "1", 0, "0", "normal", "dead-collector", "Dead", " dead", None],
+        [1, "1", 0, "0", "normal", "Dead", " dead", None],
         ids=[
             "int-1",
             "str-1",
             "int-0",
             "str-0",
             "normal",
-            "dead-collector",
             "Dead",
             "space",
             "none",
         ],
     )
-    def test_dead_guard_rejects_anything_but_the_word(self, value):
+    def test_dead_guard_rejects_anything_but_the_words(self, value):
         from lm_mcp.tools.diagnostic_remediation import _is_dead_host_status
 
         assert not _is_dead_host_status(value)

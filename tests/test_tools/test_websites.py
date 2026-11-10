@@ -233,6 +233,29 @@ class TestGetWebsiteData:
     """Tests for get_website_data tool."""
 
     @respx.mock
+    async def test_a_day_of_minutes_is_read_in_both_pages(self, client):
+        """The checkpoint data endpoint pages as the instance one does, and answers a start
+        alone with its last hour (probe of lmryanmatuszewski, 2026-11-09): a start with no
+        end is sent with end=now, and both pages are read."""
+        import time
+
+        from lm_mcp.tools.websites import get_website_data
+        from tests.metric_pages import day_of_minutes
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/website/websites/100/checkpoints/1/data"
+        ).mock(side_effect=day_of_minutes())
+
+        before = int(time.time())
+        result = await get_website_data(client, website_id=100, checkpoint_id=1, start_time=1)
+
+        data = json.loads(result[0].text)
+        assert before <= int(route.calls[0].request.url.params["end"]) <= int(time.time())
+        assert route.call_count == 2
+        assert len(data["time"]) == len(data["values"]) == 1440
+        assert data["truncated"] is False
+
+    @respx.mock
     async def test_get_website_data_returns_metrics(self, client):
         """get_website_data returns website monitoring data."""
         from lm_mcp.tools.websites import get_website_data
@@ -244,11 +267,9 @@ class TestGetWebsiteData:
                 200,
                 json={
                     "dataPoints": ["ResponseTime", "StatusCode"],
-                    "values": {
-                        "ResponseTime": [150, 145, 160],
-                        "StatusCode": [200, 200, 200],
-                    },
-                    "time": [1702500000, 1702500300, 1702500600],
+                    "values": [[160, 200], [145, 200], [150, 200]],
+                    "time": [1702500600000, 1702500300000, 1702500000000],
+                    "nextPageParams": "",
                 },
             )
         )
@@ -269,7 +290,7 @@ class TestGetWebsiteData:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/website/websites/100/checkpoints/1/data"
-        ).mock(return_value=httpx.Response(200, json={"dataPoints": [], "values": {}, "time": []}))
+        ).mock(return_value=httpx.Response(200, json={"dataPoints": [], "values": [], "time": []}))
 
         await get_website_data(
             client,

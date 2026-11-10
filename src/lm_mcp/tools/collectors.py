@@ -272,9 +272,10 @@ async def _enrich_collector(
         )
         downstream_count = num_hosts_reported
 
-    history: list[dict] = []
+    history: list[dict] | None = []
+    history_warning: str | None = None
     if include_history and hostname:
-        history = await _collector_down_history(client, hostname, history_days)
+        history, history_warning = await _collector_down_history(client, hostname, history_days)
 
     # isDown is the down signal. status is 1 whether the collector is up or down, so a
     # record with no isDown leaves the state unknown.
@@ -296,6 +297,8 @@ async def _enrich_collector(
         record["down_signal_unavailable"] = True
     if include_history:
         record["collector_down_history"] = history
+    if history_warning:
+        record["history_warning"] = history_warning
     return record
 
 
@@ -303,11 +306,13 @@ async def _collector_down_history(
     client: LogicMonitorClient,
     hostname: str,
     history_days: int,
-) -> list[dict]:
+) -> tuple[list[dict] | None, str | None]:
     """Fetch recent alerts on a device named for a collector hostname.
 
-    The API ignores the alertType clause, so rows are not limited to CollectorDown; each
-    row's alert_type names what it is.
+    A probe of 2026-11-06 (probes-2026-10.md section f) found no alert type that marks a
+    collector going down, so rows are not limited to one; each row's alert_type names
+    what it is.
+    A failed read is unknown, not an empty history: it returns None and a warning.
     """
     start_epoch = int(time.time()) - (history_days * 86400)
     try:
@@ -316,19 +321,15 @@ async def _collector_down_history(
             params={
                 "size": 100,
                 "filter": (
-                    f"monitorObjectName:{quote_filter_value(hostname)},"
-                    f"startEpoch>:{start_epoch},"
-                    'alertType~"CollectorDown"'
+                    f"monitorObjectName:{quote_filter_value(hostname)},startEpoch>:{start_epoch}"
                 ),
             },
         )
-    except Exception:
-        logger.warning(
-            "collector history query failed for hostname=%s; returning empty history",
-            hostname,
-            exc_info=True,
+    except Exception as exc:
+        logger.warning("collector history query failed for hostname=%s", hostname, exc_info=True)
+        return None, (
+            f"Alert history read failed: {exc}. null history does not mean the collector stayed up."
         )
-        return []
 
     history: list[dict] = []
     for item in result.get("items", []):
@@ -342,7 +343,7 @@ async def _collector_down_history(
                 "alert_type": item.get("type"),
             }
         )
-    return history
+    return history, None
 
 
 @require_write_permission
