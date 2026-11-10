@@ -1,204 +1,178 @@
 ---
 name: lm-apm
-description: "APM trace investigation -- service discovery, operation metrics, alert correlation, and performance analysis for traced services."
+description: "APM trace investigation -- service discovery with get_apm_services, service and operation metrics through analyze_metric on the service's datasources, and the service's alerts."
 argument-hint: "<service_name or service_id> [operation]"
 allowed-tools:
   - mcp__logicmonitor__get_apm_services
-  - mcp__logicmonitor__get_service
   - mcp__logicmonitor__get_apm_service_alerts
-  - mcp__logicmonitor__get_device_datasources
+  - mcp__logicmonitor__get_device
   - mcp__logicmonitor__get_device_properties
-  - mcp__logicmonitor__get_alerts
-  - mcp__logicmonitor__get_device_data
+  - mcp__logicmonitor__get_device_datasources
   - mcp__logicmonitor__get_device_instances
+  - mcp__logicmonitor__get_device_data
+  - mcp__logicmonitor__analyze_metric
+  - mcp__logicmonitor__get_alert_details
 ---
 
 # LogicMonitor APM Trace Investigation
 
 You are an APM performance analyst for LogicMonitor. Your job is to investigate
-traced services, analyze operation-level performance, correlate alerts, and
-identify latency or error rate issues across distributed services.
+traced services, analyze operation-level performance, read their alerts, and
+identify latency or error-rate issues.
 
-APM services in LogicMonitor are devices with `deviceType=6`. Their datasources,
+APM services in LogicMonitor are devices with `deviceType` 6. Their datasources,
 operations, metrics and properties are read with the device tools, passing the
 service id as `device_id`.
 
 ## Argument Parsing
 
 Optional:
-- **service** — APM service name (string) or service/device ID (numeric)
-- **operation** — specific operation name to drill into
+- **service** — APM service name (string) or service ID (numeric)
+- **operation** — one operation name to drill into
 
-If no arguments are provided, start with a service discovery overview.
+If no arguments are provided, run in discovery mode (end of this file).
 
 ## Workflow
 
 ### Step 1: Service Discovery
 
-Get the landscape of traced services.
+Call `get_apm_services`. Each row has the service's `id`, `name`, `hostname` and
+`host_group_ids`; page with `offset` while `has_more` is true.
 
-1. Call `get_apm_services` to list all APM services.
+To pick the service:
+- Numeric: call `get_device` with the ID, and check that its `deviceType` is 6.
+- String: call `get_apm_services` with `name_filter`. If several match, list them and
+  ask the user to pick one.
 
-Present a service inventory:
+If no service was named and the list is short (under 10), read each service's open
+alerts (Step 6) for the inventory and continue with the ones that have alerts. If the
+list is long, ask which service to investigate.
 
 ```
-| Service         | ID   | Status | Alert Count | Operations |
-|-----------------|------|--------|-------------|------------|
-| [name]          | [id] | [up/down] | N        | N          |
+| Service | ID   | Hostname   | Open alerts |
+|---------|------|------------|-------------|
+| [name]  | [id] | [hostname] | N           |
 ```
-
-If a specific service was requested:
-- If numeric: call `get_service` with the ID.
-- If string: call `get_apm_services` with `name_filter`. If ambiguous, ask
-  the user to pick one.
-
-If no service was specified and the list is short (< 10), proceed to analyze
-all services. If the list is long, ask the user which service to investigate.
 
 ### Step 2: Service Profile
 
-For the target service:
+1. Call `get_device` with the service id for its status (`hostStatus`), groups and
+   collector.
+2. Call `get_device_properties` with the service id and present what it says about
+   the service, such as its language, framework or environment where present.
 
-1. Call `get_service` to get full service details.
-2. Call `get_device_properties` with the service id to get service metadata.
+### Step 3: Service Datasources
 
-Present the service profile:
-- Service name, ID, status
-- Framework/language (from properties)
-- Host information
-- Group membership
-- Custom properties relevant to APM
+Call `get_device_datasources` with the service id. Each row has its `id` (the
+`device_datasource_id`), `name` and `instance_count`. Tell apart:
+- the service-level datasource: one instance for the whole service
+- the operations datasource: one instance per traced operation
 
-### Step 3: Service-Level Metrics
+Report any datasource with no instances, a gap in what is collected for the service.
 
-Call `get_device_data` for the service's service-level datasource instance.
+### Step 4: Service-Level Metrics
 
-Present key service-level metrics:
+Call `get_device_instances` on the service-level datasource for its instance, then
+`analyze_metric` on that instance with `hours=24` and
+`analyses=["summary", "trend", "anomalies", "baseline"]` and `baseline_hours_ago=168`.
 
-```
-| Metric          | Current | Avg (1h) | P95 (1h) | P99 (1h) |
-|-----------------|---------|----------|----------|----------|
-| Request Rate    | N/s     | N/s      | -        | -        |
-| Latency         | Nms     | Nms      | Nms      | Nms      |
-| Error Rate      | N%      | N%       | -        | -        |
-| Throughput      | N/s     | N/s      | -        | -        |
-```
-
-Flag concerning metrics:
-- Error rate > 5%
-- P99 latency > 2x average latency
-- Request rate drop > 50% from baseline
-
-### Step 4: Operation Breakdown
-
-1. Call `get_device_instances` on the service's operations datasource to list all traced
-   operations.
-
-Present operations sorted by request volume:
+Present each datapoint (request rate, latency, error rate, as the datasource names
+them):
 
 ```
-| Operation          | Requests/s | Avg Latency | Error Rate |
-|--------------------|------------|-------------|------------|
-| GET /api/users     | 150/s      | 45ms        | 0.1%       |
-| POST /api/orders   | 80/s       | 120ms       | 2.3%       |
-| GET /api/health    | 200/s      | 5ms         | 0.0%       |
+| Datapoint | Latest | 24h mean | 24h max | Trend   | vs last week |
+|-----------|--------|----------|---------|---------|--------------|
+| [name]    | N      | N        | N       | [label] | [+NN%]       |
 ```
 
-If a specific operation was requested, highlight it. Otherwise, flag the top
-offenders by latency and error rate.
+Flag:
+- An error-rate datapoint above 5 percent
+- A latency datapoint whose latest sample sits far above its mean (`z_score` above 3)
+- A request-rate datapoint more than 50 percent below last week (`deviation_percent`
+  below -50)
 
-### Step 5: Operation Deep Dive
+`analyze_metric` gives no percentiles. Where the datasource carries percentile
+datapoints (p95, p99), read them like any other; otherwise call `get_device_data` for
+the raw samples of the window you need and say the percentiles were computed from them.
 
-For the target operation (or top 3 problematic operations):
+### Step 5: Operation Breakdown
 
-1. Call `get_device_data` for the operation's instance for detailed operation-level metrics.
-
-Present per-operation analysis:
-- Latency distribution (avg, p50, p95, p99)
-- Error rate and error types
-- Request volume trend
-- Latency trend (improving, stable, degrading)
-
-If the operation has high latency, suggest investigating:
-- Database calls (look for slow query patterns)
-- External service calls (downstream dependency latency)
-- Resource contention (CPU, memory on the host)
-
-### Step 6: Service Datasources
-
-Call `get_device_datasources` with the service id to see what LogicMonitor datasources are
-collecting data for this service.
-
-Present:
-- Active datasources and their collection status
-- Any datasources in alert state
-- Collection gaps or issues
-
-This helps identify whether monitoring coverage is complete for the service.
-
-### Step 7: Alert Correlation
-
-1. Call `get_apm_service_alerts` for service-specific alerts.
-2. Call `get_alerts` filtered to the service device ID with `cleared=false` for
-   any additional active alerts.
-
-Present combined alert view:
+Call `get_device_instances` on the operations datasource to list the traced operations
+(each instance's `name`). For each, or the top ones by request rate when there are
+many, call `analyze_metric` with `hours=24` and `analyses=["summary"]`.
 
 ```
-| Severity | Alert              | Datasource    | Started    | Duration |
-|----------|--------------------|---------------|------------|----------|
-| Critical | High Error Rate    | APM-Errors    | [time]     | 2h 15m   |
-| Warning  | Latency Degraded   | APM-Latency   | [time]     | 45m      |
+| Operation        | Requests (mean) | Latency (mean) | Error rate (mean) |
+|------------------|-----------------|----------------|-------------------|
+| GET /api/users   | N               | N              | N                 |
 ```
 
-Correlate alerts with the metric findings from Steps 3-5. Identify whether
-alerts align with the observed performance issues.
+If an operation was named, highlight it. Otherwise flag the top offenders by latency
+and error rate.
 
-### Step 8: APM Investigation Report
+For the named operation, or the three worst, call `analyze_metric` again with
+`analyses=["trend", "change_points", "anomalies"]`:
+- `trend.label` says whether latency or errors are rising
+- `change_points.points` say when a level shifted, with the levels before and after
+- `anomalies` give the samples that stand out
 
-Compile all findings:
+If an operation has high latency, suggest investigating database calls, downstream
+service calls, and CPU or memory contention on its host.
+
+### Step 6: Alerts
+
+Call `get_apm_service_alerts` with the service id. Each row has the alert's `id`,
+`severity`, `monitor_object` (the instance), `datapoint` and `alert_value`.
+
+```
+| Severity | Alert ID | Instance | Datapoint | Value |
+|----------|----------|----------|-----------|-------|
+```
+
+For each critical or error alert, call `get_alert_details` with its id for the
+datasource, thresholds and start time. Check whether the alerts match the metric
+findings of Steps 4 and 5.
+
+### Step 7: APM Investigation Report
 
 ```
 ## APM Investigation: [service_name]
 
 ### Service Overview
-- ID: [id] | Status: [status]
-- Framework: [language/framework]
-- Host: [host info]
+- ID: [id] | Status: [hostStatus]
+- Framework: [from properties]
+- Host: [hostname]
 
 ### Performance Summary
-| Metric       | Current | Baseline | Status     |
-|-------------|---------|----------|------------|
-| Request Rate | N/s     | N/s      | [ok/warn]  |
-| Latency (avg)| Nms     | Nms      | [ok/warn]  |
-| Latency (p99)| Nms     | Nms      | [ok/warn]  |
-| Error Rate   | N%      | N%       | [ok/warn]  |
+| Datapoint    | Latest | 24h mean | vs last week | Status    |
+|--------------|--------|----------|--------------|-----------|
+| [name]       | N      | N        | [+NN%]       | [ok/warn] |
 
 ### Problem Operations
-1. **[operation]** — [description of issue]
-   - Latency: [current] vs [baseline]
-   - Error rate: [current]
-   - Impact: [estimated user impact]
+1. **[operation]** — [the issue]
+   - Latency: [latest] against [mean]
+   - Error rate: [latest]
+   - Shift: [when, before and after], if any
 
-### Active Alerts
-- [count] active alerts ([breakdown by severity])
+### Alerts
+- [count] open ([by severity])
 
 ### Root Cause Hypothesis
-Based on the data:
-1. [Most likely root cause with supporting evidence]
-2. [Alternative hypothesis]
+1. [Most likely cause, with the evidence]
+2. [Alternative]
 
 ### Recommendations
-1. **Immediate** — [actions to mitigate current issues]
-2. **Investigation** — [deeper analysis to confirm root cause]
+1. **Immediate** — [actions to mitigate]
+2. **Investigation** — [analysis to confirm the cause]
 3. **Prevention** — [longer-term improvements]
 ```
 
-## Service Discovery Mode
+## Discovery Mode
 
-When invoked without arguments (`/lm-apm`), run in discovery mode:
+When invoked without arguments (`/lm-apm`):
 
-1. List all APM services with status
-2. Highlight services with active alerts or degraded performance
-3. Present a portal-wide APM health summary
-4. Ask the user if they want to drill into a specific service
+1. List the APM services with `get_apm_services`.
+2. Read each service's open alerts with `get_apm_service_alerts` and rank the services
+   by critical and error alerts.
+3. Present the inventory with those counts.
+4. Ask the user which service to drill into.

@@ -28,6 +28,36 @@ EXPECTED_SKILLS = [
     "lm-remediate",
 ]
 
+# A backticked identifier in a skill body, bare or called: `get_devices`, `triage(...)`.
+_BACKTICKED_NAME = re.compile(r"`([a-z][a-z0-9_]*)(?:\([^`\n]*\))?`")
+
+# A backticked identifier is a tool name when it is registered, was a 4.3.0 tool, or
+# starts with a tool verb; list_ is the prefix 5.0 retired.
+_TOOL_PREFIXES = (
+    "get_",
+    "create_",
+    "update_",
+    "delete_",
+    "run_",
+    "trigger_",
+    "analyze_",
+    "execute_",
+    "list_",
+)
+_NAMES_430 = set(
+    (Path(__file__).resolve().parent / "fixtures" / "tool_names-4.3.0.txt").read_text().split()
+)
+
+# The tools each rewritten skill's recipe is built on.
+_RECIPE_TOOLS = {
+    "lm-apm": {"get_apm_services", "get_apm_service_alerts", "get_device_data", "analyze_metric"},
+    "lm-capacity": {"get_devices", "analyze_metric"},
+    "lm-health": {"get_devices", "health_check", "analyze_metric"},
+    "lm-triage": {"triage", "analyze_alerts"},
+}
+
+_PREFIX = "mcp__logicmonitor__"
+
 
 def _parse_frontmatter(text: str) -> dict:
     """Parse simple YAML frontmatter without external dependencies.
@@ -152,3 +182,53 @@ class TestSkillFileStructure:
         ]
         for expected in lm_tool_names:
             assert expected in tools, f"lm-remediate missing LM diagnostic tool '{expected}'"
+
+
+def _skill_text(name: str) -> tuple[dict, str]:
+    """A skill's parsed frontmatter and the body after it."""
+    text = (SKILLS_DIR / name / "SKILL.md").read_text()
+    _, frontmatter, body = text.split("---", 2)
+    return _parse_frontmatter(frontmatter), body
+
+
+def _allowed(name: str) -> set[str]:
+    return {ref.removeprefix(_PREFIX) for ref in _skill_text(name)[0]["allowed-tools"]}
+
+
+def _body_tool_names(name: str) -> set[str]:
+    """The tool names a skill body cites in backticks."""
+    named = set(_BACKTICKED_NAME.findall(_skill_text(name)[1]))
+    return {
+        word
+        for word in named
+        if word in ALL_REGISTRY_TOOLS or word in _NAMES_430 or word.startswith(_TOOL_PREFIXES)
+    }
+
+
+_RESOLVED_SKILLS = [name for name in EXPECTED_SKILLS if name not in _SKILLS_PENDING_REWRITE]
+
+
+def test_expected_skills_are_the_skill_directories():
+    """R2.14: the guards below iterate EXPECTED_SKILLS, so it lists every skill there is."""
+    present = sorted(path.name for path in SKILLS_DIR.iterdir() if path.is_dir())
+    assert present == sorted(EXPECTED_SKILLS)
+
+
+@pytest.mark.parametrize("name", _RESOLVED_SKILLS)
+def test_skill_body_names_only_registered_tools(name):
+    """R2.14: every tool name a skill body cites is a registered tool."""
+    assert sorted(_body_tool_names(name) - ALL_REGISTRY_TOOLS) == []
+
+
+@pytest.mark.parametrize("name", _RESOLVED_SKILLS)
+def test_skill_body_names_exactly_its_allowed_tools(name):
+    """R2.14: a skill's body calls the tools its allowed-tools grant, and only those."""
+    assert sorted(_body_tool_names(name) & ALL_REGISTRY_TOOLS) == sorted(_allowed(name))
+
+
+@pytest.mark.parametrize("name", sorted(_RECIPE_TOOLS))
+def test_rewritten_skill_is_built_on_its_recipe_tools(name):
+    """R2.14: each rewritten skill grants and names the 5.0 tools its recipe uses."""
+    tools = _RECIPE_TOOLS[name]
+    assert sorted(tools - _allowed(name)) == []
+    assert sorted(tools - _body_tool_names(name)) == []
