@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 GRADER = ROOT / "evals" / "grade.py"
@@ -111,3 +112,13 @@ def test_the_search_fixture_has_forty_complete_entries(field):
 
     assert len(entries) == 40
     assert all(field in entry for entry in entries)
+
+
+def test_ci_grades_the_search_eval():
+    """R7.1: a CI leg runs the grader on the committed fixture, so a ranking regression fails CI."""
+    job = yaml.safe_load((ROOT / ".github" / "workflows" / "test.yml").read_text())["jobs"]["test"]
+    versions = job["strategy"]["matrix"]["python-version"]
+    legs = {None} | {f"matrix.python-version == '{version}'" for version in versions}
+
+    (step,) = [s for s in job["steps"] if s.get("run") == "uv run python evals/grade.py"]
+    assert step.get("if") in legs
