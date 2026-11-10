@@ -1,8 +1,9 @@
-# Description: Edwin AI query tools: insights, one insight, and the filterCondition builder.
+# Description: Edwin AI query tools: insights, records, alert volume, metadata, filter builder.
 # Description: Reads Edwin's investigations so the calling model can weigh them beside raw LM data.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -15,7 +16,24 @@ from lm_mcp.tools import format_response, handle_error, validation_error
 if TYPE_CHECKING:
     from lm_mcp.client.edwin import EdwinClient
 
+logger = logging.getLogger(__name__)
+
 _MAX_INSIGHTS = 50
+_MAX_RECORDS = 50
+
+# The field each record source carries its creation time on; events have no
+# meta.createdTimestamp, and a window or order on it answers 400.
+_TIME_FIELDS = {"alerts": "meta.createdTimestamp", "events": "meta.eventTimestamp"}
+
+# Field-name prefixes a records read leaves out unless named in columns: extra.* mirrors
+# the LogicMonitor properties of the CI (2414 fields) and raw.* is the source record.
+_BULK_PREFIXES = ("extra.", "raw.")
+
+# The groups entry of each alert-volume grouping.
+_VOLUME_GROUPS = {
+    "hour": {"field": "meta.createdTimestamp", "type": "HOUR"},
+    "state": {"field": "alertDetails.alertState", "type": "COLUMN"},
+}
 
 # The fields an insight list row carries (spec R3.1). The genAi fields appear only on
 # the insights Edwin analyzed and are passed through verbatim.
@@ -106,6 +124,15 @@ def _project_insight(row: dict[str, Any]) -> dict[str, Any]:
     return _with_iso_times(kept)
 
 
+def _check_range(hours: int, limit: int | None = None, most: int = 0) -> list[TextContent] | None:
+    """The refusal for an hours or limit argument out of range, or None when each is in it."""
+    if hours < 1:
+        return validation_error("INVALID_REQUEST", f"hours must be at least 1, got {hours}")
+    if limit is not None and not 1 <= limit <= most:
+        return validation_error("INVALID_REQUEST", f"limit must be 1 to {most}, got {limit}")
+    return None
+
+
 async def get_edwin_insights(
     client: EdwinClient,
     hours: int = 24,
@@ -130,12 +157,9 @@ async def get_edwin_insights(
         ``insights`` with Edwin's fields verbatim, ``count``, ``total`` (Edwin's count
         of matches) and ``has_more``.
     """
-    if hours < 1:
-        return validation_error("INVALID_REQUEST", f"hours must be at least 1, got {hours}")
-    if not 1 <= limit <= _MAX_INSIGHTS:
-        return validation_error(
-            "INVALID_REQUEST", f"limit must be 1 to {_MAX_INSIGHTS}, got {limit}"
-        )
+    refusal = _check_range(hours, limit, _MAX_INSIGHTS)
+    if refusal is not None:
+        return refusal
     conditions = [within("meta.createdTimestamp", hours, "hour")]
     if state:
         conditions.append(equals("meta.state", state))
@@ -185,5 +209,199 @@ async def get_edwin_insight(client: EdwinClient, insight_id: str) -> list[TextCo
     try:
         result = await client.get(f"/ui/query/record/insights/{quote(insight_id, safe='')}")
         return format_response(_with_iso_times(result["results"][0]))
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_edwin_records(
+    client: EdwinClient,
+    source: str,
+    hours: int = 24,
+    filter: dict[str, Any] | None = None,
+    columns: list[str] | None = None,
+    order: list[dict[str, Any]] | None = None,
+    limit: int = 10,
+) -> list[TextContent]:
+    """List Edwin AI's alert or event records from the last ``hours``, newest first by default.
+
+    Args:
+        client: Edwin AI client.
+        source: ``alerts`` or ``events``.
+        hours: Window in hours back from now, on ``meta.createdTimestamp`` for alerts and
+            ``meta.eventTimestamp`` for events.
+        filter: One filterCondition condition, such as
+            ``{"EQUALS": [{"type": "string", "field": "cf.eventCI"}, "web01"]}``, ANDed
+            with the window.
+        columns: Fields to return beside ``_id``. Without it every field is returned
+            except the ``extra.*`` and ``raw.*`` ones.
+        order: Edwin order entries, ``[{"field", "type": "asc"|"desc", "size": null}]``.
+        limit: Most records to return, 1 to 50.
+
+    Returns:
+        ``source``, ``records``, ``count``, ``total`` (Edwin's count of matches) and
+        ``has_more``, plus a ``note`` when fields were left out.
+    """
+    if source == "insights":
+        return validation_error(
+            "INVALID_REQUEST", "Insights are read with get_edwin_insights, not get_edwin_records"
+        )
+    if source not in _TIME_FIELDS:
+        return validation_error(
+            "INVALID_REQUEST", f"source must be alerts or events, got {source!r}"
+        )
+    refusal = _check_range(hours, limit, _MAX_RECORDS)
+    if refusal is not None:
+        return refusal
+    time_field = _TIME_FIELDS[source]
+    conditions = [within(time_field, hours, "hour")]
+    if filter:
+        conditions.append(filter)
+    try:
+        result = await client.post(
+            "/ui/query/records",
+            json_body={
+                "source": source,
+                "env": {"timezone": "UTC"},
+                "filter": filter_condition(*conditions),
+                "columns": None,
+                "groups": None,
+                "order": order or [{"field": time_field, "type": "desc", "size": None}],
+                "size": limit,
+            },
+        )
+        rows = result.get("results", [])
+        if columns:
+            wanted = {"_id", *columns}
+            records = [{k: v for k, v in row.items() if k in wanted} for row in rows]
+        else:
+            records = [
+                {k: v for k, v in row.items() if not k.startswith(_BULK_PREFIXES)} for row in rows
+            ]
+        total = result.get("meta", {}).get("count", len(records))
+        response: dict[str, Any] = {
+            "source": source,
+            "records": records,
+            "count": len(records),
+            "total": total,
+            "has_more": total > len(records),
+        }
+        if not columns:
+            response["note"] = (
+                "extra.* fields (the CI's LogicMonitor properties) and raw.* fields are "
+                "left out; name them in columns to get them, and list them with "
+                "get_edwin_metadata."
+            )
+        return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_edwin_alert_volume(
+    client: EdwinClient, hours: int = 24, group_by: str = "hour"
+) -> list[TextContent]:
+    """Count the alerts Edwin AI received in the last ``hours``, by hour or by alert state.
+
+    Args:
+        client: Edwin AI client.
+        hours: Window in hours back from now.
+        group_by: ``hour`` (buckets keyed by epoch milliseconds) or ``state``.
+
+    Returns:
+        ``buckets`` as ``[key, count]`` pairs, ``total`` (alerts in the window),
+        ``bucketed`` (alerts the buckets hold) and ``unreadable`` for a bucket that
+        could not be read.
+    """
+    if group_by not in _VOLUME_GROUPS:
+        return validation_error(
+            "INVALID_REQUEST", f"group_by must be hour or state, got {group_by!r}"
+        )
+    refusal = _check_range(hours)
+    if refusal is not None:
+        return refusal
+    try:
+        result = await client.post(
+            "/ui/query/metrics",
+            json_body={
+                "source": "alerts",
+                "env": {"timezone": "UTC"},
+                "filter": filter_condition(within("meta.createdTimestamp", hours, "hour")),
+                "columns": [{"field": "meta.rowKey", "type": "COUNT"}],
+                "groups": [_VOLUME_GROUPS[group_by]],
+                "order": None,
+            },
+        )
+        buckets: list[list[Any]] = []
+        unreadable: list[Any] = []
+        for bucket in result.get("results", []):
+            try:
+                key, (count,) = bucket
+                buckets.append([key, int(count)])
+            except (TypeError, ValueError):
+                logger.warning("Edwin alert-volume bucket unreadable: %r", bucket, exc_info=True)
+                unreadable.append(bucket)
+        response: dict[str, Any] = {
+            "group_by": group_by,
+            "hours": hours,
+            "total": result.get("meta", {}).get("count"),
+            "bucketed": sum(count for _, count in buckets),
+            "buckets": buckets,
+        }
+        if unreadable:
+            response["unreadable"] = unreadable
+        return format_response(response)
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_edwin_metadata(
+    client: EdwinClient, record_type: str | None = None, prefix: str | None = None
+) -> list[TextContent]:
+    """List Edwin AI's record types, or the fields of one, from its data model.
+
+    Args:
+        client: Edwin AI client.
+        record_type: Record type to describe, such as ``alerts``; omit to list the types.
+        prefix: Only fields whose name starts with it, such as ``extra.`` or ``cf.``.
+
+    Returns:
+        Without a type: ``record_types`` with each type's ``queryable`` flag and field
+        count. With one: its ``attributes`` and ``fields`` as Edwin describes them; the
+        ``extra.*`` fields are counted, not listed, unless a prefix is given.
+    """
+    try:
+        records = (await client.get("/metadata")).get("records", [])
+        if record_type is None:
+            types = [
+                {
+                    "recordType": r["recordType"],
+                    "queryable": bool(r.get("attributes", {}).get("queryable")),
+                    "fields": len(r.get("fields", [])),
+                }
+                for r in records
+            ]
+            return format_response({"record_types": types, "count": len(types)})
+        match = next((r for r in records if r.get("recordType") == record_type), None)
+        if match is None:
+            return validation_error(
+                "INVALID_REQUEST",
+                f"Edwin has no record type {record_type!r}",
+                "Call get_edwin_metadata without record_type to list them.",
+            )
+        fields = match.get("fields", [])
+        response: dict[str, Any] = {
+            "recordType": record_type,
+            "attributes": match.get("attributes", {}),
+        }
+        if prefix:
+            response["fields"] = [f for f in fields if f.get("name", "").startswith(prefix)]
+        else:
+            response["fields"] = [f for f in fields if not f.get("name", "").startswith("extra.")]
+            response["extra_fields"] = len(fields) - len(response["fields"])
+            response["note"] = (
+                "extra.* fields mirror the CI's LogicMonitor properties; pass "
+                "prefix='extra.' to list them."
+            )
+        response["count"] = len(response["fields"])
+        return format_response(response)
     except Exception as e:
         return handle_error(e)

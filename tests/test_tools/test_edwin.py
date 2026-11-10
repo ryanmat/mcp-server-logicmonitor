@@ -2,6 +2,8 @@
 # Description: Rows are trimmed from the 2026-11-10 probe of lmryanmatuszewski.dexda.ai.
 
 import json
+import logging
+from pathlib import Path
 
 import httpx
 import pytest
@@ -11,8 +13,11 @@ from lm_mcp.client.edwin import build_edwin_client
 from lm_mcp.tools.edwin import (
     equals,
     filter_condition,
+    get_edwin_alert_volume,
     get_edwin_insight,
     get_edwin_insights,
+    get_edwin_metadata,
+    get_edwin_records,
     in_,
     list_contains,
     within,
@@ -20,6 +25,7 @@ from lm_mcp.tools.edwin import (
 
 HOST = "https://lmryanmatuszewski.dexda.ai"
 RECORDS = f"{HOST}/ui/query/records"
+METRICS = f"{HOST}/ui/query/metrics"
 
 # Insight rows from POST /ui/query/records on lmryanmatuszewski.dexda.ai, 2026-11-10
 # (docs/validation/probes-2026-11.md, Step 54): 26 of the 52 live fields of ANALYZED and
@@ -373,3 +379,302 @@ class TestGetEdwinInsight:
 
         assert route.call_count == 0
         assert body["error"]["code"] == "INVALID_REQUEST"
+
+
+# An alert and an event row from POST /ui/query/records on lmryanmatuszewski.dexda.ai,
+# 2026-11-10 (docs/validation/probes-2026-11.md, Step 55): kept fields only, strings
+# over 90 characters cut to their first 90. Live rows carry 107 to 125 fields.
+ALERT = {
+    "_id": "observability-observatorium-api-7974845f49-rs-open-cluster-management-"
+    "observability-rm-aro",
+    "alertDetails.alertState": "cleared",
+    "alertDetails.currentSeverity": 0,
+    "alertDetails.workflowState": "new",
+    "cf.eventCI": "observability-observatorium-api-7974845f49-rs-open-cluster-management-"
+    "observability-rm-aro",
+    "cf.eventName": "DifferenceCheck.Kubernetes ReplicaSet Config.dataSourceAlert",
+    "cf.eventSeverity": 2,
+    "cf.eventTime": "2026-11-10T19:04:43.00000Z",
+    "meta.createdTimestamp": 1794337502820,
+    "meta.link": "https://lmryanmatuszewski.dexda.ai/link/alert/observability-observatorium-"
+    "api-7974845f49-r",
+    "extra.lm_system_deviceid": "532100",
+    "extra.lm_display_name": "observability-observatorium-api-7974845f49-rs-open-cluster-"
+    "management-observability-rm-aro",
+    "raw.sourceRecord": '{"sdtIds":"","resourceId":4361829,"threshold":"= 1",'
+    '"type":"dataSourceAlert","startEpoch":',
+}
+EVENT = {
+    "_id": "argocd-notifications-controller-5754577c7b-nf2kk-pod-argocd-rm-aro-cluster_event_"
+    "LogicMoni",
+    "cf.eventCI": "argocd-notifications-controller-5754577c7b-nf2kk-pod-argocd-rm-aro-cluster",
+    "cf.eventName": "idleInterval.Host Status.dataSourceAlert",
+    "cf.eventSeverity": 5,
+    "cf.eventTime": "2026-11-10T19:20:22.00000Z",
+    "meta.eventTimestamp": 1794338422000,
+    "extra.lm_kubernetes_spec_nodeselector_appliesto": "kubernetes.label.kubernetes.io/os "
+    '== "linux"',
+}
+
+# POST /ui/query/metrics answers from the same probe: alerts in the last 24 hours, COUNT
+# of meta.rowKey grouped by hour (first 3 of 25 buckets) and by alertDetails.alertState.
+VOLUME_BY_HOUR = {
+    "meta": {"recordType": "alerts", "count": 141},
+    "results": [[1794250800000, [10]], [1794254400000, [2]], [1794258000000, [3]]],
+}
+VOLUME_BY_STATE = {
+    "meta": {"recordType": "alerts", "count": 141},
+    "results": [["cleared", [73]], ["active", [6]]],
+}
+
+# GET /metadata from the 2026-11-07 capture (edwin-samples/edwin-metadata.json), all 29
+# record types with at most three fields and two extra.* fields each.
+METADATA = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "edwin_metadata.json").read_text()
+)
+
+
+class TestGetEdwinRecords:
+    @pytest.mark.parametrize(
+        ("source", "time_field", "row"),
+        [("alerts", "meta.createdTimestamp", ALERT), ("events", "meta.eventTimestamp", EVENT)],
+    )
+    async def test_request_windows_and_orders_on_the_source_time_field(
+        self, client, source, time_field, row
+    ):
+        edwin, router = client
+        route = router.post(RECORDS).mock(
+            return_value=httpx.Response(
+                200, json={"meta": {"count": 141, "recordType": source}, "results": [row]}
+            )
+        )
+
+        body = payload(await get_edwin_records(edwin, source=source))
+
+        assert json.loads(route.calls.last.request.content) == {
+            "source": source,
+            "env": {"timezone": "UTC"},
+            "filter": {
+                "schemaName": "filterCondition",
+                "schemaVersion": "4",
+                "expression": {
+                    "AND": [
+                        {
+                            "WITHIN": [
+                                {"type": "long", "field": time_field},
+                                {"duration": 24, "unit": "hour"},
+                            ]
+                        }
+                    ]
+                },
+            },
+            "columns": None,
+            "groups": None,
+            "order": [{"field": time_field, "type": "desc", "size": None}],
+            "size": 10,
+        }
+        assert body["source"] == source
+        assert (body["count"], body["total"], body["has_more"]) == (1, 141, True)
+
+    async def test_filter_order_and_limit_pass_through(self, client):
+        edwin, router = client
+        route = router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 0}, "results": []})
+        )
+        condition = equals("alertDetails.alertState", "active")
+        order = [{"field": "cf.eventSeverity", "type": "desc", "size": None}]
+
+        await get_edwin_records(
+            edwin, source="alerts", hours=6, filter=condition, order=order, limit=25
+        )
+
+        sent = json.loads(route.calls.last.request.content)
+        assert sent["filter"]["expression"]["AND"] == [
+            within("meta.createdTimestamp", 6, "hour"),
+            condition,
+        ]
+        assert sent["order"] == order
+        assert sent["size"] == 25
+
+    async def test_without_columns_extra_and_raw_fields_are_left_out(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 1}, "results": [ALERT]})
+        )
+
+        body = payload(await get_edwin_records(edwin, source="alerts"))
+
+        (record,) = body["records"]
+        assert record == {
+            key: value for key, value in ALERT.items() if not key.startswith(("extra.", "raw."))
+        }
+        assert "extra." in body["note"]
+        assert "get_edwin_metadata" in body["note"]
+
+    async def test_columns_keep_the_id_and_the_named_fields(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 1}, "results": [ALERT]})
+        )
+
+        body = payload(
+            await get_edwin_records(
+                edwin, source="alerts", columns=["cf.eventCI", "extra.lm_system_deviceid"]
+            )
+        )
+
+        assert body["records"] == [
+            {
+                "_id": ALERT["_id"],
+                "cf.eventCI": ALERT["cf.eventCI"],
+                "extra.lm_system_deviceid": "532100",
+            }
+        ]
+        assert "note" not in body
+
+    @pytest.mark.parametrize(
+        ("kwargs", "words"),
+        [
+            ({"source": "insights"}, "get_edwin_insights"),
+            ({"source": "incidents"}, "alerts"),
+            ({"source": "alerts", "hours": 0}, "hours"),
+            ({"source": "alerts", "limit": 0}, "limit"),
+            ({"source": "alerts", "limit": 51}, "limit"),
+        ],
+    )
+    async def test_refusals_send_nothing(self, client, kwargs, words):
+        edwin, router = client
+        route = router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 0}, "results": []})
+        )
+
+        body = payload(await get_edwin_records(edwin, **kwargs))
+
+        assert route.call_count == 0
+        assert body["error"]["code"] == "INVALID_REQUEST"
+        assert words in body["error"]["message"]
+
+
+class TestGetEdwinAlertVolume:
+    async def test_hourly_counts_as_epoch_count_pairs(self, client):
+        edwin, router = client
+        route = router.post(METRICS).mock(return_value=httpx.Response(200, json=VOLUME_BY_HOUR))
+
+        body = payload(await get_edwin_alert_volume(edwin))
+
+        assert json.loads(route.calls.last.request.content) == {
+            "source": "alerts",
+            "env": {"timezone": "UTC"},
+            "filter": filter_condition(within("meta.createdTimestamp", 24, "hour")),
+            "columns": [{"field": "meta.rowKey", "type": "COUNT"}],
+            "groups": [{"field": "meta.createdTimestamp", "type": "HOUR"}],
+            "order": None,
+        }
+        assert body == {
+            "group_by": "hour",
+            "hours": 24,
+            "total": 141,
+            "bucketed": 15,
+            "buckets": [[1794250800000, 10], [1794254400000, 2], [1794258000000, 3]],
+        }
+
+    async def test_state_counts_report_the_alerts_no_bucket_holds(self, client):
+        edwin, router = client
+        route = router.post(METRICS).mock(return_value=httpx.Response(200, json=VOLUME_BY_STATE))
+
+        body = payload(await get_edwin_alert_volume(edwin, hours=12, group_by="state"))
+
+        sent = json.loads(route.calls.last.request.content)
+        assert sent["groups"] == [{"field": "alertDetails.alertState", "type": "COLUMN"}]
+        assert sent["filter"] == filter_condition(within("meta.createdTimestamp", 12, "hour"))
+        assert body["buckets"] == [["cleared", 73], ["active", 6]]
+        assert (body["total"], body["bucketed"]) == (141, 79)
+
+    async def test_an_unreadable_bucket_is_reported_and_logged(self, client, caplog):
+        edwin, router = client
+        broken = {"meta": {"count": 12}, "results": [[1794250800000, [10]], [1794254400000]]}
+        router.post(METRICS).mock(return_value=httpx.Response(200, json=broken))
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.edwin"):
+            body = payload(await get_edwin_alert_volume(edwin))
+
+        assert body["buckets"] == [[1794250800000, 10]]
+        assert body["unreadable"] == [[1794254400000]]
+        assert body["bucketed"] == 10
+        assert "unreadable" in caplog.text
+        assert caplog.records[0].exc_info is not None
+
+    async def test_a_403_is_scope_missing_naming_query_aggregate(self, client):
+        # The scope gate: the read-scope credential (query_records query_record) got
+        # this 403 from /ui/query/metrics in the 2026-11-10 probe.
+        edwin, router = client
+        router.post(METRICS).mock(return_value=httpx.Response(403, json=BODY_403))
+
+        body = payload(await get_edwin_alert_volume(edwin))
+
+        assert body["error"]["code"] == "SCOPE_MISSING"
+        assert body["error"]["errorCategory"] == "permission"
+        assert "query_aggregate" in body["error"]["message"]
+
+    @pytest.mark.parametrize(
+        ("kwargs", "word"), [({"group_by": "severity"}, "group_by"), ({"hours": 0}, "hours")]
+    )
+    async def test_refusals_send_nothing(self, client, kwargs, word):
+        edwin, router = client
+        route = router.post(METRICS).mock(return_value=httpx.Response(200, json=VOLUME_BY_HOUR))
+
+        body = payload(await get_edwin_alert_volume(edwin, **kwargs))
+
+        assert route.call_count == 0
+        assert body["error"]["code"] == "INVALID_REQUEST"
+        assert word in body["error"]["message"]
+
+
+class TestGetEdwinMetadata:
+    async def test_without_a_type_lists_the_29_record_types(self, client):
+        edwin, router = client
+        router.get(f"{HOST}/metadata").mock(return_value=httpx.Response(200, json=METADATA))
+
+        body = payload(await get_edwin_metadata(edwin))
+
+        assert body["count"] == 29
+        assert {"recordType": "alerts", "queryable": True, "fields": 5} in body["record_types"]
+        assert {"recordType": "ml", "queryable": False, "fields": 3} in body["record_types"]
+
+    async def test_a_type_lists_its_fields_without_the_extra_ones(self, client):
+        edwin, router = client
+        router.get(f"{HOST}/metadata").mock(return_value=httpx.Response(200, json=METADATA))
+        alerts = next(r for r in METADATA["records"] if r["recordType"] == "alerts")
+
+        body = payload(await get_edwin_metadata(edwin, record_type="alerts"))
+
+        assert body["recordType"] == "alerts"
+        assert body["attributes"] == alerts["attributes"]
+        assert body["fields"] == alerts["fields"][:3]
+        assert body["extra_fields"] == 2
+        assert "prefix" in body["note"]
+
+    @pytest.mark.parametrize(
+        ("prefix", "names"),
+        [
+            ("extra.", ["extra.lm__lm_resourceid", "extra.lm_a_genurl"]),
+            ("alertDetails.", ["alertDetails.actionedBy", "alertDetails.alertState"]),
+        ],
+    )
+    async def test_a_prefix_narrows_the_fields(self, client, prefix, names):
+        edwin, router = client
+        router.get(f"{HOST}/metadata").mock(return_value=httpx.Response(200, json=METADATA))
+
+        body = payload(await get_edwin_metadata(edwin, record_type="alerts", prefix=prefix))
+
+        assert [field["name"] for field in body["fields"]] == names
+        assert "extra_fields" not in body
+
+    async def test_an_unknown_type_is_refused(self, client):
+        edwin, router = client
+        router.get(f"{HOST}/metadata").mock(return_value=httpx.Response(200, json=METADATA))
+
+        body = payload(await get_edwin_metadata(edwin, record_type="incidents"))
+
+        assert body["error"]["code"] == "INVALID_REQUEST"
+        assert "incidents" in body["error"]["message"]
