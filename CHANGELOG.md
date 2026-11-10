@@ -367,6 +367,16 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   the blast radius' warning about devices whose neighbors could not be read.
 - The `device_health_low` best practice states its condition as a mean |`z_score`| above 3.33
   across a device's `health_check` metrics, where it named the removed health score.
+- `search_tools` searches only the tools the server lists under its settings, after
+  `LM_ENABLED_TOOLS`, `LM_DISABLED_TOOLS`, `LM_MCP_CATEGORIES`, the write gate and single-portal
+  mode, so with writes off it names no write tool; it searched every registered tool and could
+  name one the server refuses. It scores whole words, stemmed and without stopwords, in each
+  tool's name (double weight) and description, each word weighted by how few tools use it,
+  where it matched substrings. `category` takes the keys of the taxonomy
+  `documentation/tools.md` is generated from, and an unknown category is an `INVALID_REQUEST`
+  error where it returned an empty list. The descriptions of `get_devices`, `get_alerts`,
+  `get_alert_rules`, `get_device_data` and `analyze_metric` name the filters and contents
+  those tools already had.
 - `triage` reads its alert window once through `analyze_alerts`, where it read it four times:
   `statistics`, `clusters`, `noise` and `changes` carry that tool's sections, and a failed read
   is one `analyze_alerts failed` warning. `portal_overview` reads its window once for
