@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 246: 242 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 236: 232 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 141 of them, or 145 in
+multi-portal mode. With writes off, the default, `tools/list` shows 131 of them, or 135 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -63,6 +63,12 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   ID, and gives each row's `event` (`change`, `rejected` or `throttled`), `path` and `method`.
   An argument that another kind reads is refused. The filter semantics and the login and API
   token readings come from #63 by GitHub user barunagarwal.
+- `get_datasource`, `get_configsource`, `get_eventsource`, `get_propertysource`,
+  `get_logsource`, `get_topologysource`, `get_diagnosticsource`, `get_remediationsource`,
+  `get_alert_rule` and `get_escalation_chain` take `raw`, which returns the REST object whole,
+  the definition the matching `create_*` tool takes, in place of the summary. `get_dashboard`
+  with `raw` returns the dashboard with its widgets under `widgets_full`, the template
+  `create_dashboard` clones, in place of the dashboard with its portal link.
 
 ### Removed
 
@@ -132,6 +138,16 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `get_login_audit` | `get_audit_logs` with `kind="login"`, which queries the portal login wordings, so a monitored database's "Login failed" line is no longer reported as a failed portal login. `username` matches exact names; `success_only` with `failed_only` is refused. |
 | `get_change_audit` | `get_audit_logs` with `kind="change"`, which reads the change type from `Action=` or the description's leading verb, where the tool kept any entry whose description held create, add, update, delete, remove or modify anywhere. |
 | `get_api_token_audit` | `get_audit_logs` with `kind="api_token"` and `token_id` or `access_id`. It matches `API token <accessId>` in the description, where the tool filtered on an `apiTokenId` field the API does not have. |
+| `export_datasource` | `get_datasource` with `raw=true`, which returns the REST object itself where the tool wrapped it in `definition` beside `datasource_id`, `name` and `format`. |
+| `export_configsource` | `get_configsource` with `raw=true`. |
+| `export_eventsource` | `get_eventsource` with `raw=true`. |
+| `export_propertysource` | `get_propertysource` with `raw=true`. |
+| `export_logsource` | `get_logsource` with `raw=true`. |
+| `export_diagnosticsource` | `get_diagnosticsource` with `raw=true`. |
+| `export_remediationsource` | `get_remediationsource` with `raw=true`. |
+| `export_dashboard` | `get_dashboard` with `raw=true`, which always includes the widgets under `widgets_full`; `include_widgets` leaves. `create_dashboard` still unwraps a file saved from this tool. |
+| `export_alert_rule` | `get_alert_rule` with `raw=true`. |
+| `export_escalation_chain` | `get_escalation_chain` with `raw=true`. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the
@@ -251,6 +267,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Changed
 
+- `update_logicmodule` reads the module's REST object itself, where it called the type's
+  `export_*` tool. `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` gate that read by the type's
+  `get_<type>` name, where they gated it by the `export_<type>` name.
 - With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 101 tools
   whose annotations say they change the portal (`readOnlyHint` false and `openWorldHint` true),
   and a call to one by name returns the write-disabled error. That includes `update_logicmodule`,

@@ -41,7 +41,6 @@ _TITLES = {
     "netscans": "Netscans",
     "ops": "Ops, OIDs, and Services",
     "batchjobs": "Batch Jobs",
-    "exports": "Exports",
     "imports": "Imports",
     "ingestion": "Ingestion",
     "otlp_metrics": "OTLP Metrics",

@@ -107,7 +107,7 @@ async def create_configsource(
 ) -> list[TextContent]:
     """Create a ConfigSource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_configsource).
+    Accepts REST API format (the format get_configsource returns with raw=true).
     Use this for creating ConfigSources from exported definitions or from
     scratch. For LM Exchange format imports, use import_configsource instead.
 
@@ -211,18 +211,22 @@ async def update_configsource(
 async def get_configsource(
     client: LogicMonitorClient,
     configsource_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific ConfigSource.
 
     Args:
         client: LogicMonitor API client.
         configsource_id: ConfigSource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with ConfigSource details or error.
     """
     try:
         result = await client.get(f"/setting/configsources/{configsource_id}")
+        if raw:
+            return format_response(result)
 
         source = {
             "id": result.get("id"),

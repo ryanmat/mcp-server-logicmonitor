@@ -69,14 +69,14 @@ class TestFilterTools:
 
     def test_enabled_multiple_patterns(self):
         """Multiple glob patterns in enabled list work together."""
-        config = _MockConfig(enabled_tools="get_devices,get_alerts,export_*")
+        config = _MockConfig(enabled_tools="get_devices,get_alerts,import_*")
         result = _filter_tools(TOOLS, config)
         names = {t.name for t in result}
         assert "get_devices" in names
         assert "get_alerts" in names
-        # Should include export tools
-        export_tools = [n for n in names if n.startswith("export_")]
-        assert len(export_tools) > 0
+        # Should include import tools
+        import_tools = [n for n in names if n.startswith("import_")]
+        assert len(import_tools) > 0
         # Should NOT include other tools
         assert "create_device" not in names
 

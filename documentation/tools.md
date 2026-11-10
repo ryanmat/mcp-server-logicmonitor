@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 246 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 236 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -143,7 +143,7 @@ DataSource and instance monitoring
 | `get_graph_data` | Get graph image data for visualization | No |
 | `get_datasources` | List datasources from LogicMonitor | No |
 | `get_datasource` | Get details about a specific datasource | No |
-| `create_datasource` | Create a DataSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_datasource output). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_datasource. Script DataSource datapoints require appropriate type values. | Yes |
+| `create_datasource` | Create a DataSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_datasource with raw=true). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_datasource. Script DataSource datapoints require appropriate type values. | Yes |
 | `delete_datasource` | Delete a DataSource definition (requires write permission). Existing collected data is retained. | Yes |
 
 ## Dashboards
@@ -285,7 +285,7 @@ LogicModule definitions (ConfigSource, EventSource, etc.)
 |------|-------------|-------|
 | `get_configsources` | List ConfigSources | No |
 | `get_configsource` | Get details about a specific ConfigSource | No |
-| `create_configsource` | Create a ConfigSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_configsource output). For LM Exchange format, use import_configsource. | Yes |
+| `create_configsource` | Create a ConfigSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_configsource with raw=true). For LM Exchange format, use import_configsource. | Yes |
 | `delete_configsource` | Delete a ConfigSource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_configsource_update_reasons` | Get update history and audit trail for a ConfigSource | No |
 | `get_device_config` | List config versions collected for a device instance | No |
@@ -293,13 +293,13 @@ LogicModule definitions (ConfigSource, EventSource, etc.)
 | `collect_device_config` | Trigger an on-demand config collection for a device instance | Yes |
 | `get_eventsources` | List EventSources | No |
 | `get_eventsource` | Get details about a specific EventSource | No |
-| `create_eventsource` | Create an EventSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_eventsource output). For LM Exchange format, use import_eventsource. | Yes |
+| `create_eventsource` | Create an EventSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_eventsource with raw=true). For LM Exchange format, use import_eventsource. | Yes |
 | `delete_eventsource` | Delete an EventSource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_device_eventsources` | Get EventSources applied to a device (resource). Returns device-level EventSource associations. | No |
 | `update_device_eventsource` | Update a device-level EventSource association (requires write permission). Use to enable or disable alerting for an EventSource on a specific device. | Yes |
 | `get_propertysources` | List PropertySources | No |
 | `get_propertysource` | Get details about a specific PropertySource | No |
-| `create_propertysource` | Create a PropertySource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_propertysource output). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_propertysource. | Yes |
+| `create_propertysource` | Create a PropertySource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_propertysource with raw=true). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_propertysource. | Yes |
 | `delete_propertysource` | Delete a PropertySource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_topologysources` | List TopologySources | No |
 | `get_topologysource` | Get details about a specific TopologySource | No |
@@ -307,7 +307,7 @@ LogicModule definitions (ConfigSource, EventSource, etc.)
 | `delete_topologysource` | Delete a TopologySource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_logsources` | List LogSources | No |
 | `get_logsource` | Get details about a specific LogSource | No |
-| `create_logsource` | Create a LogSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_logsource output). For LM Exchange format, use import_logsource. | Yes |
+| `create_logsource` | Create a LogSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_logsource with raw=true). For LM Exchange format, use import_logsource. | Yes |
 | `delete_logsource` | Delete a LogSource definition (requires write permission). Existing collected data is retained. | Yes |
 | `get_device_logsources` | Get LogSources applied to a device (resource) | No |
 
@@ -349,36 +349,19 @@ Batch job monitoring
 | `get_device_batchjobs` | List BatchJob datasources applied to a device (resource); per-run output lives in instance data via get_device_data | No |
 | `get_scheduled_downtime_jobs` | Get batch jobs related to SDT automation | No |
 
-## Exports
-
-Export LogicModule definitions as JSON
-
-| Tool | Description | Write |
-|------|-------------|-------|
-| `export_datasource` | Export a datasource definition (REST API format). Output can be used with create_datasource. | No |
-| `export_dashboard` | Export a dashboard definition | No |
-| `export_alert_rule` | Export an alert rule definition | No |
-| `export_escalation_chain` | Export an escalation chain definition | No |
-| `export_configsource` | Export a ConfigSource definition (REST API format). Output can be used with create_configsource. | No |
-| `export_eventsource` | Export an EventSource definition (REST API format). Output can be used with create_eventsource. | No |
-| `export_propertysource` | Export a PropertySource definition (REST API format). Output can be used with create_propertysource. | No |
-| `export_logsource` | Export a LogSource definition (REST API format). Output can be used with create_logsource. | No |
-| `export_diagnosticsource` | Export a DiagnosticSource definition (REST API format). Output can be used with create_diagnosticsource. | No |
-| `export_remediationsource` | Export a RemediationSource definition (REST API format). Output can be used with create_remediationsource. | No |
-
 ## Imports
 
 Import LogicModule definitions from JSON
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `import_datasource` | Import a DataSource from LM Exchange JSON format via multipart upload (requires write permission). This expects LM Exchange format, not REST API format. For REST API format definitions (e.g., from export_datasource), use create_datasource instead. | Yes |
-| `import_configsource` | Import a ConfigSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_configsource), use create_configsource instead. | Yes |
-| `import_eventsource` | Import an EventSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_eventsource), use create_eventsource instead. | Yes |
-| `import_propertysource` | Import a PropertySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_propertysource), use create_propertysource instead. | Yes |
-| `import_logsource` | Import a LogSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_logsource), use create_logsource instead. | Yes |
+| `import_datasource` | Import a DataSource from LM Exchange JSON format via multipart upload (requires write permission). This expects LM Exchange format, not REST API format. For REST API format definitions (e.g., from get_datasource with raw=true), use create_datasource instead. | Yes |
+| `import_configsource` | Import a ConfigSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_configsource with raw=true), use create_configsource instead. | Yes |
+| `import_eventsource` | Import an EventSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_eventsource with raw=true), use create_eventsource instead. | Yes |
+| `import_propertysource` | Import a PropertySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_propertysource with raw=true), use create_propertysource instead. | Yes |
+| `import_logsource` | Import a LogSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_logsource with raw=true), use create_logsource instead. | Yes |
 | `import_topologysource` | Import a TopologySource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions, use create_topologysource instead. | Yes |
-| `import_diagnosticsource` | Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from export_diagnosticsource), use create_diagnosticsource instead. | Yes |
+| `import_diagnosticsource` | Import a DiagnosticSource from LM Exchange JSON format via multipart upload (requires write permission). For REST API format definitions (e.g., from get_diagnosticsource with raw=true), use create_diagnosticsource instead. | Yes |
 | `import_jobmonitor` | Import a JobMonitor from JSON (requires write permission) | Yes |
 | `import_appliesto_function` | Import an AppliesTo function from JSON (requires write permission) | Yes |
 
@@ -476,9 +459,9 @@ Diagnostic sources, remediation sources, and remediation execution.
 | `get_diagnostic_remediation_results` | Get structured execution results for diagnostic and remediation source runs: status, trigger type, executor, script output, and timing. Provide exactly one of alert_id or host_id. Time window params are epoch milliseconds; result timestamps are epoch seconds. | No |
 | `execute_remediation` | Execute a RemediationSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Requires write permission. | Yes |
 | `execute_diagnostic` | Execute a DiagnosticSource script on a target device. Performs pre-execution checks (collector version, device status, script review) before triggering manual execution. Poll get_diagnostic_remediation_results for status and output. Requires write permission. | Yes |
-| `create_diagnosticsource` | Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_diagnosticsource output). For LM Exchange format, use import_diagnosticsource. | Yes |
+| `create_diagnosticsource` | Create a DiagnosticSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_diagnosticsource with raw=true). For LM Exchange format, use import_diagnosticsource. | Yes |
 | `delete_diagnosticsource` | Delete a DiagnosticSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
-| `create_remediationsource` | Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as export_remediationsource output). RemediationSources have no LM Exchange import endpoint. | Yes |
+| `create_remediationsource` | Create a RemediationSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_remediationsource with raw=true). RemediationSources have no LM Exchange import endpoint. | Yes |
 | `delete_remediationsource` | Delete a RemediationSource definition (requires write permission). Action chains referencing it lose that stage. | Yes |
 
 ## Actions

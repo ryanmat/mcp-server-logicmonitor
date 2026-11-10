@@ -1,5 +1,5 @@
 # Description: Tests for update_logicmodule and its helpers (_deep_merge, _diff).
-# Description: Validates the export-modify-update workflow against full-replace blanking.
+# Description: Validates the read-modify-update workflow against full-replace blanking.
 
 from __future__ import annotations
 
@@ -111,7 +111,7 @@ class TestDiff:
 
 @pytest.fixture
 def patched_handlers(monkeypatch):
-    """Patch get_tool_handler to return a mock export handler, and every type's PUT to a mock.
+    """Patch the internal raw read to a mock, and every type's PUT to a mock.
 
     Also configures the env so check_required_tools can build LMConfig
     without raising on missing portal/auth.
@@ -126,20 +126,15 @@ def patched_handlers(monkeypatch):
 
     reset_config()
 
-    export_mock = AsyncMock()
+    read_mock = AsyncMock()
     update_mock = AsyncMock()
 
-    def fake_get_tool_handler(name):
-        if name.startswith("export_"):
-            return export_mock
-        raise ValueError(f"unexpected handler: {name}")
+    import lm_mcp.tools.workflows as workflows
 
-    import lm_mcp.registry as registry
-
-    monkeypatch.setattr(registry, "get_tool_handler", fake_get_tool_handler)
-    for module_type, (export_name, _, id_arg, required) in list(_LM_TYPES.items()):
-        monkeypatch.setitem(_LM_TYPES, module_type, (export_name, update_mock, id_arg, required))
-    yield export_mock, update_mock
+    monkeypatch.setattr(workflows, "_get_module_raw", read_mock)
+    for module_type, (path, _, id_arg, required) in list(_LM_TYPES.items()):
+        monkeypatch.setitem(_LM_TYPES, module_type, (path, update_mock, id_arg, required))
+    yield read_mock, update_mock
     reset_config()
 
 
@@ -179,15 +174,8 @@ class TestUpdateLogicmodule:
         assert "changes must be a dict" in text
 
     async def test_preview_returns_diff_no_update_call(self, patched_handlers):
-        export_mock, update_mock = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {"name": "DS", "displayName": "Old Display"},
-            }
-        )
+        read_mock, update_mock = patched_handlers
+        read_mock.return_value = {"name": "DS", "displayName": "Old Display"}
 
         result = await update_logicmodule(
             client=None,
@@ -197,7 +185,7 @@ class TestUpdateLogicmodule:
             mode="preview",
         )
 
-        assert export_mock.await_count == 1
+        assert read_mock.await_count == 1
         assert update_mock.await_count == 0  # preview must not write
         payload = json.loads(result[0].text)
         assert payload["dry_run"] is True
@@ -205,15 +193,8 @@ class TestUpdateLogicmodule:
         assert any(d["path"] == "displayName" and d["op"] == "change" for d in payload["diff"])
 
     async def test_apply_calls_update_handler(self, patched_handlers):
-        export_mock, update_mock = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {"name": "DS", "displayName": "Old"},
-            }
-        )
+        read_mock, update_mock = patched_handlers
+        read_mock.return_value = {"name": "DS", "displayName": "Old"}
         update_mock.return_value = _wrap(
             {"success": True, "datasource": {"id": 1, "name": "DS", "display_name": "New"}}
         )
@@ -226,7 +207,7 @@ class TestUpdateLogicmodule:
             mode="apply",
         )
 
-        assert export_mock.await_count == 1
+        assert read_mock.await_count == 1
         assert update_mock.await_count == 1
         # Verify the merged definition was passed to the update handler
         call_kwargs = update_mock.await_args.kwargs
@@ -239,16 +220,9 @@ class TestUpdateLogicmodule:
         assert payload["result"]["success"] is True
 
     async def test_missing_name_field_rejected(self, patched_handlers):
-        export_mock, _ = patched_handlers
-        # Export returns a definition with no name field — simulate broken export
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": None,
-                "format": "json",
-                "definition": {"displayName": "X"},  # missing 'name'
-            }
-        )
+        read_mock, _ = patched_handlers
+        # The read returns a definition with no name field, as a broken module would
+        read_mock.return_value = {"displayName": "X"}  # missing 'name'
 
         result = await update_logicmodule(
             client=None, type="datasource", id=1, changes={}, mode="preview"
@@ -258,15 +232,8 @@ class TestUpdateLogicmodule:
         assert "missing required field 'name'" in text
 
     async def test_missing_display_name_field_rejected(self, patched_handlers):
-        export_mock, _ = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {"name": "DS"},  # missing displayName
-            }
-        )
+        read_mock, _ = patched_handlers
+        read_mock.return_value = {"name": "DS"}  # missing displayName
 
         result = await update_logicmodule(
             client=None, type="datasource", id=1, changes={}, mode="preview"
@@ -275,17 +242,10 @@ class TestUpdateLogicmodule:
         assert is_error_result(result)
         assert "missing required field 'displayName'" in text
 
-    async def test_falsy_definition_unwrap_handled(self, patched_handlers):
-        """Empty dict definition is falsy in Python — must not fall through to envelope."""
-        export_mock, update_mock = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {},  # falsy! must still unwrap, not fall back to envelope
-            }
-        )
+    async def test_an_empty_definition_merges_only_the_changes(self, patched_handlers):
+        """An empty REST object merges to the changes alone, with nothing else added."""
+        read_mock, update_mock = patched_handlers
+        read_mock.return_value = {}
 
         result = await update_logicmodule(
             client=None,
@@ -295,23 +255,14 @@ class TestUpdateLogicmodule:
             mode="preview",
         )
 
-        # The merged definition should be {"name": "DS", "displayName": "DS"},
-        # NOT the envelope wrapper. If the unwrap was wrong, we'd see
-        # "datasource_id", "format" keys leaking into the merged definition.
+        # The merged definition should be {"name": "DS", "displayName": "DS"}.
         payload = json.loads(result[0].text)
         assert payload["merged_field_count"] == 2  # only the two changes
         assert update_mock.await_count == 0
 
     async def test_audit_log_attempting_then_applied_on_success(self, patched_handlers, caplog):
-        export_mock, update_mock = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {"name": "DS", "displayName": "Old"},
-            }
-        )
+        read_mock, update_mock = patched_handlers
+        read_mock.return_value = {"name": "DS", "displayName": "Old"}
         update_mock.return_value = _wrap({"success": True})
 
         with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
@@ -329,15 +280,8 @@ class TestUpdateLogicmodule:
 
     async def test_audit_log_attempting_no_applied_on_error(self, patched_handlers, caplog):
         """When update fails, the audit log MUST NOT claim success."""
-        export_mock, update_mock = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {"name": "DS", "displayName": "Old"},
-            }
-        )
+        read_mock, update_mock = patched_handlers
+        read_mock.return_value = {"name": "DS", "displayName": "Old"}
         # Simulate update failure
         update_mock.return_value = _wrap(
             {"error": True, "code": "API_ERROR", "message": "PUT failed"}
@@ -383,15 +327,8 @@ class TestApplyPassesConfirm:
     """
 
     async def test_apply_forwards_confirm_true(self, patched_handlers):
-        export_mock, update_mock = patched_handlers
-        export_mock.return_value = _wrap(
-            {
-                "datasource_id": 1,
-                "name": "DS",
-                "format": "json",
-                "definition": {"name": "DS", "displayName": "Old"},
-            }
-        )
+        read_mock, update_mock = patched_handlers
+        read_mock.return_value = {"name": "DS", "displayName": "Old"}
         update_mock.return_value = _wrap({"success": True})
 
         from lm_mcp.tools.workflows import update_logicmodule
@@ -506,8 +443,8 @@ async def test_display_name_is_required_only_where_the_api_model_has_it(
     patched_handlers, module_type, needs_display_name
 ):
     """Only DataSource and ConfigSource bodies carry displayName (swagger and a live read)."""
-    export_mock, _ = patched_handlers
-    export_mock.return_value = _wrap({"definition": {"name": "M"}})
+    read_mock, _ = patched_handlers
+    read_mock.return_value = {"name": "M"}
 
     result = await update_logicmodule(client=None, type=module_type, id=1, changes={})
 
@@ -515,11 +452,11 @@ async def test_display_name_is_required_only_where_the_api_model_has_it(
     assert refused is needs_display_name
 
 
-async def test_an_allowlist_needs_only_the_export_tool(patched_handlers, monkeypatch):
-    """The PUT handler is no tool, so LM_ENABLED_TOOLS gates the read alone."""
-    monkeypatch.setenv("LM_ENABLED_TOOLS", "update_logicmodule,export_datasource")
-    export_mock, _ = patched_handlers
-    export_mock.return_value = _wrap({"definition": {"name": "DS", "displayName": "DS"}})
+async def test_an_allowlist_needs_only_the_getter(patched_handlers, monkeypatch):
+    """The read and the PUT are no tools; LM_ENABLED_TOOLS gates the read by the getter's name."""
+    monkeypatch.setenv("LM_ENABLED_TOOLS", "update_logicmodule,get_datasource")
+    read_mock, _ = patched_handlers
+    read_mock.return_value = {"name": "DS", "displayName": "DS"}
 
     result = await update_logicmodule(client=None, type="datasource", id=1, changes={})
 
@@ -547,3 +484,44 @@ class TestRawUpdatesLeaveTheSurface:
         error = envelope(result)
         assert error["code"] == "INVALID_REQUEST"
         assert error["message"] == "Unknown tool: update_datasource"
+
+
+_SETTINGS_PATHS = {
+    "configsource": "configsources",
+    "datasource": "datasources",
+    "diagnosticsource": "diagnosticsources",
+    "eventsource": "eventsources",
+    "logsource": "logsources",
+    "propertysource": "propertyrules",
+    "remediationsource": "remediationsources",
+    "topologysource": "topologysources",
+}
+
+
+@respx.mock
+@pytest.mark.parametrize(("module_type", "path"), sorted(_SETTINGS_PATHS.items()))
+async def test_the_read_is_one_get_on_the_settings_path_not_a_sub_tool(
+    lm_client, writes_on, monkeypatch, module_type, path
+):
+    """R2.3: update_logicmodule reads the REST object itself; no registered tool is called."""
+    import lm_mcp.registry as registry
+
+    def no_sub_tool(name):
+        raise AssertionError(f"update_logicmodule called the tool {name}")
+
+    monkeypatch.setattr(registry, "get_tool_handler", no_sub_tool)
+    body = {"id": 1, "name": "M", "displayName": "M", "description": "before"}
+    get = respx.get(f"https://test.logicmonitor.com/santaba/rest/setting/{path}/1").mock(
+        return_value=httpx.Response(200, json=body)
+    )
+
+    result = await update_logicmodule(
+        lm_client, type=module_type, id=1, changes={"description": "after"}
+    )
+
+    payload = json.loads(result[0].text)
+    assert get.call_count == 1
+    assert payload["dry_run"] is True
+    assert payload["diff"] == [
+        {"path": "description", "op": "change", "before": "before", "after": "after"}
+    ]

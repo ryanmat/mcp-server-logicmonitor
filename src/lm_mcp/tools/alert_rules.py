@@ -69,18 +69,22 @@ async def get_alert_rules(
 async def get_alert_rule(
     client: LogicMonitorClient,
     rule_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get detailed information about a specific alert rule.
 
     Args:
         client: LogicMonitor API client.
         rule_id: Alert rule ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with alert rule details or error.
     """
     try:
         result = await client.get(f"/setting/alert/rules/{rule_id}")
+        if raw:
+            return format_response(result)
 
         rule = {
             "id": result.get("id"),

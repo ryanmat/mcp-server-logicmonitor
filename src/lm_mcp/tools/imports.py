@@ -1,5 +1,5 @@
-# Description: Import/Export tools for LogicMonitor MCP server.
-# Description: Provides export functionality for LogicModules.
+# Description: LogicModule import tools for LogicMonitor MCP server.
+# Description: Uploads LM Exchange JSON and redirects REST-format definitions to create_*.
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def _import_result_response(result: dict, *, extra: dict | None = None) -> list[
     return format_response(payload)
 
 
-# LogicModule type -> the REST-format create_* tool that handles an exported definition.
+# LogicModule type -> the REST-format create_* tool that handles a raw REST definition.
 # jobmonitor and appliesto_function have no create_* counterpart.
 _CREATE_COUNTERPART: dict[str, str] = {
     "datasource": "create_datasource",
@@ -73,7 +73,7 @@ def _import_error_response(error: Exception, module_type: str) -> list[TextConte
     """Redirect a REST-format / wrong-type import failure to the matching create_* tool.
 
     import_* accepts only LM Exchange JSON. Feeding it a REST API definition (from
-    export_<type> or the API) makes the importjson endpoint reject it with "does not
+    get_<type> with raw=true or the API) makes the importjson endpoint reject it with "does not
     match the expected module type"; the actionable fix is the create_* tool, so the
     message names it instead of returning the generic HTTP 400.
     """
@@ -81,8 +81,8 @@ def _import_error_response(error: Exception, module_type: str) -> list[TextConte
         create_tool = _CREATE_COUNTERPART.get(module_type)
         if create_tool:
             suggestion = (
-                f"If this definition came from export_{module_type} or the REST API it is "
-                f"REST format -- use {create_tool} with the same definition. "
+                f"If this definition came from get_{module_type} with raw=true or the REST API, "
+                f"it is REST format -- use {create_tool} with the same definition. "
                 f"import_{module_type} accepts only LM Exchange JSON (the portal's "
                 "'LM Exchange' export or a community module)."
             )
@@ -160,247 +160,6 @@ if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 
-async def export_datasource(
-    client: LogicMonitorClient,
-    datasource_id: int,
-) -> list[TextContent]:
-    """Export a DataSource definition as JSON via REST API.
-
-    Returns the REST API representation of the DataSource. This format differs
-    from LM Exchange format used by import endpoints. To import into another
-    portal, use LM Exchange export from the portal UI instead.
-
-    Args:
-        client: LogicMonitor API client.
-        datasource_id: DataSource ID to export.
-
-    Returns:
-        List of TextContent with full DataSource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/datasources/{datasource_id}")
-        return format_response(
-            {
-                "datasource_id": datasource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_eventsource(
-    client: LogicMonitorClient,
-    eventsource_id: int,
-) -> list[TextContent]:
-    """Export an EventSource definition as JSON via REST API.
-
-    Returns the REST API representation. This format differs from LM Exchange
-    format used by import endpoints.
-
-    Args:
-        client: LogicMonitor API client.
-        eventsource_id: EventSource ID to export.
-
-    Returns:
-        List of TextContent with full EventSource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/eventsources/{eventsource_id}")
-        return format_response(
-            {
-                "eventsource_id": eventsource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_configsource(
-    client: LogicMonitorClient,
-    configsource_id: int,
-) -> list[TextContent]:
-    """Export a ConfigSource definition as JSON via REST API.
-
-    Returns the REST API representation. This format differs from LM Exchange
-    format used by import endpoints.
-
-    Args:
-        client: LogicMonitor API client.
-        configsource_id: ConfigSource ID to export.
-
-    Returns:
-        List of TextContent with full ConfigSource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/configsources/{configsource_id}")
-        return format_response(
-            {
-                "configsource_id": configsource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_propertysource(
-    client: LogicMonitorClient,
-    propertysource_id: int,
-) -> list[TextContent]:
-    """Export a PropertySource definition as JSON via REST API.
-
-    Returns the REST API representation. This format differs from LM Exchange
-    format used by import endpoints.
-
-    Args:
-        client: LogicMonitor API client.
-        propertysource_id: PropertySource ID to export.
-
-    Returns:
-        List of TextContent with full PropertySource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/propertyrules/{propertysource_id}")
-        return format_response(
-            {
-                "propertysource_id": propertysource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_logsource(
-    client: LogicMonitorClient,
-    logsource_id: int,
-) -> list[TextContent]:
-    """Export a LogSource definition as JSON via REST API.
-
-    Returns the REST API representation. This format differs from LM Exchange
-    format used by import endpoints.
-
-    Args:
-        client: LogicMonitor API client.
-        logsource_id: LogSource ID to export.
-
-    Returns:
-        List of TextContent with full LogSource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/logsources/{logsource_id}")
-        return format_response(
-            {
-                "logsource_id": logsource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_dashboard(
-    client: LogicMonitorClient,
-    dashboard_id: int,
-    include_widgets: bool = True,
-) -> list[TextContent]:
-    """Export a Dashboard definition as JSON including widgets.
-
-    Args:
-        client: LogicMonitor API client.
-        dashboard_id: Dashboard ID to export.
-        include_widgets: Whether to include widget definitions.
-
-    Returns:
-        List of TextContent with full Dashboard definition or error.
-    """
-    try:
-        dashboard = await client.get(f"/dashboard/dashboards/{dashboard_id}")
-
-        if include_widgets:
-            widgets_result = await client.get(
-                f"/dashboard/dashboards/{dashboard_id}/widgets", params={"size": 1000}
-            )
-            dashboard["widgets_full"] = widgets_result.get("items", [])
-
-        return format_response(
-            {
-                "dashboard_id": dashboard_id,
-                "name": dashboard.get("name"),
-                "format": "json",
-                "definition": dashboard,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_alert_rule(
-    client: LogicMonitorClient,
-    alert_rule_id: int,
-) -> list[TextContent]:
-    """Export an Alert Rule definition as JSON.
-
-    Args:
-        client: LogicMonitor API client.
-        alert_rule_id: Alert Rule ID to export.
-
-    Returns:
-        List of TextContent with full Alert Rule definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/alert/rules/{alert_rule_id}")
-        return format_response(
-            {
-                "alert_rule_id": alert_rule_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
-async def export_escalation_chain(
-    client: LogicMonitorClient,
-    escalation_chain_id: int,
-) -> list[TextContent]:
-    """Export an Escalation Chain definition as JSON.
-
-    Args:
-        client: LogicMonitor API client.
-        escalation_chain_id: Escalation Chain ID to export.
-
-    Returns:
-        List of TextContent with full Escalation Chain definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/alert/chains/{escalation_chain_id}")
-        return format_response(
-            {
-                "escalation_chain_id": escalation_chain_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
 @require_write_permission
 async def import_datasource(
     client: LogicMonitorClient,
@@ -411,7 +170,8 @@ async def import_datasource(
     """Import a DataSource from LM Exchange JSON definition via multipart upload.
 
     Expects LM Exchange format (different from REST API format). For REST API
-    format definitions (e.g., from export_datasource), use create_datasource instead.
+    format definitions (e.g., from get_datasource with raw=true), use create_datasource
+    instead.
 
     Args:
         client: LogicMonitor API client.
@@ -653,36 +413,6 @@ async def import_appliesto_function(
         return _import_error_response(e, "appliesto_function")
 
 
-async def export_diagnosticsource(
-    client: LogicMonitorClient,
-    diagnosticsource_id: int,
-) -> list[TextContent]:
-    """Export a DiagnosticSource definition as JSON via REST API.
-
-    Returns the REST API representation. This format differs from LM Exchange
-    format used by import endpoints.
-
-    Args:
-        client: LogicMonitor API client.
-        diagnosticsource_id: DiagnosticSource ID to export.
-
-    Returns:
-        List of TextContent with full DiagnosticSource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/diagnosticsources/{diagnosticsource_id}")
-        return format_response(
-            {
-                "diagnosticsource_id": diagnosticsource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
-
-
 @require_write_permission
 async def import_diagnosticsource(
     client: LogicMonitorClient,
@@ -712,33 +442,3 @@ async def import_diagnosticsource(
         return _import_result_response(result)
     except Exception as e:
         return _import_error_response(e, "diagnosticsource")
-
-
-async def export_remediationsource(
-    client: LogicMonitorClient,
-    remediationsource_id: int,
-) -> list[TextContent]:
-    """Export a RemediationSource definition as JSON via REST API.
-
-    Returns the REST API representation. RemediationSources have no LM
-    Exchange import endpoint; use create_remediationsource with this output.
-
-    Args:
-        client: LogicMonitor API client.
-        remediationsource_id: RemediationSource ID to export.
-
-    Returns:
-        List of TextContent with full RemediationSource definition or error.
-    """
-    try:
-        result = await client.get(f"/setting/remediationsources/{remediationsource_id}")
-        return format_response(
-            {
-                "remediationsource_id": remediationsource_id,
-                "name": result.get("name"),
-                "format": "json",
-                "definition": result,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)

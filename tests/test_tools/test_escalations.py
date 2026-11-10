@@ -413,3 +413,38 @@ class TestGetRecipientGroup:
         assert group["name"] == "Team A"
         assert len(group["recipients"]) == 1
         assert group["recipients"][0]["address"] == "a@example.com"
+
+
+class TestGetEscalationChainRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.escalations import get_escalation_chain
+
+        body = {
+            "id": 100,
+            "name": "Primary On-Call",
+            "enableThrottling": True,
+            "throttlingPeriod": 10,
+            "throttlingAlerts": 5,
+            "inAlerting": False,
+            "destinations": [
+                {
+                    "type": "single",
+                    "period": 15,
+                    "stages": [{"type": "admin", "addr": "oncall@example.com"}],
+                }
+            ],
+            "ccDestinations": [],
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/alert/chains/100").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_escalation_chain(client, chain_id=100, raw=True))[0].text)
+        projected = json.loads((await get_escalation_chain(client, chain_id=100))[0].text)
+
+        assert raw == body
+        assert "enableThrottling" not in projected
+        assert projected["enable_throttling"] == body["enableThrottling"]

@@ -590,3 +590,30 @@ class TestDeleteDiagnosticSource:
         result = await delete_diagnosticsource(client, diagnosticsource_id=999)
 
         assert "error" in result[0].text.lower()
+
+
+class TestGetDiagnosticsourceRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.diagnosticsources import get_diagnosticsource
+
+        body = {
+            "id": 10,
+            "name": "Top CPU",
+            "displayName": "Top CPU",
+            "appliesTo": "isLinux()",
+            "groovyScript": "println 'top'",
+            "scriptType": "groovy",
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/diagnosticsources/10").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_diagnosticsource(client, source_id=10, raw=True))[0].text)
+        projected = json.loads((await get_diagnosticsource(client, source_id=10))[0].text)
+
+        assert raw == body
+        assert "displayName" not in projected
+        assert projected["display_name"] == body["displayName"]

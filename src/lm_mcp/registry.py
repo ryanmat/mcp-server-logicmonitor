@@ -17,9 +17,6 @@ _WRITE = ToolAnnotations(
 _DELETE = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
 )
-_EXPORT = ToolAnnotations(
-    readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
-)
 _IMPORT = ToolAnnotations(
     readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
 )
@@ -1081,6 +1078,13 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "dashboard_id": {"type": "integer", "description": "Dashboard ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Return the REST object with its widgets under "
+                        "widgets_full, the template create_dashboard clones, instead of the "
+                        "object with its portal link",
+                    },
                 },
                 "required": ["dashboard_id"],
             },
@@ -1140,13 +1144,13 @@ TOOLS.extend(
                     "template": {
                         "type": "object",
                         "description": "Full dashboard definition to clone from "
-                        "(from export_dashboard). Name is overridden, id is stripped.",
+                        "(from get_dashboard with raw=true). Name is overridden, id is stripped.",
                     },
                     "template_path": {
                         "type": "string",
                         "description": "Path to a local JSON file holding the dashboard "
-                        "definition or an export_dashboard envelope; loaded by reference so "
-                        "a large export stays out of context. Ignored if template is set.",
+                        "definition, or a 4.3.0 export_dashboard envelope; loaded by reference so "
+                        "a large definition stays out of context. Ignored if template is set.",
                     },
                 },
                 "required": ["name"],
@@ -1714,6 +1718,12 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "chain_id": {"type": "integer", "description": "Escalation chain ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Return the full REST object (every field the API returns) "
+                        "instead of the summary",
+                    },
                 },
                 "required": ["chain_id"],
             },
@@ -2217,6 +2227,12 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "rule_id": {"type": "integer", "description": "Alert rule ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Return the full REST object (every field the API returns) "
+                        "instead of the summary",
+                    },
                 },
                 "required": ["rule_id"],
             },
@@ -2610,6 +2626,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "datasource_id": {"type": "integer", "description": "Datasource ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_datasource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["datasource_id"],
             },
@@ -2618,7 +2642,7 @@ TOOLS.extend(
             name="create_datasource",
             description="Create a DataSource via REST API from a full definition dict "
             "(requires write permission). Accepts REST API format (same as "
-            "export_datasource output). Use for round-tripping exports or building "
+            "get_datasource with raw=true). Use for round-tripping exports or building "
             "definitions from scratch. For LM Exchange format, use import_datasource. "
             "Script DataSource datapoints require appropriate type values.",
             annotations=_WRITE,
@@ -2691,6 +2715,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "configsource_id": {"type": "integer", "description": "ConfigSource ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_configsource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["configsource_id"],
             },
@@ -2809,6 +2841,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "eventsource_id": {"type": "integer", "description": "EventSource ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_eventsource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["eventsource_id"],
             },
@@ -2886,6 +2926,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "propertysource_id": {"type": "integer", "description": "PropertySource ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_propertysource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["propertysource_id"],
             },
@@ -2920,6 +2968,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "topologysource_id": {"type": "integer", "description": "TopologySource ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_topologysource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["topologysource_id"],
             },
@@ -2954,6 +3010,14 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "logsource_id": {"type": "integer", "description": "LogSource ID"},
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_logsource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["logsource_id"],
             },
@@ -3640,151 +3704,15 @@ TOOLS.extend(
     ]
 )
 
-# Imports/Exports
+# Imports
 TOOLS.extend(
     [
-        Tool(
-            name="export_datasource",
-            description="Export a datasource definition (REST API format). "
-            "Output can be used with create_datasource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "datasource_id": {"type": "integer", "description": "Datasource ID"},
-                },
-                "required": ["datasource_id"],
-            },
-        ),
-        Tool(
-            name="export_dashboard",
-            description="Export a dashboard definition",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "dashboard_id": {"type": "integer", "description": "Dashboard ID"},
-                },
-                "required": ["dashboard_id"],
-            },
-        ),
-        Tool(
-            name="export_alert_rule",
-            description="Export an alert rule definition",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "alert_rule_id": {"type": "integer", "description": "Alert rule ID"},
-                },
-                "required": ["alert_rule_id"],
-            },
-        ),
-        Tool(
-            name="export_escalation_chain",
-            description="Export an escalation chain definition",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "escalation_chain_id": {
-                        "type": "integer",
-                        "description": "Escalation chain ID",
-                    },
-                },
-                "required": ["escalation_chain_id"],
-            },
-        ),
-        Tool(
-            name="export_configsource",
-            description="Export a ConfigSource definition (REST API format). "
-            "Output can be used with create_configsource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "configsource_id": {"type": "integer", "description": "ConfigSource ID"},
-                },
-                "required": ["configsource_id"],
-            },
-        ),
-        Tool(
-            name="export_eventsource",
-            description="Export an EventSource definition (REST API format). "
-            "Output can be used with create_eventsource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "eventsource_id": {"type": "integer", "description": "EventSource ID"},
-                },
-                "required": ["eventsource_id"],
-            },
-        ),
-        Tool(
-            name="export_propertysource",
-            description="Export a PropertySource definition (REST API format). "
-            "Output can be used with create_propertysource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "propertysource_id": {"type": "integer", "description": "PropertySource ID"},
-                },
-                "required": ["propertysource_id"],
-            },
-        ),
-        Tool(
-            name="export_logsource",
-            description="Export a LogSource definition (REST API format). "
-            "Output can be used with create_logsource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "logsource_id": {"type": "integer", "description": "LogSource ID"},
-                },
-                "required": ["logsource_id"],
-            },
-        ),
-        Tool(
-            name="export_diagnosticsource",
-            description="Export a DiagnosticSource definition (REST API format). "
-            "Output can be used with create_diagnosticsource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "diagnosticsource_id": {
-                        "type": "integer",
-                        "description": "DiagnosticSource ID",
-                    },
-                },
-                "required": ["diagnosticsource_id"],
-            },
-        ),
-        Tool(
-            name="export_remediationsource",
-            description="Export a RemediationSource definition (REST API format). "
-            "Output can be used with create_remediationsource.",
-            annotations=_EXPORT,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "remediationsource_id": {
-                        "type": "integer",
-                        "description": "RemediationSource ID",
-                    },
-                },
-                "required": ["remediationsource_id"],
-            },
-        ),
         Tool(
             name="import_datasource",
             description="Import a DataSource from LM Exchange JSON format via "
             "multipart upload (requires write permission). This expects LM Exchange "
             "format, not REST API format. For REST API format definitions "
-            "(e.g., from export_datasource), use create_datasource instead.",
+            "(e.g., from get_datasource with raw=true), use create_datasource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3810,7 +3738,7 @@ TOOLS.extend(
             name="create_configsource",
             description="Create a ConfigSource via REST API from a full definition dict "
             "(requires write permission). Accepts REST API format (same as "
-            "export_configsource output). For LM Exchange format, use import_configsource.",
+            "get_configsource with raw=true). For LM Exchange format, use import_configsource.",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3849,7 +3777,7 @@ TOOLS.extend(
             name="create_eventsource",
             description="Create an EventSource via REST API from a full definition dict "
             "(requires write permission). Accepts REST API format (same as "
-            "export_eventsource output). For LM Exchange format, use import_eventsource.",
+            "get_eventsource with raw=true). For LM Exchange format, use import_eventsource.",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -3888,7 +3816,7 @@ TOOLS.extend(
             name="import_configsource",
             description="Import a ConfigSource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
-            "(e.g., from export_configsource), use create_configsource instead.",
+            "(e.g., from get_configsource with raw=true), use create_configsource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3911,7 +3839,7 @@ TOOLS.extend(
             name="import_eventsource",
             description="Import an EventSource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
-            "(e.g., from export_eventsource), use create_eventsource instead.",
+            "(e.g., from get_eventsource with raw=true), use create_eventsource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3934,7 +3862,7 @@ TOOLS.extend(
             name="create_propertysource",
             description="Create a PropertySource via REST API from a full definition dict "
             "(requires write permission). Accepts REST API format (same as "
-            "export_propertysource output). Use for round-tripping exports or building "
+            "get_propertysource with raw=true). Use for round-tripping exports or building "
             "definitions from scratch. For LM Exchange format, use import_propertysource.",
             annotations=_WRITE,
             inputSchema={
@@ -3974,7 +3902,7 @@ TOOLS.extend(
             name="import_propertysource",
             description="Import a PropertySource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
-            "(e.g., from export_propertysource), use create_propertysource instead.",
+            "(e.g., from get_propertysource with raw=true), use create_propertysource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -3997,7 +3925,7 @@ TOOLS.extend(
             name="create_logsource",
             description="Create a LogSource via REST API from a full definition dict "
             "(requires write permission). Accepts REST API format (same as "
-            "export_logsource output). For LM Exchange format, use import_logsource.",
+            "get_logsource with raw=true). For LM Exchange format, use import_logsource.",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -4036,7 +3964,7 @@ TOOLS.extend(
             name="import_logsource",
             description="Import a LogSource from LM Exchange JSON format via multipart "
             "upload (requires write permission). For REST API format definitions "
-            "(e.g., from export_logsource), use create_logsource instead.",
+            "(e.g., from get_logsource with raw=true), use create_logsource instead.",
             annotations=_IMPORT,
             inputSchema={
                 "type": "object",
@@ -4121,7 +4049,7 @@ TOOLS.extend(
             name="import_diagnosticsource",
             description="Import a DiagnosticSource from LM Exchange JSON format via "
             "multipart upload (requires write permission). For REST API format "
-            "definitions (e.g., from export_diagnosticsource), use "
+            "definitions (e.g., from get_diagnosticsource with raw=true), use "
             "create_diagnosticsource instead.",
             annotations=_IMPORT,
             inputSchema={
@@ -4776,6 +4704,14 @@ TOOLS.extend(
                         "type": "integer",
                         "description": "DiagnosticSource ID",
                     },
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_diagnosticsource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["source_id"],
             },
@@ -4814,7 +4750,7 @@ TOOLS.extend(
             description=(
                 "Create a DiagnosticSource via REST API from a full definition dict "
                 "(requires write permission). Accepts REST API format (same as "
-                "export_diagnosticsource output). For LM Exchange format, use "
+                "get_diagnosticsource with raw=true). For LM Exchange format, use "
                 "import_diagnosticsource."
             ),
             annotations=_WRITE,
@@ -4907,6 +4843,14 @@ TOOLS.extend(
                         "type": "integer",
                         "description": "RemediationSource ID",
                     },
+                    "raw": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": (
+                            "Return the full REST object, the definition "
+                            "create_remediationsource takes, instead of the summary"
+                        ),
+                    },
                 },
                 "required": ["source_id"],
             },
@@ -4944,7 +4888,7 @@ TOOLS.extend(
             description=(
                 "Create a RemediationSource via REST API from a full definition dict "
                 "(requires write permission). Accepts REST API format (same as "
-                "export_remediationsource output). RemediationSources have no LM "
+                "get_remediationsource with raw=true). RemediationSources have no LM "
                 "Exchange import endpoint."
             ),
             annotations=_WRITE,
@@ -6314,17 +6258,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_otlp_metric_labels": otlp_metrics.get_otlp_metric_labels,
         "get_otlp_label_values": otlp_metrics.get_otlp_label_values,
         "query_otlp_metrics": otlp_metrics.query_otlp_metrics,
-        # Imports/Exports
-        "export_datasource": imports.export_datasource,
-        "export_dashboard": imports.export_dashboard,
-        "export_alert_rule": imports.export_alert_rule,
-        "export_escalation_chain": imports.export_escalation_chain,
-        "export_configsource": imports.export_configsource,
-        "export_eventsource": imports.export_eventsource,
-        "export_propertysource": imports.export_propertysource,
-        "export_logsource": imports.export_logsource,
-        "export_diagnosticsource": imports.export_diagnosticsource,
-        "export_remediationsource": imports.export_remediationsource,
+        # Imports
         "import_datasource": imports.import_datasource,
         "import_configsource": imports.import_configsource,
         "import_eventsource": imports.import_eventsource,

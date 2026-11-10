@@ -410,3 +410,30 @@ class TestDeleteLogsource:
 
         result = await delete_logsource(client, logsource_id=999)
         assert is_error_result(result)
+
+
+class TestGetLogsourceRaw:
+    """R2.3: raw=true returns the REST object whole; raw=false keeps the projection."""
+
+    @respx.mock
+    async def test_raw_returns_the_rest_object_and_default_projects(self, client):
+        from lm_mcp.tools.logsources import get_logsource
+
+        body = {
+            "id": 123,
+            "name": "Syslog",
+            "appliesTo": "isLinux()",
+            "logType": "syslog",
+            "collectMethod": "syslog",
+            "resourceMapping": [{"index": 0, "key": "system.hostname"}],
+        }
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/logsources/123").mock(
+            return_value=httpx.Response(200, json=body)
+        )
+
+        raw = json.loads((await get_logsource(client, logsource_id=123, raw=True))[0].text)
+        projected = json.loads((await get_logsource(client, logsource_id=123))[0].text)
+
+        assert raw == body
+        assert "logType" not in projected
+        assert projected["log_type"] == body["logType"]

@@ -100,6 +100,7 @@ async def get_diagnosticsources(
 async def get_diagnosticsource(
     client: LogicMonitorClient,
     source_id: int,
+    raw: bool = False,
 ) -> list[TextContent]:
     """Get details for a specific DiagnosticSource.
 
@@ -109,12 +110,15 @@ async def get_diagnosticsource(
     Args:
         client: LogicMonitor API client.
         source_id: DiagnosticSource ID.
+        raw: Return the REST object whole instead of the summary.
 
     Returns:
         List of TextContent with source details or error.
     """
     try:
         result = await client.get(f"/setting/diagnosticsources/{source_id}")
+        if raw:
+            return format_response(result)
 
         detail = {
             "id": result.get("id"),
@@ -219,7 +223,7 @@ async def create_diagnosticsource(
 ) -> list[TextContent]:
     """Create a DiagnosticSource via REST API using a full definition dict.
 
-    Accepts REST API format (same format returned by export_diagnosticsource).
+    Accepts REST API format (the format get_diagnosticsource returns with raw=true).
     For LM Exchange format imports, use import_diagnosticsource instead.
 
     Args:
