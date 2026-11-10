@@ -1,4 +1,4 @@
-# Description: Edwin AI query tools: insights, one insight, and the filterCondition builder.
+# Description: Edwin AI query tools: insights, records, alert volume, metadata, filter builder.
 # Description: Reads Edwin's investigations so the calling model can weigh them beside raw LM data.
 
 from __future__ import annotations
