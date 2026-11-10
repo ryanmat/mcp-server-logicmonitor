@@ -548,6 +548,49 @@ def mad_anomalies(values: list[float], threshold: float = 3.0) -> dict:
     }
 
 
+# The warning a raw reader adds when MAX_SERIES_PAGES stopped its read.
+PAGE_CAP_WARNING = (
+    f"The read stopped at the {MAX_SERIES_PAGES}-page cap, so the oldest samples of the "
+    "window are missing; shorten the window to read all of it."
+)
+
+
+async def fetch_metric_pages(
+    client: LogicMonitorClient, path: str, params: dict[str, Any]
+) -> tuple[list[str], list[Any], list[Any], bool]:
+    """Read every page of a device instance data window, as the endpoint orders them.
+
+    The endpoint pages newest first and names the next page in nextPageParams; the
+    pages are followed up to MAX_SERIES_PAGES. A datapoints selection rides every page.
+
+    Args:
+        client: LogicMonitor API client.
+        path: The instance's /data path.
+        params: The first page's query.
+
+    Returns:
+        The datapoint names, the times and the value rows of every page read, newest
+        first, and whether the page cap stopped the read with samples left.
+    """
+    datapoints = params.get("datapoints")
+    dp_names: list[str] = []
+    times: list[Any] = []
+    values: list[Any] = []
+    for page in range(MAX_SERIES_PAGES):
+        result = await client.get(path, params=params)
+        if page == 0:
+            dp_names = result.get("datapoints", result.get("dataPoints", []))
+        times.extend(result.get("time", []))
+        values.extend(result.get("values", []))
+        next_page = result.get("nextPageParams") or ""
+        if not next_page:
+            return dp_names, times, values, False
+        params = dict(parse_qsl(next_page))
+        if datapoints:
+            params["datapoints"] = datapoints
+    return dp_names, times, values, True
+
+
 async def fetch_metric_series(
     client: LogicMonitorClient,
     device_id: int,
@@ -596,25 +639,10 @@ async def fetch_metric_series(
         f"/instances/{instance_id}/data"
     )
 
-    dp_names: list[str] = []
-    rows: list[tuple[int, list[Any]]] = []
-    truncated = False
-    for page in range(MAX_SERIES_PAGES):
-        result = await client.get(path, params=params)
-        if page == 0:
-            dp_names = result.get("datapoints", result.get("dataPoints", []))
-        for t, row in zip(result.get("time", []), result.get("values", []), strict=False):
-            rows.append((int(t / 1000) if t > 1e12 else int(t), row))
-
-        next_page = result.get("nextPageParams") or ""
-        if not next_page:
-            break
-        params = dict(parse_qsl(next_page))
-        if datapoints:
-            params["datapoints"] = datapoints
-    else:
-        truncated = True
-
+    dp_names, times, values, truncated = await fetch_metric_pages(client, path, params)
+    rows = [
+        (int(t / 1000) if t > 1e12 else int(t), row) for t, row in zip(times, values, strict=False)
+    ]
     rows.sort(key=lambda r: r[0])
 
     series: dict[str, dict[str, Any]] = {}

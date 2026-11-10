@@ -19,6 +19,7 @@ from lm_mcp.tools import (
     sanitize_filter_value,
 )
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING, paginate_alerts
+from lm_mcp.tools.stats_helpers import PAGE_CAP_WARNING, fetch_metric_pages
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -129,29 +130,28 @@ async def get_interface_metrics(
         start_time = end_time - (hours_back * 3600)
         datapoints = metrics or _DEFAULT_INTERFACE_METRICS
 
-        data_result = await client.get(
+        dp_names, times, values, truncated = await fetch_metric_pages(
+            client,
             f"/device/devices/{device_id}/devicedatasources/{dsid}/instances/{instance['id']}/data",
-            params={
-                "datapoints": datapoints,
-                "start": start_time,
-                "end": end_time,
-            },
+            {"datapoints": datapoints, "start": start_time, "end": end_time},
         )
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "interface": interface,
-                "resolved_datasource": ds_name,
-                "resolved_datasource_id": dsid,
-                "resolved_instance": instance.get("displayName") or instance.get("name"),
-                "resolved_instance_id": instance["id"],
-                "window_hours": hours_back,
-                "datapoints": data_result.get("dataPoints", []),
-                "values": data_result.get("values", {}),
-                "time": data_result.get("time", []),
-            }
-        )
+        response = {
+            "device_id": device_id,
+            "interface": interface,
+            "resolved_datasource": ds_name,
+            "resolved_datasource_id": dsid,
+            "resolved_instance": instance.get("displayName") or instance.get("name"),
+            "resolved_instance_id": instance["id"],
+            "window_hours": hours_back,
+            "datapoints": dp_names,
+            "values": values,
+            "time": times,
+            "truncated": truncated,
+        }
+        if truncated:
+            response["warning"] = PAGE_CAP_WARNING
+        return format_response(response)
     except Exception as e:
         return handle_error(e)
 

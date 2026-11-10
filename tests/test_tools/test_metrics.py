@@ -157,6 +157,53 @@ class TestGetDeviceInstances:
 class TestGetDeviceData:
     """Tests for get_device_data tool."""
 
+    _DATA = (
+        "https://test.logicmonitor.com/santaba/rest/device/devices/100"
+        "/devicedatasources/1001/instances/5001/data"
+    )
+
+    @respx.mock
+    async def test_a_day_of_minutes_is_read_in_both_pages(self, client):
+        """R2.10: 1,440 samples over two pages all arrive, newest first, as the API orders them."""
+        from lm_mcp.tools.metrics import get_device_data
+        from tests.metric_pages import day_of_minutes
+
+        pages = day_of_minutes()
+        route = respx.get(self._DATA).mock(side_effect=pages)
+
+        result = await get_device_data(
+            client, device_id=100, device_datasource_id=1001, instance_id=5001, start_time=1
+        )
+
+        data = json.loads(result[0].text)
+        assert route.call_count == 2
+        next_page = json.loads(pages[0].content)["nextPageParams"]
+        assert dict(route.calls[1].request.url.params) == dict(
+            p.split("=") for p in next_page.split("&")
+        )
+        assert len(data["time"]) == len(data["values"]) == 1440
+        assert data["time"] == sorted(data["time"], reverse=True)
+        assert data["truncated"] is False
+        assert "warning" not in data
+
+    @respx.mock
+    async def test_a_read_the_page_cap_stops_says_so(self, client):
+        """R2.10: a window past the page cap is flagged, not silently cut."""
+        from lm_mcp.tools.metrics import get_device_data
+        from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES
+        from tests.metric_pages import capped_read
+
+        route = respx.get(self._DATA).mock(side_effect=capped_read())
+
+        result = await get_device_data(
+            client, device_id=100, device_datasource_id=1001, instance_id=5001, start_time=1
+        )
+
+        data = json.loads(result[0].text)
+        assert route.call_count == MAX_SERIES_PAGES
+        assert data["truncated"] is True
+        assert f"{MAX_SERIES_PAGES}-page cap" in data["warning"]
+
     @respx.mock
     async def test_get_device_data_returns_metrics(self, client):
         """get_device_data returns metric data."""
@@ -169,11 +216,9 @@ class TestGetDeviceData:
                 200,
                 json={
                     "dataPoints": ["CPUBusyPercent", "CPUIdlePercent"],
-                    "values": {
-                        "CPUBusyPercent": [25.5, 30.2, 28.1],
-                        "CPUIdlePercent": [74.5, 69.8, 71.9],
-                    },
-                    "time": [1702500000, 1702500060, 1702500120],
+                    "values": [[28.1, 71.9], [30.2, 69.8], [25.5, 74.5]],
+                    "time": [1702500120000, 1702500060000, 1702500000000],
+                    "nextPageParams": "",
                 },
             )
         )
@@ -188,6 +233,7 @@ class TestGetDeviceData:
         assert data["instance_id"] == 5001
         assert "CPUBusyPercent" in data["datapoints"]
         assert len(data["time"]) == 3
+        assert data["values"][0] == [28.1, 71.9]
 
     @respx.mock
     async def test_get_device_data_with_time_range(self, client):
@@ -196,7 +242,7 @@ class TestGetDeviceData:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/100/devicedatasources/1001/instances/5001/data"
-        ).mock(return_value=httpx.Response(200, json={"dataPoints": [], "values": {}, "time": []}))
+        ).mock(return_value=httpx.Response(200, json={"dataPoints": [], "values": [], "time": []}))
 
         await get_device_data(
             client,
@@ -218,7 +264,7 @@ class TestGetDeviceData:
 
         route = respx.get(
             "https://test.logicmonitor.com/santaba/rest/device/devices/100/devicedatasources/1001/instances/5001/data"
-        ).mock(return_value=httpx.Response(200, json={"dataPoints": [], "values": {}, "time": []}))
+        ).mock(return_value=httpx.Response(200, json={"dataPoints": [], "values": [], "time": []}))
 
         await get_device_data(
             client,

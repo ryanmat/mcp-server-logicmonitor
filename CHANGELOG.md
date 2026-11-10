@@ -230,6 +230,19 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Fixed
 
+- `get_device_data` and `get_interface_metrics` read every page of their window, up to 25, where
+  they read only the newest page, which held at most 500 samples. Both add `truncated`, and a
+  `warning` when the page cap stops the read. This closes the 4.3.0 known limit for the two of
+  its seven tools that 5.0 keeps.
+- `get_collector_health` with `include_history` returns `collector_down_history: null` and a
+  `history_warning` when the alert read fails, where it returned an empty list that looked like a
+  quiet collector. It no longer sends the `alertType` clause the API ignores. The rows are still
+  every alert on a device named for the collector, since no alert type marks a collector going
+  down.
+- `execute_diagnostic` and `execute_remediation` refuse a `dead-collector` device as they refuse a
+  `dead` one, and name the device's status word in the refusal.
+- Signature parameters, such as `X-Amz-Signature` and an Azure SAS `sig`, are masked in logged
+  arguments and in the URLs they carry.
 - `get_link_flaps` and `get_power_events` read an alert's datasource from `resourceTemplateName`.
   They read `dataSourceName`, which alert rows do not carry, so on a live portal link flaps matched
   no interface and power events matched no datasource.

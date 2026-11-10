@@ -516,6 +516,32 @@ class TestGetCollectorHealth:
         assert len(history) == 1
         assert history[0]["alert_type"] == "dataSourceAlert"
 
+    @respx.mock
+    async def test_a_failed_history_read_is_null_with_a_warning(self, client):
+        """R2.10: a failed alert read is unknown, not an empty history; the alertType
+        clause the API ignores is not sent."""
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/collector/collectors/3").mock(
+            return_value=httpx.Response(
+                200,
+                json={"id": 3, "hostname": "col-03", "status": 1, "isDown": False},
+            )
+        )
+        respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        alerts = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+            return_value=httpx.Response(500, json={"errorMessage": "portal unavailable"})
+        )
+
+        result = await get_collector_health(client, collector_id=3, include_history=True)
+
+        collector = json.loads(result[0].text)["collectors"][0]
+        assert collector["collector_down_history"] is None
+        assert collector["history_warning"].startswith("Alert history read failed:")
+        assert "alertType" not in alerts.calls.last.request.url.params["filter"]
+
 
 # (handler name, endpoint path, extra required arguments)
 _COLLECTORS_LISTS = [

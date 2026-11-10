@@ -29,7 +29,8 @@ _CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 # snmp.auth, snmp.priv) and the cloud compounds written as one word (aws.secretkey).
 _CREDENTIAL_WORD = re.compile(
     r"(?:^|_)(?:password|passwd|passphrase|pass|token|secret|key|credential"
-    r"|community|auth|priv|extra_vars|apikey|secretkey|accesskey|privatekey|clientsecret)"
+    r"|community|auth|priv|extra_vars|apikey|secretkey|accesskey|privatekey|clientsecret"
+    r"|signature|sig)"
     r"s?(?:_|$)"
 )
 # A key naming an identifier (token_id, api_key_id, device_ids) is not a credential.
@@ -82,9 +83,10 @@ def is_sensitive_key(key: str) -> bool:
 
     Matches a whole word from ``_CREDENTIAL_WORD`` (the generic words such as
     password, token, secret and key, the LogicMonitor property words pass,
-    community, auth and priv, and the one-word compounds such as secretkey,
-    singular or plural) at a snake_case, kebab-case, dotted or camelCase
-    boundary, case-insensitively, so ``api_key``, ``apiKey``, ``ssh.pass`` and
+    community, auth and priv, the request-signature words signature and sig,
+    and the one-word compounds such as secretkey, singular or plural) at a
+    snake_case, kebab-case, dotted or camelCase boundary, case-insensitively, so
+    ``api_key``, ``apiKey``, ``ssh.pass``, ``X-Amz-Signature`` and
     ``LM_BEARER_TOKEN`` match while ``keyword`` and ``tokenizer`` do not. A key
     ending in ``id`` or ``ids`` names an identifier, not a credential.
 
