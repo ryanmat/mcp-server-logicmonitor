@@ -99,11 +99,47 @@ async def _resolve_device(
     raise ValueError("Either device_id or device_name is required")
 
 
+# Keys whose values name the series a nested warning belongs to.
+_WARNING_LABEL_KEYS = ("datasource", "instance")
+
+
+def _nested_warnings(value: object, labels: tuple[str, ...] = ()) -> list[tuple[tuple, str]]:
+    """Every warnings entry and warning string under value, with the labels around it.
+
+    A dict's datasource and instance values extend the labels its children carry.
+    """
+    if isinstance(value, list):
+        return [found for item in value for found in _nested_warnings(item, labels)]
+    if not isinstance(value, dict):
+        return []
+    labels = labels + tuple(str(value[k]) for k in _WARNING_LABEL_KEYS if value.get(k))
+    found = [(labels, str(text)) for text in value.get("warnings") or []]
+    if isinstance(value.get("warning"), str):
+        found.append((labels, value["warning"]))
+    for key, child in value.items():
+        if key not in ("warnings", "warning"):
+            found.extend(_nested_warnings(child, labels))
+    return found
+
+
 def _trim_detail(report: dict, detail_level: str, full_keys: set[str]) -> dict:
-    """Remove full_keys from report when detail_level is 'summary'."""
-    if detail_level == "summary":
-        return {k: v for k, v in report.items() if k not in full_keys}
-    return report
+    """Remove full_keys from report when detail_level is 'summary'.
+
+    The warnings nested under a removed key move to the report's warnings, each
+    named by the datasource and instance around it, or else by the key.
+    """
+    if detail_level != "summary":
+        return report
+    trimmed = {k: v for k, v in report.items() if k not in full_keys}
+    lifted = [
+        f"{'/'.join(labels) or key}: {text}"
+        for key, value in report.items()
+        if key in full_keys
+        for labels, text in _nested_warnings(value)
+    ]
+    if lifted:
+        trimmed["warnings"] = [*trimmed.get("warnings", []), *lifted]
+    return trimmed
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +358,81 @@ _HEALTH_CHECK_REQUIRED = [
 _HEALTH_CHECK_HOURS = 24
 _HEALTH_CHECK_ANALYSES = ["summary", "anomalies"]
 
+# health_check analyzes the datasources whose names carry these words, case-insensitive:
+# one from each in turn, alphabetical within each, up to five.
+_HEALTH_CHECK_NAMES = (
+    re.compile("cpu", re.IGNORECASE),
+    re.compile("mem", re.IGNORECASE),
+    re.compile("disk|drive|volume|filesystem", re.IGNORECASE),
+)
+_HEALTH_CHECK_DATASOURCES = 5
+
+# One device datasources read lists them all: the API's largest page.
+_ALL_DATASOURCES = 1000
+
+_STRINGS = {"type": "array", "items": {"type": "string"}}
+
+# The report health_check returns, as a JSON Schema. A read that failed is null, with
+# a warning naming it; metrics is a full-mode key, whose warnings summary lifts.
+HEALTH_CHECK_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "device_id": {"type": "integer"},
+        "device_name": {"type": "string"},
+        "detail_level": _DETAIL_LEVEL,
+        "datasource_count": {**_COUNT, "description": "Datasources the device carries."},
+        "metrics": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "datasource": {"type": "string"},
+                    "instance": {"type": "string"},
+                    "analysis": {
+                        "type": "object",
+                        "description": "analyze_metric's summary and anomalies over 24 hours.",
+                    },
+                },
+                "required": ["datasource", "instance", "analysis"],
+                "additionalProperties": False,
+            },
+            "description": "Full: the first instance of each CPU, memory or disk datasource read.",
+        },
+        "active_alerts": {**_OBJECT_OR_NULL, "description": "get_alerts, open, for the device."},
+        "availability": {**_OBJECT_OR_NULL, "description": "calculate_availability, 30 days."},
+        "warnings": _STRINGS,
+    },
+    "required": [
+        "device_id",
+        "device_name",
+        "detail_level",
+        "datasource_count",
+        "active_alerts",
+        "availability",
+    ],
+    "additionalProperties": False,
+}
+
+
+def _health_datasources(ds_list: list[dict]) -> list[dict]:
+    """The datasources health_check analyzes, chosen by name from those with instances."""
+    with_instances = [
+        ds for ds in ds_list if ds.get("id") is not None and ds.get("instance_count") != 0
+    ]
+    groups = [
+        sorted(
+            (ds for ds in with_instances if pattern.search(ds.get("name") or "")),
+            key=lambda ds: (ds.get("name") or "").lower(),
+        )
+        for pattern in _HEALTH_CHECK_NAMES
+    ]
+    picked: list[dict] = []
+    for rank in range(max(len(group) for group in groups)):
+        for group in groups:
+            if rank < len(group) and group[rank] not in picked:
+                picked.append(group[rank])
+    return picked[:_HEALTH_CHECK_DATASOURCES]
+
 
 async def health_check(
     client: LogicMonitorClient,
@@ -331,9 +442,10 @@ async def health_check(
 ) -> list[TextContent]:
     """Composite health check for a single device.
 
-    Resolves the device, gathers datasource coverage, analyzes the first
-    instance of up to five datasources (summary and anomalies over 24 hours,
-    one read each), checks active alerts, and calculates availability.
+    Resolves the device, lists its datasources once, analyzes the first instance
+    of up to five whose names carry CPU, memory or disk words (summary and
+    anomalies over 24 hours, one read each), checks active alerts, and
+    calculates availability. HEALTH_CHECK_OUTPUT_SCHEMA documents the report.
 
     Args:
         client: LogicMonitor API client.
@@ -368,27 +480,32 @@ async def health_check(
             "detail_level": detail_level,
         }
 
-        # 2. Get datasources
-        ds_list: list[dict] = []
+        # 2. Every datasource, in one read
+        picked: list[dict] = []
         try:
             ds_data = await call_sub_tool(
                 get_device_datasources,
                 client,
                 device_id=resolved_id,
+                limit=_ALL_DATASOURCES,
             )
             ds_list = ds_data.get("datasources", [])
             report["datasource_count"] = len(ds_list)
+            picked = _health_datasources(ds_list)
+            if not picked:
+                warnings.append(
+                    f"None of the device's {len(ds_list)} datasources names CPU, memory or "
+                    "disk with an instance; metrics is empty."
+                )
         except Exception as exc:
             warnings.append(f"get_device_datasources failed: {exc}")
             report["datasource_count"] = 0
 
-        # 3. Analyze the first instance of each of the first 5 datasources, skipping
-        # any with no instance
+        # 3. Analyze the first instance of each datasource picked by name, skipping any
+        # whose instance list is empty
         metrics: list[dict] = []
-        for ds in ds_list[:5]:
-            ds_id = ds.get("id")
-            if ds_id is None:
-                continue
+        for ds in picked:
+            ds_id = ds["id"]
             ds_name = ds.get("name", ds_id)
             try:
                 inst_data = await call_sub_tool(
@@ -484,9 +601,85 @@ _CAPACITY_PLAN_REQUIRED = [
 ]
 
 # capacity_plan reads each instance once for these sections, forecasting the
-# crossing of this level.
+# crossing of the threshold, 90 unless the caller names one.
 _CAPACITY_PLAN_ANALYSES = ["trend", "seasonality", "change_points", "forecast"]
 _CAPACITY_THRESHOLD = 90.0
+
+_FORECAST_METHODS = ("linear", "holt_winters")
+
+# Each forecast method's value, or null where it does not reach the threshold.
+_PER_METHOD = {
+    "type": "object",
+    "properties": {method: {"type": ["number", "null"]} for method in _FORECAST_METHODS},
+    "required": list(_FORECAST_METHODS),
+    "additionalProperties": False,
+}
+
+# The report capacity_plan returns, as a JSON Schema. Summary carries forecast_summary
+# and full the datasources block, whose warnings summary lifts.
+CAPACITY_PLAN_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "device_id": {"type": "integer"},
+        "device_name": {"type": "string"},
+        "hours_back": {"type": "integer", "description": "Hours of history each read covers."},
+        "threshold": {"type": "number", "description": "The level each forecast must reach."},
+        "detail_level": _DETAIL_LEVEL,
+        "datasources": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "datasource": {"type": "string"},
+                    "instances": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "instance": {"type": "string"},
+                                "analysis": {
+                                    **_OBJECT_OR_NULL,
+                                    "description": "analyze_metric's trend, seasonality, "
+                                    "change points and forecast; null when the read failed.",
+                                },
+                                "analysis_error": {"type": "string"},
+                            },
+                            "required": ["instance", "analysis"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["datasource", "instances"],
+                "additionalProperties": False,
+            },
+            "description": "Full: up to five datasources and three instances each.",
+        },
+        "forecast_summary": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "datasource": {"type": "string"},
+                    "instance": {"type": "string"},
+                    "datapoint": {"type": "string"},
+                    "trend": {"type": "string", "description": "The trend section's label."},
+                    "hours_until_breach": _PER_METHOD,
+                    "breach_eta": {
+                        **_PER_METHOD,
+                        "description": "Epoch seconds each method reaches the threshold.",
+                    },
+                    "status": {"type": "string", "description": "Why no forecast was made."},
+                },
+                "required": ["datasource", "instance", "datapoint"],
+                "additionalProperties": False,
+            },
+            "description": "Summary: one headline row per datapoint read.",
+        },
+        "warnings": _STRINGS,
+    },
+    "required": ["device_id", "device_name", "hours_back", "threshold", "detail_level"],
+    "additionalProperties": False,
+}
 
 
 async def capacity_plan(
@@ -495,13 +688,15 @@ async def capacity_plan(
     device_name: str | None = None,
     datasource: str | None = None,
     hours_back: int = 168,
+    threshold: float = _CAPACITY_THRESHOLD,
     detail_level: str = "summary",
 ) -> list[TextContent]:
     """Composite capacity planning for a device.
 
     Reads each instance's series once through analyze_metric for its trend,
-    seasonality, change points and forecast against 90, across up to five
-    datasources and three instances each.
+    seasonality, change points and forecast against threshold, across up to
+    five datasources and three instances each. CAPACITY_PLAN_OUTPUT_SCHEMA
+    documents the report.
 
     Args:
         client: LogicMonitor API client.
@@ -509,6 +704,7 @@ async def capacity_plan(
         device_name: Device display name (used if device_id not provided).
         datasource: Filter to a specific datasource name.
         hours_back: Hours of historical data (default: 168 = 1 week).
+        threshold: The level each forecast reaches for (default: 90).
         detail_level: 'summary' or 'full' (default: summary).
 
     Returns:
@@ -534,6 +730,7 @@ async def capacity_plan(
             "device_id": resolved_id,
             "device_name": device_info.get("displayName", device_info.get("name", "")),
             "hours_back": hours_back,
+            "threshold": threshold,
             "detail_level": detail_level,
         }
 
@@ -592,7 +789,7 @@ async def capacity_plan(
                         instance_id=inst_id,
                         hours=hours_back,
                         analyses=_CAPACITY_PLAN_ANALYSES,
-                        threshold=_CAPACITY_THRESHOLD,
+                        threshold=threshold,
                     )
                 except Exception as exc:
                     _AUDIT.warning(
@@ -611,11 +808,11 @@ async def capacity_plan(
         report["datasources"] = ds_reports
 
         # The summary level trims the raw datasources block, so it keeps each
-        # forecast's headline and every per-instance error and warning in its place.
+        # forecast's headline and every per-instance error in its place; _trim_detail
+        # lifts the analysis warnings.
         if detail_level == "summary":
             report["forecast_summary"] = _forecast_summary(ds_reports)
             warnings.extend(_instance_errors(ds_reports))
-            warnings.extend(_instance_warnings(ds_reports))
 
         if warnings:
             report["warnings"] = warnings
@@ -629,7 +826,7 @@ async def capacity_plan(
 
 
 def _forecast_summary(ds_reports: list[dict]) -> list[dict]:
-    """One headline row per datapoint: trend label and each method's hours to breach.
+    """One headline row per datapoint: trend label and each method's breach ETA and hours.
 
     A datapoint too short to analyze carries its status instead.
     """
@@ -648,10 +845,8 @@ def _forecast_summary(ds_reports: list[dict]) -> list[dict]:
                     row["status"] = forecast["status"]
                 else:
                     row["trend"] = sections["trend"]["label"]
-                    row["hours_until_breach"] = {
-                        method: forecast[method]["hours_until_breach"]
-                        for method in ("linear", "holt_winters")
-                    }
+                    for key in ("hours_until_breach", "breach_eta"):
+                        row[key] = {method: forecast[method][key] for method in _FORECAST_METHODS}
                 rows.append(row)
     return rows
 
@@ -663,16 +858,6 @@ def _instance_errors(ds_reports: list[dict]) -> list[str]:
         for ds in ds_reports
         for inst in ds["instances"]
         if "analysis_error" in inst
-    ]
-
-
-def _instance_warnings(ds_reports: list[dict]) -> list[str]:
-    """Every analysis warning, naming datasource and instance."""
-    return [
-        f"{ds['datasource']}/{inst['instance']}: {warning}"
-        for ds in ds_reports
-        for inst in ds["instances"]
-        for warning in (inst.get("analysis") or {}).get("warnings", [])
     ]
 
 
@@ -843,7 +1028,56 @@ _DIAGNOSE_REQUIRED = [
     "get_device_properties",
     "analyze_alerts",
     "analyze_blast_radius",
+    "get_diagnostic_remediation_assignments",
+    "get_diagnostic_remediation_results",
 ]
+
+_ARRAY_OR_NULL = {"type": ["array", "null"], "items": {"type": "object"}}
+
+# The report diagnose returns, as a JSON Schema. It gathers inputs and computes no
+# health score or root cause. A read that failed leaves its key out, or null inside
+# diagnostics, with a warning naming it; device_properties and blast_radius are
+# full-mode keys, whose warnings summary lifts.
+DIAGNOSE_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "detail_level": _DETAIL_LEVEL,
+        "alert": {
+            **_OBJECT_OR_NULL,
+            "description": "get_alert_details; null when the device has no open critical alert.",
+        },
+        "device": {"type": "object", "description": "get_device for the alert's device."},
+        "device_properties": {"type": "object", "description": "Full: get_device_properties."},
+        "correlated_alerts": {
+            **_OBJECT_OR_NULL,
+            "description": "analyze_alerts 'clusters' over the last four hours.",
+        },
+        "changes": {
+            **_OBJECT_OR_NULL,
+            "description": "analyze_alerts 'changes' over the last four hours.",
+        },
+        "blast_radius": {"type": "object", "description": "Full: analyze_blast_radius."},
+        "diagnostics": {
+            "type": "object",
+            "properties": {
+                "assigned": {
+                    **_ARRAY_OR_NULL,
+                    "description": "DiagnosticSources assigned to the device.",
+                },
+                "latest_results": {
+                    **_ARRAY_OR_NULL,
+                    "description": "The alert's latest diagnostic runs, with their output.",
+                },
+            },
+            "required": ["assigned", "latest_results"],
+            "additionalProperties": False,
+            "description": "Read only: diagnose never runs a DiagnosticSource.",
+        },
+        "warnings": _STRINGS,
+    },
+    "required": ["detail_level"],
+    "additionalProperties": False,
+}
 
 
 async def diagnose(
@@ -854,9 +1088,11 @@ async def diagnose(
 ) -> list[TextContent]:
     """Composite diagnosis for an alert or device.
 
-    Gathers alert details, device context, correlated alerts, recent
-    changes, blast radius, and health score. Produces a diagnosis
-    report with probable root cause indicators.
+    Gathers alert details, device context, correlated alerts, recent changes,
+    blast radius, and the device's assigned DiagnosticSources with the latest
+    results of the alert's diagnostic runs. It reads them and never runs one,
+    and it computes no health score or root cause. DIAGNOSE_OUTPUT_SCHEMA
+    documents the report.
 
     Args:
         client: LogicMonitor API client.
@@ -875,6 +1111,10 @@ async def diagnose(
         from lm_mcp.tools.alerts import get_alert_details, get_alerts
         from lm_mcp.tools.analyze_alerts import analyze_alerts
         from lm_mcp.tools.devices import get_device
+        from lm_mcp.tools.diagnostic_remediation import (
+            get_diagnostic_remediation_assignments,
+            get_diagnostic_remediation_results,
+        )
         from lm_mcp.tools.resources import get_device_properties
         from lm_mcp.tools.topology_analysis import analyze_blast_radius
 
@@ -884,6 +1124,7 @@ async def diagnose(
         # 1. Resolve target
         alert_data: dict | None = None
         target_device_id: int | None = None
+        target_alert_id = alert_id
 
         if alert_id:
             try:
@@ -908,11 +1149,11 @@ async def diagnose(
                 )
                 alert_list = alerts_data.get("alerts", [])
                 if alert_list:
-                    resolved_alert_id = alert_list[0].get("id", "")
+                    target_alert_id = str(alert_list[0].get("id", ""))
                     alert_data = await call_sub_tool(
                         get_alert_details,
                         client,
-                        alert_id=str(resolved_alert_id),
+                        alert_id=target_alert_id,
                     )
                     target_device_id = alert_data.get("monitorObjectId")
                     report["alert"] = alert_data
@@ -978,6 +1219,32 @@ async def diagnose(
                 report["blast_radius"] = blast
             except Exception as exc:
                 warnings.append(f"analyze_blast_radius failed: {exc}")
+
+        # 5. Diagnostics: the device's assigned DiagnosticSources and the latest results
+        # of the alert's diagnostic runs, read without running any
+        if target_device_id is not None:
+            diagnostics: dict = {"assigned": None, "latest_results": None}
+            try:
+                assigned = await call_sub_tool(
+                    get_diagnostic_remediation_assignments,
+                    client,
+                    resource_id=target_device_id,
+                    module_type="diagnosticsource",
+                )
+                diagnostics["assigned"] = assigned.get("assigned_sources", [])
+            except Exception as exc:
+                warnings.append(f"get_diagnostic_remediation_assignments failed: {exc}")
+            try:
+                runs = await call_sub_tool(
+                    get_diagnostic_remediation_results,
+                    client,
+                    alert_id=target_alert_id,
+                    module_type="diagnostic",
+                )
+                diagnostics["latest_results"] = runs.get("executions", [])
+            except Exception as exc:
+                warnings.append(f"get_diagnostic_remediation_results failed: {exc}")
+            report["diagnostics"] = diagnostics
 
         if warnings:
             report["warnings"] = warnings
@@ -1374,6 +1641,103 @@ _SITE_OUTAGE_WEIGHTS = {
 }
 
 
+_SITE_OUTAGE_SIGNAL = {
+    "type": "object",
+    "properties": {
+        "triggered": {
+            "type": ["boolean", "null"],
+            "description": "null when the signal's read failed: unknown, not untriggered.",
+        },
+        "status": {"enum": ["unavailable"]},
+        "error": {"type": "string", "description": "Why the signal's read failed."},
+        "count": _COUNT,
+        "burst_count": _COUNT,
+        "dead_devices": _COUNT,
+        "threshold": {**_COUNT, "description": "Dead devices that trigger device_silence."},
+        "weight": {**_COUNT, "description": "Confidence a triggered signal adds."},
+    },
+    "required": ["triggered"],
+    "additionalProperties": False,
+}
+
+# The report detect_site_outage returns, as a JSON Schema. confidence_level and
+# unavailable_signals appear only when a signal's read failed; collectors_inspected,
+# interface_burst_detail and power_events_preview are full-mode keys.
+DETECT_SITE_OUTAGE_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "verdict": {
+            "enum": [
+                "site_outage_detected",
+                "possible_site_outage",
+                "no_outage_signature",
+                "indeterminate",
+            ],
+            "description": "indeterminate when the unread signals could change the verdict.",
+        },
+        "confidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The weights of the triggered signals, capped at 100.",
+        },
+        "confidence_level": {"enum": ["reduced"]},
+        "unavailable_signals": {
+            "type": "array",
+            "items": {"enum": ["collector_down", "interface_burst", "power_events"]},
+            "description": "Signals left out of the score because their read failed.",
+        },
+        "group_id": {"type": "integer"},
+        "window_seconds": {"type": "integer"},
+        "hours_back": {"type": "integer"},
+        "scope": {
+            "type": "object",
+            "properties": {
+                "devices_in_group": _COUNT,
+                "dead_devices": _COUNT,
+                "collectors_serving_group": _COUNT,
+            },
+            "required": ["devices_in_group", "dead_devices", "collectors_serving_group"],
+            "additionalProperties": False,
+        },
+        "signals": {
+            "type": "object",
+            "properties": {name: _SITE_OUTAGE_SIGNAL for name in _SITE_OUTAGE_WEIGHTS},
+            "required": list(_SITE_OUTAGE_WEIGHTS),
+            "additionalProperties": False,
+        },
+        "recommendations": _STRINGS,
+        "warnings": _STRINGS,
+        "collectors_inspected": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "Full: get_collector_health's record of each collector read.",
+        },
+        "interface_burst_detail": {
+            **_OBJECT_OR_NULL,
+            "description": "Full: analyze_alerts 'bursts'; null when the read failed.",
+        },
+        "power_events_preview": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": "Full: up to ten get_power_events events.",
+        },
+    },
+    "required": [
+        "verdict",
+        "confidence",
+        "group_id",
+        "window_seconds",
+        "hours_back",
+        "scope",
+        "signals",
+        "recommendations",
+        "warnings",
+    ],
+    "additionalProperties": False,
+}
+
+
 def _site_outage_verdict(score: int) -> str:
     """Map a site-outage confidence score to its verdict."""
     if score >= 70:
@@ -1412,6 +1776,7 @@ async def detect_site_outage(
     error, and is left out of the score. The report then carries
     confidence_level "reduced" and unavailable_signals; when the lost signals'
     weights could change the verdict, the verdict is "indeterminate".
+    DETECT_SITE_OUTAGE_OUTPUT_SCHEMA documents the report.
 
     Args:
         client: LogicMonitor API client.

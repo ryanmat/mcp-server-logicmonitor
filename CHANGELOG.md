@@ -342,15 +342,31 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other
   files the repository tracks.
-- `health_check` reads the first instance of up to five datasources once each through
-  `analyze_metric`, the summary and anomaly sections over 24 hours, and reports them under
-  `metrics` with the datasource and instance names. The `health_scores` and `anomalies` keys
-  leave, and a datasource whose read fails is a warning naming it.
+- `health_check` lists all of a device's datasources in one read and picks up to five whose
+  names mention CPU, memory or disk (drive, volume, filesystem), one of each in turn and
+  alphabetical within each, skipping those with no instances. It took the first five the API
+  listed, which on a Windows host in the sandbox portal put its CPU datasource 16th of 102. It
+  reads the first instance of each once through `analyze_metric`, the summary and anomaly
+  sections over 24 hours, and reports them under `metrics` with the datasource and instance
+  names. A device with none of those datasources gets an empty `metrics` list and a warning.
+  The `health_scores` and `anomalies` keys leave, and a datasource whose read fails is a warning
+  naming it. The summary carries the analysis warnings, such as a read the page cap cut short,
+  which it dropped along with `metrics`.
 - `capacity_plan` reads each instance once through `analyze_metric`, for the trend, seasonality,
-  change point and forecast sections against a threshold of 90, and reports the result under
-  the instance's `analysis`, where it read the series three or four times. A
-  `forecast_summary` row carries the trend label and each method's `hours_until_breach`, and an
+  change point and forecast sections, and reports the result under the instance's `analysis`,
+  where it read the series three or four times. It takes `threshold`, 90 unless given, where 90
+  was fixed, and reports it beside `hours_back`. A `forecast_summary` row carries the trend
+  label and each method's `hours_until_breach` and `breach_eta` (epoch seconds), and an
   instance whose read fails carries one `analysis_error`.
+- `diagnose` adds `diagnostics`: the DiagnosticSources assigned to the alert's device and the
+  latest results of the alert's diagnostic runs, read through
+  `get_diagnostic_remediation_assignments` and `get_diagnostic_remediation_results`, which join
+  the tools it needs enabled. It never runs a DiagnosticSource. Its description no longer
+  promises a health score or a probable root cause, neither of which it computed. In summary
+  mode `diagnose` and `detect_site_outage` carry the warnings of the keys they trim, such as
+  the blast radius' warning about devices whose neighbors could not be read.
+- The `device_health_low` best practice states its condition as a mean |`z_score`| above 3.33
+  across a device's `health_check` metrics, where it named the removed health score.
 - `triage` reads its alert window once through `analyze_alerts`, where it read it four times:
   `statistics`, `clusters`, `noise` and `changes` carry that tool's sections, and a failed read
   is one `analyze_alerts failed` warning. `portal_overview` reads its window once for
