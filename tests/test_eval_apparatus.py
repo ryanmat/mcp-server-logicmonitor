@@ -1,5 +1,5 @@
 # Description: Tests for the search_tools eval grader in evals/grade.py.
-# Description: Runs the grader end to end on small fixtures and checks its exit0 exit codes.
+# Description: Runs the grader end to end on small fixtures and checks its exit codes.
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def test_two_found_queries_pass_with_exit_0(tmp_path):
 
 
 def test_a_missed_query_fails_with_a_nonzero_exit(tmp_path):
-    """Two graded queries need both found: one miss fails the run under exit0."""
+    """Two graded queries need both found: one miss fails the run with a nonzero exit."""
     result = _grade(
         tmp_path,
         [
