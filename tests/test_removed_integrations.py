@@ -338,9 +338,15 @@ def test_src_names_no_removed_integration():
 
 def test_tests_name_no_removed_integration():
     """This file names them by necessity, as does the 4.3.0 tool list that the CHANGELOG
-    rename table is checked against; those two files are the exceptions."""
+    rename table is checked against, and Edwin AI's captured data model, whose record
+    types include its own Ansible integration (ansibleEdaEvent, ansiblePlaybook,
+    ansibleWorkflow); those three files are the exceptions."""
     tests = _REPO / "tests"
-    exempt = {Path(__file__).resolve(), tests / "fixtures" / "tool_names-4.3.0.txt"}
+    exempt = {
+        Path(__file__).resolve(),
+        tests / "fixtures" / "tool_names-4.3.0.txt",
+        tests / "fixtures" / "edwin_metadata.json",
+    }
     naming = {
         path.relative_to(tests).as_posix()
         for path in tests.rglob("*")
