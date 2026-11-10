@@ -51,14 +51,18 @@ def required_scope(path: str) -> str | None:
 
 
 def _edwin_message(response: httpx.Response) -> str:
-    """Edwin's words for a failed response: ``message``, else ``error``, else body or reason."""
+    """Edwin's words for a failed response: ``message``, ``error`` or ``detail``, else the text.
+
+    The query API answers ``{"code", "message", "id"}``, the token exchange
+    ``{"error"}``, and the agent API ``{"detail"}``.
+    """
     text = response.text or response.reason_phrase
     try:
         body = response.json()
     except (json.JSONDecodeError, ValueError):
         return text
     if isinstance(body, dict):
-        return str(body.get("message") or body.get("error") or text)
+        return str(body.get("message") or body.get("error") or body.get("detail") or text)
     return text
 
 
