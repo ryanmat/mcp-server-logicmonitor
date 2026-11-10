@@ -377,6 +377,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   error where it returned an empty list. The descriptions of `get_devices`, `get_alerts`,
   `get_alert_rules`, `get_device_data` and `analyze_metric` name the filters and contents
   those tools already had.
+- Thirteen parameters the handlers took but the schemas left out are declared, so a client
+  can send them: `name_filter` on `get_device_datasources`, `get_device_instances`,
+  `get_dashboard_groups`, `get_website_groups`, `get_escalation_chains`, `get_alert_rules`,
+  `get_access_groups`, `get_netscans` and `get_batchjobs`; `priority_filter` on
+  `get_alert_rules`; `tag_filter` on `get_ops_notes`; `status` on `get_batchjobs`; and
+  `device_name` on `calculate_availability`. `get_ops_note` takes `note_id` as a string, as
+  `update_ops_note` and `delete_ops_note` do, where it declared an integer. `execute_remediation`
+  carries `destructiveHint`, since a remediation script changes the host it runs on.
 - `triage` reads its alert window once through `analyze_alerts`, where it read it four times:
   `statistics`, `clusters`, `noise` and `changes` carry that tool's sections, and a failed read
   is one `analyze_alerts failed` warning. `portal_overview` reads its window once for

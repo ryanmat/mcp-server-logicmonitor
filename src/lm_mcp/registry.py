@@ -19,6 +19,10 @@ _WRITE = ToolAnnotations(
 _DELETE = ToolAnnotations(
     readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
 )
+# A tool that runs a script which changes a monitored host, such as a remediation.
+_DESTRUCTIVE_RUN = ToolAnnotations(
+    readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True
+)
 _IMPORT = ToolAnnotations(
     readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True
 )
@@ -880,6 +884,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by DataSource name (substring match)",
+                    },
                     "device_id": {"type": "integer", "description": "Device ID"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
@@ -894,6 +902,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by instance name (substring match)",
+                    },
                     "device_id": {"type": "integer", "description": "Device ID"},
                     "device_datasource_id": {
                         "type": "integer",
@@ -1293,6 +1305,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by group name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -1407,6 +1423,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by group name (substring match)",
+                    },
                     "parent_id": {"type": "integer", "description": "Filter by parent group ID"},
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
@@ -1712,6 +1732,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by chain name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -2224,6 +2248,14 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "priority_filter": {
+                        "type": "integer",
+                        "description": "Only rules of this priority",
+                    },
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by rule name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -2490,6 +2522,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by group name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -3061,6 +3097,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by netscan name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -3190,6 +3230,10 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "tag_filter": {
+                        "type": "string",
+                        "description": "Filter by tag (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -3202,7 +3246,11 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "note_id": {"type": "integer", "description": "Ops note ID"},
+                    "note_id": {
+                        "type": "string",
+                        "pattern": _LM_STRING_ID_PATTERN,
+                        "description": "Ops note ID",
+                    },
                 },
                 "required": ["note_id"],
             },
@@ -3468,6 +3516,14 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Only jobs with this status (active, inactive)",
+                    },
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by job name (substring match)",
+                    },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -4374,6 +4430,12 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "device_name": {
+                        "type": "string",
+                        "description": (
+                            "Exact device display name; pass it or device_id, not group_id"
+                        ),
+                    },
                     "device_id": {
                         "type": "integer",
                         "description": "Optional device ID filter",
@@ -4888,7 +4950,7 @@ TOOLS.extend(
                 "script review) before triggering manual execution. "
                 "Requires write permission."
             ),
-            annotations=_WRITE,
+            annotations=_DESTRUCTIVE_RUN,
             inputSchema={
                 "type": "object",
                 "properties": {
