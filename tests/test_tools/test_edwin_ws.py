@@ -109,10 +109,13 @@ def payload(result: list) -> dict:
     return json.loads(result[0].text)
 
 
-async def test_a_full_conversation(edwin_server, client):
+async def test_a_full_conversation(edwin_server, client, caplog):
     edwin, created = client
 
-    body = payload(await ask_edwin(edwin, question=QUESTION))
+    with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.edwin"):
+        body = payload(await ask_edwin(edwin, question=QUESTION))
+
+    assert [r for r in caplog.records if r.name == "lm_mcp.tools.edwin"] == []
 
     assert created.call_count == 1
     assert json.loads(created.calls.last.request.content) == {}
@@ -147,17 +150,21 @@ async def test_a_conversation_id_continues_the_thread(edwin_server, client):
     assert body["truncated"] is False
 
 
-async def test_an_early_close_returns_the_text_so_far(edwin_server, client):
+async def test_an_early_close_returns_the_text_so_far(edwin_server, client, caplog):
     edwin, _ = client
     edwin_server.frames = FRAMES[:_THIRD_TOKEN]
     edwin_server.ending = "close"
 
-    body = payload(await ask_edwin(edwin, question=QUESTION))
+    with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.edwin"):
+        body = payload(await ask_edwin(edwin, question=QUESTION))
 
     tokens = [f["message"] for f in PARSED[:_THIRD_TOKEN] if f["type"] == "answer_token"]
     assert len(tokens) == 3
     assert body["answer"] == "".join(tokens)
     assert body["truncated"] is True
+    (warning,) = [r for r in caplog.records if r.name == "lm_mcp.tools.edwin"]
+    assert "before response_end" in warning.getMessage()
+    assert "1000" in warning.getMessage()
 
 
 async def test_the_budget_truncates(edwin_server, client, monkeypatch):

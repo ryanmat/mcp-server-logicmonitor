@@ -1,4 +1,4 @@
-# Description: Edwin AI query tools: insights, one insight, and the filterCondition builder.
+# Description: Edwin AI tools: insights, records, alert volume, metadata, agent tools, Ask Edwin.
 # Description: Reads Edwin's investigations so the calling model can weigh them beside raw LM data.
 
 from __future__ import annotations
@@ -563,6 +563,11 @@ async def ask_edwin(
                             answer.append(frame.get("message") or "")
                         elif kind == "answer_thought":
                             reasoning.append(frame.get("message") or "")
+                    else:
+                        logger.warning(
+                            "Edwin closed the conversation with %s before response_end",
+                            ws.close_code,
+                        )
             except TimeoutError:
                 logger.warning("ask_edwin stopped at its %s s budget", ASK_BUDGET_SECONDS)
             except ConnectionClosedError as e:
