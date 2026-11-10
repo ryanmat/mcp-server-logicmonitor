@@ -1725,8 +1725,9 @@ class TestDiagnose:
         jsonschema.validate(data, DIAGNOSE_OUTPUT_SCHEMA)
 
     @respx.mock
-    async def test_a_failed_diagnostics_read_is_a_warning(self, auth, lm_env):
-        """A portal without ADR, or a failed read, leaves that list null and names it."""
+    async def test_a_failed_diagnostics_read_is_a_warning(self, auth, lm_env, caplog):
+        """A portal without ADR, or a failed read, leaves that list null and names it, and
+        the failure is logged with its traceback."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         respx.get(f"{_BASE}/setting/diagnosticRemediation/list").mock(return_value=_portal_error())
         respx.get(f"{_BASE}/setting/diagnosticRemediation/executionResults").mock(
@@ -1742,6 +1743,11 @@ class TestDiagnose:
         assert assigned_warning.startswith("get_diagnostic_remediation_assignments failed:")
         assert results_warning.startswith("get_diagnostic_remediation_results failed:")
         jsonschema.validate(data, DIAGNOSE_OUTPUT_SCHEMA)
+        logged = [r for r in caplog.records if r.name == "lm_mcp.audit" and r.exc_info]
+        assert [r.getMessage().split(" failed")[0] for r in logged] == [
+            "diagnose: get_diagnostic_remediation_assignments",
+            "diagnose: get_diagnostic_remediation_results",
+        ]
 
     def test_the_description_says_no_health_score_is_computed(self):
         """R2.3: diagnose stops promising a health score and says it computes none."""
