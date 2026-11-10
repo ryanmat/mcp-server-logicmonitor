@@ -11,10 +11,10 @@ under stdio.
 
 ## What it adds
 
-- `get_portals` — list the customer portals in your vault (names, host, auth type, writable).
-- `use_portal(customer)` — make that portal active for subsequent tool calls.
-- `get_current_portal` — show the active portal.
-- `run_portal_reload` — re-read the vault so portals added/removed since startup take
+- `get_portals`: list the customer portals in your vault (names, host, auth type, writable).
+- `use_portal(customer)`: make that portal active for subsequent tool calls.
+- `get_current_portal`: show the active portal.
+- `run_portal_reload`: re-read the vault so portals added/removed since startup take
   effect without restarting the client (keeps the active portal if it still exists).
 - A portal **registry** that reads credentials from an age-encrypted vault (or a plaintext
   JSON file for testing) and builds a LogicMonitor client per customer on demand.
