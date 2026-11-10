@@ -831,7 +831,7 @@ LM_MCP_TOOLS = {
 }
 
 # POST /api/run-tool answers from the same probe: a read tool that succeeded (content
-# cut to its first 120 characters of 96 KB) and one Edwin could not reach.
+# cut to its first 120 characters of 86 KB) and one Edwin could not reach.
 RUN_OK = {
     "success": True,
     "content": '{"insight": {"genAi": {"summary": "Monitoring lost data or ping results for '
