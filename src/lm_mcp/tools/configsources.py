@@ -18,6 +18,7 @@ from lm_mcp.tools import (
     require_write_permission,
     sanitize_filter_value,
 )
+from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -114,40 +115,13 @@ async def create_configsource(
     Args:
         client: LogicMonitor API client.
         definition: Full ConfigSource definition dict in REST API format.
-        overwrite: If True, delete existing ConfigSource with the same name
-            before creating.
+        overwrite: If True, replace the ConfigSource holding the definition's name in
+            place (a PUT to its id); nothing is deleted first.
 
     Returns:
         List of TextContent with created ConfigSource info or error.
     """
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        if overwrite and payload.get("name"):
-            existing = await client.get(
-                "/setting/configsources",
-                params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
-            )
-            items = existing.get("items", [])
-            if items:
-                await client.delete(f"/setting/configsources/{items[0]['id']}")
-
-        result = await client.post("/setting/configsources", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"ConfigSource '{result.get('name')}' created successfully",
-                "configsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await create_module(client, "configsource", definition, overwrite)
 
 
 @require_write_permission
@@ -223,30 +197,7 @@ async def get_configsource(
     Returns:
         List of TextContent with ConfigSource details or error.
     """
-    try:
-        result = await client.get(f"/setting/configsources/{configsource_id}")
-        if raw:
-            return format_response(result)
-
-        source = {
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "display_name": result.get("displayName"),
-            "description": result.get("description"),
-            "applies_to": result.get("appliesTo"),
-            "technology": result.get("technology"),
-            "collect_method": result.get("collectMethod"),
-            "collect_interval": result.get("collectInterval"),
-            "version": result.get("version"),
-            "tags": result.get("tags"),
-            "audit_version": result.get("auditVersion"),
-            "install_date": result.get("installDate"),
-            "config_checks": result.get("configChecks", []),
-        }
-
-        return format_response(source)
-    except Exception as e:
-        return handle_error(e)
+    return await get_module(client, "configsource", configsource_id, raw)
 
 
 def _update_reason_row(item: dict) -> dict:
@@ -491,18 +442,4 @@ async def delete_configsource(
     Returns:
         List of TextContent with deletion confirmation or error.
     """
-    try:
-        cs = await client.get(f"/setting/configsources/{configsource_id}")
-        cs_name = cs.get("name", f"ID:{configsource_id}")
-
-        await client.delete(f"/setting/configsources/{configsource_id}")
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"ConfigSource '{cs_name}' deleted",
-                "configsource_id": configsource_id,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await delete_module(client, "configsource", configsource_id)

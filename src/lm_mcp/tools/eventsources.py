@@ -18,6 +18,7 @@ from lm_mcp.tools import (
     require_write_permission,
     sanitize_filter_value,
 )
+from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -113,40 +114,13 @@ async def create_eventsource(
     Args:
         client: LogicMonitor API client.
         definition: Full EventSource definition dict in REST API format.
-        overwrite: If True, delete existing EventSource with the same name
-            before creating.
+        overwrite: If True, replace the EventSource holding the definition's name in
+            place (a PUT to its id); nothing is deleted first.
 
     Returns:
         List of TextContent with created EventSource info or error.
     """
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        if overwrite and payload.get("name"):
-            existing = await client.get(
-                "/setting/eventsources",
-                params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
-            )
-            items = existing.get("items", [])
-            if items:
-                await client.delete(f"/setting/eventsources/{items[0]['id']}")
-
-        result = await client.post("/setting/eventsources", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"EventSource '{result.get('name')}' created successfully",
-                "eventsource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await create_module(client, "eventsource", definition, overwrite)
 
 
 @require_write_permission
@@ -222,29 +196,7 @@ async def get_eventsource(
     Returns:
         List of TextContent with EventSource details or error.
     """
-    try:
-        result = await client.get(f"/setting/eventsources/{eventsource_id}")
-        if raw:
-            return format_response(result)
-
-        source = {
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "display_name": result.get("displayName"),
-            "description": result.get("description"),
-            "applies_to": result.get("appliesTo"),
-            "technology": result.get("technology"),
-            "group": result.get("group"),
-            "version": result.get("version"),
-            "tags": result.get("tags"),
-            "audit_version": result.get("auditVersion"),
-            "install_date": result.get("installDate"),
-            "filters": result.get("filters", []),
-        }
-
-        return format_response(source)
-    except Exception as e:
-        return handle_error(e)
+    return await get_module(client, "eventsource", eventsource_id, raw)
 
 
 def _device_eventsource_row(item: dict) -> dict:
@@ -357,18 +309,4 @@ async def delete_eventsource(
     Returns:
         List of TextContent with deletion confirmation or error.
     """
-    try:
-        es = await client.get(f"/setting/eventsources/{eventsource_id}")
-        es_name = es.get("name", f"ID:{eventsource_id}")
-
-        await client.delete(f"/setting/eventsources/{eventsource_id}")
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"EventSource '{es_name}' deleted",
-                "eventsource_id": eventsource_id,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await delete_module(client, "eventsource", eventsource_id)

@@ -450,46 +450,6 @@ class TestCreateDatasourceOverwrite:
     """Tests for create_datasource overwrite parameter."""
 
     @respx.mock
-    async def test_create_datasource_overwrite_deletes_existing(self, client, enable_writes):
-        """create_datasource with overwrite=True deletes existing DS before creating."""
-        from lm_mcp.tools.datasources import create_datasource
-
-        # GET to look up existing DS by name
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [{"id": 500, "name": "MyDS"}],
-                    "total": 1,
-                },
-            )
-        )
-
-        # DELETE existing DS
-        delete_route = respx.delete(
-            "https://test.logicmonitor.com/santaba/rest/setting/datasources/500"
-        ).mock(return_value=httpx.Response(200, json={}))
-
-        # POST new DS
-        respx.post("https://test.logicmonitor.com/santaba/rest/setting/datasources").mock(
-            return_value=httpx.Response(
-                200,
-                json={"id": 501, "name": "MyDS", "displayName": "My DataSource"},
-            )
-        )
-
-        result = await create_datasource(
-            client,
-            definition={"name": "MyDS", "displayName": "My DataSource"},
-            overwrite=True,
-        )
-
-        data = json.loads(result[0].text)
-        assert data["success"] is True
-        assert data["datasource"]["id"] == 501
-        assert delete_route.called
-
-    @respx.mock
     async def test_create_datasource_overwrite_no_existing(self, client, enable_writes):
         """create_datasource with overwrite=True works when no existing DS found."""
         from lm_mcp.tools.datasources import create_datasource

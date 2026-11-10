@@ -17,6 +17,7 @@ from lm_mcp.tools import (
     require_write_permission,
     sanitize_filter_value,
 )
+from lm_mcp.tools.logicmodules import create_module, delete_module, get_module
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -112,47 +113,7 @@ async def get_datasource(
     Returns:
         List of TextContent with DataSource details or error.
     """
-    try:
-        result = await client.get(f"/setting/datasources/{datasource_id}")
-        if raw:
-            return format_response(result)
-
-        # Extract key details for a cleaner response
-        datasource = {
-            "id": result.get("id"),
-            "name": result.get("name"),
-            "display_name": result.get("displayName"),
-            "description": result.get("description"),
-            "applies_to": result.get("appliesTo"),
-            "group": result.get("group"),
-            "collect_method": result.get("collectMethod"),
-            "collect_interval": result.get("collectInterval"),
-            "has_multi_instances": result.get("hasMultiInstances"),
-            "datapoints": [
-                {
-                    "id": dp.get("id"),
-                    "name": dp.get("name"),
-                    "description": dp.get("description"),
-                    "type": dp.get("type"),
-                    "alert_expr": dp.get("alertExpr"),
-                    "post_processor_method": dp.get("postProcessorMethod", ""),
-                    "post_processor_param": dp.get("postProcessorParam", ""),
-                }
-                for dp in result.get("dataPoints", [])
-            ],
-            "graphs": [
-                {
-                    "id": g.get("id"),
-                    "name": g.get("name"),
-                    "title": g.get("title"),
-                }
-                for g in result.get("graphs", [])
-            ],
-        }
-
-        return format_response(datasource)
-    except Exception as e:
-        return handle_error(e)
+    return await get_module(client, "datasource", datasource_id, raw)
 
 
 @require_write_permission
@@ -172,40 +133,13 @@ async def create_datasource(
     Args:
         client: LogicMonitor API client.
         definition: Full DataSource definition dict in REST API format.
-        overwrite: If True, delete existing DataSource with the same name before creating.
+        overwrite: If True, replace the DataSource holding the definition's name in
+            place (a PUT to its id); nothing is deleted first.
 
     Returns:
         List of TextContent with created DataSource info or error.
     """
-    try:
-        payload = normalize_definition_fields(definition)
-        payload.pop("id", None)
-
-        if overwrite and payload.get("name"):
-            # Look up existing by name and delete if found
-            existing = await client.get(
-                "/setting/datasources",
-                params={"filter": f"name:{quote_filter_value(payload['name'])}", "size": 1},
-            )
-            items = existing.get("items", [])
-            if items:
-                await client.delete(f"/setting/datasources/{items[0]['id']}")
-
-        result = await client.post("/setting/datasources", json_body=payload)
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"DataSource '{result.get('name')}' created successfully",
-                "datasource": {
-                    "id": result.get("id"),
-                    "name": result.get("name"),
-                    "display_name": result.get("displayName"),
-                },
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await create_module(client, "datasource", definition, overwrite)
 
 
 @require_write_permission
@@ -285,19 +219,4 @@ async def delete_datasource(
     Returns:
         List of TextContent with deletion confirmation or error.
     """
-    try:
-        # Get DataSource info for confirmation
-        ds = await client.get(f"/setting/datasources/{datasource_id}")
-        ds_name = ds.get("name", f"ID:{datasource_id}")
-
-        await client.delete(f"/setting/datasources/{datasource_id}")
-
-        return format_response(
-            {
-                "success": True,
-                "message": f"DataSource '{ds_name}' deleted",
-                "datasource_id": datasource_id,
-            }
-        )
-    except Exception as e:
-        return handle_error(e)
+    return await delete_module(client, "datasource", datasource_id)

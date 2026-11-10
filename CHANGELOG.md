@@ -267,6 +267,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Changed
 
+- `create_<module>` with `overwrite=true`, for the eight LogicModule types, replaces the module
+  holding the definition's name in place with a PUT to its id, where it deleted that module and
+  posted a new one; the module keeps its id, and a failed write leaves it as it was. The eight
+  types' get, delete and create read one module table of endpoint, id field and summary.
 - `update_logicmodule` reads the module's REST object itself, where it called the type's
   `export_*` tool. `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` gate that read by the type's
   `get_<type>` name, where they gated it by the `export_<type>` name.
