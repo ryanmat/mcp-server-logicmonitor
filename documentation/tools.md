@@ -37,7 +37,7 @@ Tool search and discovery
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `search_tools` | Search available MCP tools by keyword or category. Use this to discover which tools are available for a task. | No |
+| `search_tools` | Search the tools this server offers under its current settings by keyword, optionally within one category. Use it to find the tool for a task. It never names a tool the settings hide, so with writes off no write tool appears. Words such as 'the' and 'on' are ignored, plurals match singulars, and a query word that is a tool's full name ranks that tool first. | No |
 
 ## Devices
 
@@ -45,7 +45,7 @@ Device/resource management
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_devices` | List devices (resources) from LogicMonitor with optional filtering | No |
+| `get_devices` | List devices (resources) from LogicMonitor, optionally filtered by name, hostname, status or device group | No |
 | `get_device` | Get detailed information about a specific device (resource) | No |
 | `get_device_groups` | List device/resource groups from LogicMonitor | No |
 | `get_device_group` | Get detailed information about a specific device/resource group, including appliesTo expression and parent ID | No |
@@ -67,7 +67,7 @@ Alert monitoring and management
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_alerts` | Get alerts from LogicMonitor with optional filtering For Kubernetes clusters, use group_id (from get_device_groups) instead of device — the device name filter does not work reliably for K8s resources. Common mistakes: startEpoch/endEpoch use SECONDS not milliseconds. String filter values need double quotes (e.g., monitorObjectName:"hostname"). | No |
+| `get_alerts` | Get open or cleared alerts from LogicMonitor, optionally filtered by severity (critical, error, warning), device, group, datasource or time For Kubernetes clusters, use group_id (from get_device_groups) instead of device — the device name filter does not work reliably for K8s resources. Common mistakes: startEpoch/endEpoch use SECONDS not milliseconds. String filter values need double quotes (e.g., monitorObjectName:"hostname"). | No |
 | `get_alert_details` | Get detailed information about a specific alert | No |
 | `acknowledge_alert` | Acknowledge an alert (requires write permission) Common mistakes: alert_id works with or without the LMA prefix. | Yes |
 | `add_alert_note` | Add a note to an alert without acknowledging (requires write permission) | Yes |
@@ -79,7 +79,7 @@ Alert rule configuration
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_alert_rules` | List alert rules | No |
+| `get_alert_rules` | List alert rules: each rule's priority and the escalation chain it routes matching alerts to | No |
 | `get_alert_rule` | Get details about a specific alert rule | No |
 | `create_alert_rule` | Create an alert rule in LogicMonitor (requires write permission) | Yes |
 | `update_alert_rule` | Update an alert rule in LogicMonitor (requires write permission) | Yes |
@@ -139,7 +139,7 @@ DataSource and instance monitoring
 | `add_device_instance` | Add a monitored instance to a datasource on a device (requires write permission). Used for datasources without Active Discovery (e.g. ServiceStatus). | Yes |
 | `update_device_instance` | Update a monitored instance on a device (requires write permission) | Yes |
 | `delete_device_instance` | Delete a monitored instance from a datasource on a device (requires write permission) | Yes |
-| `get_device_data` | Get metric data for a device/resource datasource instance Common mistakes: Returns most recent data unless period/start/end specified. Requires device_datasource_id (from get_device_datasources) not the datasource definition ID. | No |
+| `get_device_data` | Get the raw metric values (samples) of a device/resource datasource instance, such as CPU, memory or disk usage Common mistakes: Returns most recent data unless period/start/end specified. Requires device_datasource_id (from get_device_datasources) not the datasource definition ID. | No |
 | `get_graph_data` | Get graph image data for visualization | No |
 | `get_datasources` | List datasources from LogicMonitor | No |
 | `get_datasource` | Get details about a specific datasource | No |
@@ -411,7 +411,7 @@ ML/statistical analysis and forecasting
 | `correlate_metrics` | Compute Pearson correlation between multiple metric series. Joins the series by timestamp bucket, as wide as the coarsest series' median sample interval with finer series averaged into it, and correlates over the buckets every series holds, reported as shared_samples. Builds an NxN correlation matrix and highlights strong correlations (\|r\| > 0.7). Maximum 10 sources. | No |
 | `calculate_availability` | Calculate availability percentage from alert history. Computes SLA-style uptime metrics, MTTR, and per-device breakdown from the window's cleared and active alerts, read as two lists; truncated says when the 5000-alert cap cut either read short. With target_slo it adds error_budget for the window: budget, consumed and remaining minutes, percent consumed, burn rate, projected exhaustion in days and a status (healthy, warning past 50 percent, critical past 90, exhausted). Common mistakes: hours_back defaults to 720 (30 days). Narrow scope with device_id/group_id for performance. | No |
 | `analyze_blast_radius` | Count the devices a device failure could reach through topology neighbors: neighbor_count at depth 1, dependent_count beyond it, each device's alert status, and critical path devices. A device whose neighbors neither topology path answers is listed under unreadable with a warning, never counted as zero; on a portal without those routes every read is unreadable. | No |
-| `analyze_metric` | Analyze one device instance's metric series: call this for statistics on a datapoint's recent history, such as its current level against the window, whether it is rising, its daily cycle, when it shifted, or which samples stand out. One paged read of the window feeds every section; 'summary' gives latest, mean, standard deviation, min, max and the latest sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, the detrended 24-hour autocorrelation and a label (volatile, cyclic, increasing, decreasing or stable); 'seasonality' gives detrended autocorrelation at 1, 4, 12, 24 and 168 hours, the dominant period and the peak hours in UTC; 'change_points' gives level shifts, where the mean of the next 30 samples leaves the mean of the previous 30 by five times the noise in that comparison (measured with any steady trend and autocorrelation the noise has), with the daily cycle removed first when the window holds three days or more and that leaves less noise; each shift has its timestamp and the levels before and after it, less the daily cycle when that was removed. A change in the last 30 samples is not reported yet, small shifts in strongly autocorrelated noise go unfound, on a window under a day a change inflates the noise and smaller shifts go unfound, and changes about a day apart in a few days leave the cycle in and go unfound; 'anomalies' gives z-score, IQR and MAD hits, each method's 20 most extreme; 'forecast' gives the least-squares and Holt-Winters (daily season, two days of samples needed) slopes per hour and, with threshold, when each crosses it, within 30 days; 'baseline' compares the window with one as long ending baseline_hours_ago hours ago (one more read): both windows' statistics, the mean's percent deviation and a status (normal within 20 percent, elevated or reduced within 50, anomalous past it). The baseline runs only with baseline_hours_ago. Use get_device_data for the raw samples. | No |
+| `analyze_metric` | Analyze one device instance's metric series, such as CPU, memory or disk usage: call this for statistics on a datapoint's recent history, such as its current level against the window, whether it is rising, its daily cycle, when it shifted, or which samples stand out. One paged read of the window feeds every section; 'summary' gives latest, mean, standard deviation, min, max and the latest sample's signed z-score; 'trend' gives least-squares and Theil-Sen slopes per hour, r-squared, coefficient of variation, the detrended 24-hour autocorrelation and a label (volatile, cyclic, increasing, decreasing or stable); 'seasonality' gives detrended autocorrelation at 1, 4, 12, 24 and 168 hours, the dominant period and the peak hours in UTC; 'change_points' gives level shifts, where the mean of the next 30 samples leaves the mean of the previous 30 by five times the noise in that comparison (measured with any steady trend and autocorrelation the noise has), with the daily cycle removed first when the window holds three days or more and that leaves less noise; each shift has its timestamp and the levels before and after it, less the daily cycle when that was removed. A change in the last 30 samples is not reported yet, small shifts in strongly autocorrelated noise go unfound, on a window under a day a change inflates the noise and smaller shifts go unfound, and changes about a day apart in a few days leave the cycle in and go unfound; 'anomalies' gives z-score, IQR and MAD hits, each method's 20 most extreme; 'forecast' gives the least-squares and Holt-Winters (daily season, two days of samples needed) slopes per hour and, with threshold, when each crosses it, within 30 days; 'baseline' compares the window with one as long ending baseline_hours_ago hours ago (one more read): both windows' statistics, the mean's percent deviation and a status (normal within 20 percent, elevated or reduced within 50, anomalous past it). The baseline runs only with baseline_hours_ago. Use get_device_data for the raw samples. | No |
 
 ## Session
 

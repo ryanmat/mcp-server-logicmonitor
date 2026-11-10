@@ -7,6 +7,8 @@ from typing import Any
 
 from mcp.types import Tool, ToolAnnotations
 
+from lm_mcp.resources.guides import TOOL_CATEGORIES
+
 # Annotation presets for tool categorization
 _READ_ONLY = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=True
@@ -39,7 +41,10 @@ TOOLS.extend(
     [
         Tool(
             name="get_devices",
-            description="List devices (resources) from LogicMonitor with optional filtering",
+            description=(
+                "List devices (resources) from LogicMonitor, optionally filtered by name, "
+                "hostname, status or device group"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -310,7 +315,8 @@ TOOLS.extend(
         Tool(
             name="get_alerts",
             description=(
-                "Get alerts from LogicMonitor with optional filtering"
+                "Get open or cleared alerts from LogicMonitor, optionally filtered by "
+                "severity (critical, error, warning), device, group, datasource or time"
                 "\n\nFor Kubernetes clusters, use group_id (from "
                 "get_device_groups) instead of device — the device name "
                 "filter does not work reliably for K8s resources."
@@ -988,7 +994,8 @@ TOOLS.extend(
         Tool(
             name="get_device_data",
             description=(
-                "Get metric data for a device/resource datasource instance"
+                "Get the raw metric values (samples) of a device/resource datasource "
+                "instance, such as CPU, memory or disk usage"
                 "\n\nCommon mistakes: Returns most recent data unless "
                 "period/start/end specified. Requires device_datasource_id "
                 "(from get_device_datasources) not the datasource definition ID."
@@ -2209,7 +2216,10 @@ TOOLS.extend(
     [
         Tool(
             name="get_alert_rules",
-            description="List alert rules",
+            description=(
+                "List alert rules: each rule's priority and the escalation chain it routes "
+                "matching alerts to"
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -4428,7 +4438,8 @@ TOOLS.extend(
         Tool(
             name="analyze_metric",
             description=(
-                "Analyze one device instance's metric series: call this for statistics "
+                "Analyze one device instance's metric series, such as CPU, memory or disk "
+                "usage: call this for statistics "
                 "on a datapoint's recent history, such as its current level against the "
                 "window, whether it is rising, its daily cycle, when it shifted, or which "
                 "samples stand out. One paged read of the window feeds every section; "
@@ -5524,8 +5535,12 @@ TOOLS.extend(
         Tool(
             name="search_tools",
             description=(
-                "Search available MCP tools by keyword or category. "
-                "Use this to discover which tools are available for a task."
+                "Search the tools this server offers under its current settings by "
+                "keyword, optionally within one category. Use it to find the tool for a "
+                "task. It never names a tool the settings hide, so with writes off no "
+                "write tool appears. Words such as 'the' and 'on' are ignored, plurals "
+                "match singulars, and a query word that is a tool's full name ranks that "
+                "tool first."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -5539,9 +5554,8 @@ TOOLS.extend(
                     },
                     "category": {
                         "type": "string",
-                        "description": (
-                            "Filter to a specific category (e.g., 'alerts', 'ml_analysis')"
-                        ),
+                        "enum": list(TOOL_CATEGORIES["categories"]),
+                        "description": "Search only this category's tools",
                     },
                     "limit": {
                         "type": "integer",

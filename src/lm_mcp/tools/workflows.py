@@ -3,13 +3,15 @@
 
 from __future__ import annotations
 
+import functools
 import logging
+import math
 import re
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import call_sub_tool, format_response, handle_error
+from lm_mcp.tools import call_sub_tool, format_response, handle_error, validation_error
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
 from lm_mcp.tools.logicmodules import MODULES, update_module
 
@@ -1287,113 +1289,184 @@ _WORKFLOW_ALIASES: dict[str, list[str]] = {
 }
 
 
+# Words that name no tool; search_tools drops them from queries, names and descriptions.
+_STOPWORDS = frozenset(
+    [
+        "a",
+        "about",
+        "all",
+        "an",
+        "and",
+        "any",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "can",
+        "do",
+        "does",
+        "for",
+        "from",
+        "has",
+        "have",
+        "how",
+        "i",
+        "in",
+        "into",
+        "is",
+        "it",
+        "its",
+        "me",
+        "my",
+        "of",
+        "on",
+        "or",
+        "our",
+        "that",
+        "the",
+        "their",
+        "them",
+        "then",
+        "there",
+        "these",
+        "this",
+        "to",
+        "us",
+        "was",
+        "we",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+        "you",
+        "your",
+    ]
+)
+
+
+def _stem(word: str) -> str:
+    """Fold a plural onto its singular, so 'alerts' matches 'alert' and 'properties' 'property'."""
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _search_tokens(text: str) -> set[str]:
+    """The stemmed words of text, without stopwords; underscores separate words."""
+    return {_stem(word) for word in re.findall(r"[a-z0-9]+", text.lower())} - _STOPWORDS
+
+
+@functools.cache
+def _search_index() -> tuple[dict[str, tuple[set[str], set[str]]], dict[str, float]]:
+    """Each registered tool's name and description words, and each word's weight.
+
+    A word's weight falls with the number of tools that use it, so 'device' counts
+    for less than 'cpu'. The weights come from the whole registry, so a filter that
+    hides tools does not reorder the rest.
+    """
+    from lm_mcp.registry import TOOLS
+
+    words = {
+        tool.name: (_search_tokens(tool.name), _search_tokens(tool.description or ""))
+        for tool in TOOLS
+    }
+    counts: dict[str, int] = {}
+    for name_words, desc_words in words.values():
+        for word in name_words | desc_words:
+            counts[word] = counts.get(word, 0) + 1
+    total = len(words)
+    return words, {word: math.log(1 + total / count) for word, count in counts.items()}
+
+
+# Weight of a query word found in a tool's name, against 1 for its description, and the
+# bonus for a query word that is the tool's whole name.
+_NAME_WEIGHT = 2.0
+_EXACT_NAME_BONUS = 100.0
+
+
 async def search_tools(
     client: LogicMonitorClient,
     query: str,
     category: str | None = None,
     limit: int = 10,
 ) -> list[TextContent]:
-    """Search available MCP tools by keyword or category.
+    """Search the tools the server lists under the current config.
 
-    Searches tool names and descriptions using word-level tokenization.
-    Scores matches by: exact name match (highest), word in name (medium),
-    word in description (lower). Suggests composite tools when the query
-    matches workflow concepts.
+    Applies the tools/list filters first (LM_ENABLED_TOOLS, LM_DISABLED_TOOLS,
+    LM_MCP_CATEGORIES, the write gate and single-portal mode), so it never names
+    a tool the server would refuse. Scores each tool on the stemmed query words,
+    stopwords dropped, found in its name (double weight) or description, each
+    word weighted by how few tools use it; a query word that is a tool's whole
+    name puts that tool first. Suggests composite tools when the query matches
+    workflow concepts.
 
     Args:
         client: LogicMonitor API client (unused, required by convention).
         query: Search keywords.
-        category: Filter to a specific category.
+        category: A key of the tool taxonomy documentation/tools.md is built from.
         limit: Maximum results (default: 10).
 
     Returns:
         Matching tools with relevance scores.
     """
     try:
-        from lm_mcp.registry import TOOLS
+        from lm_mcp.config import get_config
         from lm_mcp.resources.guides import TOOL_CATEGORIES
+        from lm_mcp.server import _filter_tools, collect_tools
 
-        search_corpus = list(TOOLS)
-
-        # Tokenize query into lowercase words
-        query_words = re.findall(r"[a-z0-9_]+", query.lower())
-        if not query_words:
-            return format_response(
-                {
-                    "matches": [],
-                    "total": 0,
-                    "query": query,
-                    "suggestions": [],
-                }
+        categories = TOOL_CATEGORIES["categories"]
+        if category is not None and category not in categories:
+            return validation_error(
+                "INVALID_REQUEST",
+                f"Unknown category '{category}'. Categories: {', '.join(categories)}",
             )
 
-        # Optionally filter by category
-        category_tool_names: set[str] | None = None
-        if category:
-            cats = TOOL_CATEGORIES.get("categories", {})
-            cat_data = cats.get(category)
-            if cat_data:
-                category_tool_names = set(cat_data.get("tools", []))
-            else:
-                return format_response(
-                    {
-                        "matches": [],
-                        "total": 0,
-                        "query": query,
-                        "category": category,
-                        "available_categories": list(cats.keys()),
-                        "suggestions": [],
-                    }
-                )
+        listed = _filter_tools(collect_tools(), get_config())
+        if category is not None:
+            in_category = set(categories[category]["tools"])
+            listed = [tool for tool in listed if tool.name in in_category]
 
-        # Score each tool
+        words, weights = _search_index()
+        query_words = _search_tokens(query)
+        exact = set(re.findall(r"[a-z0-9_]+", query.lower()))
+
         scored: list[tuple[float, dict]] = []
-        for tool in search_corpus:
-            name = tool.name
-            desc = (tool.description or "").lower()
-
-            if category_tool_names is not None and name not in category_tool_names:
-                continue
-
-            score = 0.0
-            name_lower = name.lower()
-            name_parts = re.findall(r"[a-z0-9]+", name_lower)
-
+        for tool in listed:
+            name_words, desc_words = words[tool.name]
+            score = _EXACT_NAME_BONUS if tool.name in exact else 0.0
             for word in query_words:
-                # Exact name match
-                if word == name_lower:
-                    score += 10.0
-                # Word appears in name parts
-                elif word in name_parts:
-                    score += 5.0
-                # Partial match in name
-                elif word in name_lower:
-                    score += 3.0
-                # Word in description
-                elif word in desc:
-                    score += 1.0
-
+                weight = weights.get(word, 0.0)
+                if word in name_words:
+                    score += _NAME_WEIGHT * weight
+                if word in desc_words:
+                    score += weight
             if score > 0:
                 scored.append(
                     (
                         score,
                         {
-                            "name": name,
+                            "name": tool.name,
                             "description": tool.description,
-                            "score": round(score, 1),
+                            "score": round(score, 2),
                         },
                     )
                 )
 
-        # Sort by score descending
         scored.sort(key=lambda x: x[0], reverse=True)
         matches = [item for _, item in scored[:limit]]
 
         # Suggest composite tools if query matches workflow concepts
         suggestions: list[str] = []
-        query_joined = " ".join(query_words)
+        query_lower = query.lower()
         for keyword, tools in _WORKFLOW_ALIASES.items():
-            if keyword in query_joined or any(keyword in w for w in query_words):
+            if keyword in query_lower:
                 for t in tools:
                     if t not in suggestions:
                         suggestions.append(t)

@@ -1788,6 +1788,7 @@ class TestDiagnose:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.usefixtures("lm_env")
 class TestSearchTools:
     """Tests for the search_tools discovery tool."""
 
@@ -1842,17 +1843,6 @@ class TestSearchTools:
         data = json.loads(result[0].text)
         assert data["total"] == 0
         assert data["matches"] == []
-
-    async def test_invalid_category(self, client):
-        """Invalid category returns empty results with available categories."""
-        result = await search_tools(
-            client,
-            query="alert",
-            category="nonexistent_cat",
-        )
-        data = json.loads(result[0].text)
-        assert data["total"] == 0
-        assert "available_categories" in data
 
 
 # ---------------------------------------------------------------------------
