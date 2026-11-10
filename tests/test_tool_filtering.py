@@ -145,8 +145,8 @@ class TestCategoryFilter:
         assert names == expected
 
     def test_categories_export_selects_the_raw_getters(self):
-        """export selects the getters that take raw=true, which return the REST object the
-        removed export_* tools returned."""
+        """export selects the getters that take raw=true, which return the object's full REST
+        definition."""
         config = _MockConfig(mcp_categories="export")
         names = {tool.name for tool in _filter_tools(TOOLS, config)}
         assert names == {

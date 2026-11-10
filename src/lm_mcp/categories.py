@@ -74,8 +74,8 @@ def categorize(tool: Tool) -> set[str]:
 
     Categories:
     - workflow: curated composite tools (triage, diagnose, ...)
-    - export: a getter that takes raw=true, returning the REST object the removed
-      export_* tools returned
+    - export: a getter that takes raw=true, which returns the object's full REST
+      definition
     - import: tool name starts with "import_"
     - read: read-only tool that talks to LM (openWorldHint=True)
     - write: mutating tool (not read-only, not destructive, not import/export)
