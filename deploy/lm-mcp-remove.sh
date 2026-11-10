@@ -63,4 +63,4 @@ echo
 echo "Removed '$NAME'. Portals now in the vault:"
 CUR="$NEW" jq -r -n 'env.CUR|fromjson | keys[] | "  - " + .'
 echo
-echo "Run reload_portals in your client to apply immediately (no restart needed)."
+echo "Call run_portal_reload in your client to apply immediately (no restart needed)."

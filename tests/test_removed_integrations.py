@@ -337,13 +337,15 @@ def test_src_names_no_removed_integration():
 
 
 def test_tests_name_no_removed_integration():
-    """This file names them by necessity, and is the one exception."""
+    """This file names them by necessity, as does the 4.3.0 tool list that the CHANGELOG
+    rename table is checked against; those two files are the exceptions."""
     tests = _REPO / "tests"
+    exempt = {Path(__file__).resolve(), tests / "fixtures" / "tool_names-4.3.0.txt"}
     naming = {
         path.relative_to(tests).as_posix()
         for path in tests.rglob("*")
         if path.suffix in {".py", ".json", ".md", ".txt"}
-        and path != Path(__file__).resolve()
+        and path not in exempt
         and _REMOVED_WORDS.search(path.read_text())
     }
 

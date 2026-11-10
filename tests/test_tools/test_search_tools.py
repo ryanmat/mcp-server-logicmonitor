@@ -53,7 +53,7 @@ async def _names(query: str, **kwargs) -> list[str]:
         ({"LM_DISABLED_TOOLS": "get_alerts"}, "get_alerts", "get_alerts"),
         ({"LM_MCP_CATEGORIES": "workflow"}, "alerts", "get_alerts"),
         ({}, "delete device", "delete_device"),
-        ({"LM_ENABLE_WRITE_OPERATIONS": "true"}, "list portals", "list_portals"),
+        ({"LM_ENABLE_WRITE_OPERATIONS": "true"}, "list portals", "get_portals"),
     ],
     ids=["enabled", "disabled", "categories", "write-gate", "single-portal"],
 )

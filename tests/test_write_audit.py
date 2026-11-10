@@ -82,9 +82,9 @@ class TestPortalAuditVisibility:
         from lm_mcp.logging import is_write_tool
 
         assert is_write_tool("use_portal")
-        assert is_write_tool("reload_portals")
-        assert not is_write_tool("list_portals")
-        assert not is_write_tool("current_portal")
+        assert is_write_tool("run_portal_reload")
+        assert not is_write_tool("get_portals")
+        assert not is_write_tool("get_current_portal")
 
     def test_audit_line_includes_active_portal_in_multi_portal(
         self, monkeypatch, tmp_path, reset_portals, caplog

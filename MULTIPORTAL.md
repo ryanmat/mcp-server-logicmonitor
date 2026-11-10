@@ -11,10 +11,10 @@ under stdio.
 
 ## What it adds
 
-- `list_portals` — list the customer portals in your vault (names, host, auth type, writable).
+- `get_portals` — list the customer portals in your vault (names, host, auth type, writable).
 - `use_portal(customer)` — make that portal active for subsequent tool calls.
-- `current_portal` — show the active portal.
-- `reload_portals` — re-read the vault so portals added/removed since startup take
+- `get_current_portal` — show the active portal.
+- `run_portal_reload` — re-read the vault so portals added/removed since startup take
   effect without restarting the client (keeps the active portal if it still exists).
 - A portal **registry** that reads credentials from an age-encrypted vault (or a plaintext
   JSON file for testing) and builds a LogicMonitor client per customer on demand.
@@ -108,7 +108,7 @@ argument list). A timestamped backup of the previous encrypted vault is kept.
 
 It prompts for a nickname (the key you pass to `use_portal`), the portal host,
 the auth type (bearer token or LMv1 access id+key), and whether that portal may
-perform writes. After it saves, run `reload_portals` in your client (or restart it)
+perform writes. After it saves, call `run_portal_reload` in your client (or restart it)
 so the server re-reads the vault, then `use_portal <nickname>`.
 
 ## Removing a portal
@@ -119,7 +119,7 @@ so the server re-reads the vault, then `use_portal <nickname>`.
 
 Lists the portals, confirms, drops the record, and re-encrypts (with a timestamped
 backup). It refuses to remove the last portal, since the server needs at least one
-to load. Run `reload_portals` afterwards to apply without a restart.
+to load. Call `run_portal_reload` afterwards to apply without a restart.
 
 Doing it by hand instead: decrypt into a variable, edit with jq, back up, re-encrypt.
 Every variable below is defined by the snippet itself, so a typo cannot truncate the

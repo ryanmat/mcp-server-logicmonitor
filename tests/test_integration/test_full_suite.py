@@ -52,7 +52,7 @@ from lm_mcp.tools.resources import (
     get_device_property,
     update_device_property,
 )
-from lm_mcp.tools.sdts import create_sdt, delete_sdt, list_sdts
+from lm_mcp.tools.sdts import create_sdt, delete_sdt, get_sdts
 from lm_mcp.tools.websites import (
     get_website,
     get_website_data,
@@ -290,7 +290,7 @@ class TestMaintenanceWindowFlow:
         assert len(sdt_result) == 1
 
         # Step 3: Verify SDT exists
-        list_result = await list_sdts(client)
+        list_result = await get_sdts(client)
         assert len(list_result) == 1
         assert "SDT_500" in list_result[0].text
 

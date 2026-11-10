@@ -12,8 +12,8 @@ from lm_mcp.tools.session import (
     clear_session_context,
     delete_session_variable,
     get_session_context,
+    get_session_history,
     get_session_variable,
-    list_session_history,
     set_session_variable,
 )
 
@@ -189,11 +189,11 @@ class TestClearSessionContext:
 
 
 class TestListSessionHistory:
-    """Tests for list_session_history tool."""
+    """Tests for get_session_history tool."""
 
     async def test_returns_empty_history(self):
         """Returns empty history when no operations."""
-        result = await list_session_history()
+        result = await get_session_history()
 
         data = json.loads(result[0].text)
         assert data["count"] == 0
@@ -205,7 +205,7 @@ class TestListSessionHistory:
         session.record_result("get_devices", {"limit": 10}, {"items": []}, True)
         session.record_result("get_device", {"device_id": 1}, {"id": 1}, True)
 
-        result = await list_session_history()
+        result = await get_session_history()
 
         data = json.loads(result[0].text)
         assert data["count"] == 2
@@ -220,7 +220,7 @@ class TestListSessionHistory:
         for i in range(10):
             session.record_result(f"tool_{i}", {}, {}, True)
 
-        result = await list_session_history(limit=3)
+        result = await get_session_history(limit=3)
 
         data = json.loads(result[0].text)
         assert data["count"] == 3
@@ -232,7 +232,7 @@ class TestListSessionHistory:
         session.record_result("tool_1", {}, {}, True)
         session.record_result("tool_2", {}, {}, True)
 
-        result = await list_session_history(limit=0)
+        result = await get_session_history(limit=0)
 
         data = json.loads(result[0].text)
         assert data["count"] == 1
@@ -243,7 +243,7 @@ class TestListSessionHistory:
         for i in range(60):
             session.record_result(f"tool_{i}", {}, {}, True)
 
-        result = await list_session_history(limit=100)
+        result = await get_session_history(limit=100)
 
         data = json.loads(result[0].text)
         assert data["count"] == 50

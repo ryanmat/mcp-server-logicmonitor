@@ -64,11 +64,11 @@ class TestExecuteToolInlineErrors:
     async def test_portal_tool_in_single_portal_mode(self, single_portal):
         from lm_mcp.server import execute_tool
 
-        result = await execute_tool("list_portals", {})
+        result = await execute_tool("get_portals", {})
         assert is_error_result(result)
         error = envelope(result)
         assert error["code"] == "FEATURE_DISABLED"
-        assert error["message"].startswith("Tool 'list_portals' is only available")
+        assert error["message"].startswith("Tool 'get_portals' is only available")
 
     async def test_tool_not_enabled(self, single_portal, monkeypatch):
         monkeypatch.setenv("LM_ENABLED_TOOLS", "get_alerts")

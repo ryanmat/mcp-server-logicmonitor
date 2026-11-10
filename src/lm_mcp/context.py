@@ -75,5 +75,5 @@ def current_client() -> LogicMonitorClient:
 def missing_client_message(multi_portal: bool) -> str:
     """The message for a caller that needs a client and has none."""
     if multi_portal:
-        return "No portal selected. Call use_portal(<customer>) first (see list_portals)."
+        return "No portal selected. Call use_portal(<customer>) first (see get_portals)."
     return "Client not initialized"

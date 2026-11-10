@@ -33,7 +33,7 @@ _SDT_TYPE_API_MAP: dict[str, str] = {
 
 
 def _sdt_row(item: dict) -> dict:
-    """Project one /sdt/sdts row onto the list_sdts fields."""
+    """Project one /sdt/sdts row onto the get_sdts fields."""
     return {
         "id": item.get("id"),
         "type": item.get("type"),
@@ -44,7 +44,7 @@ def _sdt_row(item: dict) -> dict:
     }
 
 
-async def list_sdts(
+async def get_sdts(
     client: LogicMonitorClient,
     device_id: int | None = None,
     device_group_id: int | None = None,

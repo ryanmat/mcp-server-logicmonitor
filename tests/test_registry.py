@@ -172,7 +172,7 @@ class TestRegistry:
     def test_read_tools_marked_readonly(self):
         """Read-only tools have readOnlyHint=True."""
         read_prefixes = ("get_", "list_")
-        session_reads = {"get_session_context", "get_session_variable", "list_session_history"}
+        session_reads = {"get_session_context", "get_session_variable", "get_session_history"}
         for tool in TOOLS:
             if tool.name.startswith(read_prefixes) and tool.name not in session_reads:
                 assert tool.annotations.readOnlyHint is True, (
@@ -201,7 +201,7 @@ class TestRegistry:
             "get_session_variable",
             "delete_session_variable",
             "clear_session_context",
-            "list_session_history",
+            "get_session_history",
         }
         for tool in TOOLS:
             if tool.name in session_tools:
@@ -224,7 +224,7 @@ class TestRegistry:
             "get_session_variable",
             "delete_session_variable",
             "clear_session_context",
-            "list_session_history",
+            "get_session_history",
         }
 
         for tool in TOOLS:

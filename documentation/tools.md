@@ -91,7 +91,7 @@ Scheduled downtime management
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `list_sdts` | List scheduled downtimes from LogicMonitor | No |
+| `get_sdts` | List scheduled downtimes from LogicMonitor | No |
 | `create_sdt` | Create a scheduled downtime (requires write permission) Common mistakes: duration_minutes is MINUTES not hours/seconds. DeviceSDT needs device_id, DeviceGroupSDT needs device_group_id. DeviceDataSourceSDT needs device_id + datasource_id. Cloud resources (collector_id=-2) may not support DeviceSDT; use DeviceGroupSDT on their parent group instead. | Yes |
 | `update_sdt` | Update a scheduled downtime (requires write permission). Uses fetch-modify-PUT to preserve unmodified fields. | Yes |
 | `delete_sdt` | Delete a scheduled downtime (requires write permission) | Yes |
@@ -424,7 +424,7 @@ Session context, variable management, and history
 | `get_session_variable` | Get a user-defined session variable | No |
 | `delete_session_variable` | Delete a user-defined session variable | No |
 | `clear_session_context` | Clear all session context (variables and history) | No |
-| `list_session_history` | List recent tool call history | No |
+| `get_session_history` | List recent tool call history | No |
 
 ## Portals
 
@@ -432,10 +432,10 @@ Multi-portal switching: one server, many customer portals
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `list_portals` | List the customer portals available in this multi-portal server. | No |
+| `get_portals` | List the customer portals available in this multi-portal server. | No |
 | `use_portal` | Switch the active customer portal for subsequent tool calls. | No |
-| `current_portal` | Show which customer portal is currently active. | No |
-| `reload_portals` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
+| `get_current_portal` | Show which customer portal is currently active. | No |
+| `run_portal_reload` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
 
 ## Terraform
 
