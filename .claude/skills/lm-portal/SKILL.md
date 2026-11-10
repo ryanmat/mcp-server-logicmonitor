@@ -97,7 +97,9 @@ below 40. Name the noisiest devices and datasources, and pass on the
 
 Call `analyze_alerts` with `hours=hours_back` and `analyses=["changes", "bursts"]`:
 - `changes.correlated_events` pair portal changes with the alert spikes that followed
-  them, with `time_gap_minutes` and `confidence`.
+  them, with `time_gap_minutes` and `confidence`. When `changes.audit_read_failed` is
+  true, the audit log could not be read: report the changes as unknown, since
+  `total_changes` then reads 0 whether or not anything changed.
 - `bursts.bursts` are the datasources that fired on several devices at once, each
   with its `alert_count` and `device_count`.
 

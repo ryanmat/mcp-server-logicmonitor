@@ -35,7 +35,8 @@ Steps to follow:
    blast-radius row with a critical alert count above 0 is the first to escalate; an
    unreadable count above 0 means that impact is unknown, not low.
 4. Read the changes: a portal change followed by a spike minutes later is the first
-   suspect.
+   suspect. When the changes section says the audit read failed, the changes are
+   unknown, not absent.
 5. When the hourly volume spikes, call `analyze_alerts` over the same window with
    analyses ["bursts"] for the datasources that fired on many devices at once.
 6. To list or page the open alerts themselves, call `get_alerts` with cleared=false;
@@ -45,7 +46,8 @@ Steps to follow:
 What the tools leave to you:
 - A null section in the triage result means its read failed. Report the warning and
   treat that section as unknown, not empty.
-- The severity counts include cleared alerts; the active count is the open total.
+- The severity counts include cleared alerts; the active count is the window's alerts
+  still open.
 - Acknowledge alerts or add notes only with the operator's explicit confirmation.
 
 Argument parsing: Extract severity from words like "critical alerts" or "errors".
@@ -149,13 +151,13 @@ Pre-execution checklist (complete every item before calling execute_remediation)
 6. Say how to undo the change, or that it cannot be undone.
 7. Get explicit confirmation from the operator, naming the device, the source and the
    commands from item 3. The remediation_execution scenario in
-   lm://guide/best-practices lists the same checks.
+   lm://guide/best-practices covers the AppliesTo, script and concurrency checks.
 
 Execution:
 8. Call `execute_remediation` with the host ID, the source ID and, when given, the
-   alert ID. It refuses a device whose status is dead and a collector older than
-   39.200, and it needs write operations enabled on the server. A run cannot be paused
-   or cancelled once it starts.
+   alert ID. It refuses a device whose status is dead or dead-collector and a
+   collector older than 39.200, and it needs write operations enabled on the server.
+   A run cannot be paused or cancelled once it starts.
 
 After the run:
 9. Call `get_diagnostic_remediation_results` with the host ID and the source ID for
