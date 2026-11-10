@@ -73,7 +73,7 @@ TOOL_CATEGORIES = {
         "sdts": {
             "description": "Scheduled downtime management",
             "tools": [
-                "list_sdts",
+                "get_sdts",
                 "create_sdt",
                 "update_sdt",
                 "delete_sdt",
@@ -376,16 +376,16 @@ TOOL_CATEGORIES = {
                 "get_session_variable",
                 "delete_session_variable",
                 "clear_session_context",
-                "list_session_history",
+                "get_session_history",
             ],
         },
         "portals": {
             "description": "Multi-portal switching: one server, many customer portals",
             "tools": [
-                "list_portals",
+                "get_portals",
                 "use_portal",
-                "current_portal",
-                "reload_portals",
+                "get_current_portal",
+                "run_portal_reload",
             ],
         },
         "terraform": {

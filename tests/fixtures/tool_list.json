@@ -1861,20 +1861,6 @@
       "type": "object"
     }
   },
-  "current_portal": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Show which customer portal is currently active.",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    }
-  },
   "delete_action_chain": {
     "annotations": {
       "destructiveHint": true,
@@ -3622,6 +3608,20 @@
       "type": "object"
     }
   },
+  "get_current_portal": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Show which customer portal is currently active.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
   "get_dashboard": {
     "annotations": {
       "destructiveHint": false,
@@ -5236,6 +5236,20 @@
       "type": "object"
     }
   },
+  "get_portals": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the customer portals available in this multi-portal server.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
   "get_power_events": {
     "annotations": {
       "destructiveHint": false,
@@ -5737,6 +5751,56 @@
       "type": "object"
     }
   },
+  "get_sdts": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List scheduled downtimes from LogicMonitor",
+    "inputSchema": {
+      "properties": {
+        "admin": {
+          "description": "Filter by admin username (substring match)",
+          "type": "string"
+        },
+        "device_group_id": {
+          "description": "Filter by device group ID",
+          "type": "integer"
+        },
+        "device_id": {
+          "description": "Filter by device ID",
+          "type": "integer"
+        },
+        "filter": {
+          "description": "Raw filter expression (overrides other filters). Example: type:DeviceSDT,admin~john",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        },
+        "sdt_type": {
+          "description": "Filter by SDT type",
+          "enum": [
+            "DeviceSDT",
+            "DeviceGroupSDT",
+            "DeviceDataSourceSDT"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_service": {
     "annotations": {
       "destructiveHint": false,
@@ -5828,6 +5892,26 @@
     "description": "Get current session context (variables and history)",
     "inputSchema": {
       "properties": {},
+      "type": "object"
+    }
+  },
+  "get_session_history": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List recent tool call history",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 10,
+          "description": "Maximum entries to return (max 50)",
+          "type": "integer"
+        }
+      },
       "type": "object"
     }
   },
@@ -6606,90 +6690,6 @@
       "type": "object"
     }
   },
-  "list_portals": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List the customer portals available in this multi-portal server.",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    }
-  },
-  "list_sdts": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List scheduled downtimes from LogicMonitor",
-    "inputSchema": {
-      "properties": {
-        "admin": {
-          "description": "Filter by admin username (substring match)",
-          "type": "string"
-        },
-        "device_group_id": {
-          "description": "Filter by device group ID",
-          "type": "integer"
-        },
-        "device_id": {
-          "description": "Filter by device ID",
-          "type": "integer"
-        },
-        "filter": {
-          "description": "Raw filter expression (overrides other filters). Example: type:DeviceSDT,admin~john",
-          "type": "string"
-        },
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "offset": {
-          "default": 0,
-          "description": "Pagination offset",
-          "type": "integer"
-        },
-        "sdt_type": {
-          "description": "Filter by SDT type",
-          "enum": [
-            "DeviceSDT",
-            "DeviceGroupSDT",
-            "DeviceDataSourceSDT"
-          ],
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "list_session_history": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": false,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "List recent tool call history",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 10,
-          "description": "Maximum entries to return (max 50)",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
   "portal_overview": {
     "annotations": {
       "destructiveHint": false,
@@ -6821,20 +6821,6 @@
       "type": "object"
     }
   },
-  "reload_portals": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": false,
-      "readOnlyHint": false,
-      "title": null
-    },
-    "description": "Re-read the vault so portals added or removed since startup take effect without restarting the client.",
-    "inputSchema": {
-      "properties": {},
-      "type": "object"
-    }
-  },
   "run_netscan": {
     "annotations": {
       "destructiveHint": false,
@@ -6854,6 +6840,20 @@
       "required": [
         "netscan_id"
       ],
+      "type": "object"
+    }
+  },
+  "run_portal_reload": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Re-read the vault so portals added or removed since startup take effect without restarting the client.",
+    "inputSchema": {
+      "properties": {},
       "type": "object"
     }
   },
@@ -8188,7 +8188,7 @@
     "inputSchema": {
       "properties": {
         "customer": {
-          "description": "Portal key from list_portals",
+          "description": "Portal key from get_portals",
           "type": "string"
         }
       },

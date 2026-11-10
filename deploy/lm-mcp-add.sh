@@ -93,5 +93,5 @@ echo
 echo "Saved. Portals now in the vault:"
 CUR="$NEW" jq -r -n 'env.CUR|fromjson | keys[] | "  - " + .'
 echo
-echo "Run reload_portals in your client (or restart it) so the server re-reads"
+echo "Call run_portal_reload in your client (or restart it) so the server re-reads"
 echo "the vault, then: use_portal $NAME"

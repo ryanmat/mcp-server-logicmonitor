@@ -472,7 +472,7 @@ TOOLS.extend(
 TOOLS.extend(
     [
         Tool(
-            name="list_sdts",
+            name="get_sdts",
             description="List scheduled downtimes from LogicMonitor",
             annotations=_READ_ONLY,
             inputSchema={
@@ -4661,7 +4661,7 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="list_session_history",
+            name="get_session_history",
             description="List recent tool call history",
             annotations=_SESSION_READ,
             inputSchema={
@@ -6028,7 +6028,7 @@ TOOLS.extend(
 TOOLS.extend(
     [
         Tool(
-            name="list_portals",
+            name="get_portals",
             description="List the customer portals available in this multi-portal server.",
             annotations=_SESSION_READ,
             inputSchema={"type": "object", "properties": {}},
@@ -6040,19 +6040,19 @@ TOOLS.extend(
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "customer": {"type": "string", "description": "Portal key from list_portals"}
+                    "customer": {"type": "string", "description": "Portal key from get_portals"}
                 },
                 "required": ["customer"],
             },
         ),
         Tool(
-            name="current_portal",
+            name="get_current_portal",
             description="Show which customer portal is currently active.",
             annotations=_SESSION_READ,
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
-            name="reload_portals",
+            name="run_portal_reload",
             description=(
                 "Re-read the vault so portals added or removed since startup take "
                 "effect without restarting the client."
@@ -6132,10 +6132,10 @@ def get_tool_handler(tool_name: str) -> Any:
 
     handlers = {
         # Multi-portal
-        "list_portals": portal_tools.list_portals,
+        "get_portals": portal_tools.get_portals,
         "use_portal": portal_tools.use_portal,
-        "current_portal": portal_tools.current_portal,
-        "reload_portals": portal_tools.reload_portals,
+        "get_current_portal": portal_tools.get_current_portal,
+        "run_portal_reload": portal_tools.run_portal_reload,
         # Devices
         "get_devices": devices.get_devices,
         "get_device": devices.get_device,
@@ -6156,7 +6156,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "add_alert_note": alerts.add_alert_note,
         "bulk_acknowledge_alerts": alerts.bulk_acknowledge_alerts,
         # SDTs
-        "list_sdts": sdts.list_sdts,
+        "get_sdts": sdts.get_sdts,
         "create_sdt": sdts.create_sdt,
         "delete_sdt": sdts.delete_sdt,
         "update_sdt": sdts.update_sdt,
@@ -6400,7 +6400,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_session_variable": session.get_session_variable,
         "delete_session_variable": session.delete_session_variable,
         "clear_session_context": session.clear_session_context,
-        "list_session_history": session.list_session_history,
+        "get_session_history": session.get_session_history,
         # Workflows
         "triage": workflows.triage,
         "health_check": workflows.health_check,

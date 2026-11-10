@@ -83,7 +83,7 @@ BEST_PRACTICES: dict[str, dict] = {
             {
                 "action": "Verify SDT exclusions are applied correctly",
                 "how": (
-                    "Use get_active_sdts and list_sdts to check if planned downtime "
+                    "Use get_active_sdts and get_sdts to check if planned downtime "
                     "is excluded from availability calculations"
                 ),
                 "priority": "high",

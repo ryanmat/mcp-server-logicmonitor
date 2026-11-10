@@ -286,9 +286,9 @@ class TestSessionKeyedByPortal:
         portals.activate("acme")
         await self._call("search_tools", query="device")
         await self._call("use_portal", customer="globex")
-        globex = json.loads((await self._call("list_session_history"))[0].text)
+        globex = json.loads((await self._call("get_session_history"))[0].text)
         await self._call("use_portal", customer="acme")
-        acme = json.loads((await self._call("list_session_history"))[0].text)
+        acme = json.loads((await self._call("get_session_history"))[0].text)
 
         assert "search_tools" not in [entry["tool"] for entry in globex["history"]]
         assert "search_tools" in [entry["tool"] for entry in acme["history"]]

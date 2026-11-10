@@ -156,14 +156,14 @@ SESSION_TOOLS = {
     "get_session_variable",
     "delete_session_variable",
     "clear_session_context",
-    "list_session_history",
+    "get_session_history",
 }
 
 PORTAL_TOOLS = {
-    "list_portals",
+    "get_portals",
     "use_portal",
-    "current_portal",
-    "reload_portals",
+    "get_current_portal",
+    "run_portal_reload",
 }
 
 # Discovery tools that take the client argument by convention but never use it,

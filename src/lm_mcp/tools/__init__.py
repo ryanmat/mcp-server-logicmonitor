@@ -714,7 +714,7 @@ def require_write_permission(func: F) -> F:
                         "error": True,
                         "code": "INVALID_REQUEST",
                         "message": "No portal selected",
-                        "suggestion": "Call use_portal(<customer>) first (see list_portals)",
+                        "suggestion": "Call use_portal(<customer>) first (see get_portals)",
                     }
                 )
             if not binding.writable:

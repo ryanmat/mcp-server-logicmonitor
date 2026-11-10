@@ -9,8 +9,23 @@ import pytest
 
 from lm_mcp.prompts import PROMPTS, get_prompt_messages
 from lm_mcp.registry import TOOLS
+from lm_mcp.resources import RESOURCES
 
 _BACKTICKED_NAME = re.compile(r"`([a-z][a-z0-9]*(?:_[a-z0-9]+)*)`")
+_RESOURCE_URI = re.compile(r"lm://[a-z0-9/-]+")
+
+# Each prompt's lm:// resources and the tools its workflow is built on.
+_PROMPT_REFERENCES: dict[str, tuple[set[str], set[str]]] = {
+    "incident_triage": (
+        {"lm://filters/alerts", "lm://guide/best-practices"},
+        {"triage", "analyze_alerts"},
+    ),
+    "capacity_review": ({"lm://filters/devices"}, {"capacity_plan", "analyze_metric"}),
+    "remediation": (
+        {"lm://guide/best-practices"},
+        {"get_remediationsources", "execute_remediation", "get_diagnostic_remediation_results"},
+    ),
+}
 
 _REMOVED_PROMPTS = (
     "health_check",
@@ -138,3 +153,39 @@ def test_unknown_prompt_raises_value_error():
     """get_prompt_messages refuses a name no prompt has."""
     with pytest.raises(ValueError, match="Unknown prompt"):
         get_prompt_messages("bogus_prompt", {})
+
+
+def _text(name: str) -> str:
+    return get_prompt_messages(name, {}).messages[0].content.text
+
+
+@pytest.mark.parametrize("name", sorted(_PROMPT_REFERENCES))
+def test_prompt_embeds_its_resources_and_names_its_tools(name):
+    """R2.15: each prompt names its lm:// resources and the 5.0 tools of its workflow."""
+    uris, tools = _PROMPT_REFERENCES[name]
+    text = _text(name)
+
+    assert sorted(uri for uri in uris if uri not in text) == []
+    assert sorted(tools - set(_BACKTICKED_NAME.findall(text))) == []
+
+
+@pytest.mark.parametrize("name", [prompt.name for prompt in PROMPTS])
+def test_prompt_cites_only_served_resources(name):
+    """R2.15: every lm:// URI a prompt's text cites is a resource the server serves."""
+    served = {str(resource.uri) for resource in RESOURCES}
+
+    assert sorted(set(_RESOURCE_URI.findall(_text(name))) - served) == []
+
+
+def test_remediation_prompt_carries_the_pre_execution_checklist():
+    """R2.15: the remediation prompt carries the checks execute_remediation does not run."""
+    text = _text("remediation")
+
+    assert "Pre-execution checklist" in text
+    assert "`get_diagnostic_remediation_assignments`" in text
+    assert "explicit confirmation" in text
+
+
+def test_capacity_prompt_carries_the_flat_forecast_branch():
+    """R2.15: the capacity prompt says what to do when no forecast crosses the threshold."""
+    assert "When no forecast crosses" in _text("capacity_review")
