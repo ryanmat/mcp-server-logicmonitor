@@ -1309,6 +1309,32 @@ class TestPortalOverview:
         jsonschema.validate(summary, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
         assert "requires disabled tools: get_alerts, get_devices" in full
 
+    async def test_a_report_of_failed_reads_validates_against_the_schema(self, client, lm_env):
+        """Every read failing leaves each key null with one warning per tool, in full mode."""
+        failing = {
+            name: patch(name, new_callable=AsyncMock, side_effect=RuntimeError("API timeout"))
+            for name in (
+                "lm_mcp.tools.analyze_alerts.analyze_alerts",
+                "lm_mcp.tools.collectors.get_collectors",
+                "lm_mcp.tools.sdts.get_active_sdts",
+                "lm_mcp.tools.alerts.get_alerts",
+                "lm_mcp.tools.devices.get_devices",
+            )
+        }
+        with ExitStack() as stack:
+            for patcher in failing.values():
+                stack.enter_context(patcher)
+            data = json.loads((await portal_overview(client, detail_level="full"))[0].text)
+
+        null_keys = set(PORTAL_OVERVIEW_OUTPUT_SCHEMA["properties"]) - {
+            "hours_back",
+            "detail_level",
+            "warnings",
+        }
+        assert {key: data[key] for key in null_keys} == dict.fromkeys(null_keys)
+        assert len(data["warnings"]) == 5
+        jsonschema.validate(data, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+
     def test_the_output_schema_refuses_an_undocumented_key(self):
         report = {
             "hours_back": 4,
