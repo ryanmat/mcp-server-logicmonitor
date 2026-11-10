@@ -5905,7 +5905,8 @@ TOOLS.extend(
                             "Include recent alerts on a device named for the collector's "
                             "hostname. A collector with no such device returns an empty "
                             "list, which does not show it stayed up. The API cannot narrow "
-                            "rows to CollectorDown; each row's alert_type names what it is."
+                            "rows to CollectorDown; each row's alert_type names what it is. "
+                            "A failed read is null with history_warning, not an empty list."
                         ),
                     },
                     "history_days": {

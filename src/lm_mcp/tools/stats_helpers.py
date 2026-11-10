@@ -615,8 +615,8 @@ async def fetch_metric_series(
         instance_id: Instance ID.
         datapoints: Comma-separated datapoint names (all if omitted).
         hours_back: Number of hours to look back.
-        end_hours_ago: Hours before now the window ends; 0 reads up to now and sends
-            no end.
+        end_hours_ago: Hours before now the window ends; 0 reads up to now. The end
+            is always sent: the endpoint answers a start alone with its last hour.
 
     Returns:
         Dict keyed by datapoint name, each containing:
@@ -627,9 +627,7 @@ async def fetch_metric_series(
     now_epoch = int(time.time())
     start_epoch = now_epoch - ((hours_back + end_hours_ago) * 3600)
 
-    params: dict[str, Any] = {"start": start_epoch}
-    if end_hours_ago:
-        params["end"] = now_epoch - end_hours_ago * 3600
+    params: dict[str, Any] = {"start": start_epoch, "end": now_epoch - end_hours_ago * 3600}
     if datapoints:
         params["datapoints"] = datapoints
 
