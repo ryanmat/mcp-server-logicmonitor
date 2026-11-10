@@ -3260,30 +3260,6 @@
       "type": "object"
     }
   },
-  "get_api_token_audit": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get API token usage audit logs",
-    "inputSchema": {
-      "properties": {
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "token_id": {
-          "description": "Filter by API token ID",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
   "get_api_tokens": {
     "annotations": {
       "destructiveHint": false,
@@ -3392,11 +3368,15 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Read the portal audit log: call this for who did what and when. kind='all' returns one page of entries, newest first; kind='change' returns the configuration changes (create, update, delete or import, read from each entry's description) found in a pool of the newest entries, with scanned and has_more. username is an exact name or a comma-separated list; action and resource_type are text the description must contain (the portal applies one, the second is matched on the fetched page); start_time and end_time bound the entry time in epoch seconds. System and automation actors (System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the fetch unless exclude_system is false or a username is given; dropped counts them and paging follows the rows the portal returned. offset plus the rows read must stay within 10,000, and the filter within about 900 characters.",
+    "description": "Read the portal audit log: call this for who did what and when. kind='all' returns one page of entries, newest first; kind='change' returns the configuration changes (create, update, delete or import, read from each entry's description) found in a pool of the newest entries, with scanned and has_more; kind='login' returns portal sign-ins, sign-outs and failed logins, one query per login wording (up to six calls), with status and method per row, success_only or failed_only, and total as a lower bound while has_more is true; kind='api_token' returns the rows naming an API token, given by access_id or token_id (read to its access ID), keeping only that exact access ID, with event (change, rejected, throttled), path and method per row. username is an exact name or a comma-separated list; action and resource_type (kinds all and change) are whole words the description holds (the portal applies one, the second is matched on the fetched page); start_time and end_time bound the entry time in epoch seconds. System and automation actors (System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the fetch for kinds all and change unless exclude_system is false or a username is given; dropped counts them and paging follows the rows the portal returned. An argument another kind reads is refused. offset plus the rows read must stay within 10,000, and the filter within about 900 characters.",
     "inputSchema": {
       "properties": {
+        "access_id": {
+          "description": "With kind api_token: the token's whole access ID",
+          "type": "string"
+        },
         "action": {
-          "description": "Text the description contains, e.g. Action=Delete",
+          "description": "Whole words the description holds, e.g. Action=Delete",
           "type": "string"
         },
         "change_type": {
@@ -3418,12 +3398,19 @@
           "description": "Drop system and automation actors (default true)",
           "type": "boolean"
         },
+        "failed_only": {
+          "default": false,
+          "description": "With kind login: failed logins only",
+          "type": "boolean"
+        },
         "kind": {
           "default": "all",
-          "description": "all: every entry; change: configuration changes only",
+          "description": "all: every entry; change: configuration changes; login: portal logins; api_token: rows naming an API token",
           "enum": [
             "all",
-            "change"
+            "change",
+            "login",
+            "api_token"
           ],
           "type": "string"
         },
@@ -3438,11 +3425,20 @@
           "type": "integer"
         },
         "resource_type": {
-          "description": "Text the description contains, e.g. Type=Device",
+          "description": "Whole words the description holds, e.g. Type=Device",
           "type": "string"
         },
         "start_time": {
           "description": "Only entries at or after this epoch second",
+          "type": "integer"
+        },
+        "success_only": {
+          "default": false,
+          "description": "With kind login: successful logins only",
+          "type": "boolean"
+        },
+        "token_id": {
+          "description": "With kind api_token: the token's id, read to its access ID",
           "type": "integer"
         },
         "username": {
@@ -3495,34 +3491,6 @@
           "default": 0,
           "description": "Pagination offset",
           "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_change_audit": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get configuration change audit logs",
-    "inputSchema": {
-      "properties": {
-        "change_type": {
-          "description": "Filter by change type",
-          "type": "string"
-        },
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "resource_type": {
-          "description": "Filter by resource type",
-          "type": "string"
         }
       },
       "type": "object"
@@ -5041,40 +5009,6 @@
           "default": 4,
           "description": "Minimum alert fires to qualify as flapping",
           "type": "integer"
-        }
-      },
-      "type": "object"
-    }
-  },
-  "get_login_audit": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get login/authentication audit logs",
-    "inputSchema": {
-      "properties": {
-        "failed_only": {
-          "default": false,
-          "description": "Only failed logins",
-          "type": "boolean"
-        },
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "success_only": {
-          "default": false,
-          "description": "Only successful logins",
-          "type": "boolean"
-        },
-        "username": {
-          "description": "Filter by username",
-          "type": "string"
         }
       },
       "type": "object"

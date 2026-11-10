@@ -118,9 +118,9 @@ class TestAuditToolErrors:
     """Tests for audit tool bug fix where happenedOn is epoch int, not string."""
 
     @respx.mock
-    async def test_get_change_audit_handles_int_happened_on(self, client):
-        """get_change_audit handles happenedOn as epoch integer."""
-        from lm_mcp.tools.audit import get_change_audit
+    async def test_change_kind_handles_int_happened_on(self, client):
+        """get_audit_logs(kind="change") handles happenedOn as epoch integer."""
+        from lm_mcp.tools.audit import get_audit_logs
 
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
             return_value=httpx.Response(
@@ -149,22 +149,22 @@ class TestAuditToolErrors:
             )
         )
 
-        result = await get_change_audit(client)
+        result = await get_audit_logs(client, kind="change")
         assert len(result) == 1
         # Only the Update entry should be included, not the login
         assert "Update" in result[0].text
         assert "logged in" not in result[0].text
 
     @respx.mock
-    async def test_get_change_audit_empty_items(self, client):
-        """get_change_audit handles empty results gracefully."""
-        from lm_mcp.tools.audit import get_change_audit
+    async def test_change_kind_empty_items(self, client):
+        """get_audit_logs(kind="change") handles empty results gracefully."""
+        from lm_mcp.tools.audit import get_audit_logs
 
         respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        result = await get_change_audit(client)
+        result = await get_audit_logs(client, kind="change")
         assert len(result) == 1
         assert "0" in result[0].text
 

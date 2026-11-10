@@ -28,6 +28,24 @@ def _api_token_row(item: dict) -> dict:
     }
 
 
+async def find_api_token(client: LogicMonitorClient, token_id: int) -> dict:
+    """Read one API token by id across the portal through the id filter.
+
+    A row with another id is not the token: a filter the API does not apply returns
+    other tokens.
+
+    Raises:
+        NotFoundError: When no row carries that id.
+    """
+    listing = await client.get(
+        "/setting/admins/apitokens", params={"filter": f"id:{token_id}", "size": 1}
+    )
+    items: list[dict] = listing.get("items") or []
+    if not items or items[0].get("id") != token_id:
+        raise NotFoundError(f"API token {token_id} not found")
+    return items[0]
+
+
 async def get_api_tokens(
     client: LogicMonitorClient,
     admin_id: int | None = None,
@@ -74,13 +92,7 @@ async def get_api_token(
         if admin_id is not None:
             result = await client.get(f"/setting/admins/{admin_id}/apitokens/{token_id}")
         else:
-            listing = await client.get(
-                "/setting/admins/apitokens", params={"filter": f"id:{token_id}", "size": 1}
-            )
-            items = listing.get("items") or []
-            if not items:
-                raise NotFoundError(f"API token {token_id} not found")
-            result = items[0]
+            result = await find_api_token(client, token_id)
 
         token = {
             "id": result.get("id"),

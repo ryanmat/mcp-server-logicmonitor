@@ -8,9 +8,9 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals and additions below take the server from 306 tools to 249: 245 with
+Against 4.3.0, the removals and additions below take the server from 306 tools to 246: 242 with
 one portal, plus `list_portals`, `use_portal`, `current_portal` and `reload_portals` in
-multi-portal mode. With writes off, the default, `tools/list` shows 144 of them, or 148 in
+multi-portal mode. With writes off, the default, `tools/list` shows 141 of them, or 145 in
 multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
 model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
 on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
@@ -55,9 +55,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   dropped after the fetch by default, never when a `username` is given, and `dropped` counts
   them; `username` takes a comma-separated list and is refused when wildcard stripping leaves
   nothing. A request past the 10,000-row offset or a filter over 900 characters is refused as
-  `INVALID_REQUEST` before it is sent. The filter semantics come from #63. `get_change_audit` reads a
-  change the same way, from `Action=` or the description's leading verb, where it kept any
-  entry whose description held create, add, update, delete, remove or modify anywhere.
+  `INVALID_REQUEST` before it is sent. `login` queries each portal login wording (six at most),
+  merges the rows newest first with `status` and `method`, takes `success_only` or
+  `failed_only` but not both, and reports `total` as a lower bound while older rows exist;
+  `offset` pages the merged rows. `api_token` reads the rows naming `API token <accessId>`,
+  from `access_id` or from `token_id` read to its access ID, keeps only rows naming that exact
+  ID, and gives each row's `event` (`change`, `rejected` or `throttled`), `path` and `method`.
+  An argument that another kind reads is refused. The filter semantics and the login and API
+  token readings come from #63 by GitHub user barunagarwal.
 
 ### Removed
 
@@ -124,6 +129,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 | `get_trace_service_metrics` | `get_device_data` on the service-level instance. |
 | `get_trace_operation_metrics` | `get_device_data` on the operation's instance. |
 | `get_trace_service_properties` | `get_device_properties` with the service id as `device_id`. |
+| `get_login_audit` | `get_audit_logs` with `kind="login"`, which queries the portal login wordings, so a monitored database's "Login failed" line is no longer reported as a failed portal login. `username` matches exact names; `success_only` with `failed_only` is refused. |
+| `get_change_audit` | `get_audit_logs` with `kind="change"`, which reads the change type from `Action=` or the description's leading verb, where the tool kept any entry whose description held create, add, update, delete, remove or modify anywhere. |
+| `get_api_token_audit` | `get_audit_logs` with `kind="api_token"` and `token_id` or `access_id`. It matches `API token <accessId>` in the description, where the tool filtered on an `apiTokenId` field the API does not have. |
 
 - The `summarize` argument on `triage`, `health_check`, `portal_overview`, `capacity_plan` and
   `diagnose`, and the `nl_summary` key it added to their reports. The calling model writes the

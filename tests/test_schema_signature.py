@@ -29,7 +29,7 @@ def test_invariant_covers_every_registered_tool():
     """The parametrized invariant runs over the full tool surface, one case per tool."""
     names = [t.name for t in ALL_TOOLS]
     assert len(names) == len(set(names))
-    assert len(names) >= 249
+    assert len(names) >= 246
 
 
 @pytest.mark.parametrize("tool", ALL_TOOLS, ids=lambda t: t.name)

@@ -3215,14 +3215,22 @@ TOOLS.extend(
                 "returns one page of entries, newest first; kind='change' returns the "
                 "configuration changes (create, update, delete or import, read from each "
                 "entry's description) found in a pool of the newest entries, with scanned "
-                "and has_more. username is an exact name or a comma-separated list; action "
-                "and resource_type are text the description must contain (the portal applies "
-                "one, the second is matched on the fetched page); start_time and end_time "
-                "bound the entry time in epoch seconds. System and automation actors "
-                "(System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the "
-                "fetch unless exclude_system is false or a username is given; dropped counts "
-                "them and paging follows the rows the portal returned. offset plus the rows "
-                "read must stay within 10,000, and the filter within about 900 characters."
+                "and has_more; kind='login' returns portal sign-ins, sign-outs and failed "
+                "logins, one query per login wording (up to six calls), with status and "
+                "method per row, success_only or failed_only, and total as a lower bound "
+                "while has_more is true; kind='api_token' returns the rows naming an API "
+                "token, given by access_id or token_id (read to its access ID), keeping only "
+                "that exact access ID, with event (change, rejected, throttled), path and "
+                "method per row. username is an exact name or a comma-separated list; "
+                "action and resource_type (kinds all and change) are whole words the "
+                "description holds (the portal applies one, the second is matched on the "
+                "fetched page); start_time and end_time bound the entry time in epoch "
+                "seconds. System and automation actors (System:*, LogicMonitor Internal, "
+                "cloud auto-delete) are dropped after the fetch for kinds all and change "
+                "unless exclude_system is false or a username is given; dropped counts them "
+                "and paging follows the rows the portal returned. An argument another kind "
+                "reads is refused. offset plus the rows read must stay within 10,000, and "
+                "the filter within about 900 characters."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3230,9 +3238,12 @@ TOOLS.extend(
                 "properties": {
                     "kind": {
                         "type": "string",
-                        "enum": ["all", "change"],
+                        "enum": ["all", "change", "login", "api_token"],
                         "default": "all",
-                        "description": "all: every entry; change: configuration changes only",
+                        "description": (
+                            "all: every entry; change: configuration changes; login: portal "
+                            "logins; api_token: rows naming an API token"
+                        ),
                     },
                     "username": {
                         "type": "string",
@@ -3240,16 +3251,34 @@ TOOLS.extend(
                     },
                     "action": {
                         "type": "string",
-                        "description": "Text the description contains, e.g. Action=Delete",
+                        "description": "Whole words the description holds, e.g. Action=Delete",
                     },
                     "resource_type": {
                         "type": "string",
-                        "description": "Text the description contains, e.g. Type=Device",
+                        "description": "Whole words the description holds, e.g. Type=Device",
                     },
                     "change_type": {
                         "type": "string",
                         "enum": ["create", "update", "delete", "import"],
                         "description": "With kind change: the change type to keep",
+                    },
+                    "success_only": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "With kind login: successful logins only",
+                    },
+                    "failed_only": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "With kind login: failed logins only",
+                    },
+                    "access_id": {
+                        "type": "string",
+                        "description": "With kind api_token: the token's whole access ID",
+                    },
+                    "token_id": {
+                        "type": "integer",
+                        "description": "With kind api_token: the token's id, read to its access ID",
                     },
                     "start_time": {
                         "type": "integer",
@@ -3266,56 +3295,6 @@ TOOLS.extend(
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
-                },
-            },
-        ),
-        Tool(
-            name="get_api_token_audit",
-            description="Get API token usage audit logs",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "token_id": {
-                        "type": "integer",
-                        "description": "Filter by API token ID",
-                    },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                },
-            },
-        ),
-        Tool(
-            name="get_login_audit",
-            description="Get login/authentication audit logs",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "username": {"type": "string", "description": "Filter by username"},
-                    "success_only": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Only successful logins",
-                    },
-                    "failed_only": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Only failed logins",
-                    },
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                },
-            },
-        ),
-        Tool(
-            name="get_change_audit",
-            description="Get configuration change audit logs",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "resource_type": {"type": "string", "description": "Filter by resource type"},
-                    "change_type": {"type": "string", "description": "Filter by change type"},
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
                 },
             },
         ),
@@ -6315,9 +6294,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "delete_ops_note": ops.delete_ops_note,
         # Audit logs are owned by the audit module.
         "get_audit_logs": audit.get_audit_logs,
-        "get_api_token_audit": audit.get_api_token_audit,
-        "get_login_audit": audit.get_login_audit,
-        "get_change_audit": audit.get_change_audit,
         # Topology
         "get_topology_map": topology.get_topology_map,
         "get_device_neighbors": topology.get_device_neighbors,

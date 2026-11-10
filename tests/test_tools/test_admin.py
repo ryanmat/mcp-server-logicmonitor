@@ -312,6 +312,18 @@ class TestApiTokens:
         result = await get_api_token(client, token_id=999)
         assert envelope(result)["message"].startswith("API token 999 not found")
 
+    @respx.mock
+    async def test_get_api_token_without_admin_refuses_another_id(self, client):
+        """R2.11: a portal-wide lookup that returns a different token is not found."""
+        from lm_mcp.tools.api_tokens import get_api_token
+
+        respx.get(API_TOKENS_URL).mock(
+            return_value=httpx.Response(200, json={"items": [LIVE_API_TOKEN], "total": 1})
+        )
+
+        result = await get_api_token(client, token_id=101)
+        assert envelope(result)["message"].startswith("API token 101 not found")
+
 
 class TestAccessGroups:
     @respx.mock

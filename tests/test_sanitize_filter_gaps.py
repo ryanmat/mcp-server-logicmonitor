@@ -88,64 +88,6 @@ class TestAuditSanitizeGaps:
         data = json.loads(result[0].text)
         assert "note" not in data
 
-    @respx.mock
-    async def test_get_login_audit_username_wildcard_stripped(self, client):
-        """get_login_audit strips wildcards from username filter."""
-        from lm_mcp.tools.audit import get_login_audit
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_login_audit(client, username="admin*")
-
-        data = json.loads(result[0].text)
-        assert "note" in data
-        assert "Wildcard" in data["note"]
-
-    @respx.mock
-    async def test_get_login_audit_username_clean_no_note(self, client):
-        """get_login_audit does not add note for clean username."""
-        from lm_mcp.tools.audit import get_login_audit
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_login_audit(client, username="admin")
-
-        data = json.loads(result[0].text)
-        assert "note" not in data
-
-    @respx.mock
-    async def test_get_change_audit_change_type_wildcard_stripped(self, client):
-        """get_change_audit strips wildcards from change_type filter."""
-        from lm_mcp.tools.audit import get_change_audit
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_change_audit(client, change_type="create*")
-
-        data = json.loads(result[0].text)
-        assert "note" in data
-        assert "Wildcard" in data["note"]
-
-    @respx.mock
-    async def test_get_change_audit_change_type_clean_no_note(self, client):
-        """get_change_audit does not add note for clean change_type."""
-        from lm_mcp.tools.audit import get_change_audit
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/setting/accesslogs").mock(
-            return_value=httpx.Response(200, json={"items": [], "total": 0})
-        )
-
-        result = await get_change_audit(client, change_type="create")
-
-        data = json.loads(result[0].text)
-        assert "note" not in data
-
 
 class TestCostSanitizeGaps:
     """Tests for sanitize gaps in cost.py."""
