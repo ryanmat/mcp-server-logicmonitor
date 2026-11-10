@@ -73,9 +73,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 
 ### Removed
 
-Every 4.3.0 tool that 5.0 does not register under its 4.3.0 name. A name in the 5.0 tool column
-is the same tool renamed, and the changes listed for this release apply to it under that name. A tool
-marked `removed` has no successor of its own; the last column says what to call instead.
+The table lists every 4.3.0 tool that 5.0 does not register under its 4.3.0 name. A name in the 5.0
+tool column is the same tool renamed, and the changes listed for this release apply to it under that
+name. A tool marked `removed` has no successor of its own; the last column says what to call
+instead.
 
 | 4.3.0 tool | 5.0 tool | Replacement |
 |---|---|---|

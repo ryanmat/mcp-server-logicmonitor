@@ -1,4 +1,4 @@
-# Description: Guards the CHANGELOG rename table against the 4.3.0 tool list and the registry.
+# Description: Guards the R2.13 CHANGELOG rename table against the 4.3.0 tools and the registry.
 # Description: Each 4.3.0 name 5.0 does not register has one row naming its 5.0 tool or "removed".
 from __future__ import annotations
 
