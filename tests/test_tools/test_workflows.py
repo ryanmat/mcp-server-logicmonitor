@@ -149,17 +149,16 @@ def _ok(payload: dict) -> httpx.Response:
     return httpx.Response(200, json=payload)
 
 
-def _alerts_by_read(active: list[dict], device_alerts: dict[int, list[dict]]):
-    """Serve window reads from active, and analyze_blast_radius' open-alert check of one
-    device (filter monitorObjectId:<id>,cleared:false) from device_alerts."""
-    window = alert_lists(active)
+# One device's alert list, which analyze_blast_radius reads for each device it reaches.
+_DEVICE_ALERTS = rf"{re.escape(_BASE)}/device/devices/\d+/alerts"
+
+
+def _device_alerts(rows_by_device: dict[int, list[dict]]):
+    """Serve analyze_blast_radius' open-alert check of one device from rows_by_device."""
 
     def respond(request: httpx.Request) -> httpx.Response:
-        clauses = request.url.params.get("filter", "")
-        if clauses.startswith("monitorObjectId:"):
-            rows = device_alerts.get(int(clauses.split(",")[0].split(":")[1]), [])
-            return _ok({"items": rows, "total": len(rows)})
-        return window(request)
+        rows = rows_by_device.get(int(request.url.path.split("/")[-2]), [])
+        return _ok({"items": rows, "total": len(rows)})
 
     return respond
 
@@ -684,7 +683,7 @@ class TestTriage:
         assert data["warnings"] == [ALERT_WINDOW_TRUNCATED_WARNING]
 
     @staticmethod
-    def _mock_blast_portal() -> tuple[respx.Route, respx.Route]:
+    def _mock_blast_portal() -> tuple[respx.Route, respx.Route, respx.Route]:
         """Two device clusters and a website cluster: core-sw (100) reaches access-1 (200),
         which has a critical alert open; edge-fw's (101) neighbors answer 404 on both paths."""
         active = [
@@ -695,8 +694,9 @@ class TestTriage:
             _device_alert(5, "shop", 7, "website"),
             _device_alert(6, "shop", 7, "website"),
         ]
-        alerts = respx.get(_ALERTS_URL).mock(
-            side_effect=_alerts_by_read(active, {200: [{"severity": 4}]})
+        alerts = respx.get(_ALERTS_URL).mock(side_effect=alert_lists(active))
+        device_alerts = respx.get(url__regex=_DEVICE_ALERTS).mock(
+            side_effect=_device_alerts({200: [{"severity": 4}]})
         )
         respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
         respx.get(url__regex=_NEIGHBORS).mock(
@@ -705,7 +705,7 @@ class TestTriage:
         devices = respx.get(f"{_BASE}/device/devices").mock(
             return_value=_ok({"items": [], "total": 0})
         )
-        return alerts, devices
+        return alerts, devices, device_alerts
 
     @respx.mock
     async def test_summary_reports_blast_radius_counts_by_cluster_device_id(self, auth, lm_env):
@@ -713,12 +713,14 @@ class TestTriage:
         with no device search, the website cluster gets none, and an unreadable neighbor
         read is counted rather than reported as zero reach."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
-        alerts, devices = self._mock_blast_portal()
+        alerts, devices, device_alerts = self._mock_blast_portal()
 
         data = json.loads((await triage(client))[0].text)
 
         assert len(_window_reads(alerts)) == 2
-        assert alerts.call_count == 3  # the two window reads and access-1's open-alert check
+        assert alerts.call_count == 2  # the two window reads
+        # access-1's open-alert check reads its own alert list
+        assert [c.request.url.params["filter"] for c in device_alerts.calls] == ["cleared:false"]
         assert devices.call_count == 0
         assert data["blast_radius"] == [_CORE_SW_COUNTS, _EDGE_FW_COUNTS]
         device_keys = {c["key"] for c in data["clusters"]["clusters"] if c["type"] == "device"}
@@ -764,7 +766,8 @@ class TestTriage:
                 _device_alert(10 * device_id + k, f"dev-{device_id}", device_id)
                 for k in range(size)
             ]
-        respx.get(_ALERTS_URL).mock(side_effect=_alerts_by_read(active, {}))
+        respx.get(_ALERTS_URL).mock(side_effect=alert_lists(active))
+        respx.get(url__regex=_DEVICE_ALERTS).mock(side_effect=_device_alerts({}))
         respx.get(_AUDIT_URL).mock(return_value=_ok({"items": []}))
         topology = respx.get(url__regex=_NEIGHBORS).mock(side_effect=_topology({}, set()))
 

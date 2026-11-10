@@ -116,12 +116,10 @@ async def analyze_blast_radius(
         alert_check_failures = 0
         for dev in devices_to_check:
             try:
+                # Each device's own alert list: /alert/alerts ignores a device id filter.
                 alert_result = await client.get(
-                    "/alert/alerts",
-                    params={
-                        "filter": (f"monitorObjectId:{dev['device_id']},cleared:false"),
-                        "size": 5,
-                    },
+                    f"/device/devices/{dev['device_id']}/alerts",
+                    params={"filter": "cleared:false", "size": 5},
                 )
                 dev_alerts = alert_result.get("items", [])
                 dev["active_alert_count"] = len(dev_alerts)

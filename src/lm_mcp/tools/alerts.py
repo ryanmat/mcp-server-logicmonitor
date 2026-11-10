@@ -16,6 +16,7 @@ from lm_mcp.tools import (
     portal_url,
     require_write_permission,
     resolve_group_filter,
+    validation_error,
 )
 
 if TYPE_CHECKING:
@@ -171,7 +172,9 @@ async def get_alerts(
         datasource: Filter by datasource/template name (supports wildcards).
         device: Filter by device/monitor object name (supports wildcards).
         group_id: Filter by device group ID (matches all devices in the group).
-        device_id: Filter by device/resource ID.
+        device_id: Read this device's own alert list, /device/devices/{id}/alerts, since
+            /alert/alerts ignores a device id filter. Every other filter applies there
+            except group_id, which that list ignores and which is refused beside it.
         filter: Raw filter expression for advanced queries (overrides other filters).
             Supports LogicMonitor filter syntax with operators:
             : (equal), !: (not equal), > < >: <: (comparisons),
@@ -184,6 +187,13 @@ async def get_alerts(
     Returns:
         List of TextContent with alert data or error.
     """
+    if device_id is not None and group_id is not None:
+        return validation_error(
+            "INVALID_REQUEST",
+            "group_id cannot narrow a device's alerts: the device alert list ignores the "
+            "group filter.",
+            "Pass device_id for one device's alerts, or group_id for a group's.",
+        )
     clauses = []
     if severity and severity.lower() in SEVERITY_MAP:
         clauses.append(f"severity:{SEVERITY_MAP[severity.lower()]}")
@@ -209,12 +219,11 @@ async def get_alerts(
             clauses.append(await resolve_group_filter(client, group_id))
         except Exception as e:
             return handle_error(e)
-    if device_id is not None:
-        clauses.append(f"monitorObjectId:{device_id}")
+    path = "/alert/alerts" if device_id is None else f"/device/devices/{device_id}/alerts"
 
     return await list_tool(
         client,
-        "/alert/alerts",
+        path,
         key="alerts",
         project=_alert_row,
         limit=min(limit, 1000),

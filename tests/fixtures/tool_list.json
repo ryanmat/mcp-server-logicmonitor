@@ -2981,7 +2981,7 @@
           "type": "string"
         },
         "device_id": {
-          "description": "Filter by device/resource ID",
+          "description": "Read this device's own alert list; every other filter applies there except group_id, which is refused beside it",
           "type": "integer"
         },
         "end_epoch": {

@@ -121,6 +121,14 @@ class TestGetResourceContent:
         assert "severity" in data["fields"]
         assert "common_queries" in data
 
+    def test_alert_filters_say_monitor_object_id_is_ignored(self):
+        """/alert/alerts ignores monitorObjectId, so the resource offers no example of it."""
+        data = json.loads(get_resource_content("lm://filters/alerts"))
+        field = data["fields"]["monitorObjectId"]
+        assert field["examples"] == []
+        assert "ignores" in field["description"]
+        assert "device_id" in field["description"]
+
     def test_get_filters_devices(self):
         """get_resource_content returns device filters JSON."""
         content = get_resource_content("lm://filters/devices")

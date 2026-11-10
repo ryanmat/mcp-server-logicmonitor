@@ -375,7 +375,8 @@ TOOLS.extend(
                     },
                     "device_id": {
                         "type": "integer",
-                        "description": "Filter by device/resource ID",
+                        "description": "Read this device's own alert list; every other "
+                        "filter applies there except group_id, which is refused beside it",
                     },
                     "filter": {
                         "type": "string",
