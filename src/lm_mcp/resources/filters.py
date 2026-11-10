@@ -148,9 +148,11 @@ ALERT_FILTERS = {
         },
         "monitorObjectId": {
             "type": "integer",
-            "description": "Device/resource ID",
+            "description": "Device/resource ID on each alert row. /alert/alerts ignores a "
+            "filter on it and returns every device's alerts; get_alerts with device_id reads "
+            "one device's alert list instead.",
             "operators": [":"],
-            "examples": ["monitorObjectId:9269"],
+            "examples": [],
         },
         "monitorObjectGroups": {
             "type": "string",

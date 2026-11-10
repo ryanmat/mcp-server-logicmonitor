@@ -11,6 +11,7 @@ from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
 from tests.alert_pages import alert_pages
+from tests.envelope import envelope
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
@@ -236,17 +237,37 @@ class TestGetAlertsGroupAndDeviceId:
 
     @respx.mock
     async def test_get_alerts_with_device_id(self, client):
-        """get_alerts filters by device ID using monitorObjectId."""
+        """device_id reads the device's own alert list; /alert/alerts ignores monitorObjectId."""
         from lm_mcp.tools.alerts import get_alerts
 
-        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+        portal = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/9269/alerts"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
 
-        await get_alerts(client, device_id=9269)
+        await get_alerts(client, device_id=9269, severity="critical", cleared=False)
 
+        assert not portal.called
+        assert route.called
         params = dict(route.calls[0].request.url.params)
-        assert params["filter"] == "monitorObjectId:9269"
+        assert params["filter"] == "severity:4,cleared:false"
+
+    @respx.mock
+    async def test_get_alerts_device_id_takes_a_raw_filter(self, client):
+        """A raw filter replaces the named filters on the device's alert list too."""
+        from lm_mcp.tools.alerts import get_alerts
+
+        route = respx.get(
+            "https://test.logicmonitor.com/santaba/rest/device/devices/9269/alerts"
+        ).mock(return_value=httpx.Response(200, json={"items": [], "total": 0}))
+
+        await get_alerts(client, device_id=9269, severity="error", filter="acked:false")
+
+        assert route.called
+        params = dict(route.calls[0].request.url.params)
+        assert params["filter"] == "acked:false"
 
     @respx.mock
     async def test_get_alerts_group_id_with_severity(self, client):
@@ -269,23 +290,20 @@ class TestGetAlertsGroupAndDeviceId:
         assert f'monitorObjectGroups~"{self.GROUP_PATH}"' in filt
 
     @respx.mock
-    async def test_get_alerts_group_id_and_device_id_together(self, client):
-        """get_alerts combines group_id and device_id filters."""
+    async def test_get_alerts_refuses_group_id_with_device_id(self, client):
+        """The device's alert list ignores monitorObjectGroups, so group_id is refused there."""
         from lm_mcp.tools.alerts import get_alerts
 
-        respx.get("https://test.logicmonitor.com/santaba/rest/device/groups/1977").mock(
-            return_value=httpx.Response(200, json={"id": 1977, "fullPath": self.GROUP_PATH})
-        )
-        route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
+        reads = respx.get(url__regex=r".*").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await get_alerts(client, group_id=1977, device_id=9269)
+        result = await get_alerts(client, group_id=1977, device_id=9269)
 
-        params = dict(route.calls[0].request.url.params)
-        filt = params["filter"]
-        assert f'monitorObjectGroups~"{self.GROUP_PATH}"' in filt
-        assert "monitorObjectId:9269" in filt
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert "group_id" in error["message"]
+        assert not reads.called
 
     @respx.mock
     async def test_get_alerts_k8s_device_name(self, client):
@@ -309,19 +327,14 @@ class TestGetAlertsGroupAndDeviceId:
 
     @respx.mock
     async def test_get_alerts_raw_filter_overrides_group_id(self, client):
-        """Raw filter takes precedence over group_id and device_id."""
+        """Raw filter takes precedence over group_id."""
         from lm_mcp.tools.alerts import get_alerts
 
         route = respx.get("https://test.logicmonitor.com/santaba/rest/alert/alerts").mock(
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
-        await get_alerts(
-            client,
-            group_id=1977,
-            device_id=9269,
-            filter="severity:4,cleared:false",
-        )
+        await get_alerts(client, group_id=1977, filter="severity:4,cleared:false")
 
         params = dict(route.calls[0].request.url.params)
         assert params["filter"] == "severity:4,cleared:false"
