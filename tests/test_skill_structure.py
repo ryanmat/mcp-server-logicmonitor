@@ -53,6 +53,7 @@ _RECIPE_TOOLS = {
     "lm-apm": {"get_apm_services", "get_apm_service_alerts", "get_device_data", "analyze_metric"},
     "lm-capacity": {"get_devices", "analyze_metric"},
     "lm-health": {"get_devices", "health_check", "analyze_metric"},
+    "lm-portal": {"portal_overview", "analyze_alerts", "get_collectors"},
     "lm-triage": {"triage", "analyze_alerts"},
 }
 

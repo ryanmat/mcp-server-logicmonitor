@@ -307,7 +307,7 @@ Clients read these through the standard MCP resource and prompt calls.
 |--------|-------------|-----------|
 | `incident_triage` | Analyze active alerts, identify patterns, suggest root cause | `severity`, `time_window_hours` |
 | `capacity_review` | Review resource utilization and identify capacity concerns | `group_id`, `threshold_percent` |
-| `remediation` | Execute a LogicMonitor remediation source with pre-execution safety checks | `host_id`, `remediation_source_id` |
+| `remediation` | Execute a LogicMonitor remediation source with pre-execution safety checks | `host_id`, `remediation_source_id`, `alert_id` |
 
 </details>
 
