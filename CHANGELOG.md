@@ -11,11 +11,14 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 236:
 232 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode. With writes off, the default, `tools/list` shows 131 of
-them, or 135 in multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock` holds 59 packages, down from 137, with the
-model stack gone. `uv export --no-dev --extra http` lists 35 runtime packages, 34 of which install
-on Linux, the same 34 as 4.3.0; `pywin32` is Windows-only. The test suite runs 2,628 tests in 16 to
-31 s on each CI leg, against 2,959 passing and 8 skipped in 179 to 191 s for 4.3.0, and the
-Python under `src/` is 33,992 lines, down from 40,839.
+them, or 135 in multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
+holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
+lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
+Windows-only. The Python under `src/` is 32,170 lines, down from 40,839. The eight LogicModule
+tool modules hold 1,738 of those lines and the module table they share (`tools/logicmodules.py`)
+530, 2,268 together, where the eight held 2,785 in 4.3.0. The test suite runs 3,445 tests; the
+CI runs on main after #149 to #153 merged, at 2,893 to 3,404 tests, finished the test step in
+under a minute on every Python leg, against 2,959 passing and 8 skipped in 179 to 191 s for 4.3.0.
 
 The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 `WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`, `HF_DEVICE`,
