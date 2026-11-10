@@ -112,7 +112,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 
 ### Find a tool
 
-- `search_tools`: keyword search across every tool by name and description, with an optional `category` filter
+- `search_tools`: keyword search by name and description over the tools your settings list, so with writes off it names no write tool; an optional `category` narrows it to one group
 - the `lm://guide/tool-categories` resource: all 236 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 

@@ -378,8 +378,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   instance whose read fails carries one `analysis_error`.
 - `diagnose` adds `diagnostics`: the DiagnosticSources assigned to the alert's device and the
   latest results of the alert's diagnostic runs, read through
-  `get_diagnostic_remediation_assignments` and `get_diagnostic_remediation_results`, which join
-  the tools it needs enabled. It never runs a DiagnosticSource. Its description no longer
+  `get_diagnostic_remediation_assignments` and `get_diagnostic_remediation_results`, so it now
+  needs both of those tools enabled. It never runs a DiagnosticSource. Its description no longer
   promises a health score or a probable root cause, neither of which it computed. In summary
   mode `diagnose` and `detect_site_outage` carry the warnings of the keys they trim, such as
   the blast radius' warning about devices whose neighbors could not be read.

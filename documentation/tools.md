@@ -21,7 +21,7 @@ Composite workflow tools -- recommended starting point
 | `diagnose` | Composite diagnosis: given an alert, or a device's latest open critical alert, gathers the alert details, device context, alerts clustered and audit changes in the last four hours, blast radius, and the device's assigned DiagnosticSources with the latest results of the alert's diagnostic runs. It reads those results and never runs a DiagnosticSource. It computes no health score or root cause; health_check reports each metric's z-score. | No |
 | `update_logicmodule` | Update a LogicModule definition (configsource, datasource, diagnosticsource, eventsource, logsource, propertysource, remediationsource, topologysource). Reads the current full definition, deep-merges your `changes` onto it, validates required fields, and either returns a dry-run diff (mode='preview', default) or applies the merged definition (mode='apply'). The LogicMonitor update is full-replace, so the merged full definition is sent and fields you do not change are kept. | Yes |
 | `detect_site_outage` | Composite workflow for site outage detection. Chains CollectorDown detection, mass-interface-down burst analysis, UPS on-battery events, and downstream device silence into a single site-outage verdict with confidence score, scope, and affected device list. Designed to catch the class of site-outage that generic AIOps correlation misses. Pass a device group ID representing the site. | No |
-| `audit_network_monitoring_coverage` | Portal audit that counts UPS/PDU devices onboarded, interface DataSources applied, SNMP credentials configured, and NetFlow exporters set up. Returns a prioritized gap list with onboarding recommendations — turns 'you can't detect X' into 'here's how to enable detection of X.' | No |
+| `audit_network_monitoring_coverage` | Portal audit that counts UPS/PDU devices onboarded, interface DataSources applied, SNMP credentials configured, and NetFlow exporters set up. Returns a prioritized gap list, each gap with the onboarding step that would let the portal detect what it cannot detect today. | No |
 
 ## Universal Reference
 
@@ -67,7 +67,7 @@ Alert monitoring and management
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `get_alerts` | Get open or cleared alerts from LogicMonitor, optionally filtered by severity (critical, error, warning), device, group, datasource or time For Kubernetes clusters, use group_id (from get_device_groups) instead of device — the device name filter does not work reliably for K8s resources. Common mistakes: startEpoch/endEpoch use SECONDS not milliseconds. String filter values need double quotes (e.g., monitorObjectName:"hostname"). | No |
+| `get_alerts` | Get open or cleared alerts from LogicMonitor, optionally filtered by severity (critical, error, warning), device, group, datasource or time For Kubernetes clusters, use group_id (from get_device_groups) instead of device; the device name filter does not work reliably for K8s resources. Common mistakes: startEpoch/endEpoch use SECONDS not milliseconds. String filter values need double quotes (e.g., monitorObjectName:"hostname"). | No |
 | `get_alert_details` | Get detailed information about a specific alert | No |
 | `acknowledge_alert` | Acknowledge an alert (requires write permission) Common mistakes: alert_id works with or without the LMA prefix. | Yes |
 | `add_alert_note` | Add a note to an alert without acknowledging (requires write permission) | Yes |
@@ -139,7 +139,7 @@ DataSource and instance monitoring
 | `add_device_instance` | Add a monitored instance to a datasource on a device (requires write permission). Used for datasources without Active Discovery (e.g. ServiceStatus). | Yes |
 | `update_device_instance` | Update a monitored instance on a device (requires write permission) | Yes |
 | `delete_device_instance` | Delete a monitored instance from a datasource on a device (requires write permission) | Yes |
-| `get_device_data` | Get the raw metric values (samples) of a device/resource datasource instance, such as CPU, memory or disk usage Common mistakes: Returns most recent data unless period/start/end specified. Requires device_datasource_id (from get_device_datasources) not the datasource definition ID. | No |
+| `get_device_data` | Get the raw metric values (samples) of a device/resource datasource instance, such as CPU, memory or disk usage Common mistakes: Returns the last hour unless start_time or end_time is given. Requires device_datasource_id (from get_device_datasources) not the datasource definition ID. | No |
 | `get_graph_data` | Get graph image data for visualization | No |
 | `get_datasources` | List datasources from LogicMonitor | No |
 | `get_datasource` | Get details about a specific datasource | No |
