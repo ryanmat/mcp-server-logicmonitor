@@ -224,3 +224,53 @@ def test_rewritten_skill_is_built_on_its_recipe_tools(name):
 def test_lm_capacity_reads_otel_series_through_analyze_metric():
     """R2.14, R3.2: lm-capacity's OTel branch calls analyze_metric with source="otlp"."""
     assert 'source="otlp"' in _skill_text("lm-capacity")[1]
+
+
+def _step(name: str, heading: str) -> str:
+    """One '### ' section of a skill body, from its heading to the next one."""
+    body = _skill_text(name)[1]
+    start = body.index(f"### {heading}")
+    end = body.find("\n### ", start + 1)
+    return body[start:] if end == -1 else body[start:end]
+
+
+def test_lm_capacity_argument_hint_names_the_workload():
+    """lm-capacity takes a device or an OTel workload, so its argument hint names both."""
+    hint = _skill_text("lm-capacity")[0]["argument-hint"]
+    assert "device" in hint
+    assert "workload" in hint
+
+
+def test_lm_capacity_breach_step_quotes_the_no_threshold_reason():
+    """Step 8 reads analyze_metric's answer to a forecast with no threshold, by its text."""
+    from lm_mcp.tools.analyze_metric import holt_winters_forecast, linear_forecast
+
+    # Two days at 30-minute samples, enough for Holt-Winters to fit its daily season.
+    stamps = [i * 1800 for i in range(96)]
+    values = [50.0 + (i % 48) / 4 for i in range(96)]
+    reasons = {
+        linear_forecast(values, stamps, None)["reason"],
+        holt_winters_forecast(values, stamps, None)["reason"],
+    }
+    assert len(reasons) == 1
+    (reason,) = reasons
+    # The paragraph that lists the reasons a method gives in place of a crossing.
+    paragraphs = _step("lm-capacity", "Step 8").split("\n\n")
+    (reason_list,) = [p for p in paragraphs if "Where a method has no" in p]
+    assert f"`{reason}`" in reason_list
+
+
+def test_lm_edwin_says_a_ci_with_one_alert_forms_no_device_cluster():
+    """Step 4 compares triage's clusters with Edwin's grouping; one alert forms no cluster."""
+    from lm_mcp.tools.analyze_alerts import cluster_by_device
+
+    alert = {
+        "id": "LMA1",
+        "monitorObjectName": "ci-a",
+        "monitorObjectType": "device",
+        "monitorObjectId": 7,
+        "startEpoch": 1,
+    }
+    assert cluster_by_device([alert]) == []
+    assert cluster_by_device([alert, {**alert, "id": "LMA2"}]) != []
+    assert "forms no device cluster" in _step("lm-edwin", "Step 4")

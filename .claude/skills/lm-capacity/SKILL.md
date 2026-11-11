@@ -1,7 +1,7 @@
 ---
 name: lm-capacity
 description: "Capacity planning and forecasting -- one analyze_metric read per resource for current level, trend, daily and weekly cycles, level shifts and threshold-breach forecasts, with a week-over-week baseline and growth recommendations."
-argument-hint: "<device_id or device_name> [datasource] [datapoint]"
+argument-hint: "<device_id or device_name> [datasource] [datapoint] | workload=<namespace or PromQL query>"
 allowed-tools:
   - mcp__logicmonitor__get_device
   - mcp__logicmonitor__get_devices
@@ -110,7 +110,9 @@ From `summary`:
 | Disk (C:)  | C:       | NN%              | NN%  | NN%        |
 ```
 
-Flag any resource currently above 80 percent.
+On a device read, which is in percent, flag any resource currently above 80 percent. An
+OTel series is in its metric's unit: flag it when its latest value has reached the
+threshold set in the OTel branch, and flag none when no threshold was set.
 
 ### Step 5: Trend
 
@@ -176,13 +178,20 @@ From `forecast`, which projects `linear` and `holt_winters` to the `threshold` w
 
 Give each crossing in days (`hours_until_breach` divided by 24). Where a method has no
 crossing, give its `reason`: the line never reaches the threshold, the fitted line
-crossed it before the window ended, the crossing lies past 30 days, or (Holt-Winters)
-the window holds under two days of samples.
+crossed it before the window ended, the crossing lies past 30 days, (Holt-Winters)
+the window holds under two days of samples, or `no threshold given`.
+
+`no threshold given` means there is no breach forecast, not that the resource is safe.
+It is what an OTel workload with no limit gets from both methods (Holt-Winters gives its
+two-day reason first on a shorter window). Report the trend instead: Step 5's `label`
+and slope per day, and the Holt-Winters `slope_per_hour` times 24, the fit's latest
+slope, when it is not null. Leave urgency unclassified.
 
 Classify urgency by the earlier crossing:
 - under 7 days: immediate action.
 - 7 to 30 days: plan remediation within the current sprint.
-- no crossing within 30 days: no immediate concern; keep monitoring.
+- no crossing within 30 days, with a threshold given: no immediate concern; keep
+  monitoring.
 
 ### Step 9: Week-over-week baseline
 
@@ -196,15 +205,18 @@ direction.
 ### Step 10: Capacity report
 
 ```
-## Capacity report: [device_name]
+## Capacity report: [device_name or workload]
 
-### Device
-- ID: [id] | Type: [type] | Groups: [groups]
+### Device or workload
+- Device: ID: [id] | Type: [type] | Groups: [groups]
+- Workload: Query: [PromQL query] | Series: [n] | Unit: [metric unit]
 
 ### Resource summary
-| Resource   | Status    | Current | Trend   | Breach ETA  | vs last week  |
-|------------|-----------|---------|---------|-------------|---------------|
-| CPU        | [ok/warn] | NN%     | [label] | [days/none] | [NN% up/down] |
+| Resource   | Status    | Current             | Trend   | Breach ETA               | vs last week  |
+|------------|-----------|---------------------|---------|--------------------------|---------------|
+| CPU        | [ok/warn] | NN% or [value unit] | [label] | [days/none/no threshold] | [NN% up/down] |
+
+For a workload, each row is one series, named by its selector.
 
 ### Key findings
 1. [Most urgent capacity finding]
