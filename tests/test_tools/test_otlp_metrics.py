@@ -1,5 +1,5 @@
 # Description: Tests for OTLP Metrics query MCP tools.
-# Description: Validates PromQL range queries, discovery endpoints, and feature-flag degrade paths.
+# Description: Validates PromQL range and instant queries, discovery, and the feature-off answers.
 
 import json
 
