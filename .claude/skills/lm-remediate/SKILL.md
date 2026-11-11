@@ -34,7 +34,8 @@ Execute these steps in order. After each step, present findings before moving on
 
 ### Step 1: Diagnose
 
-Call `diagnose` with `alert_id` or `device_name`. It returns:
+Call `diagnose` with `alert_id` or `device_name` and `detail_level="full"`, since the
+summary level leaves out the blast radius and the device's properties. It returns:
 
 - `alert`: the alert's datasource, instance, datapoint, value, thresholds and severity
 - `device`: the device ID, display name, status and collector

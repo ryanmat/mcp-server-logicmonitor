@@ -77,6 +77,9 @@ Edwin.
 
 ### Step 3: The causal CI's metric
 
+A ConfigSource alert (its alert text in `meta.earliestHighestAlertDescription` says
+`Configsource:`) has no metric series; say so and go to Step 4. Otherwise:
+
 1. Call `get_devices` with `name_filter` set to the causal CI. Edwin's CI names are
    LogicMonitor resource display names; take the exact match. With none, say the CI is
    not a monitored device and go to Step 4.
@@ -89,20 +92,23 @@ Edwin.
 
 Read whether the datapoint moved when the insight says it did: a change point or
 anomalies near `meta.firstEventTimestamp_iso`, or a trend that was already under way.
-A ConfigSource alert (its alert text says `Configsource:`) has no metric series; say
-so and go to Step 4.
 
 ### Step 4: LogicMonitor's view of the window
 
-Call `triage` with `device` set to the causal CI's display name and `hours_back`
-covering the insight's span. Compare:
+Call `triage` with no `device`, `hours_back` reaching back past
+`meta.firstEventTimestamp_iso`, and `detail_level="full"`. A `device` filter matches
+the causal CI's name as a substring and leaves the impacted CIs' alerts out, and only
+the full detail level names the devices in each blast-radius row. Find the causal CI
+and the impacted CIs in the result, then compare:
 
 - its clusters with Edwin's grouping: do the impacted CIs fall in one LogicMonitor
   cluster, or in several?
 - its correlated changes with Edwin's root cause: a change just before
   `meta.firstEventTimestamp_iso` that the root cause does not mention
-- its blast radius with `ml.impactedCIList`: devices LogicMonitor's topology puts near
-  the causal CI that Edwin left out, or the reverse
+- its blast radius with `ml.impactedCIList`: the `affected_devices` of the row for the
+  causal CI's device cluster against Edwin's impacted list, devices one names and the
+  other does not. The rows cover the three largest device clusters; when the causal
+  CI's is not among them, say this comparison is untested.
 
 If the triage result says the audit log could not be read, the changes are unknown;
 say so.
