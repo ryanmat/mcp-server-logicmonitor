@@ -425,3 +425,41 @@ class TestAlertRuleCRUDToolRegistration:
 
         handler = get_tool_handler("delete_alert_rule")
         assert handler is not None
+
+
+class TestOtlpQueryRefused:
+    """R3.2: the v3 alert rule body has no query field, so an OTLP query is refused."""
+
+    @pytest.fixture
+    def writable(self, monkeypatch):
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+
+    @respx.mock
+    async def test_create_alert_rule_refuses_an_otlp_query(self, client, writable):
+        from lm_mcp.tools.alert_rules import create_alert_rule
+
+        route = respx.route(url__startswith="https://test.logicmonitor.com/")
+
+        result = await create_alert_rule(
+            client, name="OTLP up", priority=100, escalation_chain_id=1, otlp_query="up == 0"
+        )
+
+        assert is_error_result(result)
+        error = json.loads(result[0].text)["error"]
+        assert error["code"] == "INVALID_REQUEST"
+        assert "query" in error["message"]
+        assert not route.called
+
+    @respx.mock
+    async def test_update_alert_rule_refuses_an_otlp_query(self, client, writable):
+        from lm_mcp.tools.alert_rules import update_alert_rule
+
+        route = respx.route(url__startswith="https://test.logicmonitor.com/")
+
+        result = await update_alert_rule(client, rule_id=7, otlp_query="up == 0")
+
+        assert is_error_result(result)
+        assert json.loads(result[0].text)["error"]["code"] == "INVALID_REQUEST"
+        assert not route.called

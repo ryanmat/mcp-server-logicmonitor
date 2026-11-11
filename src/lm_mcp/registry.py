@@ -1231,7 +1231,8 @@ TOOLS.extend(
                     "widget_type": {
                         "type": "string",
                         "description": "Widget type (cgraph, sgraph, bigNumber, text, "
-                        "html, alert, noc, gauge, pieChart, table, etc.)",
+                        "html, alert, noc, gauge, pieChart, table, advancedmetrics for a "
+                        "PromQL query, etc.)",
                     },
                     "column_index": {
                         "type": "integer",
@@ -1256,6 +1257,12 @@ TOOLS.extend(
                         "description": "Widget configuration (type-specific). "
                         "Merged into the request payload.",
                     },
+                    "otlp_query": {
+                        "type": "string",
+                        "description": "PromQL query over native OTLP metrics; advancedmetrics "
+                        "widgets only. Sets advancedMetricsGraphInfo queryType otlp and the "
+                        "query; the portal fills in the line chart and the rest",
+                    },
                 },
                 "required": ["dashboard_id", "name", "widget_type"],
             },
@@ -1276,6 +1283,11 @@ TOOLS.extend(
                     "row_span": {"type": "integer", "description": "New height in rows"},
                     "col_span": {"type": "integer", "description": "New width in columns (1-12)"},
                     "config": {"type": "object", "description": "New configuration"},
+                    "otlp_query": {
+                        "type": "string",
+                        "description": "New PromQL query of an advancedmetrics widget; other "
+                        "widget types refuse it",
+                    },
                 },
                 "required": ["dashboard_id", "widget_id"],
             },
@@ -2324,6 +2336,11 @@ TOOLS.extend(
                         "default": False,
                         "description": "Suppress ack/SDT notifications",
                     },
+                    "otlp_query": {
+                        "type": "string",
+                        "description": "Not supported: the v3 alert rule body has no query "
+                        "field, so passing one returns INVALID_REQUEST",
+                    },
                 },
                 "required": ["name", "priority", "escalation_chain_id"],
             },
@@ -2350,6 +2367,11 @@ TOOLS.extend(
                     "suppress_alert_ack_sdt": {
                         "type": "boolean",
                         "description": "Updated suppress ack/SDT setting",
+                    },
+                    "otlp_query": {
+                        "type": "string",
+                        "description": "Not supported: the v3 alert rule body has no query "
+                        "field, so passing one returns INVALID_REQUEST",
                     },
                 },
                 "required": ["rule_id"],
