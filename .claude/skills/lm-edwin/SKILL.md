@@ -104,8 +104,8 @@ and the impacted CIs in the result, then compare:
 - its clusters with Edwin's grouping: do the impacted CIs fall in one LogicMonitor
   cluster, or in several? A cluster holds two or more alerts, so a CI with one alert in
   the window forms no device cluster of its own; it shows up only in a datasource or
-  signature cluster's `devices`, when another device alerts on the same datasource or
-  datapoint.
+  signature cluster's `devices`, when another device alerts on the same datasource (or
+  the same datapoint of it).
   When an impacted CI is in no cluster, say the grouping is untested for it, not that
   LogicMonitor separates it from Edwin's grouping.
 - its correlated changes with Edwin's root cause: a change just before

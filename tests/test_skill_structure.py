@@ -254,7 +254,10 @@ def test_lm_capacity_breach_step_quotes_the_no_threshold_reason():
     }
     assert len(reasons) == 1
     (reason,) = reasons
-    assert f"`{reason}`" in _step("lm-capacity", "Step 8")
+    # The paragraph that lists the reasons a method gives in place of a crossing.
+    paragraphs = _step("lm-capacity", "Step 8").split("\n\n")
+    (reason_list,) = [p for p in paragraphs if "Where a method has no" in p]
+    assert f"`{reason}`" in reason_list
 
 
 def test_lm_edwin_says_a_ci_with_one_alert_forms_no_device_cluster():
