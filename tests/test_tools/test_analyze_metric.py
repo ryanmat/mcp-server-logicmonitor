@@ -1,5 +1,5 @@
-# Description: Tests for analyze_metric, the one-fetch analysis of a device instance's series.
-# Description: Covers the paged read, each section, section selection and warnings.
+# Description: Tests for analyze_metric over a device instance or a PromQL range query.
+# Description: Covers the paged read, the otlp source, each section, section selection and warnings.
 
 import json
 import math
@@ -1150,7 +1150,8 @@ def _otlp_body(*series):
     """A query-range body in the live shape: each series (labels or None, [(epoch, text)]).
 
     An aggregate with no grouping carries no metric key at all, as
-    sum(rate(apiserver_request_total[5m])) answered on 2026-11-11.
+    sum(rate(apiserver_request_total{cluster_name="rm-aro-cluster"}[5m])) answered on
+    2026-11-11 (docs/validation/otel-probe-2026-11-11-aggregate.json).
     """
     data = []
     for labels, points in series:

@@ -19,18 +19,17 @@ and provide actionable capacity recommendations.
 
 ## Argument parsing
 
-Required:
+Required, one of:
 - `device`: device ID (numeric) or device name (string)
+- `workload`: a workload whose metrics arrive over OpenTelemetry with no LogicMonitor
+  device, such as the pods of a Kubernetes namespace, or a PromQL query; it takes the
+  OTel branch after Step 3 in place of Steps 1 to 3
 
 Optional:
 - `datasource`: one datasource to analyze (default: CPU, memory and disk)
 - `datapoint`: one datapoint within it (default: the utilization datapoint)
 
 If only a device is provided, run a capacity analysis across CPU, memory and disk.
-
-A workload whose metrics arrive over OpenTelemetry with no LogicMonitor device, such as
-the pods of a Kubernetes namespace, takes the OTel branch after Step 3 in place of
-Steps 1 to 3.
 
 ## Workflow
 
@@ -89,12 +88,16 @@ For a workload reported over OpenTelemetry:
    `filesystem`) to find the metric names, such as `k8s_pod_cpu_usage`.
 2. Write a PromQL query that yields one series per instance, such as
    `max by (k8s_pod_name) (k8s_pod_cpu_usage{k8s_namespace_name="kube-system"})`.
-3. Call `analyze_metric` with `source="otlp"`, that `query`, the analyses, `threshold`
-   and `hours` of Step 3, and `step` "5m". It reads one range query and analyzes the
-   first 20 series it returns; when `warnings` says the query returned more, narrow it.
+3. Call `analyze_metric` with `source="otlp"`, that `query`, the analyses and `hours` of
+   Step 3, and `step` "5m". Set `threshold` in the metric's own unit, such as the pods'
+   CPU limit in cores for `k8s_pod_cpu_usage`, or leave it out when the workload sets no
+   limit: Step 3's percentages do not apply to these metrics. It reads one range query
+   and analyzes the first 20 series it returns; when `warnings` says the query returned
+   more, narrow it.
 
 Each series comes back under `series`, keyed by its selector; Steps 4 to 9 read it as
-they read a datapoint, and Step 9's baseline takes `source="otlp"` and the same query.
+they read a datapoint, in the metric's unit rather than percent, and Step 9's baseline
+takes `source="otlp"` and the same query.
 
 ### Step 4: Current utilization
 
