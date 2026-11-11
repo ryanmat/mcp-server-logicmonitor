@@ -21,6 +21,7 @@ EXPECTED_SKILLS = [
     "lm-capacity",
     "lm-edwin",
     "lm-health",
+    "lm-logs",
     "lm-portal",
     "lm-triage",
     "lm-remediate",
@@ -52,6 +53,13 @@ _RECIPE_TOOLS = {
     "lm-capacity": {"get_devices", "analyze_metric", "get_otlp_metric_names"},
     "lm-edwin": {"get_edwin_insights", "get_edwin_insight", "analyze_metric", "triage"},
     "lm-health": {"get_devices", "health_check", "analyze_metric"},
+    "lm-logs": {
+        "get_log_pipelines",
+        "get_tracked_log_queries",
+        "get_log_query_groups",
+        "get_log_partitions",
+        "get_log_usage",
+    },
     "lm-portal": {"portal_overview", "analyze_alerts", "get_collectors"},
     "lm-remediate": {
         "diagnose",

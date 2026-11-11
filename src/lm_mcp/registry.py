@@ -4298,6 +4298,64 @@ TOOLS.extend(
     ]
 )
 
+# LM Logs configuration and usage
+_LOG_PAGE = {
+    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+}
+
+TOOLS.extend(
+    [
+        Tool(
+            name="get_log_pipelines",
+            description=(
+                "List every LM Logs pipeline with its query and the partitions it names. Use it "
+                "to see which log queries the pipelines match; it returns all pipelines at "
+                "once and takes no arguments. It does not search log content."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="get_tracked_log_queries",
+            description=(
+                "List the portal's tracked log queries, each row as the API returns it. "
+                "Use it to see which log queries the portal tracks; it does not run them."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": dict(_LOG_PAGE)},
+        ),
+        Tool(
+            name="get_log_query_groups",
+            description=(
+                "List the saved LM Logs query groups (folders) with their type, owner, "
+                "permission and the queries each holds."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": dict(_LOG_PAGE)},
+        ),
+        Tool(
+            name="get_log_partitions",
+            description=(
+                "List the LM Logs partitions with whether each is active or paused, its "
+                "routing criteria, and its active contract (state, SKU, retention, usage limit, "
+                "period). Use it to check partition state and contract limits."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": dict(_LOG_PAGE)},
+        ),
+        Tool(
+            name="get_log_usage",
+            description=(
+                "Read the portal's LM Logs usage figure from /log/usage: one number, returned "
+                "as the API gives it, with no unit or period stated by the API."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": {}},
+        ),
+    ]
+)
+
 # Correlation and Analysis
 TOOLS.extend(
     [
@@ -6406,6 +6464,7 @@ def get_tool_handler(tool_name: str) -> Any:
         imports,
         ingestion,
         integrations,
+        logs,
         logsources,
         metrics,
         netscans,
@@ -6698,6 +6757,12 @@ def get_tool_handler(tool_name: str) -> Any:
         # Ingestion
         "ingest_logs": ingestion.ingest_logs,
         "push_metrics": ingestion.push_metrics,
+        # LM Logs
+        "get_log_pipelines": logs.get_log_pipelines,
+        "get_tracked_log_queries": logs.get_tracked_log_queries,
+        "get_log_query_groups": logs.get_log_query_groups,
+        "get_log_partitions": logs.get_log_partitions,
+        "get_log_usage": logs.get_log_usage,
         # Correlation and Analysis
         "analyze_alerts": analyze_alerts.analyze_alerts,
         # ML/Statistical Analysis

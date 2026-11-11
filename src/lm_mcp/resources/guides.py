@@ -329,6 +329,19 @@ TOOL_CATEGORIES = {
                 "push_metrics",
             ],
         },
+        "logs": {
+            "description": (
+                "LM Logs configuration and usage: pipelines, tracked queries, query groups, "
+                "partitions and the usage figure"
+            ),
+            "tools": [
+                "get_log_pipelines",
+                "get_tracked_log_queries",
+                "get_log_query_groups",
+                "get_log_partitions",
+                "get_log_usage",
+            ],
+        },
         "otlp_metrics": {
             "description": (
                 "Native OTLP metrics: PromQL range and instant queries and metric/label discovery"

@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 244 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 249 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -373,6 +373,18 @@ Push custom logs and metrics
 |------|-------------|-------|
 | `ingest_logs` | Ingest log entries into LogicMonitor (requires LMv1 auth) | Yes |
 | `push_metrics` | Push custom metrics into LogicMonitor (requires LMv1 auth) | Yes |
+
+## Logs
+
+LM Logs configuration and usage: pipelines, tracked queries, query groups, partitions and the usage figure
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_log_pipelines` | List every LM Logs pipeline with its query and the partitions it names. Use it to see which log queries the pipelines match; it returns all pipelines at once and takes no arguments. It does not search log content. | No |
+| `get_tracked_log_queries` | List the portal's tracked log queries, each row as the API returns it. Use it to see which log queries the portal tracks; it does not run them. | No |
+| `get_log_query_groups` | List the saved LM Logs query groups (folders) with their type, owner, permission and the queries each holds. | No |
+| `get_log_partitions` | List the LM Logs partitions with whether each is active or paused, its routing criteria, and its active contract (state, SKU, retention, usage limit, period). Use it to check partition state and contract limits. | No |
+| `get_log_usage` | Read the portal's LM Logs usage figure from /log/usage: one number, returned as the API gives it, with no unit or period stated by the API. | No |
 
 ## OTLP Metrics
 

@@ -5150,6 +5150,84 @@
       "type": "object"
     }
   },
+  "get_log_partitions": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the LM Logs partitions with whether each is active or paused, its routing criteria, and its active contract (state, SKU, retention, usage limit, period). Use it to check partition state and contract limits.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_log_pipelines": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List every LM Logs pipeline with its query and the partitions it names. Use it to see which log queries the pipelines match; it returns all pipelines at once and takes no arguments. It does not search log content.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  "get_log_query_groups": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the saved LM Logs query groups (folders) with their type, owner, permission and the queries each holds.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_log_usage": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Read the portal's LM Logs usage figure from /log/usage: one number, returned as the API gives it, with no unit or period stated by the API.",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
   "get_logsource": {
     "annotations": {
       "destructiveHint": false,
@@ -6356,6 +6434,31 @@
       "type": "object"
     }
   },
+  "get_tracked_log_queries": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the portal's tracked log queries, each row as the API returns it. Use it to see which log queries the portal tracks; it does not run them.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_upcoming_sdts": {
     "annotations": {
       "destructiveHint": false,
@@ -7201,6 +7304,7 @@
             "batchjobs",
             "imports",
             "ingestion",
+            "logs",
             "otlp_metrics",
             "correlation",
             "traces",
