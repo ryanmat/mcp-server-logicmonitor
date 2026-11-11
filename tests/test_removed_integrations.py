@@ -372,6 +372,7 @@ def test_tests_name_no_removed_integration():
         "documentation/tools.md",
         ".github/workflows/test.yml",
         ".github/dependabot.yml",
+        ".claude/skills/lm-remediate/SKILL.md",
     ],
 )
 def test_public_file_names_no_removed_integration(name):
