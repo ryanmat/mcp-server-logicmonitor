@@ -446,3 +446,149 @@ class TestErrorsArrayIn200:
 
         assert is_error_result(result)
         assert "Unexpected error fetching labels" in result[0].text
+
+
+# POST /metrics/query {"query": "up"} on lmryanmatuszewski, 2026-11-11
+# (docs/validation/otel-probe-2026-11-11.json): two of its six series, each label kept.
+_VECTOR_UP = {
+    "data": [
+        {
+            "metric": {
+                "cluster_name": "rm-aks-cluster",
+                "__name__": "up",
+                "service_name": "kube-state-metrics",
+                "k8s_pod_name": "kube-proxy-jqwjm",
+                "server_port": "8080",
+                "server_address": "lm-otel-container-kube-state-metrics",
+                "service_instance_id": "lm-otel-container-kube-state-metrics:8080",
+                "k8s_deployment_name": "rancher-webhook",
+                "k8s_namespace_name": "kube-system",
+                "url_scheme": "http",
+            },
+            "values": [{"value": "1", "timestamp": 1794408470}],
+        },
+        {
+            "metric": {
+                "cluster_name": "rm-aks-cluster",
+                "__name__": "up",
+                "service_name": "kube-state-metrics",
+                "k8s_pod_name": "kube-proxy-jqwjm",
+                "server_port": "8080",
+                "server_address": "lm-otel-container-kube-state-metrics",
+                "service_instance_id": "lm-otel-container-kube-state-metrics:8080",
+                "k8s_deployment_name": "rancher-webhook",
+                "k8s_namespace_name": "logicmonitor",
+                "url_scheme": "http",
+            },
+            "values": [{"value": "1", "timestamp": 1794408470}],
+        },
+    ],
+    "meta": {"accessible": True, "queryTimeMs": 205, "resultType": "vector"},
+}
+
+_OTLP_TOOLS = (
+    "get_otlp_metric_names",
+    "get_otlp_metric_labels",
+    "get_otlp_label_values",
+    "query_otlp_metrics",
+)
+
+
+class TestPromoted:
+    """R3.2: the OTel tools are no longer previews behind a feature-flag notice."""
+
+    @pytest.mark.parametrize("name", _OTLP_TOOLS)
+    def test_description_carries_no_preview_or_feature_flag(self, name):
+        from lm_mcp.registry import TOOLS
+
+        description = next(t for t in TOOLS if t.name == name).description
+
+        assert not description.startswith("[PREVIEW]")
+        assert "feature flag" not in description.lower()
+        assert "feature-flag" not in description.lower()
+
+
+class TestInstantQuery:
+    """R3.2: query_otlp_metrics(instant=true) reads POST /metrics/query."""
+
+    @respx.mock
+    async def test_instant_posts_the_query_alone_to_metrics_query(self, client):
+        from lm_mcp.tools.otlp_metrics import query_otlp_metrics
+
+        instant = respx.post(f"{BASE}/metrics/query").mock(
+            return_value=httpx.Response(200, json=_VECTOR_UP)
+        )
+        ranged = respx.post(f"{BASE}/metrics/query-range")
+
+        result = await query_otlp_metrics(client, query="up", instant=True)
+        data = json.loads(result[0].text)
+
+        assert json.loads(instant.calls[0].request.content) == {"query": "up"}
+        assert not ranged.called
+        assert data["result_type"] == "vector"
+        assert data["instant"] is True
+        assert data["series_count_total"] == 2
+        assert data["series"][1]["labels"]["k8s_namespace_name"] == "logicmonitor"
+        assert data["series"][0]["points"] == [[1794408470, 1.0]]
+        assert "start" not in data and "end" not in data
+
+    @respx.mock
+    async def test_range_stays_on_query_range(self, client):
+        from lm_mcp.tools.otlp_metrics import query_otlp_metrics
+
+        instant = respx.post(f"{BASE}/metrics/query")
+        ranged = respx.post(f"{BASE}/metrics/query-range").mock(
+            return_value=httpx.Response(200, json=_matrix_body())
+        )
+
+        result = await query_otlp_metrics(
+            client, query="up", start=1781200000, end=1781203600, instant=False
+        )
+
+        assert ranged.called and not instant.called
+        assert json.loads(result[0].text)["instant"] is False
+
+    @pytest.mark.parametrize(
+        "window",
+        [{"start": 1781200000}, {"end": 1781203600}, {"step": "5m"}],
+        ids=["start", "end", "step"],
+    )
+    @respx.mock
+    async def test_instant_refuses_a_window_argument(self, client, window):
+        from lm_mcp.tools.otlp_metrics import query_otlp_metrics
+
+        route = respx.post(url__startswith=f"{BASE}/metrics/")
+
+        result = await query_otlp_metrics(client, query="up", instant=True, **window)
+
+        assert is_error_result(result)
+        assert next(iter(window)) in json.loads(result[0].text)["error"]["message"]
+        assert not route.called
+
+    @pytest.mark.parametrize(
+        "window",
+        [{"start": 1781200000}, {"end": 1781203600}, {}],
+        ids=["no_end", "no_start", "none"],
+    )
+    @respx.mock
+    async def test_range_without_start_and_end_is_refused(self, client, window):
+        from lm_mcp.tools.otlp_metrics import query_otlp_metrics
+
+        route = respx.post(url__startswith=f"{BASE}/metrics/")
+
+        result = await query_otlp_metrics(client, query="up", **window)
+
+        assert is_error_result(result)
+        assert "start and end" in json.loads(result[0].text)["error"]["message"]
+        assert not route.called
+
+    @respx.mock
+    async def test_instant_surfaces_errors_array(self, client):
+        from lm_mcp.tools.otlp_metrics import query_otlp_metrics
+
+        respx.post(f"{BASE}/metrics/query").mock(return_value=_ERRORS_IN_200)
+
+        result = await query_otlp_metrics(client, query="up", instant=True)
+
+        assert is_error_result(result)
+        assert "Unexpected error fetching labels" in result[0].text

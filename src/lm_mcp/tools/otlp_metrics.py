@@ -1,5 +1,5 @@
 # Description: OTLP Metrics query tools for LogicMonitor MCP server.
-# Description: PromQL range queries and metric/label discovery for native OTLP metrics.
+# Description: PromQL range and instant queries and metric/label discovery for native OTLP metrics.
 
 from __future__ import annotations
 
@@ -21,11 +21,11 @@ _FEATURE_SUGGESTION = (
     "and confirm the API token has the OTLP Metrics permission."
 )
 # query-range matrices can be huge; cap the payload handed back to the model.
-_MAX_SERIES = 20
+MAX_SERIES = 20
 _MAX_POINTS_PER_SERIES = 500
 
 
-def _handle_otlp_error(e: Exception) -> list[TextContent]:
+def handle_otlp_error(e: Exception) -> list[TextContent]:
     """Translate feature-unavailable errors into a friendly response.
 
     Flag-disabled portals 404 (the /metrics routes are absent entirely);
@@ -47,7 +47,7 @@ def _handle_otlp_error(e: Exception) -> list[TextContent]:
     return handle_error(e)
 
 
-def _body_errors(result: dict) -> list[TextContent] | None:
+def otlp_body_errors(result: dict) -> list[TextContent] | None:
     """Detect the HTTP-200-with-errors body the metrics backend can return.
 
     The metrics proxy reports backend failures as a 200 carrying an
@@ -70,7 +70,7 @@ def _body_errors(result: dict) -> list[TextContent] | None:
 
 def _format_string_list(result: dict, items_key: str, **extra: Any) -> list[TextContent]:
     """Normalize the shared list-response body of the three GET endpoints."""
-    error_response = _body_errors(result)
+    error_response = otlp_body_errors(result)
     if error_response is not None:
         return error_response
     meta = result.get("meta") or {}
@@ -135,7 +135,7 @@ async def get_otlp_metric_names(
         result = await client.get("/metrics/metric-names", params=params)
         return _format_string_list(result, "metric_names")
     except Exception as e:
-        return _handle_otlp_error(e)
+        return handle_otlp_error(e)
 
 
 async def get_otlp_metric_labels(
@@ -172,7 +172,7 @@ async def get_otlp_metric_labels(
         result = await client.get("/metrics/labels", params=params)
         return _format_string_list(result, "labels")
     except Exception as e:
-        return _handle_otlp_error(e)
+        return handle_otlp_error(e)
 
 
 async def get_otlp_label_values(
@@ -213,17 +213,13 @@ async def get_otlp_label_values(
         result = await client.get("/metrics/label-values", params=params)
         return _format_string_list(result, "values", key=key)
     except Exception as e:
-        return _handle_otlp_error(e)
+        return handle_otlp_error(e)
 
 
-async def query_otlp_metrics(
-    client: LogicMonitorClient,
-    query: str,
-    start: int,
-    end: int,
-    step: str | None = None,
-) -> list[TextContent]:
-    """Run a PromQL range query against the native OTLP metrics store.
+async def read_otlp_range(
+    client: LogicMonitorClient, query: str, start: int, end: int, step: str | None = None
+) -> dict[str, Any]:
+    """POST one query-range read and return its body as the metrics API answers it.
 
     Args:
         client: LogicMonitor API client.
@@ -231,9 +227,77 @@ async def query_otlp_metrics(
         start: Window start as unix epoch seconds.
         end: Window end as unix epoch seconds.
         step: Resolution step (e.g. "30s", "5m"); backend default if omitted.
+    """
+    body: dict = {"query": query, "start": start, "end": end}
+    if step:
+        body["step"] = step
+    result: dict[str, Any] = await client.post("/metrics/query-range", json_body=body)
+    return result
+
+
+def _selector(name: str | None, labels: dict[str, Any], query: str) -> str:
+    """A series' PromQL selector, name{label="value",...} with the labels sorted; the
+    query itself for an aggregate that carries neither a name nor a label."""
+    matchers = ",".join(f'{key}="{labels[key]}"' for key in sorted(labels))
+    if not name and not matchers:
+        return query
+    return f"{name or ''}{{{matchers}}}" if matchers else str(name)
+
+
+def otlp_series(result: dict[str, Any], query: str) -> tuple[dict[str, dict[str, Any]], int]:
+    """The first MAX_SERIES series of a query-range body, keyed by selector, for analysis.
+
+    Each series holds its finite samples oldest first, as the metric series reader
+    returns them: values, epoch-second timestamps and truncated, always false since a
+    range read is not paged. NaN, infinite and unreadable samples are left out.
 
     Returns:
-        List of TextContent with the result matrix or error.
+        The series and the number the body carried.
+    """
+    raw_series = result.get("data") or []
+    series: dict[str, dict[str, Any]] = {}
+    for entry in raw_series[:MAX_SERIES]:
+        labels = dict(entry.get("metric") or {})
+        name = labels.pop("__name__", None)
+        values: list[float] = []
+        timestamps: list[int] = []
+        for point in entry.get("values") or []:
+            timestamp, value = _normalize_point(point)
+            if timestamp is not None and isinstance(value, float) and math.isfinite(value):
+                values.append(value)
+                timestamps.append(int(timestamp))
+        series[_selector(name, labels, query)] = {
+            "values": values,
+            "timestamps": timestamps,
+            "truncated": False,
+        }
+    return series, len(raw_series)
+
+
+async def query_otlp_metrics(
+    client: LogicMonitorClient,
+    query: str,
+    start: int | None = None,
+    end: int | None = None,
+    step: str | None = None,
+    instant: bool = False,
+) -> list[TextContent]:
+    """Run a PromQL query against the native OTLP metrics store.
+
+    A range query reads start to end; an instant query reads each series' value now
+    and takes no window.
+
+    Args:
+        client: LogicMonitor API client.
+        query: PromQL expression.
+        start: Window start as unix epoch seconds; range queries only.
+        end: Window end as unix epoch seconds; range queries only.
+        step: Resolution step (e.g. "30s", "5m"); range queries only, backend
+            default if omitted.
+        instant: Read POST /metrics/query for the value now instead of a range.
+
+    Returns:
+        List of TextContent with the series or error.
     """
     if not query:
         return validation_error(
@@ -241,28 +305,47 @@ async def query_otlp_metrics(
             "query is required",
             "Pass a PromQL expression, e.g. avg(container_cpu_usage_seconds_total).",
         )
-    if start >= end:
+    if instant:
+        window = [
+            name
+            for name, value in (("start", start), ("end", end), ("step", step))
+            if value is not None
+        ]
+        if window:
+            return validation_error(
+                "INVALID_REQUEST",
+                f"An instant query takes no {', '.join(window)}",
+                "Drop them for the value now, or set instant=false for a range query.",
+            )
+    elif start is None or end is None:
+        return validation_error(
+            "INVALID_REQUEST",
+            "A range query needs start and end (unix epoch seconds)",
+            "Pass both, or set instant=true for each series' value now.",
+        )
+    elif start >= end:
         return validation_error(
             "INVALID_REQUEST",
             "start must be before end (unix epoch seconds)",
             "Swap the values or widen the window.",
         )
     try:
-        body: dict = {"query": query, "start": start, "end": end}
-        if step:
-            body["step"] = step
-        result = await client.post("/metrics/query-range", json_body=body)
+        if instant:
+            result = await client.post("/metrics/query", json_body={"query": query})
+        else:
+            assert start is not None and end is not None
+            result = await read_otlp_range(client, query, start, end, step)
 
-        error_response = _body_errors(result)
+        error_response = otlp_body_errors(result)
         if error_response is not None:
             return error_response
 
         meta = result.get("meta") or {}
         raw_series = result.get("data") or []
-        truncated = len(raw_series) > _MAX_SERIES
+        truncated = len(raw_series) > MAX_SERIES
 
         series = []
-        for entry in raw_series[:_MAX_SERIES]:
+        for entry in raw_series[:MAX_SERIES]:
             labels = dict(entry.get("metric") or {})
             name = labels.pop("__name__", None)
             points = [_normalize_point(p) for p in entry.get("values") or []]
@@ -281,23 +364,27 @@ async def query_otlp_metrics(
             )
 
         response: dict[str, Any] = {
-            "result_type": meta.get("resultType", "matrix"),
+            "result_type": meta.get("resultType", "vector" if instant else "matrix"),
             "query": query,
-            "start": start,
-            "end": end,
-            "step": step,
-            "series_count_total": len(raw_series),
-            "series_count_returned": len(series),
-            "series": series,
+            "instant": instant,
         }
+        if not instant:
+            response.update({"start": start, "end": end, "step": step})
+        response.update(
+            {
+                "series_count_total": len(raw_series),
+                "series_count_returned": len(series),
+                "series": series,
+            }
+        )
         if meta.get("queryTimeMs") is not None:
             response["query_time_ms"] = meta["queryTimeMs"]
         if truncated:
             response["truncated"] = True
             response["note"] = (
-                f"Output capped at {_MAX_SERIES} series / {_MAX_POINTS_PER_SERIES} points per "
+                f"Output capped at {MAX_SERIES} series / {_MAX_POINTS_PER_SERIES} points per "
                 "series. Use a larger step, a narrower time window, or a more specific query."
             )
         return format_response(response)
     except Exception as e:
-        return _handle_otlp_error(e)
+        return handle_otlp_error(e)

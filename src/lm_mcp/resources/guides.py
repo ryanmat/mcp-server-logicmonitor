@@ -331,8 +331,7 @@ TOOL_CATEGORIES = {
         },
         "otlp_metrics": {
             "description": (
-                "Native OTLP metrics: PromQL range queries and metric/label "
-                "discovery (feature-flag gated, [PREVIEW])"
+                "Native OTLP metrics: PromQL range and instant queries and metric/label discovery"
             ),
             "tools": [
                 "get_otlp_metric_names",

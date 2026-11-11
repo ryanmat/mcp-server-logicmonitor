@@ -49,7 +49,7 @@ _NAMES_430 = set(
 # The tools each rewritten skill's recipe is built on.
 _RECIPE_TOOLS = {
     "lm-apm": {"get_apm_services", "get_apm_service_alerts", "get_device_data", "analyze_metric"},
-    "lm-capacity": {"get_devices", "analyze_metric"},
+    "lm-capacity": {"get_devices", "analyze_metric", "get_otlp_metric_names"},
     "lm-edwin": {"get_edwin_insights", "get_edwin_insight", "analyze_metric", "triage"},
     "lm-health": {"get_devices", "health_check", "analyze_metric"},
     "lm-portal": {"portal_overview", "analyze_alerts", "get_collectors"},
@@ -219,3 +219,8 @@ def test_rewritten_skill_is_built_on_its_recipe_tools(name):
     tools = _RECIPE_TOOLS[name]
     assert sorted(tools - _allowed(name)) == []
     assert sorted(tools - _body_tool_names(name)) == []
+
+
+def test_lm_capacity_reads_otel_series_through_analyze_metric():
+    """R2.14, R3.2: lm-capacity's OTel branch calls analyze_metric with source="otlp"."""
+    assert 'source="otlp"' in _skill_text("lm-capacity")[1]
