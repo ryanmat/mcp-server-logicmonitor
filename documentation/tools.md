@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 236 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 244 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -436,6 +436,21 @@ Multi-portal switching: one server, many customer portals
 | `use_portal` | Switch the active customer portal for subsequent tool calls. | No |
 | `get_current_portal` | Show which customer portal is currently active. | No |
 | `run_portal_reload` | Re-read the vault so portals added or removed since startup take effect without restarting the client. | No |
+
+## Edwin
+
+Edwin AI: its insights, its copy of alerts and events, its data model, its agents' tools, and Ask Edwin; listed only with Edwin credentials
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_edwin_insights` | List the insights Edwin AI created in the last `hours`, newest first. An insight is an incident Edwin built by correlating alerts. Each row has Edwin's id and display id, state, workflow state, severity, causal CI, impacted CIs, alert count and alert keys, a link into Edwin, and once Edwin has analyzed it, its title, summary, root cause, impact, timeline, remediation, evidence, contributing factors and similar incidents. Call this to find what Edwin concluded about an incident before reading raw alerts and metrics; get_edwin_insight reads one insight whole. `total` is Edwin's count of matches; it has read exactly 10000 for a window of all time, so treat 10000 as a lower bound. A cleared insight reads severity 0. | No |
+| `get_edwin_insight` | Read one Edwin AI insight by its `_id` from get_edwin_insights, with every field Edwin holds for it, including the ones get_edwin_insights leaves out. Each epoch-millisecond timestamp comes with an ISO 8601 twin. | No |
+| `get_edwin_records` | List Edwin AI's own copy of the alerts or events it received in the last `hours`, newest first unless `order` says otherwise. Use it to see what Edwin correlated; LogicMonitor's alerts are read with get_alerts and insights with get_edwin_insights. `filter` takes one Edwin filterCondition condition, ANDed with the window, such as {"EQUALS": [{"type": "string", "field": "cf.eventCI"}, "web01"]}; get_edwin_metadata lists the field names. Without `columns` every field comes back except extra.* (the CI's LogicMonitor properties) and raw.* (the source record). | No |
+| `get_edwin_alert_volume` | Count the alerts Edwin AI received in the last `hours`, by hour or by alert state. Returns [key, count] buckets, hour keys in epoch milliseconds, and Edwin's total for the window. The Edwin credential needs the query_aggregate scope; without it the call fails with SCOPE_MISSING naming that scope. | No |
+| `get_edwin_metadata` | List Edwin AI's record types with their field counts, or with `record_type` the fields of one type, so you can name fields in get_edwin_records filters and columns. The extra.* fields, the CI's LogicMonitor properties, are counted but not listed unless `prefix` asks for them. | No |
+| `get_edwin_tools` | List Edwin AI's agents, or with `agent` (such as LMDiagnosticsAgent) that agent's MCP servers and the active tools on each. The mcp_name and tool name pairs are what edwin_run_tool takes. Edwin publishes no input schema for its tools, so a tool's short_description is the only guide to its parameter names. | No |
+| `edwin_run_tool` | Run one tool on one of Edwin AI's MCP servers, sending `parameters` to Edwin unchanged. Requires write permission: an Edwin tool can change the systems it connects to, and this server cannot tell which tools do, so every run is gated and audited. Take mcp_name and tool_name from get_edwin_tools; the parameter names come from the tool's short_description, since Edwin publishes no input schema. A tool that reports failure returns REJECTED_BY_TOOL with Edwin's error. | Yes |
+| `ask_edwin` | Ask Edwin AI a question in plain words and wait up to 120 seconds for its answer. Edwin investigates with its own tools and returns `answer`, `reasoning` (its tool-call narration), a `conversation_id` to pass back for a follow-up, and `truncated: true` when the answer stopped early. Slower than the get_edwin_* reads; use it when a question needs Edwin's judgment rather than one of its records. | No |
 
 ## Terraform
 

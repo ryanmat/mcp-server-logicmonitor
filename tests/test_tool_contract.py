@@ -149,7 +149,7 @@ def single_portal(monkeypatch):
 
 async def test_writes_off_lists_no_tool_that_changes_the_portal(single_portal):
     """R1.9: with writes off, tools/list carries no tool annotated as changing the portal."""
-    from lm_mcp.server import PORTAL_TOOLS, list_tools
+    from lm_mcp.server import EDWIN_TOOLS, PORTAL_TOOLS, list_tools
 
     listed = await list_tools()
     names = {tool.name for tool in listed}
@@ -158,7 +158,9 @@ async def test_writes_off_lists_no_tool_that_changes_the_portal(single_portal):
     assert {t.name for t in listed if t.annotations.readOnlyHint is False} == (
         _CLOSED_WORLD_WRITES - PORTAL_TOOLS
     )
-    assert names == {t.name for t in TOOLS if not _changes_the_portal(t)} - PORTAL_TOOLS
+    assert names == (
+        {t.name for t in TOOLS if not _changes_the_portal(t)} - PORTAL_TOOLS - EDWIN_TOOLS
+    )
 
 
 async def test_writes_off_keeps_portal_selection_in_multi_portal(monkeypatch, tmp_path):
@@ -179,14 +181,14 @@ async def test_writes_off_keeps_portal_selection_in_multi_portal(monkeypatch, tm
 
 
 async def test_writes_on_lists_every_tool(single_portal, monkeypatch):
-    """R1.9: with writes on, tools/list carries every tool the single-portal surface has."""
-    from lm_mcp.server import PORTAL_TOOLS, list_tools
+    """R1.9: with writes on, tools/list carries every tool of a single portal without Edwin."""
+    from lm_mcp.server import EDWIN_TOOLS, PORTAL_TOOLS, list_tools
 
     monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
 
     names = {tool.name for tool in await list_tools()}
 
-    assert names == {t.name for t in TOOLS} - PORTAL_TOOLS
+    assert names == {t.name for t in TOOLS} - PORTAL_TOOLS - EDWIN_TOOLS
 
 
 async def test_a_hidden_tool_called_by_name_is_refused(single_portal, caplog):

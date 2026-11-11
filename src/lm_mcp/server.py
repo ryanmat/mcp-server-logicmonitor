@@ -2,8 +2,10 @@
 # Description: Provides shared tool execution middleware and stdio transport.
 
 import asyncio
+import dataclasses
 import json
 import logging
+from typing import TYPE_CHECKING
 
 from mcp.server import Server
 from mcp.types import CallToolResult, GetPromptResult, TextContent, Tool
@@ -31,15 +33,18 @@ from lm_mcp.tools import (
     write_disabled_response,
 )
 
+if TYPE_CHECKING:
+    from lm_mcp.client.edwin import EdwinClient
+
 logger = logging.getLogger(__name__)
 
 # Create server instance
 SERVER_INSTRUCTIONS = (
-    "This server exposes up to 236 LogicMonitor tools, more than most clients load at once. "
+    "This server exposes up to 244 LogicMonitor tools, more than most clients load at once. "
     "To find the right tool for a task, call `search_tools` with relevant keywords (or a "
-    "`category`) first instead of enumerating the full list. Composite workflow tools -- "
-    "`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, "
-    "`detect_site_outage` -- answer common multi-step investigations in a single call. "
+    "`category`) first instead of enumerating the full list. The composite workflow tools "
+    "(`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan` and "
+    "`detect_site_outage`) answer common multi-step investigations in a single call. "
     "Tools that change the portal (create, update, delete, acknowledge, run) are listed "
     "only when the operator sets `LM_ENABLE_WRITE_OPERATIONS=true`."
 )
@@ -47,6 +52,9 @@ server = Server("logicmonitor-platform", version=__version__, instructions=SERVE
 
 # Global client (initialized on startup)
 _client: LogicMonitorClient | None = None
+
+# The Edwin AI client the transport bootstrap built, or None when Edwin is not configured
+_edwin_client: "EdwinClient | None" = None
 
 
 def get_client() -> LogicMonitorClient:
@@ -90,11 +98,22 @@ def _set_client(client: LogicMonitorClient) -> None:
     _client = client
 
 
+def _set_edwin_client(client: "EdwinClient | None") -> None:
+    """Set the Edwin AI client the Edwin tools call, or None to withdraw them.
+
+    Called by the transport bootstrap at startup and when it closes its backends.
+    """
+    global _edwin_client
+    _edwin_client = client
+
+
 def _filter_tools(tools: list, config) -> list:
     """Filter tools on the write gate, LM_ENABLED_TOOLS, LM_DISABLED_TOOLS and LM_MCP_CATEGORIES.
 
     With LM_ENABLE_WRITE_OPERATIONS false, tools whose annotations say they change the
-    portal are left out.
+    portal are left out. The Edwin tools are left out unless the bootstrap built an
+    Edwin client, which it does only when both Edwin credentials are set, and in
+    multi-portal mode the Edwin tools that change state are left out (see _edwin_write).
 
     Supports comma-separated tool names and glob patterns (e.g., "get_*", "delete_*").
     LM_MCP_CATEGORIES composes by intersection — it narrows the result of the
@@ -110,6 +129,11 @@ def _filter_tools(tools: list, config) -> list:
     """
     if not config.multi_portal:
         tools = [t for t in tools if t.name not in PORTAL_TOOLS]
+
+    if _edwin_client is None:
+        tools = [t for t in tools if t.name not in EDWIN_TOOLS]
+    elif config.multi_portal:
+        tools = [t for t in tools if not _edwin_write(t.name)]
 
     if not config.enable_write_operations:
         tools = [t for t in tools if not writes_to_portal(t)]
@@ -166,6 +190,19 @@ PORTAL_TOOLS = {
     "run_portal_reload",
 }
 
+# Edwin AI tools: served only with an Edwin client, which their handlers take in place
+# of the LogicMonitor client
+EDWIN_TOOLS = {
+    "get_edwin_insights",
+    "get_edwin_insight",
+    "get_edwin_records",
+    "get_edwin_alert_volume",
+    "get_edwin_metadata",
+    "get_edwin_tools",
+    "edwin_run_tool",
+    "ask_edwin",
+}
+
 # Discovery tools that take the client argument by convention but never use it,
 # so they must work before a portal is selected in multi-portal mode.
 CLIENT_OPTIONAL_TOOLS = {
@@ -174,20 +211,30 @@ CLIENT_OPTIONAL_TOOLS = {
 }
 
 
+def _edwin_write(name: str) -> bool:
+    """Whether a tool is an Edwin tool that changes state. Edwin AI is one tenant for every
+    portal in multi-portal mode, so no portal's vault write flag vouches for such a call."""
+    return name in EDWIN_TOOLS and is_write_tool(name)
+
+
 def _call_binding(config: LMConfig) -> CallBinding:
-    """The client, write flag and portal name a call runs against, read once at its start."""
+    """The clients, write flag and portal name a call runs against, read once at its start."""
     if config.multi_portal:
-        return portals.call_binding(writes_enabled=config.enable_write_operations)
-    return CallBinding(client=_client, writable=config.enable_write_operations, portal=None)
+        binding = portals.call_binding(writes_enabled=config.enable_write_operations)
+        return dataclasses.replace(binding, edwin=_edwin_client)
+    return CallBinding(
+        client=_client, writable=config.enable_write_operations, portal=None, edwin=_edwin_client
+    )
 
 
 async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
     """Execute a LogicMonitor tool with full middleware chain.
 
-    Binds the call's client, write flag and portal name for its duration (spec
-    R2.12), then applies tool filtering, the write gate, write audit logging and
-    session recording. In multi-portal mode every result except a portal tool's
-    carries the bound portal name. The MCP call_tool handler delegates to it.
+    Binds the call's LogicMonitor and Edwin clients, write flag and portal name for
+    its duration (spec R2.12), then applies tool filtering, the write gate, write
+    audit logging and session recording. In multi-portal mode every result except a
+    portal tool's carries the bound portal name. The MCP call_tool handler delegates
+    to it.
 
     Args:
         name: Tool name to execute.
@@ -215,6 +262,22 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
             return error_content(
                 "FEATURE_DISABLED",
                 f"Tool '{name}' is only available in multi-portal mode (set LM_MULTI_PORTAL=true).",
+            )
+
+        # Edwin tools exist only with the Edwin client the bootstrap built
+        if name in EDWIN_TOOLS and current_binding().edwin is None:
+            if is_write_tool(name):
+                log_write_operation(name, arguments, success=False)
+            return error_content(
+                "FEATURE_DISABLED",
+                f"Tool '{name}' needs Edwin AI: set EDWIN_CLIENT_ID and EDWIN_CLIENT_TOKEN.",
+            )
+        if config.multi_portal and _edwin_write(name):
+            log_write_operation(name, arguments, success=False)
+            return error_content(
+                "FEATURE_DISABLED",
+                f"Tool '{name}' is off in multi-portal mode: Edwin AI is one tenant for every "
+                "portal, so no portal's write permission can cover the change.",
             )
 
         # Reject calls to filtered-out tools
@@ -250,6 +313,10 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
             # These handlers ignore the client; pass the bound one as-is (possibly
             # None before use_portal) so discovery works portal-free.
             result = await handler(current_binding().client, **arguments)
+        elif name in EDWIN_TOOLS:
+            # Edwin tools take the Edwin client in place of the LogicMonitor one, so they
+            # work before a portal is selected.
+            result = await handler(current_binding().edwin, **arguments)
         else:
             client = current_binding().client
             if client is None:

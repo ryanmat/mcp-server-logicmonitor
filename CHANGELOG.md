@@ -8,10 +8,11 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 236:
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 244:
 232 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
-`run_portal_reload` in multi-portal mode. With writes off, the default, `tools/list` shows 131 of
-them, or 135 in multi-portal mode. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
+`run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
+With writes off, the default, `tools/list` shows 131 of them, or 135 in multi-portal mode, and
+seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
 Windows-only. The Python under `src/` is 32,172 lines, down from 40,839; the eight LogicModule
@@ -73,6 +74,16 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   the definition the matching `create_*` tool takes, in place of the summary. `get_dashboard`
   with `raw` returns the dashboard with its widgets under `widgets_full`, the template
   `create_dashboard` clones, in place of the dashboard with its portal link.
+- Edwin AI tools, listed only when `EDWIN_CLIENT_ID` and `EDWIN_CLIENT_TOKEN` are both set:
+  `get_edwin_insights` and `get_edwin_insight` (the incidents Edwin correlated, with its
+  analysis), `get_edwin_records` (Edwin's copy of alerts and events), `get_edwin_alert_volume`,
+  `get_edwin_metadata`, `get_edwin_tools` (the tools of Edwin's agents), `edwin_run_tool`
+  (runs one; write-gated, annotated destructive, audited, and not offered in multi-portal mode)
+  and `ask_edwin` (an Ask Edwin conversation over Edwin's websocket, 120-second budget).
+  `EDWIN_HOST` overrides the derived host `https://<portal name>.dexda.ai` and is required in
+  multi-portal mode. A 403 from Edwin is `SCOPE_MISSING`, naming the credential scope the call
+  needs where the path is known.
+  `websockets` (>=14.0) becomes a core dependency for `ask_edwin`.
 
 ### Removed
 

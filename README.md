@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 236 tools, 3 workflow prompts, and 25 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 244 tools, 3 workflow prompts, and 25 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 236 counts every tool the server can advertise; four of them appear only in multi-portal mode; see [Integrations](#integrations).
+The 244 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search by name and description over the tools your settings list, so with writes off it names no write tool; an optional `category` narrows it to one group
-- the `lm://guide/tool-categories` resource: all 236 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 244 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -167,7 +167,7 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 
 ## Integrations
 
-`terraform_generate` needs no settings. Multi-portal mode is optional; add its variables to the `env` block or `claude mcp add` command from [Setup](#setup).
+`terraform_generate` needs no settings. Multi-portal mode and Edwin AI are optional; add their variables to the `env` block or `claude mcp add` command from [Setup](#setup).
 
 ### Terraform
 
@@ -176,6 +176,10 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 ### Multi-portal mode
 
 Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`get_portals`, `use_portal`, `get_current_portal`, `run_portal_reload`) switch the active portal at runtime. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
+
+### Edwin AI
+
+Set `EDWIN_CLIENT_ID` and `EDWIN_CLIENT_TOKEN` to an Edwin AI API credential and the server lists eight more tools. `get_edwin_insights` and `get_edwin_insight` read the incidents Edwin built by correlating alerts, with its root cause and remediation analysis when it has written one. `get_edwin_records`, `get_edwin_alert_volume` and `get_edwin_metadata` read Edwin's copy of alerts and events and its data model. `get_edwin_tools` lists the tools of Edwin's agents and `edwin_run_tool` runs one; it needs `LM_ENABLE_WRITE_OPERATIONS=true`, every run is audited, and multi-portal mode does not offer it, since one Edwin tenant serves every portal there. `ask_edwin` asks Edwin a question and waits up to two minutes for the answer. The server calls `https://<portal name>.dexda.ai` unless `EDWIN_HOST` names another host; multi-portal mode has no portal name to derive it from, so set `EDWIN_HOST` there. A credential that lacks a scope a tool needs gets `SCOPE_MISSING` naming the scope.
 
 ## Deployment
 
@@ -246,6 +250,9 @@ To get LMv1 credentials:
 | `LM_VAULT_FILE` | No | - | Path to the age-encrypted portal vault (multi-portal) |
 | `LM_AGE_KEY` | No | - | Path to the age identity that decrypts the vault (multi-portal) |
 | `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |
+| `EDWIN_CLIENT_ID` | No | - | Edwin AI API credential client id. With `EDWIN_CLIENT_TOKEN` it turns on the eight Edwin tools; one without the other leaves them off and logs a warning |
+| `EDWIN_CLIENT_TOKEN` | No | - | Secret of that Edwin AI credential |
+| `EDWIN_HOST` | No | `https://<portal name>.dexda.ai` | Edwin AI base URL, https only. Required in multi-portal mode, which has no `LM_PORTAL` to derive it from |
 | `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address. With `LM_TRANSPORT=http`, an address other than `127.0.0.1`, `::1` or `localhost` needs `LM_HTTP_AUTH_TOKEN` or `LM_HTTP_ALLOW_UNAUTHENTICATED=true`, or the server refuses to start. |
 | `LM_HTTP_PORT` | No | `8080` | HTTP server port |
 | `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on every path outside `/` and the health endpoints (min 16 chars). Needed to start on a non-loopback `LM_HTTP_HOST`, the default `0.0.0.0` included, unless `LM_HTTP_ALLOW_UNAUTHENTICATED=true`. Health endpoints and `/` stay open for probes. HTTP transport only. |
@@ -293,7 +300,7 @@ Clients read these through the standard MCP resource and prompt calls.
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 236 tools organized by domain category |
+| `lm://guide/tool-categories` | All 244 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

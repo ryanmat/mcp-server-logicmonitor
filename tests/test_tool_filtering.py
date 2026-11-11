@@ -4,7 +4,7 @@
 import pytest
 
 from lm_mcp.registry import TOOLS
-from lm_mcp.server import PORTAL_TOOLS, _filter_tools
+from lm_mcp.server import EDWIN_TOOLS, PORTAL_TOOLS, _filter_tools
 
 
 class _MockConfig:
@@ -29,10 +29,10 @@ class TestFilterTools:
     """Tests for the _filter_tools function."""
 
     def test_no_filters_returns_all(self):
-        """No filters returns all tools."""
+        """No filters returns every tool a single-portal server without Edwin serves."""
         config = _MockConfig()
         result = _filter_tools(TOOLS, config)
-        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS) - len(EDWIN_TOOLS)
 
     def test_enabled_exact_names(self):
         """Enabled list with exact names returns only those tools."""
@@ -119,7 +119,7 @@ class TestCategoryFilter:
     def test_categories_unset_returns_all(self):
         config = _MockConfig()
         result = _filter_tools(TOOLS, config)
-        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS) - len(EDWIN_TOOLS)
 
     def test_categories_read_only_excludes_destructive(self):
         config = _MockConfig(mcp_categories="read")
@@ -198,7 +198,7 @@ class TestCategoryFilter:
         """Defensive: all-typo input does not silently empty the surface."""
         config = _MockConfig(mcp_categories="bogus,nonsense")
         result = _filter_tools(TOOLS, config)
-        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS)
+        assert len(result) == len(TOOLS) - len(PORTAL_TOOLS) - len(EDWIN_TOOLS)
 
     @pytest.mark.asyncio
     async def test_call_tool_rejects_filtered_by_category(self, monkeypatch):

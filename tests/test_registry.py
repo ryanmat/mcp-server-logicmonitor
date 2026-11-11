@@ -290,6 +290,44 @@ def _formats_own_page_query(tree: ast.Module) -> bool:
     return False
 
 
+_EDWIN_TOOLS = {
+    "get_edwin_insights",
+    "get_edwin_insight",
+    "get_edwin_records",
+    "get_edwin_alert_volume",
+    "get_edwin_metadata",
+    "get_edwin_tools",
+    "edwin_run_tool",
+    "ask_edwin",
+}
+
+
+class TestEdwinTools:
+    """R3.1: the eight Edwin tools are registered, annotated and grouped."""
+
+    def test_the_server_gates_exactly_the_registered_edwin_tools(self):
+        from lm_mcp.server import EDWIN_TOOLS
+
+        assert set(EDWIN_TOOLS) == _EDWIN_TOOLS
+        assert {tool.name for tool in TOOLS} >= _EDWIN_TOOLS
+
+    def test_edwin_run_tool_is_a_destructive_run_and_the_other_seven_read_only(self):
+        annotations = {tool.name: tool.annotations for tool in TOOLS if tool.name in _EDWIN_TOOLS}
+
+        run = annotations.pop("edwin_run_tool")
+        assert (run.readOnlyHint, run.destructiveHint, run.idempotentHint) == (False, True, False)
+        assert all(a.readOnlyHint is True for a in annotations.values())
+
+    def test_edwin_run_tool_says_it_needs_write_permission(self):
+        tool = next(t for t in TOOLS if t.name == "edwin_run_tool")
+        assert "write permission" in tool.description.lower()
+
+    def test_the_edwin_category_holds_the_eight_tools(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        assert set(TOOL_CATEGORIES["categories"]["edwin"]["tools"]) == _EDWIN_TOOLS
+
+
 class TestListToolGuard:
     """R2.5: a list tool pages through list_tool and takes and declares limit and offset.
 
@@ -335,9 +373,13 @@ class TestListToolGuard:
         assert not unforwarded, unforwarded
 
     def test_no_list_handler_formats_its_own_page_query(self):
+        """The Edwin reads stay outside: Edwin's record query is not a LogicMonitor list, its
+        body carries ``size`` and it takes no offset (spec R3.1)."""
         own = sorted(
             name
             for name, (sig, tree) in _handler_sources().items()
-            if "limit" in sig.parameters and _formats_own_page_query(tree)
+            if "limit" in sig.parameters
+            and name not in _EDWIN_TOOLS
+            and _formats_own_page_query(tree)
         )
         assert not own, f"move these onto list_tool: {own}"

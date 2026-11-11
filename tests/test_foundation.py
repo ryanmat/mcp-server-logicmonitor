@@ -88,6 +88,26 @@ class TestReleaseMetadata:
         assert stated, f"{doc} states no tool count"
         assert set(stated) == {total}, f"{doc} states {sorted(set(stated))}, registry has {total}"
 
+    def test_readme_and_server_json_list_every_edwin_setting(self):
+        """R3.1: each Edwin setting appears where an operator configures the server."""
+        from lm_mcp.edwin_config import EdwinConfig
+
+        settings = {f"EDWIN_{field.upper()}" for field in EdwinConfig.model_fields}
+        readme = (REPO_ROOT / "README.md").read_text()
+        rows = set(re.findall(r"^\| `(EDWIN_[A-Z_]+)` \|", readme, re.MULTILINE))
+        server = json.loads((REPO_ROOT / "server.json").read_text())
+        listed = {
+            variable["name"]: variable
+            for package in server["packages"]
+            for variable in package["environmentVariables"]
+        }
+
+        assert settings == {"EDWIN_CLIENT_ID", "EDWIN_CLIENT_TOKEN", "EDWIN_HOST"}
+        assert sorted(settings - rows) == []
+        assert sorted(settings - set(listed)) == []
+        assert listed["EDWIN_CLIENT_TOKEN"]["isSecret"] is True
+        assert not any(listed[name]["isRequired"] for name in settings)
+
 
 class TestFoundationIntegration:
     """Integration tests for foundation components."""
