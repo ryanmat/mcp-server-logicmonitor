@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
+    from lm_mcp.client.edwin import EdwinClient
 
 
 @dataclass(frozen=True)
@@ -24,11 +25,14 @@ class CallBinding:
             and, in multi-portal mode, the portal's own vault flag.
         portal: The portal name in multi-portal mode, None before use_portal; always
             None in single-portal mode.
+        edwin: The Edwin AI client the transport built at startup, or None when Edwin
+            is not configured; one for the server, whichever portal is bound.
     """
 
     client: LogicMonitorClient | None
     writable: bool
     portal: str | None
+    edwin: EdwinClient | None = None
 
 
 _binding: ContextVar[CallBinding] = ContextVar("lm_mcp_call_binding")

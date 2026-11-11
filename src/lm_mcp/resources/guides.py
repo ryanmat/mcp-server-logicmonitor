@@ -388,6 +388,22 @@ TOOL_CATEGORIES = {
                 "run_portal_reload",
             ],
         },
+        "edwin": {
+            "description": (
+                "Edwin AI: its insights, its copy of alerts and events, its data model, "
+                "its agents' tools, and Ask Edwin; listed only with Edwin credentials"
+            ),
+            "tools": [
+                "get_edwin_insights",
+                "get_edwin_insight",
+                "get_edwin_records",
+                "get_edwin_alert_volume",
+                "get_edwin_metadata",
+                "get_edwin_tools",
+                "edwin_run_tool",
+                "ask_edwin",
+            ],
+        },
         "terraform": {
             "description": "Export LogicMonitor resources as Terraform HCL",
             "tools": [

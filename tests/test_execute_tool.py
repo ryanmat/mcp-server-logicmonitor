@@ -12,6 +12,7 @@ import pytest
 import respx
 from mcp.types import CallToolRequest, CallToolRequestParams, CallToolResult, TextContent
 
+from lm_mcp.exceptions import ConfigurationError
 from lm_mcp.tools import ErrorContent, is_error_result
 from tests.envelope import envelope
 
@@ -646,3 +647,300 @@ class TestWriteOutcomeFromResult:
 
         assert Version("1.18.0") not in mcp.specifier
         assert Version("1.19.0") in mcp.specifier
+
+
+EDWIN_TOOL_NAMES = {
+    "get_edwin_insights",
+    "get_edwin_insight",
+    "get_edwin_records",
+    "get_edwin_alert_volume",
+    "get_edwin_metadata",
+    "get_edwin_tools",
+    "edwin_run_tool",
+    "ask_edwin",
+}
+EDWIN_HOST = "https://lmryanmatuszewski.dexda.ai"
+# The insight row get_edwin_insights projects, from the 2026-11-10 probe
+# (tests/test_tools/test_edwin.py carries the full row).
+EDWIN_INSIGHT = {
+    "_id": "correlation_36fa3f53-e608-4192-aeca-e0097d2a1e94_1794020047392",
+    "meta.displayId": "EDN000029424",
+    "meta.state": "cleared",
+    "ml.insightSeverity": 0,
+    "meta.createdTimestamp": 1794020047392,
+}
+
+
+@pytest.fixture
+def edwin_env(monkeypatch, reset_portals):
+    """Single-portal env with writes on, both Edwin credentials, and the token exchange answered."""
+    monkeypatch.setenv("LM_PORTAL", "lmryanmatuszewski.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "lm-bearer-token-fixture")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+    monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+    monkeypatch.setenv("EDWIN_CLIENT_ID", "edwin-client-id-fixture")
+    monkeypatch.setenv("EDWIN_CLIENT_TOKEN", "edwin-secret-fix")
+    monkeypatch.delenv("EDWIN_HOST", raising=False)
+    with respx.mock(assert_all_called=False) as router:
+        router.post(f"{EDWIN_HOST}/auth/token").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "access_token": "eyJhbGciOiJSUzI1NiJ9.fixture.sig",
+                    "token_type": "Bearer",
+                    "expires_in": 1799,
+                },
+            )
+        )
+        yield monkeypatch, router
+
+
+@pytest.fixture
+async def edwin_server(edwin_env):
+    """The server with its backends bootstrapped the way both transports build them."""
+    from lm_mcp.config import get_config
+    from lm_mcp.transport.bootstrap import bootstrap_backends
+
+    backends = bootstrap_backends(get_config())
+    yield edwin_env[1]
+    await backends.close()
+
+
+class TestEdwinBackend:
+    """R3.1: the Edwin tools are served, dispatched and gated only when Edwin is configured."""
+
+    @pytest.mark.parametrize(
+        ("client_id", "client_token", "listed"),
+        [
+            ("edwin-client-id-fixture", "edwin-secret-fix", True),
+            ("edwin-client-id-fixture", None, False),
+            (None, "edwin-secret-fix", False),
+            (None, None, False),
+        ],
+        ids=["both", "id_only", "token_only", "neither"],
+    )
+    async def test_the_edwin_tools_are_listed_only_with_both_credentials(
+        self, edwin_env, client_id, client_token, listed
+    ):
+        from lm_mcp.config import get_config
+        from lm_mcp.server import list_tools
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        monkeypatch = edwin_env[0]
+        for name, value in (("EDWIN_CLIENT_ID", client_id), ("EDWIN_CLIENT_TOKEN", client_token)):
+            if value is None:
+                monkeypatch.delenv(name, raising=False)
+        backends = bootstrap_backends(get_config())
+        try:
+            names = {tool.name for tool in await list_tools()}
+        finally:
+            await backends.close()
+
+        assert (names & EDWIN_TOOL_NAMES) == (EDWIN_TOOL_NAMES if listed else set())
+        assert "get_devices" in names
+
+    async def test_closing_the_backends_withdraws_the_edwin_tools(self, edwin_server):
+        from lm_mcp.config import get_config
+        from lm_mcp.server import list_tools
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        backends = bootstrap_backends(get_config())
+        await backends.close()
+
+        assert not {tool.name for tool in await list_tools()} & EDWIN_TOOL_NAMES
+
+    async def test_an_edwin_tool_reads_through_the_bound_edwin_client(self, edwin_server):
+        """The call reaches Edwin with no LogicMonitor client bound at all."""
+        from lm_mcp.server import execute_tool
+
+        route = edwin_server.post(f"{EDWIN_HOST}/ui/query/records").mock(
+            return_value=httpx.Response(
+                200,
+                json={"meta": {"count": 1, "recordType": "insights"}, "results": [EDWIN_INSIGHT]},
+            )
+        )
+
+        result = await execute_tool("get_edwin_insights", {"hours": 6, "limit": 5})
+
+        assert not is_error_result(result)
+        assert json.loads(result[0].text)["insights"][0]["meta.displayId"] == "EDN000029424"
+        body = json.loads(route.calls.last.request.content)
+        assert body["size"] == 5
+        assert route.calls.last.request.headers["authorization"] == (
+            "Bearer eyJhbGciOiJSUzI1NiJ9.fixture.sig"
+        )
+
+    async def test_without_edwin_an_edwin_tool_is_refused_as_disabled(self, edwin_env, caplog):
+        from lm_mcp.config import get_config
+        from lm_mcp.server import execute_tool
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        for name in ("EDWIN_CLIENT_ID", "EDWIN_CLIENT_TOKEN"):
+            edwin_env[0].delenv(name)
+        backends = bootstrap_backends(get_config())
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            read = await execute_tool("get_edwin_insights", {})
+            run = await execute_tool(
+                "edwin_run_tool", {"mcp_name": "query-mcp", "tool_name": "t", "parameters": {}}
+            )
+        await backends.close()
+
+        for result in (read, run):
+            assert is_error_result(result)
+            error = json.loads(result[0].text)["error"]
+            assert error["code"] == "FEATURE_DISABLED"
+            assert "EDWIN_CLIENT_ID" in error["message"]
+        assert [level for level, _ in _audit_lines(caplog)] == [logging.WARNING]
+
+    async def test_bootstrap_with_no_host_to_derive_logs_and_serves_without_edwin(
+        self, edwin_env, tmp_path, caplog
+    ):
+        """Multi-portal mode has no LM_PORTAL to derive the Edwin host from."""
+        from lm_mcp.config import get_config
+        from lm_mcp.server import list_tools
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        monkeypatch = edwin_env[0]
+        portals_file = tmp_path / "portals.json"
+        portals_file.write_text(
+            json.dumps({"acme": {"portal": "acme.example.com", "bearer_token": "t"}})
+        )
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(portals_file))
+        monkeypatch.delenv("LM_PORTAL")
+        monkeypatch.delenv("LM_BEARER_TOKEN")
+
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.transport.bootstrap"):
+            backends = bootstrap_backends(get_config())
+        names = {tool.name for tool in await list_tools()}
+        await backends.close()
+
+        assert backends.edwin is None
+        assert not names & EDWIN_TOOL_NAMES
+        records = [r for r in caplog.records if r.name == "lm_mcp.transport.bootstrap"]
+        assert len(records) == 1
+        assert records[0].levelno == logging.WARNING
+        assert records[0].exc_info and records[0].exc_info[0] is ConfigurationError
+        assert "EDWIN_HOST" in records[0].getMessage()
+
+    async def test_multi_portal_reads_edwin_before_a_portal_is_selected(
+        self, edwin_env, tmp_path, reset_portals
+    ):
+        """Edwin is one tenant for the server: EDWIN_HOST names it, no use_portal needed."""
+        from lm_mcp.config import get_config
+        from lm_mcp.server import execute_tool
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        monkeypatch, router = edwin_env
+        portals_file = tmp_path / "portals.json"
+        portals_file.write_text(
+            json.dumps({"acme": {"portal": "acme.example.com", "bearer_token": "t"}})
+        )
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(portals_file))
+        monkeypatch.setenv("EDWIN_HOST", EDWIN_HOST)
+        monkeypatch.delenv("LM_PORTAL")
+        monkeypatch.delenv("LM_BEARER_TOKEN")
+        route = router.get(f"{EDWIN_HOST}/api/agents").mock(
+            return_value=httpx.Response(200, json={"agents": [], "total": 0})
+        )
+
+        backends = bootstrap_backends(get_config())
+        result = await execute_tool("get_edwin_tools", {})
+        await backends.close()
+
+        assert not is_error_result(result)
+        assert route.called
+
+    async def test_multi_portal_withholds_edwin_run_tool_and_keeps_the_reads(
+        self, edwin_env, tmp_path, reset_portals, caplog
+    ):
+        """Edwin is one tenant for every portal, so no portal's write flag can vouch for a run
+        that may change it: the run is unlisted and refused, even on a writable portal."""
+        from lm_mcp.config import get_config
+        from lm_mcp.server import execute_tool, list_tools
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        monkeypatch, router = edwin_env
+        portals_file = tmp_path / "portals.json"
+        portals_file.write_text(
+            json.dumps(
+                {"acme": {"portal": "acme.example.com", "bearer_token": "t", "writable": True}}
+            )
+        )
+        monkeypatch.setenv("LM_MULTI_PORTAL", "true")
+        monkeypatch.setenv("LM_PORTALS_FILE", str(portals_file))
+        monkeypatch.setenv("EDWIN_HOST", EDWIN_HOST)
+        monkeypatch.delenv("LM_PORTAL")
+        monkeypatch.delenv("LM_BEARER_TOKEN")
+        run = router.post(f"{EDWIN_HOST}/api/run-tool")
+
+        backends = bootstrap_backends(get_config())
+        await execute_tool("use_portal", {"customer": "acme"})
+        names = {tool.name for tool in await list_tools()}
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await execute_tool(
+                "edwin_run_tool", {"mcp_name": "query-mcp", "tool_name": "t", "parameters": {}}
+            )
+        await backends.close()
+
+        assert "edwin_run_tool" not in names
+        assert names >= EDWIN_TOOL_NAMES - {"edwin_run_tool"}
+        error = json.loads(result[0].text)["error"]
+        assert error["code"] == "FEATURE_DISABLED"
+        assert "multi-portal" in error["message"]
+        assert not run.called
+        assert [level for level, _ in _audit_lines(caplog)] == [logging.WARNING]
+
+    async def test_edwin_run_tool_audits_with_credential_parameter_keys_masked(
+        self, edwin_server, caplog
+    ):
+        from lm_mcp.server import execute_tool
+
+        route = edwin_server.post(f"{EDWIN_HOST}/api/run-tool").mock(
+            return_value=httpx.Response(200, json={"success": True, "content": "{}", "error": None})
+        )
+        arguments = {
+            "mcp_name": "query-mcp",
+            "tool_name": "fetch_insight_by_id",
+            "parameters": {"api_key": "key-value-fixture", "host": "web01"},
+        }
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await execute_tool("edwin_run_tool", arguments)
+
+        assert not is_error_result(result)
+        assert json.loads(route.calls.last.request.content)["parameters"]["api_key"] == (
+            "key-value-fixture"
+        )
+        audit = _audit_lines(caplog)
+        assert len(audit) == 1
+        assert audit[0][0] == logging.INFO
+        assert "edwin_run_tool" in audit[0][1] and "web01" in audit[0][1]
+        assert "key-value-fixture" not in caplog.text
+
+    async def test_search_tools_ranks_get_edwin_insights_first_for_what_edwin_found(
+        self, edwin_server
+    ):
+        from lm_mcp.server import execute_tool
+
+        result = await execute_tool("search_tools", {"query": "what did Edwin find"})
+
+        first, second = json.loads(result[0].text)["matches"][:2]
+        assert first["name"] == "get_edwin_insights"
+        assert first["score"] > second["score"]
+
+    async def test_search_tools_names_no_edwin_tool_without_edwin(self, edwin_env):
+        from lm_mcp.config import get_config
+        from lm_mcp.server import execute_tool
+        from lm_mcp.transport.bootstrap import bootstrap_backends
+
+        for name in ("EDWIN_CLIENT_ID", "EDWIN_CLIENT_TOKEN"):
+            edwin_env[0].delenv(name)
+        backends = bootstrap_backends(get_config())
+        result = await execute_tool("search_tools", {"query": "what did Edwin find"})
+        await backends.close()
+
+        names = {match["name"] for match in json.loads(result[0].text)["matches"]}
+        assert not names & EDWIN_TOOL_NAMES

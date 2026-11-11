@@ -6063,6 +6063,258 @@ TOOLS.extend(
     ]
 )
 
+# Edwin AI: listed only when both Edwin credentials are set
+_EDWIN_HOURS = {
+    "type": "integer",
+    "default": 24,
+    "minimum": 1,
+    "description": "Window in hours back from now",
+}
+_EDWIN_LIMIT = {
+    "type": "integer",
+    "default": 10,
+    "minimum": 1,
+    "maximum": 50,
+    "description": "Most rows to return, 1 to 50",
+}
+TOOLS.extend(
+    [
+        Tool(
+            name="get_edwin_insights",
+            description=(
+                "List the insights Edwin AI created in the last `hours`, newest first. An "
+                "insight is an incident Edwin built by correlating alerts. Each row has Edwin's "
+                "id and display id, state, workflow state, severity, causal CI, impacted CIs, "
+                "alert count and alert keys, a link into Edwin, and once Edwin has analyzed it, "
+                "its title, summary, root cause, impact, timeline, remediation, evidence, "
+                "contributing factors and similar incidents. Call this to find what Edwin "
+                "concluded about an incident before reading raw alerts and metrics; "
+                "get_edwin_insight reads one insight whole. `total` is Edwin's count of "
+                "matches; it has read exactly 10000 for a window of all time, so treat 10000 "
+                "as a lower bound. A cleared insight reads severity 0."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hours": {
+                        **_EDWIN_HOURS,
+                        "description": "Window in hours back from now, on the insight's "
+                        "creation time",
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "Insight state to match exactly; active and cleared "
+                        "are the values seen",
+                    },
+                    "severity": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Edwin severity numbers (ml.insightSeverity) to match any "
+                        "of; a cleared insight reads 0",
+                    },
+                    "causal_ci": {
+                        "type": "string",
+                        "description": "CI Edwin named as the cause, matched exactly",
+                    },
+                    "impacted_ci": {
+                        "type": "string",
+                        "description": "CI that must be in the insight's impacted list",
+                    },
+                    "limit": _EDWIN_LIMIT,
+                },
+            },
+        ),
+        Tool(
+            name="get_edwin_insight",
+            description=(
+                "Read one Edwin AI insight by its `_id` from get_edwin_insights, with every "
+                "field Edwin holds for it, including the ones get_edwin_insights leaves out. "
+                "Each epoch-millisecond timestamp comes with an ISO 8601 twin."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "insight_id": {
+                        "type": "string",
+                        "description": "The insight's _id, such as correlation_<uuid>_<epoch ms>",
+                    },
+                },
+                "required": ["insight_id"],
+            },
+        ),
+        Tool(
+            name="get_edwin_records",
+            description=(
+                "List Edwin AI's own copy of the alerts or events it received in the last "
+                "`hours`, newest first unless `order` says otherwise. Use it to see what "
+                "Edwin correlated; LogicMonitor's alerts are read with get_alerts and "
+                "insights with get_edwin_insights. `filter` takes one Edwin filterCondition "
+                "condition, ANDed with the window, such as "
+                '{"EQUALS": [{"type": "string", "field": "cf.eventCI"}, "web01"]}; '
+                "get_edwin_metadata lists the field names. Without `columns` every field comes "
+                "back except extra.* (the CI's LogicMonitor properties) and raw.* (the source "
+                "record)."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "enum": ["alerts", "events"],
+                        "description": "Record source to read",
+                    },
+                    "hours": {
+                        **_EDWIN_HOURS,
+                        "description": "Window in hours back from now, on meta.createdTimestamp "
+                        "for alerts and meta.eventTimestamp for events",
+                    },
+                    "filter": {
+                        "type": "object",
+                        "description": "One filterCondition condition, ANDed with the window",
+                    },
+                    "columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Fields to return beside _id; name extra.* or raw.* "
+                        "fields here to get them",
+                    },
+                    "order": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "description": 'Edwin order entries: [{"field": ..., "type": "asc" or '
+                        '"desc", "size": null}]',
+                    },
+                    "limit": _EDWIN_LIMIT,
+                },
+                "required": ["source"],
+            },
+        ),
+        Tool(
+            name="get_edwin_alert_volume",
+            description=(
+                "Count the alerts Edwin AI received in the last `hours`, by hour or by alert "
+                "state. Returns [key, count] buckets, hour keys in epoch milliseconds, and "
+                "Edwin's total for the window. The Edwin credential needs the query_aggregate "
+                "scope; without it the call fails with SCOPE_MISSING naming that scope."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "hours": _EDWIN_HOURS,
+                    "group_by": {
+                        "type": "string",
+                        "enum": ["hour", "state"],
+                        "default": "hour",
+                        "description": "Bucket by hour of creation or by alert state",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_edwin_metadata",
+            description=(
+                "List Edwin AI's record types with their field counts, or with `record_type` "
+                "the fields of one type, so you can name fields in get_edwin_records filters "
+                "and columns. The extra.* fields, the CI's LogicMonitor properties, are counted "
+                "but not listed unless `prefix` asks for them."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "record_type": {
+                        "type": "string",
+                        "description": "Record type to describe, such as alerts; omit to list "
+                        "the types",
+                    },
+                    "prefix": {
+                        "type": "string",
+                        "description": "Only fields whose name starts with it, such as extra. "
+                        "or cf.",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_edwin_tools",
+            description=(
+                "List Edwin AI's agents, or with `agent` (such as LMDiagnosticsAgent) that "
+                "agent's MCP servers and the active tools on each. The mcp_name and tool name "
+                "pairs are what edwin_run_tool takes. Edwin publishes no input schema for its "
+                "tools, so a tool's short_description is the only guide to its parameter names."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "string",
+                        "description": "Agent name; omit to list the agents",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="edwin_run_tool",
+            description=(
+                "Run one tool on one of Edwin AI's MCP servers, sending `parameters` to Edwin "
+                "unchanged. Requires write permission: an Edwin tool can change the systems it "
+                "connects to, and this server cannot tell which tools do, so every run is "
+                "gated and audited. Take mcp_name and tool_name from get_edwin_tools; the "
+                "parameter names come from the tool's short_description, since Edwin "
+                "publishes no input schema. A tool that reports failure returns "
+                "REJECTED_BY_TOOL with Edwin's error."
+            ),
+            annotations=_DESTRUCTIVE_RUN,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "mcp_name": {
+                        "type": "string",
+                        "description": "Edwin MCP server, from get_edwin_tools",
+                    },
+                    "tool_name": {
+                        "type": "string",
+                        "description": "Tool on that server, from get_edwin_tools",
+                    },
+                    "parameters": {
+                        "type": "object",
+                        "description": "The tool's arguments, sent to Edwin as given",
+                    },
+                },
+                "required": ["mcp_name", "tool_name", "parameters"],
+            },
+        ),
+        Tool(
+            name="ask_edwin",
+            description=(
+                "Ask Edwin AI a question in plain words and wait up to 120 seconds for its "
+                "answer. Edwin investigates with its own tools and returns `answer`, "
+                "`reasoning` (its tool-call narration), a `conversation_id` to pass back for a "
+                "follow-up, and `truncated: true` when the answer stopped early. Slower than "
+                "the get_edwin_* reads; use it when a question needs Edwin's judgment rather "
+                "than one of its records."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "The question, in plain words"},
+                    "conversation_id": {
+                        "type": "string",
+                        "description": "A conversation to continue; omit to start one",
+                    },
+                },
+                "required": ["question"],
+            },
+        ),
+    ]
+)
+
 
 def get_tool_handler(tool_name: str) -> Any:
     """Get the handler function for a tool.
@@ -6096,6 +6348,7 @@ def get_tool_handler(tool_name: str) -> Any:
         devices,
         diagnostic_remediation,
         diagnosticsources,
+        edwin,
         escalations,
         eventsources,
         imports,
@@ -6136,6 +6389,15 @@ def get_tool_handler(tool_name: str) -> Any:
         "use_portal": portal_tools.use_portal,
         "get_current_portal": portal_tools.get_current_portal,
         "run_portal_reload": portal_tools.run_portal_reload,
+        # Edwin AI
+        "get_edwin_insights": edwin.get_edwin_insights,
+        "get_edwin_insight": edwin.get_edwin_insight,
+        "get_edwin_records": edwin.get_edwin_records,
+        "get_edwin_alert_volume": edwin.get_edwin_alert_volume,
+        "get_edwin_metadata": edwin.get_edwin_metadata,
+        "get_edwin_tools": edwin.get_edwin_tools,
+        "edwin_run_tool": edwin.edwin_run_tool,
+        "ask_edwin": edwin.ask_edwin,
         # Devices
         "get_devices": devices.get_devices,
         "get_device": devices.get_device,
