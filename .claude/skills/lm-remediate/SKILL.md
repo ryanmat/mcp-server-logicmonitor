@@ -1,210 +1,134 @@
 ---
 name: lm-remediate
-description: "Diagnose a LogicMonitor alert and remediate via Ansible Automation Platform."
+description: "Diagnose a LogicMonitor alert and remediate it -- one diagnose call, the device's assigned RemediationSources, its action chains and Edwin AI's agent tools, the pre-execution checklist, then a confirmed execute_remediation or edwin_run_tool and its result."
 argument-hint: "<alert_id or device_name>"
 allowed-tools:
-  - mcp__logicmonitor__get_alerts
+  - mcp__logicmonitor__diagnose
+  - mcp__logicmonitor__get_diagnostic_remediation_assignments
+  - mcp__logicmonitor__get_remediationsources
+  - mcp__logicmonitor__get_remediationsource
+  - mcp__logicmonitor__get_action_chains
+  - mcp__logicmonitor__get_diagnostic_remediation_results
   - mcp__logicmonitor__get_alert_details
-  - mcp__logicmonitor__get_device
-  - mcp__logicmonitor__get_device_data
-  - mcp__logicmonitor__analyze_metric
-  - mcp__logicmonitor__analyze_alerts
-  - mcp__logicmonitor__analyze_blast_radius
-  - mcp__logicmonitor__test_awx_connection
-  - mcp__logicmonitor__get_job_templates
-  - mcp__logicmonitor__get_job_template
-  - mcp__logicmonitor__launch_job
-  - mcp__logicmonitor__get_job_status
-  - mcp__logicmonitor__get_job_output
-  - mcp__logicmonitor__get_inventories
-  - mcp__logicmonitor__get_inventory_hosts
+  - mcp__logicmonitor__execute_remediation
+  - mcp__logicmonitor__get_edwin_tools
+  - mcp__logicmonitor__edwin_run_tool
   - mcp__logicmonitor__add_ops_note
-  - mcp__logicmonitor__acknowledge_alert
 ---
 
-# LogicMonitor Alert Remediation
+# LogicMonitor alert remediation
 
-You are a remediation operator for LogicMonitor + Ansible Automation Platform. Your
-job is to diagnose an alert, find the right playbook, execute a safe remediation, and
-verify the fix. You bridge monitoring (LogicMonitor) and automation (AAP) into a
-single structured workflow.
+You diagnose a LogicMonitor alert and, when a fix exists and the operator confirms it,
+run it: a LogicMonitor RemediationSource on the device, or a tool of one of Edwin AI's
+agents. Nothing runs without the operator's explicit confirmation.
 
-## Argument Parsing
+## Argument parsing
 
-Parse the user's input to determine the remediation target:
-- **Numeric value** -- Treat as an alert ID. Call `get_alert_details` with that ID.
-- **String value** -- Treat as a device name. Call `get_alerts` with a device filter
-  to find active alerts on that device.
-- **No argument** -- Ask the user what to remediate (alert ID or device name).
+- An alert ID such as `LMA12345`: diagnose that alert.
+- A device name: diagnose its latest open critical alert.
+- No argument: ask what to remediate.
 
 ## Workflow
 
-Execute these steps in order. Present findings at each step before moving on.
+Execute these steps in order. After each step, present findings before moving on.
 
-### Step 0: Connection Check
+### Step 1: Diagnose
 
-Call `test_awx_connection` to verify the Ansible Automation Platform is reachable.
+Call `diagnose` with `alert_id` or `device_name` and `detail_level="full"`, since the
+summary level leaves out the blast radius and the device's properties. It returns:
 
-- If the connection fails, stop immediately. Report the failure and suggest
-  checking AWX_URL, AWX_TOKEN, and network connectivity.
-- If the connection succeeds, proceed.
+- `alert`: the alert's datasource, instance, datapoint, value, thresholds and severity
+- `device`: the device ID, display name, status and collector
+- `correlated_alerts` and `changes`: the alerts clustered with it and the audit
+  changes of the last four hours
+- `blast_radius`: the devices around it
+- `diagnostics`: the DiagnosticSources `assigned` to the device and their
+  `latest_results`, script output included
+- `warnings`: the sub-reads that failed
 
-### Step 1: Alert Context
+Present the alert, the device, and what the diagnostic output and the changes say
+about the cause. Read `diagnostics.latest_results` before proposing any fix: the
+diagnostic output often shows the cause already. If `diagnose` found no
+alert, report that and stop.
 
-Gather the alert and device context.
+### Step 2: Remediation options
 
-1. Call `get_alert_details` for the target alert (or `get_alerts` if starting from
-   a device name).
-2. Call `get_device` for the affected device.
+1. Call `get_diagnostic_remediation_assignments` with `resource_id` set to the device
+   ID and `module_type` "remediationsource" for the RemediationSources assigned to the
+   device. `get_remediationsources` finds a source by name when the operator asks for
+   one; a source outside the device's assignments runs a script written for other
+   devices, so do not offer it.
+2. Call `get_action_chains`. A chain with a remediation stage for this kind of alert
+   may already have run without anyone asking; Step 3 checks for that run before a
+   second one starts by hand.
+3. When the Edwin AI tools are listed (the server has `EDWIN_CLIENT_ID` and
+   `EDWIN_CLIENT_TOKEN`), call `get_edwin_tools` with `agent` set to
+   `LMDiagnosticsAgent`, or the agent the operator names, for the tools Edwin's agents
+   can run. Edwin publishes no input schema for them: a tool's `short_description` is
+   the only guide to its parameter names, so state the parameters you would send and
+   why. Without Edwin credentials, skip this item.
 
-Capture: alert ID, device ID, device name, datasource, datapoint, severity,
-alert value, threshold, alert start time.
-
-If no active alerts are found for the target, report that and stop.
-
-### Step 2: Diagnosis
-
-Build the remediation context with deeper analysis.
-
-1. Call `analyze_metric` with `analyses=["summary", "anomalies"]` for the alerting
-   datasource/instance.
-2. Call `get_device_data` for the alerting datasource/instance to see current metrics.
-3. Call `analyze_alerts` with `analyses=["clusters", "changes"]` to find related alerts
-   that may share a root cause and recent changes that may have caused the issue.
-
-Present a diagnosis summary:
-- Latest-sample z-scores and anomaly hits
-- Current metric values vs. thresholds
-- Correlated alerts (if any)
-- Recent changes (if any)
-
-### Step 3: Blast Radius Assessment
-
-Call `analyze_blast_radius` with `depth=2` on the affected device.
-
-Document the dependencies before taking any remediation action:
-- Upstream dependencies (what this device depends on)
-- Downstream dependents (what depends on this device)
-- Blast radius score and risk level
-
-### Step 4: Playbook Discovery
-
-Search for matching job templates in AAP using a 3-tier approach:
-
-1. **Convention match**: Call `get_job_templates` with a `lm-remediate-*` name filter
-   matching the datasource category (e.g., `lm-remediate-cpu-high`, `lm-remediate-disk-full`).
-2. **Keyword match**: If no convention match, search with keywords from the alert
-   datasource and datapoint names.
-3. **Browse all**: If still no match, call `get_job_templates` to list all available
-   templates and present them.
-
-For each candidate template, call `get_job_template` to retrieve its details
-(extra_vars, survey spec, required inventory).
-
-#### Branch: No Templates Found
-
-If no suitable job templates exist in AAP:
-
-- Present the diagnosis from Steps 1-3
-- Offer two paths:
-  - **Path A**: Generate a playbook inline based on the diagnosis. Describe what the
-    playbook would do, the tasks it would contain, and the expected outcome. The
-    operator can then create the template in AAP manually.
-  - **Path B**: Provide manual remediation steps based on the diagnosis.
-- Stop the workflow here (no automated execution without a template).
-
-### Step 5: Present Options
-
-Show the candidate playbook(s) to the operator:
-
-- Template name and description
-- Required extra_vars and their recommended values based on the diagnosis
-- Inventory and host targeting
-- Risk assessment (low/medium/high based on blast radius and template actions)
-
-Wait for the operator to select a template and confirm the parameters.
-
-### Step 6: Dry Run
-
-Execute a dry run to preview changes before live execution.
-
-1. Call `get_inventories` and select the appropriate inventory.
-2. Call `launch_job` with `check_mode=true` (dry run) using the selected template
-   and parameters.
-3. Call `get_job_status` to poll until the job completes.
-4. Call `get_job_output` to retrieve the dry run results.
-
-Present what WOULD change:
-- Tasks that would execute
-- Resources that would be modified
-- Any warnings or errors from the dry run
-
-If the dry run shows destructive changes (file deletion, service restart, package
-removal), warn explicitly and highlight the impact.
-
-Wait for explicit approval before proceeding to live execution.
-
-### Step 7: Live Execution
-
-Requires explicit approval from the operator.
-
-1. Call `launch_job` with the selected template and parameters (without check_mode).
-2. Call `get_job_status` to poll until the job completes.
-3. Call `get_job_output` to retrieve the execution results.
-
-Present the execution outcome:
-- Job status (successful/failed)
-- Tasks executed and their results
-- Any errors or warnings
-
-If the job fails, present the error output and suggest next steps.
-
-### Step 8: Verification
-
-Verify whether the remediation resolved the issue.
-
-1. Call `get_device_data` for the alerting datasource to check current metric values.
-2. Call `analyze_metric` again to get the updated z-scores.
-3. Call `get_alert_details` to check if the alert has cleared.
-
-Present a before/after comparison:
-- Metric values: before vs. after
-- Latest-sample z-scores: before vs. after
-- Alert status: still active or cleared
-
-### Step 9: Documentation
-
-Record the remediation action for audit and operational tracking.
-
-1. Call `add_ops_note` documenting the alert ID, job template used, job ID,
-   execution result, and verification outcome.
-2. If the alert has cleared, call `acknowledge_alert` with a note referencing
-   the remediation job.
-
-## Safety Constraints
-
-Before ANY write operation (`launch_job`, `add_ops_note`, `acknowledge_alert`),
-you MUST:
-- State exactly what the operation will do
-- Identify the affected resources by name and ID
-- Get explicit confirmation from the operator
-
-Additional safety rules:
-- Never auto-launch a job without completing the dry run (Step 6) first
-- Never skip the blast radius assessment (Step 3)
-- If dry run output shows destructive changes, warn explicitly before approval
-- If the operator declines at any approval gate, stop and respect the decision
-
-## Output Format
-
-After completing the workflow, present a structured summary:
+Present the options:
 
 ```
-## Remediation Summary
-- Alert: [alert_id] -- [datasource/datapoint] on [device]
-- Z-scores: [before] -> [after]
-- Template Used: [template_name]
-- Job ID: [job_id]
-- Result: [success/failed/partial]
-- Alert Status: [cleared/still active]
+| Option | Kind | What it would do |
+|--------|------|------------------|
+| [source name] | RemediationSource | [what the script does] |
+| [mcp_name / tool name] | Edwin agent tool | [from its short_description] |
+```
+
+If there are none, recommend a manual fix from the diagnosis and stop.
+
+### Step 3: Pre-execution checklist
+
+For a RemediationSource, complete every item before running it:
+
+1. Read the script. Call `get_remediationsource` with the source ID and name every
+   state-changing command it runs (restart, stop, kill, rm, delete, reboot, shutdown,
+   service or package changes) and what each would do to this device.
+2. Check for runs in progress. Call `get_diagnostic_remediation_results` with `host_id`
+   set to the device ID and `module_type` "remediation". Do not start a run while
+   another on the device is in progress; nothing prevents concurrent runs.
+3. State what the run should change about the alert, and how to undo the change or
+   that it cannot be undone.
+4. Get explicit confirmation from the operator, naming the device, the source and the
+   commands from item 1.
+
+For an Edwin agent tool, state the `mcp_name`, the tool name and every parameter, say
+what the tool's `short_description` says it does, and get explicit confirmation.
+Edwin's own result is the only record of what the tool did.
+
+### Step 4: Run
+
+- RemediationSource: call `execute_remediation` with `host_id`,
+  `remediation_source_id` and the alert's ID as `alert_id`. It refuses a device whose
+  status is dead or dead-collector and a collector older than 39.200. A run cannot be
+  paused or cancelled once it starts.
+- Edwin agent tool: call `edwin_run_tool` with `mcp_name`, `tool_name` and
+  `parameters`. A tool that reports failure returns `REJECTED_BY_TOOL` with Edwin's
+  error.
+
+Both tools need write operations enabled on the server; with them off the call is
+refused. Say so and leave the recommendation.
+
+### Step 5: Verify
+
+1. For a RemediationSource, call `get_diagnostic_remediation_results` with `host_id`
+   and `remediation_source_id` for the run's status and script output.
+2. Call `get_alert_details` with the alert's ID. A run that succeeded has fixed nothing
+   until the alert condition clears; say whether it has.
+3. Record what ran and its result with `add_ops_note` on the device, after the
+   operator confirms the note.
+
+## Output format
+
+Use a header per step. End with:
+
+```
+## Remediation summary
+- Alert: [alert ID] on [device] ([datasource] [datapoint], [severity])
+- Cause: [one line from the diagnosis]
+- Ran: [source or Edwin tool], confirmed by the operator / nothing ran
+- Result: [status and output in one line]
+- Alert after the run: [cleared / still open]
 ```

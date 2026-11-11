@@ -15,13 +15,11 @@ SKILLS_DIR = Path(__file__).resolve().parent.parent / ".claude" / "skills"
 # Build a set of the core tool names from the registry for cross-referencing
 ALL_REGISTRY_TOOLS = {tool.name for tool in TOOLS}
 
-# lm-remediate's allowed-tools name tools outside the registry, so name resolution skips it.
-_SKILLS_PENDING_REWRITE = {"lm-remediate"}
-
 # Expected skills (directory names under .claude/skills/)
 EXPECTED_SKILLS = [
     "lm-apm",
     "lm-capacity",
+    "lm-edwin",
     "lm-health",
     "lm-portal",
     "lm-triage",
@@ -52,8 +50,18 @@ _NAMES_430 = set(
 _RECIPE_TOOLS = {
     "lm-apm": {"get_apm_services", "get_apm_service_alerts", "get_device_data", "analyze_metric"},
     "lm-capacity": {"get_devices", "analyze_metric"},
+    "lm-edwin": {"get_edwin_insights", "get_edwin_insight", "analyze_metric", "triage"},
     "lm-health": {"get_devices", "health_check", "analyze_metric"},
     "lm-portal": {"portal_overview", "analyze_alerts", "get_collectors"},
+    "lm-remediate": {
+        "diagnose",
+        "get_remediationsources",
+        "execute_remediation",
+        "get_diagnostic_remediation_results",
+        "get_action_chains",
+        "get_edwin_tools",
+        "edwin_run_tool",
+    },
     "lm-triage": {"triage", "analyze_alerts"},
 }
 
@@ -144,11 +152,10 @@ class TestSkillFileStructure:
             assert len(fm["allowed-tools"]) > 0, f"Skill '{name}' 'allowed-tools' is empty"
 
     def test_skill_allowed_tools_exist_in_registry(self):
-        """Each frontmatter tool maps to a registry tool, outside _SKILLS_PENDING_REWRITE.
+        """Each frontmatter tool maps to a registry tool.
 
         Skill files reference tools as 'mcp__logicmonitor__<tool_name>'.
-        This test strips the prefix and checks against TOOLS. A skill in that
-        set still has its prefix checked.
+        This test strips the prefix and checks against TOOLS.
         """
         prefix = "mcp__logicmonitor__"
         for name, fm in self.skills.items():
@@ -157,8 +164,6 @@ class TestSkillFileStructure:
                     f"Skill '{name}' tool '{tool_ref}' missing expected prefix"
                 )
                 tool_name = tool_ref[len(prefix) :]
-                if name in _SKILLS_PENDING_REWRITE:
-                    continue
                 assert tool_name in ALL_REGISTRY_TOOLS, (
                     f"Skill '{name}' references tool '{tool_name}' which does not exist in TOOLS"
                 )
@@ -167,22 +172,6 @@ class TestSkillFileStructure:
         """The lm-remediate skill directory and SKILL.md exist."""
         skill_file = SKILLS_DIR / "lm-remediate" / "SKILL.md"
         assert skill_file.exists(), "lm-remediate/SKILL.md does not exist"
-
-    def test_lm_remediate_has_lm_diagnostic_tools(self):
-        """lm-remediate skill includes LM diagnostic tools."""
-        fm = self.skills.get("lm-remediate", {})
-        tools = fm.get("allowed-tools", [])
-        lm_tool_names = [
-            "mcp__logicmonitor__get_alerts",
-            "mcp__logicmonitor__get_alert_details",
-            "mcp__logicmonitor__get_device",
-            "mcp__logicmonitor__get_device_data",
-            "mcp__logicmonitor__analyze_metric",
-            "mcp__logicmonitor__analyze_alerts",
-            "mcp__logicmonitor__analyze_blast_radius",
-        ]
-        for expected in lm_tool_names:
-            assert expected in tools, f"lm-remediate missing LM diagnostic tool '{expected}'"
 
 
 def _skill_text(name: str) -> tuple[dict, str]:
@@ -206,22 +195,19 @@ def _body_tool_names(name: str) -> set[str]:
     }
 
 
-_RESOLVED_SKILLS = [name for name in EXPECTED_SKILLS if name not in _SKILLS_PENDING_REWRITE]
-
-
 def test_expected_skills_are_the_skill_directories():
     """R2.14: the guards below iterate EXPECTED_SKILLS, so it lists every skill there is."""
     present = sorted(path.name for path in SKILLS_DIR.iterdir() if path.is_dir())
     assert present == sorted(EXPECTED_SKILLS)
 
 
-@pytest.mark.parametrize("name", _RESOLVED_SKILLS)
+@pytest.mark.parametrize("name", EXPECTED_SKILLS)
 def test_skill_body_names_only_registered_tools(name):
     """R2.14: every tool name a skill body cites is a registered tool."""
     assert sorted(_body_tool_names(name) - ALL_REGISTRY_TOOLS) == []
 
 
-@pytest.mark.parametrize("name", _RESOLVED_SKILLS)
+@pytest.mark.parametrize("name", EXPECTED_SKILLS)
 def test_skill_body_names_exactly_its_allowed_tools(name):
     """R2.14: a skill's body calls the tools its allowed-tools grant, and only those."""
     assert sorted(_body_tool_names(name) & ALL_REGISTRY_TOOLS) == sorted(_allowed(name))

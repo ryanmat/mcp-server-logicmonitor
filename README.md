@@ -164,6 +164,8 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 | Portal Overview | `/lm-portal` | Portal-wide snapshot for shift handoff: alerts, collectors, SDTs, down devices |
 | Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
 | APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
+| Remediation | `/lm-remediate <alert_id or device>` | Diagnose an alert, then run an assigned RemediationSource or an Edwin AI agent tool after a pre-execution checklist and your confirmation |
+| Edwin Review | `/lm-edwin [insight]` | Check an Edwin AI insight's root cause against the causal CI's metric and the alert window |
 
 ## Integrations
 

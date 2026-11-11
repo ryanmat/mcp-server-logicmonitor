@@ -84,6 +84,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   multi-portal mode. A 403 from Edwin is `SCOPE_MISSING`, naming the credential scope the call
   needs where the path is known.
   `websockets` (>=14.0) becomes a core dependency for `ask_edwin`.
+- The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
+  the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
+  assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
 
 ### Removed
 
