@@ -3633,15 +3633,16 @@ TOOLS.extend(
     ]
 )
 
-# OTLP Metrics (native OTLP ingest, PromQL query surface; feature-flag gated)
+# OTLP Metrics (native OTLP ingest, PromQL query surface)
 TOOLS.extend(
     [
         Tool(
             name="get_otlp_metric_names",
             description=(
-                "[PREVIEW] List metric names ingested via native OpenTelemetry (OTLP). "
-                "Requires the OTLP Metrics feature flag; returns a friendly notice "
-                "when unavailable"
+                "List the names of metrics ingested through native OpenTelemetry (OTLP), "
+                "optionally those containing a substring, to find what to query with "
+                'query_otlp_metrics or analyze_metric(source="otlp"). A portal without OTLP '
+                "Metrics answers with available: false"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3666,8 +3667,8 @@ TOOLS.extend(
         Tool(
             name="get_otlp_metric_labels",
             description=(
-                "[PREVIEW] List label names on native OTLP metrics, optionally "
-                "narrowed to one metric"
+                "List the label names on native OTLP metrics, optionally narrowed to one "
+                "metric or to names containing a substring"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3696,8 +3697,8 @@ TOOLS.extend(
         Tool(
             name="get_otlp_label_values",
             description=(
-                "[PREVIEW] List values observed for one native OTLP metric label "
-                "(e.g. all service_name values)"
+                "List the values observed for one native OTLP metric label, such as every "
+                "service_name, optionally narrowed to one metric"
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3730,8 +3731,11 @@ TOOLS.extend(
         Tool(
             name="query_otlp_metrics",
             description=(
-                "[PREVIEW] Run a PromQL range query against native OTLP metrics. "
-                "Returns a time-series matrix"
+                "Run a PromQL query against native OTLP metrics. A range query (start and "
+                "end in epoch seconds, optional step) returns each series' samples over the "
+                "window; instant=true returns each series' value now and takes no window. "
+                "Returns at most 20 series and 500 points a series, downsampled; for "
+                'statistics on a series use analyze_metric(source="otlp")'
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -3751,23 +3755,29 @@ TOOLS.extend(
                     "start": {
                         "type": "integer",
                         "description": (
-                            "Window start, unix epoch seconds. Keep windows under ~30 "
-                            "days; very wide windows fail in the metrics backend"
+                            "Window start, unix epoch seconds; range queries only. Keep "
+                            "windows under ~30 days; very wide windows fail in the metrics "
+                            "backend"
                         ),
                     },
                     "end": {
                         "type": "integer",
-                        "description": "Window end, unix epoch seconds",
+                        "description": "Window end, unix epoch seconds; range queries only",
                     },
                     "step": {
                         "type": "string",
                         "description": (
-                            "Resolution step, e.g. '30s', '5m', '1h'; use larger steps "
-                            "for wider windows"
+                            "Resolution step, e.g. '30s', '5m', '1h'; range queries only; use "
+                            "larger steps for wider windows"
                         ),
                     },
+                    "instant": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Read each series' value now instead of a range",
+                    },
                 },
-                "required": ["query", "start", "end"],
+                "required": ["query"],
             },
         ),
     ]
@@ -4530,27 +4540,52 @@ TOOLS.extend(
                 "hours ago (one more read): both windows' statistics, the mean's percent "
                 "deviation and a status (normal within 20 percent, elevated or reduced "
                 "within 50, anomalous past it). The baseline runs only with "
-                "baseline_hours_ago. Use get_device_data for the raw samples."
+                "baseline_hours_ago. Use get_device_data for the raw samples. With "
+                'source="otlp" it reads one PromQL range query (query, hours, step) in place '
+                "of a device instance and runs the same sections on each series it returns, "
+                "the first 20."
             ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "source": {
+                        "type": "string",
+                        "enum": ["device", "otlp"],
+                        "default": "device",
+                        "description": (
+                            "device reads a device instance's datapoints; otlp reads a "
+                            "PromQL range query over native OTLP metrics"
+                        ),
+                    },
                     "device_id": {
                         "type": "integer",
-                        "description": "Device ID",
+                        "description": "Device ID; required with source device",
                     },
                     "device_datasource_id": {
                         "type": "integer",
-                        "description": "Device-DataSource ID",
+                        "description": "Device-DataSource ID; required with source device",
                     },
                     "instance_id": {
                         "type": "integer",
-                        "description": "Instance ID",
+                        "description": "Instance ID; required with source device",
                     },
                     "datapoints": {
                         "type": "string",
-                        "description": "Comma-separated datapoint names (all if omitted)",
+                        "description": (
+                            "Comma-separated datapoint names (all if omitted); source device"
+                        ),
+                    },
+                    "query": {
+                        "type": "string",
+                        "description": "PromQL expression; required with source otlp",
+                    },
+                    "step": {
+                        "type": "string",
+                        "description": (
+                            "Resolution step of the otlp read, such as '5m'; the metrics "
+                            "backend picks one when omitted"
+                        ),
                     },
                     "hours": {
                         "type": "integer",
@@ -4590,11 +4625,6 @@ TOOLS.extend(
                         ),
                     },
                 },
-                "required": [
-                    "device_id",
-                    "device_datasource_id",
-                    "instance_id",
-                ],
             },
         ),
     ]

@@ -1,5 +1,5 @@
-# Description: Tests for analyze_metric, the one-fetch analysis of a device instance's series.
-# Description: Covers the paged read, each section, section selection and warnings.
+# Description: Tests for analyze_metric over a device instance or a PromQL range query.
+# Description: Covers the paged read, the otlp source, each section, section selection and warnings.
 
 import json
 import math
@@ -1121,11 +1121,8 @@ class TestRegistration:
         tool = next(t for t in TOOLS if t.name == "analyze_metric")
 
         assert tool.inputSchema["properties"]["analyses"]["items"]["enum"] == list(SECTIONS)
-        assert tool.inputSchema["required"] == [
-            "device_id",
-            "device_datasource_id",
-            "instance_id",
-        ]
+        assert tool.inputSchema["properties"]["source"]["enum"] == ["device", "otlp"]
+        assert "required" not in tool.inputSchema
         assert tool.annotations.readOnlyHint is True
 
     @respx.mock
@@ -1143,3 +1140,226 @@ class TestRegistration:
             result = await execute_tool("analyze_metric", {**SERIES_ARGS, "analyses": ["summary"]})
 
         assert _body(result)["datapoints"]["cpu"]["summary"]["latest"] == 4.0
+
+
+OTLP_URL = "https://test.logicmonitor.com/santaba/rest/metrics/query-range"
+OTLP_QUERY = 'sum by (code) (rate(apiserver_request_total{cluster_name="rm-aro-cluster"}[5m]))'
+
+
+def _otlp_body(*series):
+    """A query-range body in the live shape: each series (labels or None, [(epoch, text)]).
+
+    An aggregate with no grouping carries no metric key at all, as
+    sum(rate(apiserver_request_total{cluster_name="rm-aro-cluster"}[5m])) answered on
+    2026-11-11 (docs/validation/otel-probe-2026-11-11-aggregate.json).
+    """
+    data = []
+    for labels, points in series:
+        entry = {"values": [{"value": v, "timestamp": t} for t, v in points]}
+        if labels is not None:
+            entry["metric"] = labels
+        data.append(entry)
+    return {"data": data, "meta": {"accessible": True, "queryTimeMs": 236, "resultType": "matrix"}}
+
+
+def _texts(points):
+    return [(t, repr(v)) for t, v in points]
+
+
+class TestOtlpSource:
+    """R3.2: analyze_metric(source="otlp") reads one PromQL range query and runs every section."""
+
+    @respx.mock
+    async def test_one_range_read_feeds_every_section_per_series(self, client):
+        from lm_mcp.tools.analyze_metric import SECTIONS, analyze_metric
+
+        rising = _texts(_every(300, [100.0 + i for i in range(60)]))
+        flat = _texts(_every(300, [5.0] * 60))
+        route = respx.post(OTLP_URL).mock(
+            return_value=httpx.Response(
+                200, json=_otlp_body(({"code": "200"}, rising), ({"code": "0"}, flat))
+            )
+        )
+
+        before = int(time.time())
+        result = await analyze_metric(client, source="otlp", query=OTLP_QUERY, hours=6, step="5m")
+        after = int(time.time())
+
+        assert route.call_count == 1
+        sent = json.loads(route.calls[0].request.content)
+        assert sent["query"] == OTLP_QUERY and sent["step"] == "5m"
+        assert before <= sent["end"] <= after
+        assert sent["end"] - sent["start"] == 6 * 3600
+        body = _body(result)
+        assert body["source"] == "otlp"
+        assert list(body["series"]) == ['{code="200"}', '{code="0"}']
+        entry = body["series"]['{code="200"}']
+        assert entry["sample_count"] == 60
+        assert set(entry) >= {s for s in SECTIONS if s != "baseline"}
+        assert entry["summary"]["latest"] == 159.0
+        assert entry["trend"]["label"] == "increasing"
+        assert body["series"]['{code="0"}']["summary"]["stddev"] == 0.0
+
+    @respx.mock
+    async def test_series_keys_name_labels_and_an_unlabeled_aggregate(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        points = _texts(_every(300, [1.0, 2.0, 3.0]))
+        respx.post(OTLP_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json=_otlp_body(
+                    ({"__name__": "up", "job": "kubelet", "cluster_name": "rm-aks"}, points),
+                    (None, points),
+                ),
+            )
+        )
+
+        body = _body(await analyze_metric(client, source="otlp", query="up", analyses=["summary"]))
+
+        assert list(body["series"]) == ['up{cluster_name="rm-aks",job="kubelet"}', "up"]
+
+    @respx.mock
+    async def test_nan_and_infinite_samples_are_left_out(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        points = [
+            (BASE_EPOCH, "NaN"),
+            (BASE_EPOCH + 300, "4"),
+            (BASE_EPOCH + 600, "+Inf"),
+            (BASE_EPOCH + 900, "6"),
+        ]
+        respx.post(OTLP_URL).mock(
+            return_value=httpx.Response(200, json=_otlp_body(({"code": "500"}, points)))
+        )
+
+        body = _body(await analyze_metric(client, source="otlp", query="q", analyses=["summary"]))
+
+        entry = body["series"]['{code="500"}']
+        assert entry["sample_count"] == 2
+        assert entry["summary"]["mean"] == 5.0
+
+    @respx.mock
+    async def test_more_series_than_the_cap_analyzes_the_first_and_warns(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+        from lm_mcp.tools.otlp_metrics import MAX_SERIES
+
+        points = _texts(_every(300, [1.0, 2.0]))
+        series = [({"pod": f"p{i:02d}"}, points) for i in range(MAX_SERIES + 5)]
+        respx.post(OTLP_URL).mock(return_value=httpx.Response(200, json=_otlp_body(*series)))
+
+        body = _body(await analyze_metric(client, source="otlp", query="q", analyses=["summary"]))
+
+        assert len(body["series"]) == MAX_SERIES
+        assert body["series_count_total"] == MAX_SERIES + 5
+        assert any(str(MAX_SERIES + 5) in w for w in body["warnings"])
+
+    @respx.mock
+    async def test_no_series_is_an_empty_result_with_a_warning(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        respx.post(OTLP_URL).mock(return_value=httpx.Response(200, json=_otlp_body()))
+
+        result = await analyze_metric(client, source="otlp", query="q")
+
+        body = _body(result)
+        assert body["series"] == {}
+        assert body["series_count_total"] == 0
+        assert body["warnings"]
+
+    @respx.mock
+    async def test_baseline_reads_the_earlier_window_with_a_second_range_query(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        now_points = _texts(_every(300, [12.0] * 10))
+        then_points = _texts(_every(300, [10.0] * 10))
+        route = respx.post(OTLP_URL).mock(
+            side_effect=[
+                httpx.Response(200, json=_otlp_body(({"code": "200"}, now_points))),
+                httpx.Response(200, json=_otlp_body(({"code": "200"}, then_points))),
+            ]
+        )
+
+        body = _body(
+            await analyze_metric(
+                client,
+                source="otlp",
+                query="q",
+                hours=2,
+                analyses=["baseline"],
+                baseline_hours_ago=168,
+            )
+        )
+
+        first, second = (json.loads(c.request.content) for c in route.calls)
+        assert first["end"] - second["end"] == 168 * 3600
+        assert second["end"] - second["start"] == 2 * 3600
+        baseline = body["series"]['{code="200"}']["baseline"]
+        assert baseline["deviation_percent"] == 20.0
+        assert baseline["status"] == "normal"
+
+    @respx.mock
+    async def test_a_200_with_an_errors_array_is_an_upstream_error(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        respx.post(OTLP_URL).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "meta": {"accessible": True},
+                    "errors": [{"type": "INTERNAL_ERROR", "message": "storage timed out"}],
+                },
+            )
+        )
+
+        result = await analyze_metric(client, source="otlp", query="q")
+
+        assert envelope(result)["code"] == "UPSTREAM_ERROR"
+        assert "storage timed out" in envelope(result)["message"]
+
+    @respx.mock
+    async def test_a_portal_without_otlp_gets_the_unavailable_notice(self, client):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        respx.post(OTLP_URL).mock(
+            return_value=httpx.Response(
+                404, json={"errorMessage": "HTTP 404 Not Found", "errorCode": 1400}
+            )
+        )
+
+        body = _body(await analyze_metric(client, source="otlp", query="q"))
+
+        assert body["available"] is False
+
+    @pytest.mark.parametrize(
+        ("kwargs", "named"),
+        [
+            ({"source": "otlp"}, "query"),
+            ({"source": "otlp", "query": "q", "device_id": 1}, "device_id"),
+            ({"source": "otlp", "query": "q", "datapoints": "cpu"}, "datapoints"),
+            ({"source": "device", "query": "q", **SERIES_ARGS}, "query"),
+            ({"source": "device", "step": "5m", **SERIES_ARGS}, "step"),
+            ({"source": "device", "device_id": 1}, "device_datasource_id"),
+            ({"source": "prometheus", "query": "q"}, "source"),
+        ],
+        ids=[
+            "otlp_no_query",
+            "otlp_device_id",
+            "otlp_datapoints",
+            "device_query",
+            "device_step",
+            "device_missing_ids",
+            "unknown_source",
+        ],
+    )
+    @respx.mock
+    async def test_arguments_of_the_other_source_are_refused(self, client, kwargs, named):
+        from lm_mcp.tools.analyze_metric import analyze_metric
+
+        route = respx.route(url__startswith="https://test.logicmonitor.com/")
+
+        result = await analyze_metric(client, **kwargs)
+
+        assert envelope(result)["code"] == "INVALID_REQUEST"
+        assert named in envelope(result)["message"]
+        assert not route.called

@@ -1,15 +1,23 @@
-# Description: analyze_metric reads one device instance's series once and analyzes it by section.
+# Description: analyze_metric reads a device instance or a PromQL range query, analyzed by section.
 # Description: Holds the series math behind each of its sections.
 
 from __future__ import annotations
 
 import math
 import statistics
+import time
 from typing import TYPE_CHECKING, Any
 
 from mcp.types import TextContent
 
 from lm_mcp.tools import format_response, handle_error, validation_error
+from lm_mcp.tools.otlp_metrics import (
+    MAX_SERIES,
+    handle_otlp_error,
+    otlp_body_errors,
+    otlp_series,
+    read_otlp_range,
+)
 from lm_mcp.tools.stats_helpers import (
     autocorrelation,
     coefficient_of_variation,
@@ -30,6 +38,9 @@ if TYPE_CHECKING:
 
 # The sections analyze_metric offers, in the order it reports them.
 SECTIONS = ("summary", "trend", "seasonality", "change_points", "anomalies", "forecast", "baseline")
+
+# Where analyze_metric reads its series: a device instance's datapoints or a PromQL range query.
+SOURCES = ("device", "otlp")
 
 DEFAULT_HOURS = 168
 
@@ -521,35 +532,174 @@ async def _fetch_series(
     )
 
 
+def _source_refusal(
+    source: str,
+    device_args: dict[str, int | None],
+    datapoints: str | None,
+    query: str | None,
+    step: str | None,
+) -> list[TextContent] | None:
+    """The refusal for an unknown source, or for an argument the source lacks or does not take."""
+    if source not in SOURCES:
+        return validation_error(
+            "INVALID_REQUEST",
+            f"Unknown source {source!r}; analyze_metric reads from {', '.join(SOURCES)}.",
+            "Pass source='device' with the device ids, or source='otlp' with a query.",
+        )
+    if source == "otlp":
+        if not query:
+            return validation_error(
+                "INVALID_REQUEST",
+                "source otlp needs a query, a PromQL expression.",
+                "Find metric names with get_otlp_metric_names.",
+            )
+        stray = [
+            name
+            for name, value in {**device_args, "datapoints": datapoints}.items()
+            if value is not None
+        ]
+        if stray:
+            return validation_error(
+                "INVALID_REQUEST",
+                f"source otlp reads a PromQL query and takes no {', '.join(stray)}.",
+                "Drop them, or use source='device'.",
+            )
+        return None
+    missing = [name for name, value in device_args.items() if value is None]
+    if missing:
+        return validation_error(
+            "INVALID_REQUEST",
+            f"source device needs {', '.join(missing)}.",
+            "Pass the device, Device-DataSource and instance ids, or use source='otlp'.",
+        )
+    stray = [name for name, value in (("query", query), ("step", step)) if value is not None]
+    if stray:
+        return validation_error(
+            "INVALID_REQUEST",
+            f"source device reads a device instance and takes no {', '.join(stray)}.",
+            "Drop them, or use source='otlp' with a query.",
+        )
+    return None
+
+
+def _analyze_each(
+    series: dict[str, dict[str, Any]],
+    baseline_series: dict[str, dict[str, Any]],
+    selected: list[str],
+    threshold: float | None,
+) -> dict[str, Any]:
+    """Each series' sample count, truncated flag and requested sections, by series name."""
+    results: dict[str, Any] = {}
+    for name, data in series.items():
+        values = data["values"]
+        timestamps = data["timestamps"]
+        entry: dict[str, Any] = {
+            "sample_count": len(values),
+            "truncated": data["truncated"],
+        }
+        for section in selected:
+            if len(values) < 2:
+                entry[section] = {"status": "insufficient_data"}
+            elif section == "forecast":
+                entry[section] = _forecast_section(values, timestamps, threshold)
+            elif section == "baseline":
+                earlier = baseline_series.get(name, {}).get("values", [])
+                entry[section] = baseline_comparison(values, earlier)
+            else:
+                entry[section] = _SECTION_BUILDERS[section](values, timestamps)
+        results[name] = entry
+    return results
+
+
+async def _analyze_otlp(
+    client: LogicMonitorClient,
+    query: str,
+    hours: int,
+    step: str | None,
+    selected: list[str],
+    threshold: float | None,
+    baseline_hours_ago: int | None,
+) -> list[TextContent]:
+    """The otlp source: one range read of the window, one more for the baseline."""
+    now = int(time.time())
+    baseline = "baseline" in selected and baseline_hours_ago is not None
+    try:
+        result = await read_otlp_range(client, query, now - hours * 3600, now, step)
+        refusal = otlp_body_errors(result)
+        if refusal is not None:
+            return refusal
+        series, total = otlp_series(result, query)
+        baseline_series: dict[str, dict[str, Any]] = {}
+        if baseline and baseline_hours_ago is not None:
+            end = now - baseline_hours_ago * 3600
+            earlier = await read_otlp_range(client, query, end - hours * 3600, end, step)
+            refusal = otlp_body_errors(earlier)
+            if refusal is not None:
+                return refusal
+            baseline_series, _ = otlp_series(earlier, query)
+
+        response: dict[str, Any] = {
+            "source": "otlp",
+            "query": query,
+            "hours": hours,
+            "step": step,
+            "analyses": selected,
+            "series_count_total": total,
+            "series": _analyze_each(series, baseline_series, selected, threshold),
+        }
+        if baseline:
+            response["baseline_hours_ago"] = baseline_hours_ago
+        if total == 0:
+            response["warnings"] = [
+                "The query returned no series in the window; check it with query_otlp_metrics."
+            ]
+        elif total > MAX_SERIES:
+            response["warnings"] = [
+                f"The query returned {total} series and the first {MAX_SERIES} are analyzed; "
+                "narrow it with label matchers or an aggregation."
+            ]
+        return format_response(response)
+    except Exception as e:
+        return handle_otlp_error(e)
+
+
 async def analyze_metric(
     client: LogicMonitorClient,
-    device_id: int,
-    device_datasource_id: int,
-    instance_id: int,
+    device_id: int | None = None,
+    device_datasource_id: int | None = None,
+    instance_id: int | None = None,
     datapoints: str | None = None,
     hours: int = DEFAULT_HOURS,
     analyses: list[str] | None = None,
     threshold: float | None = None,
     baseline_hours_ago: int | None = None,
+    source: str = "device",
+    query: str | None = None,
+    step: str | None = None,
 ) -> list[TextContent]:
-    """Analyze each datapoint of one device instance's series, one section per analysis.
+    """Analyze each datapoint of one device instance's series, or each series of one PromQL
+    range query, one section per analysis.
 
     Args:
         client: LogicMonitor API client.
-        device_id: Device ID.
-        device_datasource_id: Device-DataSource ID.
-        instance_id: Instance ID.
-        datapoints: Comma-separated datapoint names (all if omitted).
+        device_id: Device ID; source device.
+        device_datasource_id: Device-DataSource ID; source device.
+        instance_id: Instance ID; source device.
+        datapoints: Comma-separated datapoint names (all if omitted); source device.
         hours: Hours of history to read (default: 168).
         analyses: Sections to compute (default: all of SECTIONS, the baseline only when
             baseline_hours_ago is given).
         threshold: Level the forecast reports the crossing of.
         baseline_hours_ago: Hours before now the baseline window ends; it is as long
-            as the analyzed window and read with one more paged read.
+            as the analyzed window and read with one more read.
+        source: device for a device instance's datapoints, otlp for a PromQL query.
+        query: PromQL expression; source otlp.
+        step: Resolution step of the otlp read; the backend picks one when omitted.
 
     Returns:
-        Per-datapoint sample count, truncated flag and the requested sections;
-        warnings names any datapoint the page cap cut short.
+        Per-datapoint (device) or per-series (otlp) sample count, truncated flag and the
+        requested sections; warnings names a datapoint the page cap cut short, or an
+        otlp query that returned no series or more than MAX_SERIES.
     """
     if analyses is None:
         selected = [s for s in SECTIONS if s != "baseline" or baseline_hours_ago is not None]
@@ -570,6 +720,20 @@ async def analyze_metric(
             "baseline_hours_ago.",
             "Pass baseline_hours_ago, such as 168 for the same window a week earlier.",
         )
+    device_args = {
+        "device_id": device_id,
+        "device_datasource_id": device_datasource_id,
+        "instance_id": instance_id,
+    }
+    refusal = _source_refusal(source, device_args, datapoints, query, step)
+    if refusal is not None:
+        return refusal
+    if source == "otlp":
+        assert query is not None
+        return await _analyze_otlp(
+            client, query, hours, step, selected, threshold, baseline_hours_ago
+        )
+    assert device_id is not None and device_datasource_id is not None and instance_id is not None
 
     try:
         series = await _fetch_series(
@@ -587,33 +751,13 @@ async def analyze_metric(
                 end_hours_ago=baseline_hours_ago,
             )
 
-        results: dict[str, Any] = {}
-        for dp_name, dp_data in series.items():
-            values = dp_data["values"]
-            timestamps = dp_data["timestamps"]
-            entry: dict[str, Any] = {
-                "sample_count": len(values),
-                "truncated": dp_data["truncated"],
-            }
-            for section in selected:
-                if len(values) < 2:
-                    entry[section] = {"status": "insufficient_data"}
-                elif section == "forecast":
-                    entry[section] = _forecast_section(values, timestamps, threshold)
-                elif section == "baseline":
-                    earlier = baseline_series.get(dp_name, {}).get("values", [])
-                    entry[section] = baseline_comparison(values, earlier)
-                else:
-                    entry[section] = _SECTION_BUILDERS[section](values, timestamps)
-            results[dp_name] = entry
-
         response: dict[str, Any] = {
             "device_id": device_id,
             "device_datasource_id": device_datasource_id,
             "instance_id": instance_id,
             "hours": hours,
             "analyses": selected,
-            "datapoints": results,
+            "datapoints": _analyze_each(series, baseline_series, selected, threshold),
         }
         if baseline_hours_ago is not None and "baseline" in selected:
             response["baseline_hours_ago"] = baseline_hours_ago

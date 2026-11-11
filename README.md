@@ -122,10 +122,10 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 |------|-------|
 | Alerts | Query, acknowledge, bulk acknowledge, add notes, and full CRUD for alert rules |
 | Devices | Full CRUD for devices and groups, properties, and manual datasource instances |
-| Metrics | Datasources, instances, metric data, graphs, and native OTLP metrics (preview) through PromQL range queries |
+| Metrics | Datasources, instances, metric data, graphs, and native OTLP metrics through PromQL range and instant queries; `analyze_metric(source="otlp")` analyzes a PromQL series |
 | Dashboards | Full CRUD for dashboards, widgets, and groups |
 | SDT | Create, list, bulk create, and bulk delete scheduled downtime |
-| Collectors | Collectors and collector groups |
+| Collectors | Collectors and collector groups; OpenTelemetry (lmotel) collectors are not among them, since the v3 API the server reads does not list them |
 | Websites | Full CRUD for synthetic checks and website groups |
 | Reports | List, view, run, and schedule reports |
 | Escalations | Full CRUD for escalation chains and recipient groups |

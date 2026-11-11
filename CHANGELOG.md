@@ -87,6 +87,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
+- `query_otlp_metrics` takes `instant`: true reads `POST /metrics/query` for each series' current
+  value and refuses `start`, `end` and `step`; a range query needs `start` and `end`.
+  `analyze_metric` takes `source="otlp"` with `query` and `step`: it reads one PromQL range
+  query (one more for the baseline) and runs its sections on each series returned, the first 20,
+  keyed by PromQL selector, NaN and infinite samples left out; its three device ids are
+  required only with `source="device"`, the default. The four OTLP tools lose the `[PREVIEW]`
+  prefix and the feature-flag notice in their descriptions. The `lm-capacity` skill reads OTel
+  workloads through `analyze_metric(source="otlp")`.
 
 ### Removed
 
