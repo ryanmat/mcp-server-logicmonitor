@@ -12,6 +12,7 @@ from lm_mcp.tools import (
     handle_error,
     list_tool,
     require_write_permission,
+    validation_error,
 )
 
 if TYPE_CHECKING:
@@ -112,6 +113,15 @@ async def get_alert_rule(
         return handle_error(e)
 
 
+def _otlp_query_refusal() -> list[TextContent]:
+    """The refusal for an OTLP query on an alert rule, whose v3 body has no query field."""
+    return validation_error(
+        "INVALID_REQUEST",
+        "Alert rules take no query: the v3 alert rule body has no field for an OTLP query",
+        "An alert rule routes alerts by device, group, datasource, datapoint and level.",
+    )
+
+
 @require_write_permission
 async def create_alert_rule(
     client: LogicMonitorClient,
@@ -126,6 +136,7 @@ async def create_alert_rule(
     instance: str | None = None,
     suppress_alert_clear: bool = False,
     suppress_alert_ack_sdt: bool = False,
+    otlp_query: str | None = None,
 ) -> list[TextContent]:
     """Create an alert rule in LogicMonitor.
 
@@ -142,10 +153,13 @@ async def create_alert_rule(
         instance: Instance pattern to match.
         suppress_alert_clear: Whether to suppress alert clear notifications.
         suppress_alert_ack_sdt: Whether to suppress ack/SDT notifications.
+        otlp_query: Refused; the v3 alert rule body has no query field.
 
     Returns:
         List of TextContent with result or error.
     """
+    if otlp_query is not None:
+        return _otlp_query_refusal()
     try:
         body: dict = {
             "name": name,
@@ -192,6 +206,7 @@ async def update_alert_rule(
     level_str: str | None = None,
     suppress_alert_clear: bool | None = None,
     suppress_alert_ack_sdt: bool | None = None,
+    otlp_query: str | None = None,
 ) -> list[TextContent]:
     """Update an alert rule in LogicMonitor.
 
@@ -204,10 +219,13 @@ async def update_alert_rule(
         level_str: Updated alert level filter.
         suppress_alert_clear: Updated suppress alert clear setting.
         suppress_alert_ack_sdt: Updated suppress ack/SDT setting.
+        otlp_query: Refused; the v3 alert rule body has no query field.
 
     Returns:
         List of TextContent with result or error.
     """
+    if otlp_query is not None:
+        return _otlp_query_refusal()
     try:
         body: dict = {}
 

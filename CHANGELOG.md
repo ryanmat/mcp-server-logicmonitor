@@ -95,6 +95,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   required only with `source="device"`, the default. The four OTLP tools lose the `[PREVIEW]`
   prefix and the feature-flag notice in their descriptions. The `lm-capacity` skill reads OTel
   workloads through `analyze_metric(source="otlp")`.
+- `add_widget` and `update_widget` take `otlp_query`, a PromQL query for an `advancedmetrics`
+  widget: it sets `queryType` `otlp` and the query in the widget's `advancedMetricsGraphInfo`,
+  and the portal fills in the line chart. Other widget types refuse it. `create_alert_rule` and
+  `update_alert_rule` refuse `otlp_query`, since the v3 alert rule body has no query field.
 
 ### Removed
 

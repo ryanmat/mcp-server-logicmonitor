@@ -1297,3 +1297,125 @@ class TestGetDashboardRaw:
         assert listed.call_count == 1
         assert "widgets_full" not in projected
         assert "portal_url" in projected
+
+
+WIDGETS_URL = "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
+NODE_CPU = 'max by (k8s_node_name) (k8s_node_cpu_usage{cluster_name="rm-aks-cluster"})'
+POD_CPU = 'max by (k8s_pod_name) (k8s_pod_cpu_usage{k8s_namespace_name="kube-system"})'
+# An advancedmetrics widget as GET /dashboard/widgets/{id} returned it on 2026-11-11, after a
+# POST carrying only queryType and query (docs/validation/widget-probe-2026-11-11.json).
+ADVANCED_WIDGET = {
+    "id": 7139,
+    "name": "probe query_only",
+    "type": "advancedmetrics",
+    "dashboardId": 568,
+    "description": "",
+    "interval": 3,
+    "theme": "borderPurple",
+    "timescale": "day",
+    "lastUpdatedBy": "lm-mcp",
+    "lastUpdatedOn": 1794409375,
+    "userPermission": "write",
+    "advancedMetricsGraphInfo": {
+        "query": NODE_CPU,
+        "legend": "",
+        "lmQueryTypePreset": 0,
+        "queryFilters": [],
+        "queryTimeSelectors": [],
+        "queryFunctions": [],
+        "queryType": "otlp",
+        "step": None,
+        "queries": [],
+        "transformations": [],
+        "maxValue": "NaN",
+        "minValue": "NaN",
+        "verticalLabel": None,
+        "desc": False,
+        "scaleUnit": 0,
+        "globalConsolidateFunction": "default",
+        "visualizationType": "line",
+    },
+}
+
+
+class TestOtlpWidgetQuery:
+    """R3.2: add_widget and update_widget set an advancedmetrics widget's OTLP query."""
+
+    @respx.mock
+    async def test_add_widget_sets_query_type_and_query(self, client, enable_writes):
+        from lm_mcp.tools.dashboards import add_widget
+
+        route = respx.post(WIDGETS_URL).mock(
+            return_value=httpx.Response(200, json={**ADVANCED_WIDGET, "id": 7140})
+        )
+
+        result = await add_widget(
+            client,
+            dashboard_id=568,
+            name="Node CPU",
+            widget_type="advancedmetrics",
+            otlp_query=NODE_CPU,
+            config={"advancedMetricsGraphInfo": {"legend": "{{k8s_node_name}}"}},
+        )
+
+        assert not is_error_result(result)
+        body = json.loads(route.calls[0].request.content)
+        assert body["type"] == "advancedmetrics"
+        assert body["advancedMetricsGraphInfo"] == {
+            "legend": "{{k8s_node_name}}",
+            "queryType": "otlp",
+            "query": NODE_CPU,
+        }
+
+    @respx.mock
+    async def test_add_widget_refuses_an_otlp_query_on_another_type(self, client, enable_writes):
+        from lm_mcp.tools.dashboards import add_widget
+
+        route = respx.post(WIDGETS_URL)
+
+        result = await add_widget(
+            client, dashboard_id=568, name="CPU", widget_type="cgraph", otlp_query=NODE_CPU
+        )
+
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert "advancedmetrics" in error["message"] and "cgraph" in error["message"]
+        assert not route.called
+
+    @respx.mock
+    async def test_update_widget_replaces_the_query_and_keeps_the_rest(self, client, enable_writes):
+        from lm_mcp.tools.dashboards import update_widget
+
+        respx.get(f"{WIDGETS_URL}/7139").mock(
+            return_value=httpx.Response(200, json=ADVANCED_WIDGET)
+        )
+        route = respx.put(f"{WIDGETS_URL}/7139").mock(
+            return_value=httpx.Response(200, json=ADVANCED_WIDGET)
+        )
+
+        result = await update_widget(client, dashboard_id=568, widget_id=7139, otlp_query=POD_CPU)
+
+        assert not is_error_result(result)
+        graph = json.loads(route.calls[0].request.content)["advancedMetricsGraphInfo"]
+        assert graph["query"] == POD_CPU
+        assert graph["queryType"] == "otlp"
+        assert graph["visualizationType"] == "line"
+        assert graph["globalConsolidateFunction"] == "default"
+
+    @respx.mock
+    async def test_update_widget_refuses_an_otlp_query_on_another_type(self, client, enable_writes):
+        from lm_mcp.tools.dashboards import update_widget
+
+        respx.get(f"{WIDGETS_URL}/456").mock(
+            return_value=httpx.Response(
+                200, json={"id": 456, "name": "CPU", "type": "cgraph", "dashboardId": 123}
+            )
+        )
+        route = respx.put(f"{WIDGETS_URL}/456")
+
+        result = await update_widget(client, dashboard_id=123, widget_id=456, otlp_query=POD_CPU)
+
+        error = envelope(result)
+        assert error["code"] == "INVALID_REQUEST"
+        assert "cgraph" in error["message"]
+        assert not route.called

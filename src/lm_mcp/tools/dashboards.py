@@ -16,12 +16,16 @@ from lm_mcp.tools import (
     portal_url,
     require_write_permission,
     strip_readonly,
+    validation_error,
 )
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
 logger = logging.getLogger(__name__)
+
+# The one widget type whose v3 body carries an OTLP query, in advancedMetricsGraphInfo.
+OTLP_WIDGET_TYPE = "advancedmetrics"
 
 
 def _count_widgets(item: dict) -> int:
@@ -494,6 +498,24 @@ async def get_widget(
         return handle_error(e)
 
 
+def _otlp_query_refusal(widget_type: str) -> list[TextContent]:
+    """The refusal for an OTLP query on a widget type whose v3 body has no field for it."""
+    return validation_error(
+        "INVALID_REQUEST",
+        f"otlp_query applies to {OTLP_WIDGET_TYPE} widgets; a {widget_type} widget's v3 body "
+        "has no OTLP query",
+        f"Use widget_type '{OTLP_WIDGET_TYPE}' for a widget that plots a PromQL query.",
+    )
+
+
+def _set_otlp_query(payload: dict, otlp_query: str) -> None:
+    """Set queryType otlp and the query in the widget's advancedMetricsGraphInfo, keeping
+    its other fields; the portal fills in the visualization and the rest."""
+    graph = dict(payload.get("advancedMetricsGraphInfo") or {})
+    graph.update({"queryType": "otlp", "query": otlp_query})
+    payload["advancedMetricsGraphInfo"] = graph
+
+
 @require_write_permission
 async def add_widget(
     client: LogicMonitorClient,
@@ -506,6 +528,7 @@ async def add_widget(
     row: int | None = None,
     description: str | None = None,
     config: dict | None = None,
+    otlp_query: str | None = None,
 ) -> list[TextContent]:
     """Add a widget to a dashboard.
 
@@ -525,10 +548,13 @@ async def add_widget(
         row: Start row (defaults to below existing widgets).
         description: Widget description.
         config: Additional widget configuration (type-specific).
+        otlp_query: PromQL query of an advancedmetrics widget, set with queryType otlp.
 
     Returns:
         List of TextContent with created widget details or error.
     """
+    if otlp_query is not None and widget_type != OTLP_WIDGET_TYPE:
+        return _otlp_query_refusal(widget_type)
     try:
         payload: dict = {
             "name": name,
@@ -574,6 +600,9 @@ async def add_widget(
             }
             for key, val in _sla_defaults.items():
                 payload.setdefault(key, val)
+
+        if otlp_query is not None:
+            _set_otlp_query(payload, otlp_query)
 
         result = await client.post(
             "/dashboard/widgets",
@@ -630,6 +659,7 @@ async def update_widget(
     row_span: int | None = None,
     col_span: int | None = None,
     config: dict | None = None,
+    otlp_query: str | None = None,
 ) -> list[TextContent]:
     """Update an existing widget's content and/or its placement.
 
@@ -648,12 +678,15 @@ async def update_widget(
         row_span: New height in rows.
         col_span: New width in columns (1-12).
         config: Additional configuration to update.
+        otlp_query: New PromQL query of an advancedmetrics widget, set with queryType otlp.
 
     Returns:
         List of TextContent with updated widget details or error.
     """
     try:
-        content_changed = name is not None or description is not None or bool(config)
+        content_changed = (
+            name is not None or description is not None or bool(config) or otlp_query is not None
+        )
         position_changed = any(v is not None for v in (column_index, row, row_span, col_span))
 
         widget_summary: dict = {"id": widget_id}
@@ -662,6 +695,8 @@ async def update_widget(
             # Preserve unmodified fields but drop server-managed read-only ones so the
             # PUT does not 400 on echoed values.
             current = await client.get(f"/dashboard/widgets/{widget_id}")
+            if otlp_query is not None and current.get("type") != OTLP_WIDGET_TYPE:
+                return _otlp_query_refusal(str(current.get("type")))
             payload = strip_readonly(dict(current), _WIDGET_READONLY_FIELDS)
             if name is not None:
                 payload["name"] = name
@@ -669,6 +704,8 @@ async def update_widget(
                 payload["description"] = description
             if config:
                 payload.update(config)
+            if otlp_query is not None:
+                _set_otlp_query(payload, otlp_query)
 
             result = await client.put(
                 f"/dashboard/widgets/{widget_id}",

@@ -171,6 +171,10 @@
           "description": "Widget name",
           "type": "string"
         },
+        "otlp_query": {
+          "description": "PromQL query over native OTLP metrics; advancedmetrics widgets only. Sets advancedMetricsGraphInfo queryType otlp and the query; the portal fills in the line chart and the rest",
+          "type": "string"
+        },
         "row": {
           "description": "Start row. Omit to append below existing widgets.",
           "type": "integer"
@@ -180,7 +184,7 @@
           "type": "integer"
         },
         "widget_type": {
-          "description": "Widget type (cgraph, sgraph, bigNumber, text, html, alert, noc, gauge, pieChart, table, etc.)",
+          "description": "Widget type (cgraph, sgraph, bigNumber, text, html, alert, noc, gauge, pieChart, table, advancedmetrics for a PromQL query, etc.)",
           "type": "string"
         }
       },
@@ -918,6 +922,10 @@
         },
         "name": {
           "description": "Name of the alert rule",
+          "type": "string"
+        },
+        "otlp_query": {
+          "description": "Not supported: the v3 alert rule body has no query field, so passing one returns INVALID_REQUEST",
           "type": "string"
         },
         "priority": {
@@ -7511,6 +7519,10 @@
           "description": "Updated name",
           "type": "string"
         },
+        "otlp_query": {
+          "description": "Not supported: the v3 alert rule body has no query field, so passing one returns INVALID_REQUEST",
+          "type": "string"
+        },
         "priority": {
           "description": "Updated priority level",
           "type": "integer"
@@ -8426,6 +8438,10 @@
         },
         "name": {
           "description": "New name",
+          "type": "string"
+        },
+        "otlp_query": {
+          "description": "New PromQL query of an advancedmetrics widget; other widget types refuse it",
           "type": "string"
         },
         "row": {
