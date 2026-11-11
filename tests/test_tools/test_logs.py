@@ -19,7 +19,8 @@ BASE = "https://test.logicmonitor.com/santaba/rest"
 
 # Answers of a sandbox portal at X-Version 3 on 2026-11-11, every key as read. The
 # *_size1_offset1 entries answered size=1&offset=1: /logpipelines returned all four rows
-# (it applied neither), /log/logquerygroups an empty page under total 1.
+# (it applied neither), /log/logquerygroups an empty page under total 1, /log/partitions
+# its second partition; partitions_size1_offset0 is its first, under total 2.
 LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "log_reads.json").read_text())
 
 
@@ -160,9 +161,9 @@ class TestGetLogPartitions:
             return_value=httpx.Response(200, json=LIVE["partitions"])
         )
 
-        body = _body(await get_log_partitions(client, limit=1))
+        body = _body(await get_log_partitions(client))
 
-        assert route.calls.last.request.url.params["size"] == "1"
+        assert route.calls.last.request.url.params["size"] == "50"
         paused, default = body["partitions"]
         assert paused == {
             "id": "3",
@@ -190,6 +191,23 @@ class TestGetLogPartitions:
             True,
             None,
         )
+
+    @respx.mock
+    async def test_pages_one_partition_at_a_time(self, client):
+        from lm_mcp.tools.logs import get_log_partitions
+
+        def page(request):
+            offset = request.url.params["offset"]
+            assert request.url.params["size"] == "1"
+            return httpx.Response(200, json=LIVE[f"partitions_size1_offset{offset}"])
+
+        respx.get(f"{BASE}/log/partitions").mock(side_effect=page)
+
+        first = _body(await get_log_partitions(client, limit=1))
+        second = _body(await get_log_partitions(client, limit=1, offset=1))
+
+        assert ([p["id"] for p in first["partitions"]], first["has_more"]) == (["3"], True)
+        assert ([p["id"] for p in second["partitions"]], second["has_more"]) == (["1"], False)
 
     @respx.mock
     async def test_a_partition_without_an_active_contract_reads_none(self, client):
