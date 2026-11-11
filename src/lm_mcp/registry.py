@@ -4309,9 +4309,9 @@ TOOLS.extend(
         Tool(
             name="get_log_pipelines",
             description=(
-                "List every LM Logs pipeline with its query and the partitions it names. Use it "
-                "to see which log queries the pipelines match; it returns all pipelines at "
-                "once and takes no arguments. It does not search log content."
+                "List every LM Logs pipeline with its log query and the partitions it names. It "
+                "returns all pipelines at once and takes no arguments. It does not search log "
+                "content."
             ),
             annotations=_READ_ONLY,
             inputSchema={"type": "object", "properties": {}},
@@ -4347,8 +4347,8 @@ TOOLS.extend(
         Tool(
             name="get_log_usage",
             description=(
-                "Read the portal's LM Logs usage figure from /log/usage: one number, returned "
-                "as the API gives it, with no unit or period stated by the API."
+                "Read the portal's LM Logs usage figure from /log/usage: one number, as returned. "
+                "The API states no unit or period for it."
             ),
             annotations=_READ_ONLY,
             inputSchema={"type": "object", "properties": {}},
