@@ -1151,7 +1151,8 @@ def _otlp_body(*series):
 
     An aggregate with no grouping carries no metric key at all, as
     sum(rate(apiserver_request_total{cluster_name="rm-aro-cluster"}[5m])) answered on
-    2026-11-11 (docs/validation/otel-probe-2026-11-11-aggregate.json).
+    2026-11-11 (capture kept locally as otel-probe-2026-11-11-aggregate.json, not in
+    the repo).
     """
     data = []
     for labels, points in series:
