@@ -1,0 +1,341 @@
+{
+  "logpipelines": {
+    "total": 4,
+    "items": [
+      {
+        "id": "2",
+        "name": "demo pipeline",
+        "query": "_resource.name=\"ip-10-55-119-135.us-west-2.compute.internal\""
+      },
+      {
+        "id": "3",
+        "name": "OpenShift AlertManager - All",
+        "description": "All alerts from OpenShift Prometheus AlertManager",
+        "query": "source_type=\"prometheus_alertmanager\"",
+        "partitions": [
+          "default"
+        ]
+      },
+      {
+        "id": "4",
+        "name": "OpenShift AlertManager - Critical",
+        "description": "Critical severity alerts from OpenShift",
+        "query": "source_type=\"prometheus_alertmanager\" AND severity=\"critical\"",
+        "partitions": [
+          "default"
+        ]
+      },
+      {
+        "id": "5",
+        "name": "OpenShift AlertManager - Platform",
+        "description": "Platform infrastructure alerts",
+        "query": "source_type=\"prometheus_alertmanager\" AND namespace=\"platform-alerts\"",
+        "partitions": [
+          "default"
+        ]
+      }
+    ],
+    "searchId": null,
+    "isMin": false
+  },
+  "logpipelines_size1_offset1": {
+    "total": 4,
+    "items": [
+      {
+        "id": "2",
+        "name": "demo pipeline",
+        "query": "_resource.name=\"ip-10-55-119-135.us-west-2.compute.internal\""
+      },
+      {
+        "id": "3",
+        "name": "OpenShift AlertManager - All",
+        "description": "All alerts from OpenShift Prometheus AlertManager",
+        "query": "source_type=\"prometheus_alertmanager\"",
+        "partitions": [
+          "default"
+        ]
+      },
+      {
+        "id": "4",
+        "name": "OpenShift AlertManager - Critical",
+        "description": "Critical severity alerts from OpenShift",
+        "query": "source_type=\"prometheus_alertmanager\" AND severity=\"critical\"",
+        "partitions": [
+          "default"
+        ]
+      },
+      {
+        "id": "5",
+        "name": "OpenShift AlertManager - Platform",
+        "description": "Platform infrastructure alerts",
+        "query": "source_type=\"prometheus_alertmanager\" AND namespace=\"platform-alerts\"",
+        "partitions": [
+          "default"
+        ]
+      }
+    ],
+    "searchId": null,
+    "isMin": false
+  },
+  "tracked_log": {
+    "total": 0,
+    "items": [],
+    "searchId": null,
+    "isMin": false
+  },
+  "logquerygroups": {
+    "total": 1,
+    "items": [
+      {
+        "id": 1,
+        "name": "Ungrouped",
+        "description": "Ungrouped folder",
+        "parentId": 0,
+        "ownerId": 0,
+        "logQuery": [],
+        "userPermission": "WRITE",
+        "groupType": "PRIVATE"
+      }
+    ],
+    "searchId": null,
+    "isMin": false
+  },
+  "logquerygroups_size1_offset1": {
+    "total": 1,
+    "items": [],
+    "searchId": null,
+    "isMin": false
+  },
+  "partitions": {
+    "total": 2,
+    "items": [
+      {
+        "id": "3",
+        "parent": null,
+        "tenant": "argus",
+        "name": "k8JobLogs",
+        "description": "",
+        "priority": 0,
+        "criteria": null,
+        "fullname": null,
+        "userPermission": null,
+        "active": false,
+        "pausedAt": 1777060505648,
+        "previousContract": {
+          "id": 20,
+          "fromEpoch": 1790812800,
+          "contractIntervalHours": 0,
+          "toEpoch": 1793491200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "expired",
+          "limitReachedAt": null
+        },
+        "activeContract": {
+          "id": 31,
+          "fromEpoch": 1793491200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1796083200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "active",
+          "limitReachedAt": null
+        },
+        "futureContract": {
+          "id": 34,
+          "fromEpoch": 1796083200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1798761600,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "future",
+          "limitReachedAt": null
+        }
+      },
+      {
+        "id": "1",
+        "parent": null,
+        "tenant": "",
+        "name": "default",
+        "description": "default partition",
+        "priority": 0,
+        "criteria": null,
+        "fullname": null,
+        "userPermission": null,
+        "active": true,
+        "pausedAt": null,
+        "previousContract": {
+          "id": 19,
+          "fromEpoch": 1790812800,
+          "contractIntervalHours": 0,
+          "toEpoch": 1793491200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "expired",
+          "limitReachedAt": null
+        },
+        "activeContract": {
+          "id": 30,
+          "fromEpoch": 1793491200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1796083200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "active",
+          "limitReachedAt": null
+        },
+        "futureContract": {
+          "id": 33,
+          "fromEpoch": 1796083200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1798761600,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "future",
+          "limitReachedAt": null
+        }
+      }
+    ],
+    "searchId": null,
+    "isMin": false
+  },
+  "partitions_size1_offset0": {
+    "total": 2,
+    "items": [
+      {
+        "id": "3",
+        "parent": null,
+        "tenant": "argus",
+        "name": "k8JobLogs",
+        "description": "",
+        "priority": 0,
+        "criteria": null,
+        "fullname": null,
+        "userPermission": null,
+        "active": false,
+        "pausedAt": 1777060505648,
+        "previousContract": {
+          "id": 20,
+          "fromEpoch": 1790812800,
+          "contractIntervalHours": 0,
+          "toEpoch": 1793491200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "expired",
+          "limitReachedAt": null
+        },
+        "activeContract": {
+          "id": 31,
+          "fromEpoch": 1793491200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1796083200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "active",
+          "limitReachedAt": null
+        },
+        "futureContract": {
+          "id": 34,
+          "fromEpoch": 1796083200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1798761600,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "future",
+          "limitReachedAt": null
+        }
+      }
+    ],
+    "searchId": null,
+    "isMin": false
+  },
+  "partitions_size1_offset1": {
+    "total": 2,
+    "items": [
+      {
+        "id": "1",
+        "parent": null,
+        "tenant": "",
+        "name": "default",
+        "description": "default partition",
+        "priority": 0,
+        "criteria": null,
+        "fullname": null,
+        "userPermission": null,
+        "active": true,
+        "pausedAt": null,
+        "previousContract": {
+          "id": 19,
+          "fromEpoch": 1790812800,
+          "contractIntervalHours": 0,
+          "toEpoch": 1793491200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "expired",
+          "limitReachedAt": null
+        },
+        "activeContract": {
+          "id": 30,
+          "fromEpoch": 1793491200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1796083200,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "active",
+          "limitReachedAt": null
+        },
+        "futureContract": {
+          "id": 33,
+          "fromEpoch": 1796083200,
+          "contractIntervalHours": 0,
+          "toEpoch": 1798761600,
+          "retention": 35,
+          "sku": "LG3",
+          "usageLimit": "0B",
+          "stopIngestionOnLimit": false,
+          "autoRestartOnRenewal": false,
+          "state": "future",
+          "limitReachedAt": null
+        }
+      }
+    ],
+    "searchId": null,
+    "isMin": false
+  },
+  "usage": {
+    "usage": 503681379607
+  }
+}

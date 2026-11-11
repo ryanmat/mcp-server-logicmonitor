@@ -302,6 +302,41 @@ _EDWIN_TOOLS = {
 }
 
 
+_LOG_TOOLS = {
+    "get_log_pipelines",
+    "get_tracked_log_queries",
+    "get_log_query_groups",
+    "get_log_partitions",
+    "get_log_usage",
+}
+
+
+class TestLogTools:
+    """R3.3: the five LM Logs reads are registered, read-only, handled and grouped."""
+
+    def test_each_is_registered_read_only_with_its_handler(self):
+        registered = {tool.name: tool for tool in TOOLS if tool.name in _LOG_TOOLS}
+
+        assert set(registered) == _LOG_TOOLS
+        assert all(tool.annotations.readOnlyHint is True for tool in registered.values())
+        assert {name: get_tool_handler(name).__name__ for name in _LOG_TOOLS} == {
+            name: name for name in _LOG_TOOLS
+        }
+
+    def test_the_paged_reads_declare_limit_and_offset_and_the_others_do_not(self):
+        schemas = {tool.name: tool.inputSchema["properties"] for tool in TOOLS}
+
+        for name in ("get_tracked_log_queries", "get_log_query_groups", "get_log_partitions"):
+            assert {"limit", "offset"} <= set(schemas[name]), name
+        assert schemas["get_log_pipelines"] == {}
+        assert schemas["get_log_usage"] == {}
+
+    def test_the_logs_category_holds_the_five_tools(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        assert set(TOOL_CATEGORIES["categories"]["logs"]["tools"]) == _LOG_TOOLS
+
+
 class TestEdwinTools:
     """R3.1: the eight Edwin tools are registered, annotated and grouped."""
 
