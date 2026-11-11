@@ -1316,6 +1316,9 @@ ADVANCED_WIDGET = {
     "lastUpdatedBy": "lm-mcp",
     "lastUpdatedOn": 1794409375,
     "userPermission": "write",
+    "displaySettings": {},
+    "isSupportCustomProperty": False,
+    "supportCustomProperty": False,
     "advancedMetricsGraphInfo": {
         "query": NODE_CPU,
         "legend": "",
