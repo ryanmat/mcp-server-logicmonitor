@@ -4338,7 +4338,7 @@ TOOLS.extend(
             name="get_log_partitions",
             description=(
                 "List the LM Logs partitions with whether each is active or paused, its "
-                "routing criteria, and its active contract (state, SKU, retention, usage limit, "
+                "criteria, and its active contract (state, SKU, retention, usage limit, "
                 "period). Use it to check partition state and contract limits."
             ),
             annotations=_READ_ONLY,

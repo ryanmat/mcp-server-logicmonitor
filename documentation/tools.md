@@ -383,7 +383,7 @@ LM Logs configuration and usage: pipelines, tracked queries, query groups, parti
 | `get_log_pipelines` | List every LM Logs pipeline with its log query and the partitions it names. It returns all pipelines at once and takes no arguments. It does not search log content. | No |
 | `get_tracked_log_queries` | List the portal's tracked log queries, each row as the API returns it. Use it to see which log queries the portal tracks; it does not run them. | No |
 | `get_log_query_groups` | List the saved LM Logs query groups (folders) with their type, owner, permission and the queries each holds. | No |
-| `get_log_partitions` | List the LM Logs partitions with whether each is active or paused, its routing criteria, and its active contract (state, SKU, retention, usage limit, period). Use it to check partition state and contract limits. | No |
+| `get_log_partitions` | List the LM Logs partitions with whether each is active or paused, its criteria, and its active contract (state, SKU, retention, usage limit, period). Use it to check partition state and contract limits. | No |
 | `get_log_usage` | Read the portal's LM Logs usage figure from /log/usage: one number, as returned. The API states no unit or period for it. | No |
 
 ## OTLP Metrics

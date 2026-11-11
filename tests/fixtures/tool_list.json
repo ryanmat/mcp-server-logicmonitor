@@ -5158,7 +5158,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "List the LM Logs partitions with whether each is active or paused, its routing criteria, and its active contract (state, SKU, retention, usage limit, period). Use it to check partition state and contract limits.",
+    "description": "List the LM Logs partitions with whether each is active or paused, its criteria, and its active contract (state, SKU, retention, usage limit, period). Use it to check partition state and contract limits.",
     "inputSchema": {
       "properties": {
         "limit": {

@@ -36,7 +36,7 @@ Call `get_log_partitions`. When `has_more` is true, call it again with `offset` 
 - `name`, `description`, `tenant` and `priority`
 - `active`, false for a paused partition, and `paused_at`, the pause time in epoch
   milliseconds, or null
-- `criteria`, the partition's routing criteria, or null
+- `criteria`, as the API returns it, or null
 - `active_contract`: `state`, `sku`, `retention`, `usage_limit`,
   `stop_ingestion_on_limit`, `limit_reached_at`, and the contract period as `from_epoch`
   and `to_epoch` in epoch seconds; null when the partition has no active contract
