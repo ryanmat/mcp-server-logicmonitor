@@ -1,0 +1,962 @@
+
+==========================$Internal Collector Status==========================
+is scheduled at Thu Nov 12 09:09:16 PST 2026, finished at Thu Nov 12 09:09:16 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[
+  {
+    "name": "module.Collector",
+    "detail": "The collector is alive and last updated 0h 0m 1s ago. ",
+    "status": "OK"
+  },
+  {
+    "name": "module.Watchdog",
+    "detail": "The collector watchdog is alive and last updated 0h 0m 2s ago. ",
+    "status": "OK"
+  }
+]
+
+==========================Agent_Check0001_CollectorEnvironmentCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:16 PST 2026, finished at Thu Nov 12 09:09:40 PST 2026, status 0
+summary:
+detail: {"threadStat":"all=1144,run=47,blocked=0,wait=1097","agentMem":{"agentMaxMemoryInMB":4096,"agentUsedMemoryInMB":1705,"agentCommittedMemoryInMB":3302,"agentHostEntryInMB":11},"os":{"totalSwapInMB":0,"freeMemInMB":14,"phyMemInMB":8192,"commitVirtualMemInMB":12088,"freeSwapInMB":0,"processors":4,"arch":"64","osName":"Linux_5.14.0-427.66.1.el9_4.x86_64"},"collectorSize":"Large","watchdogStatus":"RUNNING"}
+:checkpoints:[
+  {
+    "name": "ownerOfBinary",
+    "detail": 0,
+    "status": "OK"
+  },
+  {
+    "name": "OSVersion",
+    "detail": "20230214",
+    "status": "OK"
+  },
+  {
+    "name": "OSDistribution",
+    "detail": "Chainguard",
+    "status": "OK"
+  },
+  {
+    "name": "basic.OS",
+    "detail": "Linux_5.14.0-427.66.1.el9_4.x86_64 on 64 bit ",
+    "status": "OK"
+  },
+  {
+    "name": "basic.Processors",
+    "detail": "4 Cores Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+    "status": "OK"
+  },
+  {
+    "name": "basic.Version",
+    "detail": "Collector #161 version is 40000 and size Large",
+    "status": "OK"
+  },
+  {
+    "name": "basic.Role",
+    "detail": "Collector does not have admin/root privileges.",
+    "status": "OK"
+  },
+  {
+    "name": "isAdmin",
+    "detail": false,
+    "status": "OK"
+  },
+  {
+    "name": "basic.User",
+    "detail": "logicmonitor",
+    "status": "OK"
+  },
+  {
+    "name": "isLocalSystemAccount",
+    "detail": false,
+    "status": "OK"
+  },
+  {
+    "name": "isContainerized",
+    "detail": true,
+    "status": "OK"
+  },
+  {
+    "name": "isWinrmEnabled",
+    "detail": false,
+    "status": "OK"
+  },
+  {
+    "name": "EnforceLogicMonitorSSL",
+    "detail": true,
+    "status": "OK"
+  },
+  {
+    "name": "modulesChangeOnCollector",
+    "detail": false,
+    "status": "OK"
+  },
+  {
+    "name": "isCollectorPublisherStarted",
+    "detail": false,
+    "status": "OK"
+  },
+  {
+    "name": "module.SnmpTrap",
+    "detail": "The snmptrap is disabled. Please check conf \"eventcollector.defines\" and \"eventcollector.snmptrap.enable\" in agent.conf",
+    "status": "DISABLED"
+  },
+  {
+    "name": "module.Syslog",
+    "detail": "The syslog is listening on port - 514",
+    "status": "OK"
+  },
+  {
+    "name": "module.RemoteSession",
+    "detail": "The remotesession is enabled. ",
+    "status": "OK"
+  },
+  {
+    "name": "module.Netflow",
+    "detail": "The netflow is enabled. ",
+    "status": "OK"
+  },
+  {
+    "name": "module.JobMonitor",
+    "detail": "The JobMonitor is listening on port - 7214",
+    "status": "OK"
+  },
+  {
+    "name": "module.SPSE",
+    "detail": "No powershell tasks executed yet",
+    "status": "OK"
+  }
+]
+
+==========================Agent_Check0002_DataCollectorPerformanceCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:40 PST 2026, finished at Thu Nov 12 09:09:42 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[
+  {
+    "name": "biz.DataSource.BATCHSCRIPT",
+    "detail": "6 of 38412 tasks (0.02%) returned NaN for all datapoints.",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.CIM",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.DNS",
+    "detail": "0 of 58852 tasks (0.00%) returned NaN for all datapoints.",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.ESX",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.JDBC",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.JMX",
+    "detail": "0 of 181354 tasks (0.00%) returned NaN for all datapoints.",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.MEMCACHED",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.MONGO",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.NETAPP",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.PING",
+    "detail": "17 of 302880 tasks (0.01%) returned NaN for all datapoints.",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.TCP",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.UDP",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.XEN",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.DATAPUMP",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.PERFMON",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.SCRIPT",
+    "detail": "66191 of 2313056 tasks (2.86%) returned NaN for all datapoints.",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.SNMP",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.WEBPAGE",
+    "detail": "0 of 289 tasks (0.00%) returned NaN for all datapoints.",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.WMI",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.DataSource.SDKSCRIPT",
+    "detail": "No tasks",
+    "status": "OK"
+  }
+]
+
+==========================Agent_Check0004_PersistentReporterCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:42 PST 2026, finished at Thu Nov 12 09:09:42 PST 2026, status 0
+summary:
+detail:
+
+==========================Agent_Check0005_LongTimeTasksCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:42 PST 2026, finished at Thu Nov 12 09:09:43 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[
+  {
+    "name": "biz.ConfigSource",
+    "detail": "No long running tasks found",
+    "status": "OK"
+  },
+  {
+    "name": "biz.PropertySource",
+    "detail": "No long running tasks found",
+    "status": "OK"
+  },
+  {
+    "name": "biz.EventSource.LOGFILE",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.EventSource.SNMPTRAP",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.EventSource.SYSLOG",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.EventSource.WINDOWSEVENTLOG",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.EventSource.SCRIPTEVENT",
+    "detail": "No tasks",
+    "status": "OK"
+  },
+  {
+    "name": "biz.TopologySource",
+    "detail": "Finished 10281 tasks and 0 tasks is still running (queue is 0)",
+    "status": "OK"
+  }
+]
+
+==========================Agent_Check0006_AutoDiscoveryCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:43 PST 2026, finished at Thu Nov 12 09:09:43 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[{
+  "name": "biz.ActiveDiscoverQueue",
+  "detail": "The ad queue length is - 0",
+  "status": "OK"
+}]
+
+==========================Agent_Check0009_ErrorDumpFileCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:43 PST 2026, finished at Thu Nov 12 09:09:44 PST 2026, status 0
+summary:
+detail:
+
+==========================Agent_Check0011_CollectorCPUUsageCheck.groovy==========================
+is scheduled at Thu Nov 12 09:09:44 PST 2026, finished at Thu Nov 12 09:10:55 PST 2026, status 0
+summary:
+detail: [script=totalThread=300,runThread=0,cpu=7.02, batchscript=totalThread=20,runThread=0,cpu=5.37, reporter-cache=totalThread=17,runThread=5,cpu=1.01, autoprops=totalThread=15,runThread=0,cpu=0.06, ping=totalThread=20,runThread=0,cpu=0.03]
+:checkpoints:[{
+  "name": "module.CollectorCpu",
+  "detail": "No abnormal cpu consuming component found. The top one cpu consuming component is script,totalThread=300,runThread=0,cpu=7.02",
+  "status": "OK"
+}]
+
+==========================Agent_Check0012_DiskUsageCheck.groovy==========================
+is scheduled at Thu Nov 12 09:10:55 PST 2026, finished at Thu Nov 12 09:10:55 PST 2026, status 0
+summary:
+detail: Free disk is 92998.88 MBytes and the collector folder size is 6329.41 MBytes
+:checkpoints:[{
+  "name": "basic.Disk",
+  "detail": "Free disk is 92998.88 MBytes and the collector folder size is 6329.41 MBytes",
+  "status": "OK"
+}]
+
+==========================Agent_Check0013_CollectorConfCheck.groovy==========================
+is scheduled at Thu Nov 12 09:10:55 PST 2026, finished at Thu Nov 12 09:10:56 PST 2026, status 0
+summary:
+detail: The snmp.pdu.timeout value is 5. Found user added date formats - [yyyy-MM-dd'T'HH:mm:ss.SSS'Z', MMM  d HH:mm:ss, yyyy-MM-dd'T'HH:mm:ss, yyyy-MM-dd'T'HH:mm:ssXXX]
+:checkpoints:[{
+  "name": "biz.CollectorConf",
+  "detail": "No config issue found.",
+  "status": "OK"
+}]
+
+==========================Agent_Check0014_ExternalProcessCPU_Linux.groovy==========================
+is scheduled at Thu Nov 12 09:10:56 PST 2026, finished at Thu Nov 12 09:10:56 PST 2026, status 0
+summary:
+detail:  pid:244230, cpu:58.00, cmd:logicmonitor agent
+
+
+==========================Agent_Check0015_AbnormalThreadsCheck.groovy==========================
+is scheduled at Thu Nov 12 09:10:56 PST 2026, finished at Thu Nov 12 09:10:57 PST 2026, status 0
+summary:
+detail:  collectorThreadCount=1144,sseThreadCount=NA,curFD=957,jbossThreadCount=0,snmpTransportThreadCount=10,jschThreads=0
+
+==========================Agent_Check0016_AbnormalLogCheck.groovy==========================
+is scheduled at Thu Nov 12 09:10:57 PST 2026, finished at Thu Nov 12 09:11:06 PST 2026, status 0
+summary:
+detail: agentVersion=40000,platform=linux64,readLine=200000,timeChanged=false,delayScheduleCount=0,avgDelayInSec=0.00,snappyClassNotFound=false,oomWhenMapFailedFound=false,unknownBufferDataReportExceptionFound=false,uptime=23h 56m 56s, agentReadLine=1, sunSecurityNoClassDefFound=false, javaxCryptoNoClassDefFound=false, SSEReadLine=0, sunSecurityNoClassDefFound=false, javaxCryptoNoClassDefFound=false, watchdogReadLine=1, sunSecurityNoClassDefFound=false, javaxCryptoNoClassDefFound=false
+
+==========================Agent_Check0018_CheckThreadUsage.groovy==========================
+is scheduled at Thu Nov 12 09:11:06 PST 2026, finished at Thu Nov 12 09:12:17 PST 2026, status 0
+summary:
+detail:
+
+==========================Agent_Check0019_CheckWMITaskHang.groovy==========================
+is scheduled at Thu Nov 12 09:12:17 PST 2026, finished at Thu Nov 12 09:12:17 PST 2026, status 0
+summary:
+detail: This script only support Windows collector
+
+==========================Agent_Check0020_CheckWMIQuotaViolationIssues.groovy==========================
+is scheduled at Thu Nov 12 09:12:17 PST 2026, finished at Thu Nov 12 09:12:17 PST 2026, status 0
+summary:
+detail: This script only support Windows collector
+
+==========================Agent_Check0021_CheckAgentDirectoriesWritable.groovy==========================
+is scheduled at Thu Nov 12 09:12:17 PST 2026, finished at Thu Nov 12 09:12:18 PST 2026, status 0
+summary:
+detail:
+
+==========================Agent_Check0022_LogsHoldTime.groovy==========================
+is scheduled at Thu Nov 12 09:12:18 PST 2026, finished at Thu Nov 12 09:12:18 PST 2026, status 0
+summary:
+detail: {"HoldTime":"0 minutes","UpdateOn":"0 minutes ago","startTime":"2026-11-12 17:11:51.620 GMT","endTime":"2026-11-12 17:12:03.155 GMT"}
+
+==========================Agent_Check0024_CheckDebugOrTraceLogLevel.groovy==========================
+is scheduled at Thu Nov 12 09:12:18 PST 2026, finished at Thu Nov 12 09:12:19 PST 2026, status 0
+summary:
+detail: pollnow={*=1}=DEBUG
+
+
+==========================Agent_Check0025_LogRotateCheck.groovy==========================
+is scheduled at Thu Nov 12 09:12:19 PST 2026, finished at Thu Nov 12 09:12:19 PST 2026, status 0
+summary:
+detail: The record time for the last log is [2026-11-12 17:12:19.389 GMT]
+
+==========================Agent_Check0028_SseExtraJarLocation.groovy==========================
+is scheduled at Thu Nov 12 09:12:19 PST 2026, finished at Thu Nov 12 09:12:19 PST 2026, status 0
+summary:
+detail: SSE feature is disabled
+
+==========================Agent_Check0030_CheckSbwinproxyMemoryCPU.groovy==========================
+is scheduled at Thu Nov 12 09:12:19 PST 2026, finished at Thu Nov 12 09:12:20 PST 2026, status 0
+summary:
+detail: This script only support Windows collector, and Collector version must more than v24002
+
+==========================Agent_Check0031_EventLogStatistical_Windows.groovy==========================
+is scheduled at Thu Nov 12 09:12:20 PST 2026, finished at Thu Nov 12 09:12:20 PST 2026, status 0
+summary:
+detail:
+
+==========================Agent_Check0032_CoreFileCheck.groovy==========================
+is scheduled at Thu Nov 12 09:12:20 PST 2026, finished at Thu Nov 12 09:12:21 PST 2026, status 0
+summary:
+detail: all jar exists.
+
+==========================Agent_Check0033_CollectorWorkLoad.groovy==========================
+is scheduled at Thu Nov 12 09:12:21 PST 2026, finished at Thu Nov 12 09:12:52 PST 2026, status 1
+summary: Problem:The host memory has used too much which may cause collector OOM(Out Of Memory error).
+Analyze:
+Suggestion:Please decrease the memory by moving some devices to another collector.
+
+
+detail: <agent.CollectorWorkLoadCheck$EnvCheckFlags@492f92db hostCpu=0.0 hostCpuCausedByProcessName= hostCpuCausedByProcessCmdline= hostMemUsedMostByProcessName= hostCpuMostUsedByProcess=0.0 hostMemMostUsedByProcess=0 hostLoad=7.12109375 hostPhysicalMemInMB=8192 hostAvailablePhysicaMemInMB=0 hostSwapMemInMB=0 hostFreeSwapMemInMB=0 hostProcessCount=0 sseEnable=false sseCpu=0.0 sseMemInMB=0 sbproxyCpu=0.0 sbproxyMemInMB=5 agentCpu=0.073278425 agentMemInMB=4228 reporterLatencyInMinute=0 postIOTime=0 diag=Unknown collection types skipped from weighted load: [openmetrics].  collectorSize=Large weightedCurInstanceCount=0.08685711111111452 weightedMaxInstanceCount=1.0 problemFound=true suggestion= _problems=[agent.CollectorWorkLoadCheck$ProblemRecord@368ceddd] _reporterCheck={"name":"biz.ReportingData","detail":"The reporter has a avg latency - 0 minutes","status":"OK"} _instanceCheck={"name":"biz.InstanceCount","detail":"The collector has 2558 instances","status":"OK"} _hostCpu={"name":"basic.CPU","detail":"The host cpu is 0.00% and collector cpu is 7.33%, sbproxy cpu is 0.00%, sse cpu is 0.00% ","status":"OK"} _hostMem={"name":"basic.Memory","detail":"The host has total 8192 MB physical memory and free memory is 0 MB (collector used 4228 MB, sse used 0 MB, sbproxy used 5 MB). The memory swap is disabled. Please decrease the memory by moving some devices to another collector.","status":"WARN"}>
+:checkpoints:[
+  {
+    "name": "biz.ReportingData",
+    "detail": "The reporter has a avg latency - 0 minutes",
+    "status": "OK"
+  },
+  {
+    "name": "biz.InstanceCount",
+    "detail": "The collector has 2558 instances",
+    "status": "OK"
+  },
+  {
+    "name": "basic.CPU",
+    "detail": "The host cpu is 0.00% and collector cpu is 7.33%, sbproxy cpu is 0.00%, sse cpu is 0.00% ",
+    "status": "OK"
+  },
+  {
+    "name": "basic.Memory",
+    "detail": "The host has total 8192 MB physical memory and free memory is 0 MB (collector used 4228 MB, sse used 0 MB, sbproxy used 5 MB). The memory swap is disabled. Please decrease the memory by moving some devices to another collector.",
+    "status": "WARN"
+  }
+]
+
+==========================Agent_Check0034_CheckSbproxyCrashWinEventLog.groovy==========================
+is scheduled at Thu Nov 12 09:12:52 PST 2026, finished at Thu Nov 12 09:12:52 PST 2026, status 0
+summary:
+detail: This script only support Windows collector
+
+==========================Agent_Check0036_SNMPAutodegradePerfProblem.groovy==========================
+is scheduled at Thu Nov 12 09:12:52 PST 2026, finished at Thu Nov 12 09:12:53 PST 2026, status 0
+summary:
+detail: snmpThreadCount=50,snmpTaskCount=0,snmpTaskTimeoutCount=0,timeoutTaskPercent=0.00%,downgradeHostCount=0,hostCount=950
+
+==========================Agent_Check0037_AutoPropsCheck.groovy==========================
+is scheduled at Thu Nov 12 09:12:53 PST 2026, finished at Thu Nov 12 09:12:53 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[{
+  "name": "biz.AutoPropsQueue",
+  "detail": "The ap queue length is - 0",
+  "status": "OK"
+}]
+
+==========================Agent_Check0041_CogsPerformanceCheck.groovy==========================
+is scheduled at Thu Nov 12 09:12:53 PST 2026, finished at Thu Nov 12 09:12:54 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[
+  {
+    "name": "cogs.CpuStats",
+    "detail": [
+      {
+        "cpuUsage": 3.59,
+        "totalThreadCount": 20,
+        "runnableThreadCount": 0,
+        "collectorName": "batchscript"
+      },
+      {
+        "cpuUsage": 3.38,
+        "totalThreadCount": 300,
+        "runnableThreadCount": 0,
+        "collectorName": "script"
+      },
+      {
+        "cpuUsage": 0.02,
+        "totalThreadCount": 200,
+        "runnableThreadCount": 1,
+        "collectorName": "jmx"
+      },
+      {
+        "cpuUsage": 0.02,
+        "totalThreadCount": 20,
+        "runnableThreadCount": 0,
+        "collectorName": "ping"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 30,
+        "runnableThreadCount": 0,
+        "collectorName": "configsource.script"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 1,
+        "runnableThreadCount": 0,
+        "collectorName": "dns"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 10,
+        "runnableThreadCount": 0,
+        "collectorName": "openmetrics"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 1,
+        "runnableThreadCount": 0,
+        "collectorName": "sp"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 0,
+        "runnableThreadCount": 0,
+        "collectorName": "syntheticsselenium"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 1,
+        "runnableThreadCount": 0,
+        "collectorName": "topology"
+      },
+      {
+        "cpuUsage": 0,
+        "totalThreadCount": 10,
+        "runnableThreadCount": 0,
+        "collectorName": "webpage"
+      }
+    ],
+    "status": "OK"
+  },
+  {
+    "name": "cogs.QueueStats",
+    "detail": [
+      {
+        "instanceCount": 1653,
+        "totalThreadCount": 300,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "script"
+      },
+      {
+        "instanceCount": 384,
+        "totalThreadCount": 30,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "configsource.script"
+      },
+      {
+        "instanceCount": 211,
+        "totalThreadCount": 20,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "ping"
+      },
+      {
+        "instanceCount": 149,
+        "totalThreadCount": 200,
+        "throughput": 100,
+        "runnableThreadCount": 1,
+        "collectorName": "jmx"
+      },
+      {
+        "instanceCount": 82,
+        "totalThreadCount": 1,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "dns"
+      },
+      {
+        "instanceCount": 66,
+        "totalThreadCount": 20,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "batchscript"
+      },
+      {
+        "instanceCount": 11,
+        "totalThreadCount": 10,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "openmetrics"
+      },
+      {
+        "instanceCount": 2,
+        "totalThreadCount": 10,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "webpage"
+      },
+      {
+        "instanceCount": 0,
+        "totalThreadCount": 0,
+        "throughput": 100,
+        "runnableThreadCount": 0,
+        "collectorName": "syntheticsselenium"
+      }
+    ],
+    "status": "OK"
+  },
+  {
+    "name": "cogs.DSTableByNan",
+    "detail": [
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451973,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 495854,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 495876,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451915,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 495859,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451912,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451910,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451878,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451911,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451977,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451972,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451930,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451976,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 495875,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451890,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451891,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 495858,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451872,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451964,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451905,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451965,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumes",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451889,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451961,
+        "avgExcTime": 0,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451963,
+        "avgExcTime": 4,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451921,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM_PersistentVolumeClaims",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "script",
+        "deviceId": 451923,
+        "avgExcTime": 1,
+        "queueDsi": 0
+      },
+      {
+        "nanDsi": 1,
+        "dsName": "Kubernetes_KSM",
+        "timeoutDsi": 0,
+        "droppedDsi": 0,
+        "collectorName": "openmetrics",
+        "deviceId": 446193,
+        "avgExcTime": 17,
+        "queueDsi": 0
+      }
+    ],
+    "status": "OK"
+  }
+]
+
+==========================Agent_Check0042_ExternalProcessCPU_Windows.groovy==========================
+is scheduled at Thu Nov 12 09:12:54 PST 2026, finished at Thu Nov 12 09:12:55 PST 2026, status 0
+summary:
+detail: Only applies to windows collector
+
+==========================Agent_Check0043_FixCIMIssue.groovy==========================
+is scheduled at Thu Nov 12 09:12:55 PST 2026, finished at Thu Nov 12 09:12:55 PST 2026, status 0
+summary:
+detail: Only applies to windows collector
+
+==========================Agent_Check0044_FixIndyFlag.groovy==========================
+is scheduled at Thu Nov 12 09:12:55 PST 2026, finished at Thu Nov 12 09:12:55 PST 2026, status 0
+summary:
+detail: Skipped: wrapper.conf (no incorrect flag found); watchdog.conf (no incorrect flag found); website.conf (no incorrect flag found).
+
+==========================Agent_Check0045_FixModJarReference.groovy==========================
+is scheduled at Thu Nov 12 09:12:55 PST 2026, finished at Thu Nov 12 09:12:56 PST 2026, status 0
+summary:
+detail: wrapper.conf does not reference ../lib/MOD-1.12.1.jar in any classpath entry. No remediation needed.
+
+==========================Payload_Verification_Report==========================
+is scheduled at Wed Oct 21 20:09:38 PDT 2026, finished at Thu Nov 12 09:13:14 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[{
+  "name": "module.SignatureValueChangedForHealthCheckScripts",
+  "detail": "Signature verification successful and collector health check scripts are not modified. ",
+  "status": "OK"
+}]
+
+==========================Watchdog_Check0001_MainThreadisAlive.groovy==========================
+is scheduled at Thu Nov 12 09:12:56 PST 2026, finished at Thu Nov 12 09:13:00 PST 2026, status 0
+summary:
+detail:
+:checkpoints:[
+  {
+    "name": "agentVersion",
+    "detail": 40000,
+    "status": "OK"
+  },
+  {
+    "name": "module.Sbproxy",
+    "detail": "Sbproxy is okay",
+    "status": "OK"
+  },
+  {
+    "name": "module.ShaValueChanged",
+    "detail": "Collector exported jars and executables are not modified",
+    "status": "OK"
+  },
+  {
+    "name": "shaValueDetail",
+    "detail": 0,
+    "status": "OK"
+  },
+  {
+    "name": "module.WatchdogToPortalConnection",
+    "detail": "Watchdog last run is about 1.93 seconds ago. Watchdog got feed about 7.93 seconds ago. Main thread is alive with state TIMED_WAITING. ",
+    "status": "OK"
+  }
+]
+
+==========================Watchdog_Check0003_CheckEnforceSSLWithProxy.groovy==========================
+is scheduled at Thu Nov 12 09:13:00 PST 2026, finished at Thu Nov 12 09:13:04 PST 2026, status 0
+summary:
+detail:
+
+==========================Watchdog_Check0004_CheckAgentCanNotStart.groovy==========================
+is scheduled at Thu Nov 12 09:13:04 PST 2026, finished at Thu Nov 12 09:13:04 PST 2026, status 0
+summary:
+detail: This script is not run on this collector
+
+==========================Watchdog_Check0005_CheckSbproxyCanNotStart.groovy==========================
+is scheduled at Thu Nov 12 09:13:04 PST 2026, finished at Thu Nov 12 09:13:10 PST 2026, status 0
+summary:
+detail: restartTimes=0
+
+==========================Watchdog_Check0006_UpdateHTTPClientToOKHTTP.groovy==========================
+is scheduled at Thu Nov 12 09:13:10 PST 2026, finished at Thu Nov 12 09:13:14 PST 2026, status 0
+summary:
+detail: This script did not run on this collector
