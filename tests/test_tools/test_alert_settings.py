@@ -85,6 +85,51 @@ class TestThresholdGrammar:
 
         assert not threshold_parses(expr)
 
+    @pytest.mark.parametrize(
+        "expr",
+        [
+            "foo> 1",
+            "dleta> 5",
+            "%> 1",
+            "zzz|> 1",
+            "( 99:99 00:00 ) > 1",
+            "( 12:60 13:00 ) > 1",
+            "( 00:00 24:30 ) > 1",
+        ],
+    )
+    def test_a_method_or_time_the_portal_does_not_write_does_not_parse(self, expr):
+        """The portal's datasources use one method, delta, with or without its pipe, and
+        clock times up to 24:00; a mistyped method or time is refused, not sent."""
+        from lm_mcp.tools.alert_settings import threshold_parses
+
+        assert not threshold_parses(expr)
+
+
+class TestUnknownLevel:
+    """A level outside instance, device and group is refused with the error envelope."""
+
+    @respx.mock
+    async def test_the_read_refuses_it(self, client):
+        from lm_mcp.tools.alert_settings import get_alert_settings
+
+        error = envelope(await get_alert_settings(client, "instance_group", device_id=1786))
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert "instance_group" in error["message"]
+        assert not respx.calls
+
+    @respx.mock
+    async def test_the_write_refuses_it(self, client, writes):
+        from lm_mcp.tools.alert_settings import update_alert_settings
+
+        error = envelope(
+            await update_alert_settings(client, "instance_group", "> 1", device_id=1786)
+        )
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert "instance_group" in error["message"]
+        assert not respx.calls
+
 
 class TestGetAlertSettings:
     """R3.5: each level reads its /alertsettings path and projects datapoint, thresholds and

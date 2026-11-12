@@ -19,15 +19,18 @@ from lm_mcp.tools import (
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
-# One threshold clause as LogicMonitor stores it: an optional time frame "( HH:MM HH:MM )",
-# an optional comparison method ("delta", "delta|", "|"), an operator, a space, and one to
-# three severity values (warning, error, critical). Clauses join with commas. The portal's
-# datasource definitions use these forms; the API answered 500 to an operator with no space
-# after it and stored a fourth value, so neither passes.
+# One threshold clause as LogicMonitor stores it: an optional time frame "( HH:MM HH:MM )"
+# of clock times up to 24:00, an optional comparison method ("delta", "delta|" or "|"), an
+# operator, a space, and one to three severity values (warning, error, critical). Clauses
+# join with commas. The portal's datasource definitions use these forms and delta is the only
+# method they use; the docs name other methods without spelling them, so those are refused.
+# The API answered 500 to an operator with no space after it and stored a fourth value as
+# written, so neither passes.
 _NUMBER = r"-?(?:\d+(?:\.\d+)?|\.\d+)"
+_TIME = r"(?:(?:[01]?\d|2[0-3]):[0-5]\d|24:00)"
 _CLAUSE = (
-    r"(?:\(\s*\d{1,2}:\d{2}\s+\d{1,2}:\d{2}\s*\)\s*)?"
-    r"[a-z%]*\|?"
+    rf"(?:\(\s*{_TIME}\s+{_TIME}\s*\)\s*)?"
+    r"(?:delta\|?|\|)?"
     r"(?:>=|<=|!=|>|<|=)"
     rf"\s+{_NUMBER}(?:\s+{_NUMBER}){{0,2}}"
 )
@@ -52,7 +55,12 @@ def threshold_parses(expr: str) -> bool:
 
 
 def _missing(level: str, ids: dict[str, int | None]) -> list[TextContent] | None:
-    """The refusal for a level whose path ids were not all given, or None."""
+    """The refusal for a level outside the three, or one whose path ids were not all
+    given, or None."""
+    if level not in _LEVEL_IDS:
+        return validation_error(
+            "INVALID_REQUEST", f"level={level!r} is not one of {', '.join(_LEVEL_IDS)}"
+        )
     missing = [name for name in _LEVEL_IDS[level] if ids.get(name) is None]
     if not missing:
         return None
@@ -69,8 +77,9 @@ def _instance_path(device_id: Any, device_datasource_id: Any, instance_id: Any) 
 
 def _parents(item: dict) -> list[tuple[str, dict]]:
     """The levels an instance inherits from, highest precedence first, as LogicMonitor
-    documents it: instance group, resource datasource, resource groups (listed by the API
-    highest first), then the datasource's global definition."""
+    documents it: instance group, resource datasource, resource groups, then the datasource's
+    global definition. The resource groups are taken in the order the API lists them, which
+    the swagger gives as highest priority first; the probe saw one group, not an order."""
     groups = [("device_group", group) for group in item.get("parentDeviceGroupAlertExprList") or []]
     return [
         ("instance_group", item.get("parentInstanceGroupAlertExpr") or {}),
