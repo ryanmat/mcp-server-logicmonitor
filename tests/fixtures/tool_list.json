@@ -4545,6 +4545,44 @@
       "type": "object"
     }
   },
+  "get_device_flows": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List a NetFlow exporter device's flow records over the last hours_back hours, rows as the API returns them (source and destination IP, port, DNS name and ASN, protocol, bytes). Answers FEATURE_DISABLED when the portal has NetFlow off for the device.",
+    "inputSchema": {
+      "properties": {
+        "device_id": {
+          "description": "NetFlow exporter device ID",
+          "type": "integer"
+        },
+        "hours_back": {
+          "default": 1,
+          "description": "Hours of flows to read, ending now",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "device_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_device_group": {
     "annotations": {
       "destructiveHint": false,
@@ -4832,6 +4870,54 @@
       "required": [
         "device_id",
         "property_name"
+      ],
+      "type": "object"
+    }
+  },
+  "get_device_top_talkers": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "A NetFlow exporter device's top talkers over the last hours_back hours: by=endpoint pages its top endpoints and by=port its top ports, with each one's usage and share, rows as the API returns them; by=graph returns its top talkers graph whole. Answers 'what is consuming my WAN?' Answers FEATURE_DISABLED when the portal has NetFlow off for the device.",
+    "inputSchema": {
+      "properties": {
+        "by": {
+          "default": "endpoint",
+          "description": "Top endpoints, top ports, or the top talkers graph",
+          "enum": [
+            "endpoint",
+            "port",
+            "graph"
+          ],
+          "type": "string"
+        },
+        "device_id": {
+          "description": "NetFlow exporter device ID",
+          "type": "integer"
+        },
+        "hours_back": {
+          "default": 1,
+          "description": "Hours of flows to read, ending now",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 10,
+          "description": "Max rows (endpoint and port)",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset (endpoint and port)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "device_id"
       ],
       "type": "object"
     }
@@ -5746,43 +5832,6 @@
       "type": "object"
     }
   },
-  "get_network_flows": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Get network flow data (NetFlow/sFlow)",
-    "inputSchema": {
-      "properties": {
-        "dest_ip": {
-          "description": "Filter by destination IP",
-          "type": "string"
-        },
-        "device_id": {
-          "description": "Device ID",
-          "type": "integer"
-        },
-        "limit": {
-          "default": 50,
-          "description": "Max results",
-          "type": "integer"
-        },
-        "offset": {
-          "default": 0,
-          "description": "Pagination offset",
-          "type": "integer"
-        },
-        "source_ip": {
-          "description": "Filter by source IP",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    }
-  },
   "get_oid": {
     "annotations": {
       "destructiveHint": false,
@@ -6690,55 +6739,6 @@
       },
       "required": [
         "name"
-      ],
-      "type": "object"
-    }
-  },
-  "get_top_talkers": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Rank NetFlow flows on an exporter by bandwidth, packets, or flow count. Group by source IP, destination IP, protocol, application, or source->destination pair. Answers 'what is consuming my WAN?'",
-    "inputSchema": {
-      "properties": {
-        "exporter_device_id": {
-          "description": "NetFlow exporter device ID",
-          "type": "integer"
-        },
-        "group_by": {
-          "default": "src_ip",
-          "description": "Aggregation dimension",
-          "enum": [
-            "src_ip",
-            "dst_ip",
-            "application",
-            "protocol",
-            "src_dst_pair"
-          ],
-          "type": "string"
-        },
-        "hours_back": {
-          "default": 1,
-          "description": "Time window to aggregate (default: 1 hour)",
-          "type": "integer"
-        },
-        "min_bytes": {
-          "default": 0,
-          "description": "Drop aggregated entries below this byte threshold",
-          "type": "integer"
-        },
-        "n": {
-          "default": 10,
-          "description": "Number of top entries to return (default: 10)",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "exporter_device_id"
       ],
       "type": "object"
     }

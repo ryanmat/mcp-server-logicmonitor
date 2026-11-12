@@ -117,12 +117,14 @@ TOOL_CATEGORIES = {
         },
         "networking": {
             "description": (
-                "Network intelligence primitives: interface metrics, NetFlow top "
-                "talkers, link flap identification, power event filtering (UPS/PDU)"
+                "Network intelligence primitives: interface metrics, a device's NetFlow "
+                "flows and top talkers, link flap identification, power event filtering "
+                "(UPS/PDU)"
             ),
             "tools": [
                 "get_interface_metrics",
-                "get_top_talkers",
+                "get_device_flows",
+                "get_device_top_talkers",
                 "get_link_flaps",
                 "get_power_events",
             ],
@@ -245,7 +247,6 @@ TOOL_CATEGORIES = {
                 "get_topology_map",
                 "get_device_neighbors",
                 "get_device_interfaces",
-                "get_network_flows",
                 "get_device_connections",
             ],
         },

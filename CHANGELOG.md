@@ -124,6 +124,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   checkpoints carry) and `get_device_delta`. A delta read without `delta_id` lists devices and
   starts a delta, returning its `delta_id`; a read with it lists the devices changed since, with
   `change`, and refuses `name_filter`, which the portal does not apply there.
+- NetFlow on the device paths: `get_device_flows` and `get_device_top_talkers` (rows), replacing
+  `get_network_flows` and `get_top_talkers`. A portal answer of "Netflow disabled" is
+  `FEATURE_DISABLED`, not `INVALID_REQUEST`.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
@@ -223,6 +226,8 @@ instead.
 | `export_dashboard` | removed | `get_dashboard` with `raw=true`, which always includes the widgets under `widgets_full`; `include_widgets` leaves. `create_dashboard` still unwraps a file saved from this tool. |
 | `export_alert_rule` | removed | `get_alert_rule` with `raw=true`. |
 | `export_escalation_chain` | removed | `get_escalation_chain` with `raw=true`. |
+| `get_network_flows` | removed | `get_device_flows`, which reads `/device/devices/{id}/flows` for one device, `device_id` required, over `hours_back`; `/netflow/flows` answered 404. `source_ip` and `dest_ip` leave, and rows come back as the API returns them. |
+| `get_top_talkers` | removed | `get_device_top_talkers`, which reads the device's top endpoints (`by="endpoint"`), top ports (`by="port"`) or top talkers graph (`by="graph"`) as the portal ranks them, where the tool ranked `/netflow/flows` rows itself. `exporter_device_id` becomes `device_id`; `n` becomes `limit`; `group_by` and `min_bytes` leave. |
 | `list_sdts` | `get_sdts` | Renamed. |
 | `list_session_history` | `get_session_history` | Renamed. |
 | `list_portals` | `get_portals` | Renamed. |
@@ -403,8 +408,8 @@ instead.
   `get_scheduled_reports`, `get_escalation_chains`, `get_recipient_groups`, `get_integrations`,
   `get_action_chains`, `get_action_rules`, `get_device_datasources`, `get_device_instances`,
   `get_device_eventsources`, `get_device_logsources`, `get_batchjobs`, `get_device_batchjobs`,
-  `get_scheduled_downtime_jobs`, `get_topology_map`, `get_device_interfaces`, `get_network_flows`,
-  `get_services`, `get_service_groups`, `get_api_tokens`, `get_cost_recommendations`,
+  `get_scheduled_downtime_jobs`, `get_topology_map`, `get_device_interfaces`, `get_services`,
+  `get_service_groups`, `get_api_tokens`, `get_cost_recommendations`,
   `get_device_properties`, `get_ops_notes`, `get_oids`, `get_netscans`, `get_dashboard_groups`,
   `get_alert_rules` and `get_access_groups` return `offset` and `has_more` beside `count`, the
   envelope the shared pagination helper builds, and all but `get_collector_groups`, `get_roles`,

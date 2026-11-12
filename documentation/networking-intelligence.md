@@ -8,7 +8,7 @@ Closes the correlation gap that let a customer power outage escape detection. Th
 
 - [Primitives](#primitives)
   - [get_interface_metrics](#get_interface_metrics)
-  - [get_top_talkers](#get_top_talkers)
+  - [get_device_flows and get_device_top_talkers](#get_device_flows-and-get_device_top_talkers)
   - [get_link_flaps](#get_link_flaps)
   - [get_collector_health](#get_collector_health)
   - [get_power_events](#get_power_events)
@@ -39,20 +39,19 @@ Per-interface time-series metrics. Answers "how is this port performing?"
 - `INTERFACE_DATASOURCE_NOT_FOUND` -- no Interface-family DataSource applied (device lacks SNMP monitoring).
 - `INTERFACE_NOT_FOUND` -- DataSource found but no instance matches; response includes up to 50 available instance names.
 
-### get_top_talkers
+### get_device_flows and get_device_top_talkers
 
-Ranks NetFlow flows for an exporter by bandwidth. Answers "what is consuming my WAN?"
+A NetFlow exporter device's flows and top talkers. `get_device_top_talkers` answers "what is consuming my WAN?"
 
 **Parameters:**
-- `exporter_device_id` (int, required) -- NetFlow exporter device ID
-- `hours_back` (int, optional, default `1`)
-- `n` (int, optional, default `10`) -- number of top entries
-- `group_by` (str, optional, default `src_ip`) -- one of `src_ip`, `dst_ip`, `application`, `protocol`, `src_dst_pair`
-- `min_bytes` (int, optional, default `0`) -- drop aggregated entries below this byte threshold
+- `device_id` (int, required) -- the NetFlow exporter device
+- `hours_back` (int, optional, default `1`) -- the window, ending now
+- `by` (str, `get_device_top_talkers` only, default `endpoint`) -- `endpoint`, `port` or `graph`
+- `limit` and `offset` (int, optional) -- paging; the graph is not paged
 
-**Behavior:** Pulls raw flows from `/netflow/flows` in the window, aggregates client-side on the requested dimension, sorts by total bytes, returns top-N with `total_bytes`, `total_packets`, `flow_count`, and `percentage_of_total`.
+**Behavior:** `get_device_flows` pages `/device/devices/{id}/flows`. `get_device_top_talkers` pages `/endpoints` (`by=endpoint`) or `/ports` (`by=port`), each row with its usage and share, or returns `/topTalkersGraph` whole (`by=graph`). Rows come back as the API returns them: the only portal read has NetFlow off, so the row shapes are the API reference's, not checked against live data.
 
-**Graceful degradation:** Returns `"note": "No flows exported in window -- check NetFlow exporter configuration"` when the exporter is not sending flows.
+**Errors surfaced:** `FEATURE_DISABLED` when the portal answers "Netflow disabled", as it did for every device on that portal; `NOT_FOUND` for an unknown device.
 
 ### get_link_flaps
 
@@ -187,7 +186,7 @@ The tools degrade gracefully when prerequisites are missing, but detection fidel
 
 - **For `detect_site_outage` to trigger the UPS signal:** UPS and PDU devices must be onboarded as LM resources (APC, Liebert, or Eaton DataSources applied). Without them, Signal C always reports zero and the verdict relies on the other three signals.
 - **For `get_interface_metrics`:** the target device must have an Interface-family DataSource applied (typically `SNMP_Network_Interfaces`), which requires SNMP credentials on the device.
-- **For `get_top_talkers`:** the exporter device must be forwarding NetFlow/sFlow/IPFIX records to LM collectors, and NetFlow ingestion must be enabled on the portal.
+- **For `get_device_flows` and `get_device_top_talkers`:** the exporter device must be forwarding NetFlow/sFlow/IPFIX records to LM collectors, and NetFlow ingestion must be enabled on the portal; otherwise they answer `FEATURE_DISABLED`.
 - **For `get_collector_health` downstream-count accuracy:** the `currentCollectorId` field must be populated on devices; falls back to the collector's stale `numberOfHosts` when the filter endpoint is unavailable.
 
 Run `audit_network_monitoring_coverage` first when onboarding a new customer or investigating repeated missed detections -- it surfaces the prerequisite gaps before they matter operationally.

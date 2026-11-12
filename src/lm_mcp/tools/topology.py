@@ -150,54 +150,6 @@ async def get_device_interfaces(
     )
 
 
-def _flow_row(item: dict) -> dict:
-    """Project one /netflow/flows row onto the get_network_flows fields."""
-    return {
-        "id": item.get("id"),
-        "source_ip": item.get("srcIP"),
-        "source_port": item.get("srcPort"),
-        "dest_ip": item.get("dstIP"),
-        "dest_port": item.get("dstPort"),
-        "protocol": item.get("protocol"),
-        "bytes": item.get("bytes"),
-        "packets": item.get("packets"),
-        "exporter_device": item.get("exporterDeviceDisplayName"),
-    }
-
-
-async def get_network_flows(
-    client: LogicMonitorClient,
-    device_id: int | None = None,
-    source_ip: str | None = None,
-    dest_ip: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
-) -> list[TextContent]:
-    """Get network flow data (NetFlow/sFlow).
-
-    Args:
-        client: LogicMonitor API client.
-        device_id: Filter by exporter device ID.
-        source_ip: Filter by source IP address.
-        dest_ip: Filter by destination IP address.
-        limit: Maximum number of flows to return.
-        offset: Number of results to skip for pagination.
-
-    Returns:
-        List of TextContent with flow data or error.
-    """
-    return await list_tool(
-        client,
-        "/netflow/flows",
-        key="flows",
-        project=_flow_row,
-        limit=limit,
-        offset=offset,
-        named={"srcIP:": source_ip, "dstIP:": dest_ip},
-        clauses=[f"exporterDeviceId:{device_id}"] if device_id else [],
-    )
-
-
 async def get_device_connections(
     client: LogicMonitorClient,
     device_id: int,
