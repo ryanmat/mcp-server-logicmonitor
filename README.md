@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 256 tools, 3 workflow prompts, and 25 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 258 tools, 3 workflow prompts, and 25 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 256 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
+The 258 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,14 +113,14 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search by name and description over the tools your settings list, so with writes off it names no write tool; an optional `category` narrows it to one group
-- the `lm://guide/tool-categories` resource: all 256 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 258 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
 
 | Area | Tools |
 |------|-------|
-| Alerts | Query, acknowledge, bulk acknowledge, add notes, and full CRUD for alert rules |
+| Alerts | Query, acknowledge, bulk acknowledge, add notes, full CRUD for alert rules, and datapoint thresholds read at instance, device and group level with the level each comes from, and set at instance or group level |
 | Devices | Full CRUD for devices and groups, properties, and manual datasource instances |
 | Metrics | Datasources, instances, metric data, graphs, and native OTLP metrics through PromQL range and instant queries; `analyze_metric(source="otlp")` analyzes a PromQL series |
 | Dashboards | Full CRUD for dashboards, widgets, and groups |
@@ -304,7 +304,7 @@ Clients read these through the standard MCP resource and prompt calls.
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 256 tools organized by domain category |
+| `lm://guide/tool-categories` | All 258 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

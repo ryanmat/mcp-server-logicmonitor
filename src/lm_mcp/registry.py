@@ -2382,6 +2382,86 @@ TOOLS.extend(
     ]
 )
 
+# Alert thresholds
+_ALERT_SETTING_IDS = {
+    "level": {
+        "type": "string",
+        "enum": ["instance", "device", "group"],
+        "description": (
+            "instance: one device datasource instance (device_id, device_datasource_id, "
+            "instance_id); device: every instance on device_id; group: a device group's "
+            "settings for one datasource (group_id, datasource_id)"
+        ),
+    },
+    "device_id": {"type": "integer", "description": "Device ID (instance and device level)"},
+    "device_datasource_id": {
+        "type": "integer",
+        "description": "Device datasource ID, as get_device_datasources lists it (instance level)",
+    },
+    "instance_id": {"type": "integer", "description": "Instance ID (instance level)"},
+    "datapoint_id": {"type": "integer", "description": "Datapoint ID"},
+    "group_id": {"type": "integer", "description": "Device group ID (group level)"},
+    "datasource_id": {"type": "integer", "description": "Datasource ID (group level)"},
+}
+
+TOOLS.extend(
+    [
+        Tool(
+            name="get_alert_settings",
+            description=(
+                "Read datapoint alert thresholds at instance, device or group level: each "
+                "datapoint's threshold in force and the level it comes from (instance, "
+                "instance_group, device_datasource, device_group with source_group, group or "
+                "global), beside the level's own and the global threshold. Use it before "
+                "tuning a noisy threshold with update_alert_settings."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    **_ALERT_SETTING_IDS,
+                    "datapoint_id": {
+                        "type": "integer",
+                        "description": "One datapoint's setting (instance level)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["level"],
+            },
+        ),
+        Tool(
+            name="update_alert_settings",
+            description=(
+                "Set or clear one datapoint's alert threshold at instance or group level "
+                "(requires write permission). threshold is an operator, a space and up to three "
+                "values for warning, error and critical, such as '> 60 80 90'; '' clears the "
+                "level's own threshold so it inherits again. A threshold that does not parse is "
+                "refused before any call. The device level has no write."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    **_ALERT_SETTING_IDS,
+                    "threshold": {
+                        "type": "string",
+                        "description": (
+                            "Threshold such as '> 60 80 90', 'delta> 5' or "
+                            "'( 00:00 12:00 ) > 90 , > 80'; '' to clear"
+                        ),
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Threshold history note (instance level)",
+                    },
+                },
+                "required": ["level", "threshold"],
+            },
+        ),
+    ]
+)
+
 # Alert Rules
 TOOLS.extend(
     [
@@ -6578,6 +6658,7 @@ def get_tool_handler(tool_name: str) -> Any:
         access_groups,
         actions,
         alert_rules,
+        alert_settings,
         alerts,
         analyze_alerts,
         analyze_metric,
@@ -6759,6 +6840,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_http_integration": integrations.update_http_integration,
         "delete_integration": integrations.delete_integration,
         # Alert Rules
+        "get_alert_settings": alert_settings.get_alert_settings,
+        "update_alert_settings": alert_settings.update_alert_settings,
         "get_alert_rules": alert_rules.get_alert_rules,
         "get_alert_rule": alert_rules.get_alert_rule,
         "create_alert_rule": alert_rules.create_alert_rule,
