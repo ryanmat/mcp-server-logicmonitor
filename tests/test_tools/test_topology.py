@@ -173,44 +173,6 @@ class TestGetDeviceInterfaces:
         assert data["total"] == 2
 
 
-class TestGetNetworkFlows:
-    """Tests for get_network_flows tool."""
-
-    @respx.mock
-    async def test_get_network_flows_returns_flows(self, client):
-        """get_network_flows returns flow data."""
-        from lm_mcp.tools.topology import get_network_flows
-
-        respx.get("https://test.logicmonitor.com/santaba/rest/netflow/flows").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {
-                            "id": 1,
-                            "srcIP": "192.168.1.100",
-                            "srcPort": 443,
-                            "dstIP": "10.0.0.50",
-                            "dstPort": 8080,
-                            "protocol": "TCP",
-                            "bytes": 1024000,
-                            "packets": 1000,
-                            "exporterDeviceDisplayName": "router-01",
-                        }
-                    ],
-                    "total": 1,
-                },
-            )
-        )
-
-        result = await get_network_flows(client)
-
-        data = json.loads(result[0].text)
-        assert data["total"] == 1
-        assert data["flows"][0]["source_ip"] == "192.168.1.100"
-        assert data["flows"][0]["bytes"] == 1024000
-
-
 class TestGetDeviceConnections:
     """Tests for get_device_connections tool."""
 

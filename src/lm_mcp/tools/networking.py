@@ -1,5 +1,5 @@
 # Description: Network intelligence tools for LogicMonitor MCP server.
-# Description: Interface metrics, top talkers, link flaps, power events.
+# Description: Interface metrics, device NetFlow (flows and top talkers), link flaps, power events.
 
 from __future__ import annotations
 
@@ -14,12 +14,14 @@ from lm_mcp.tools import (
     SEVERITY_MAP,
     format_response,
     handle_error,
+    list_tool,
     quote_filter_value,
     resolve_group_filter,
     sanitize_filter_value,
+    validation_error,
 )
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING, paginate_alerts
-from lm_mcp.tools.stats_helpers import PAGE_CAP_WARNING, fetch_metric_pages
+from lm_mcp.tools.stats_helpers import PAGE_CAP_WARNING, fetch_metric_pages, window_params
 
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
@@ -48,11 +50,10 @@ _DEFAULT_POWER_PATTERNS = (
     "Power_",
 )
 
-# Flows requested per get_top_talkers call.
-_FLOWS_PAGE_SIZE = 1000
-
-# Valid group_by values for get_top_talkers.
-_TOP_TALKERS_GROUP_BY = frozenset({"src_ip", "dst_ip", "application", "protocol", "src_dst_pair"})
+# get_device_top_talkers' by: the device path each reads and the response key of its rows;
+# graph reads the top talkers graph whole.
+_TOP_TALKERS_PATHS = {"endpoint": ("endpoints", "endpoints"), "port": ("ports", "ports")}
+_TOP_TALKERS_BY = (*_TOP_TALKERS_PATHS, "graph")
 
 
 async def get_interface_metrics(
@@ -184,143 +185,96 @@ def _match_interface_instance(instances: list[dict], interface: str) -> dict | N
     return None
 
 
-async def get_top_talkers(
-    client: LogicMonitorClient,
-    exporter_device_id: int,
-    hours_back: int = 1,
-    n: int = 10,
-    group_by: str = "src_ip",
-    min_bytes: int = 0,
-) -> list[TextContent]:
-    """Rank NetFlow flows for an exporter by bandwidth.
+def _netflow_window(hours_back: int) -> dict[str, int]:
+    """The start and end of a NetFlow read: the last hours_back hours, ending now."""
+    return window_params(int(time.time()) - hours_back * 3600, None)
 
-    Aggregates raw flow records client-side by the requested dimension and
-    returns the top-N by total bytes.
+
+async def get_device_flows(
+    client: LogicMonitorClient,
+    device_id: int,
+    hours_back: int = 1,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List a device's NetFlow flow records over the last hours_back hours, rows as the API
+    returns them.
 
     Args:
         client: LogicMonitor API client.
-        exporter_device_id: NetFlow exporter device ID.
-        hours_back: Time window to aggregate (default: 1 hour).
-        n: Number of top entries to return (default: 10).
-        group_by: Aggregation dimension. One of src_ip, dst_ip, application,
-            protocol, src_dst_pair.
-        min_bytes: Drop aggregated entries below this byte threshold (default: 0).
+        device_id: Device ID of the NetFlow exporter.
+        hours_back: Hours of flows to read, ending now.
+        limit: Maximum number of flows to return.
+        offset: Number of results to skip for pagination.
 
     Returns:
-        List of TextContent with top-talker ranking or error.
+        List of TextContent with the flows or error; FEATURE_DISABLED when the portal
+        answers that NetFlow is off.
     """
-    if group_by not in _TOP_TALKERS_GROUP_BY:
-        return format_response(
-            {
-                "error": True,
-                "code": "INVALID_REQUEST",
-                "message": f"group_by must be one of {sorted(_TOP_TALKERS_GROUP_BY)}",
-                "suggestion": "Use src_ip, dst_ip, application, protocol, or src_dst_pair.",
-            }
+    return await list_tool(
+        client,
+        f"/device/devices/{device_id}/flows",
+        key="flows",
+        project=dict,
+        limit=limit,
+        offset=offset,
+        params=_netflow_window(hours_back),
+        extra={"device_id": device_id, "window_hours": hours_back},
+    )
+
+
+async def get_device_top_talkers(
+    client: LogicMonitorClient,
+    device_id: int,
+    by: str = "endpoint",
+    hours_back: int = 1,
+    limit: int = 10,
+    offset: int = 0,
+) -> list[TextContent]:
+    """Read a device's NetFlow top talkers over the last hours_back hours.
+
+    by="endpoint" pages its top endpoints and by="port" its top ports, rows as the API
+    returns them; by="graph" returns its top talkers graph whole, with no paging.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID of the NetFlow exporter.
+        by: endpoint, port or graph.
+        hours_back: Hours of flows to read, ending now.
+        limit: Maximum number of rows to return (endpoint and port).
+        offset: Number of results to skip for pagination (endpoint and port).
+
+    Returns:
+        List of TextContent with the rows or the graph, or error; FEATURE_DISABLED when
+        the portal answers that NetFlow is off.
+    """
+    if by not in _TOP_TALKERS_BY:
+        return validation_error(
+            "INVALID_REQUEST",
+            f"by must be one of {list(_TOP_TALKERS_BY)}",
+            suggestion="Use endpoint, port or graph.",
         )
-
-    try:
-        end_epoch = int(time.time())
-        start_epoch = end_epoch - (hours_back * 3600)
-
-        params: dict = {
-            "size": _FLOWS_PAGE_SIZE,
-            "filter": (
-                f"exporterDeviceId:{exporter_device_id},"
-                f"startEpoch>:{start_epoch},startEpoch<:{end_epoch}"
-            ),
-        }
-        result = await client.get("/netflow/flows", params=params)
-        flows = result.get("items", [])
-
-        # The flow list is read as one page. A negative total (a lower bound),
-        # a total past the page, or a full page with no total means flows were
-        # left unread.
-        raw_total = result.get("total")
-        if raw_total is None:
-            truncated = len(flows) >= _FLOWS_PAGE_SIZE
-        else:
-            truncated = raw_total < 0 or len(flows) < raw_total
-        api_total = raw_total if raw_total is not None and raw_total >= 0 else None
-
-        aggregated: dict[str, dict] = defaultdict(
-            lambda: {"total_bytes": 0, "total_packets": 0, "flow_count": 0}
-        )
-        total_bytes = 0
-
-        for flow in flows:
-            key = _flow_group_key(flow, group_by)
-            if key is None:
-                continue
-            flow_bytes = int(flow.get("bytes") or 0)
-            flow_packets = int(flow.get("packets") or 0)
-            aggregated[key]["total_bytes"] += flow_bytes
-            aggregated[key]["total_packets"] += flow_packets
-            aggregated[key]["flow_count"] += 1
-            total_bytes += flow_bytes
-
-        ranked = []
-        for key, stats in aggregated.items():
-            if stats["total_bytes"] < min_bytes:
-                continue
-            percentage = (
-                round(100.0 * stats["total_bytes"] / total_bytes, 2) if total_bytes > 0 else 0.0
+    device_path = f"/device/devices/{device_id}"
+    head = {"device_id": device_id, "by": by, "window_hours": hours_back}
+    if by == "graph":
+        try:
+            graph = await client.get(
+                f"{device_path}/topTalkersGraph", params=_netflow_window(hours_back)
             )
-            ranked.append(
-                {
-                    "key": key,
-                    "total_bytes": stats["total_bytes"],
-                    "total_packets": stats["total_packets"],
-                    "flow_count": stats["flow_count"],
-                    "percentage_of_total": percentage,
-                }
-            )
-
-        ranked.sort(key=lambda x: x["total_bytes"], reverse=True)
-        top = ranked[:n]
-
-        response: dict = {
-            "exporter_device_id": exporter_device_id,
-            "window_hours": hours_back,
-            "group_by": group_by,
-            "flows_analyzed": len(flows),
-            "truncated": truncated,
-            "api_total": api_total,
-            "total_bytes_in_window": total_bytes,
-            "top_talkers": top,
-        }
-        if not flows:
-            response["note"] = (
-                "No flows exported in window — check NetFlow exporter configuration "
-                "and ensure the device is forwarding flow records."
-            )
-        return format_response(response)
-    except Exception as e:
-        return handle_error(e)
-
-
-def _flow_group_key(flow: dict, group_by: str) -> str | None:
-    """Derive aggregation key from a flow record."""
-    if group_by == "src_ip":
-        return flow.get("srcIP")
-    if group_by == "dst_ip":
-        return flow.get("dstIP")
-    if group_by == "protocol":
-        return flow.get("protocol")
-    if group_by == "src_dst_pair":
-        src = flow.get("srcIP")
-        dst = flow.get("dstIP")
-        if src and dst:
-            return f"{src}->{dst}"
-        return None
-    if group_by == "application":
-        app = flow.get("application") or flow.get("nbar2")
-        if app:
-            return str(app)
-        proto = flow.get("protocol") or "unknown"
-        port = flow.get("dstPort") or "unknown"
-        return f"{proto}:{port}"
-    return None
+            return format_response({**head, "graph": graph})
+        except Exception as e:
+            return handle_error(e)
+    tail, key = _TOP_TALKERS_PATHS[by]
+    return await list_tool(
+        client,
+        f"{device_path}/{tail}",
+        key=key,
+        project=dict,
+        limit=limit,
+        offset=offset,
+        params=_netflow_window(hours_back),
+        extra=head,
+    )
 
 
 async def get_link_flaps(

@@ -2398,7 +2398,8 @@ def _derive_gaps(inventory: dict, coverage: dict) -> list[dict]:
                 "recommendation": (
                     "Enable NetFlow export on core and WAN devices. Set "
                     "netflow.enabled=true on the device or add the NetflowExporter "
-                    "DataSource so the /netflow/flows endpoint receives records."
+                    "DataSource, so get_device_flows and get_device_top_talkers have "
+                    "flows to read."
                 ),
             }
         )

@@ -23,8 +23,6 @@ collectors.py: start_epoch
 dashboards.py: group_id
 devices.py: group_id
 devices.py: parent_id
-networking.py: end_epoch
-networking.py: exporter_device_id
 networking.py: SEVERITY_MAP[severity.lower()]
 networking.py: start_epoch
 reports.py: group_id
@@ -34,7 +32,6 @@ sdts.py: device_group_id
 sdts.py: device_id
 sdts.py: future
 sdts.py: now
-topology.py: device_id
 traces.py: SEVERITY_MAP[severity.lower()]
 websites.py: group_id
 websites.py: parent_id

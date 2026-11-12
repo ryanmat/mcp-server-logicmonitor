@@ -139,7 +139,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Logs | LM Logs pipelines, tracked queries, saved query groups, partitions with their contracts, and the usage figure. Log search is not offered: the v3 search endpoint applied neither the query nor the time range when probed |
 | Batch jobs | List batch jobs and the BatchJob datasources on a device; per-run output comes from `get_device_data` |
 
-`get_network_flows` and `get_top_talkers` read `/netflow/flows`, which answered 404 on the only portal tested, one with no NetFlow-enabled device. Treat both as unverified until you have tried them on a portal with NetFlow data.
+`get_device_flows` and `get_device_top_talkers` read a device's NetFlow paths and answer `FEATURE_DISABLED` when the portal has NetFlow off, as the only portal tested does. They return rows as the API sends them, so treat the row shapes as unverified until you have tried them on a portal with NetFlow data.
 
 `update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it reads the full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff by default, so a partial change cannot blank a script.
 

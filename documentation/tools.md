@@ -136,12 +136,13 @@ Collector status and management
 
 ## Networking
 
-Network intelligence primitives: interface metrics, NetFlow top talkers, link flap identification, power event filtering (UPS/PDU)
+Network intelligence primitives: interface metrics, a device's NetFlow flows and top talkers, link flap identification, power event filtering (UPS/PDU)
 
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_interface_metrics` | Pull interface-level metrics (in/out bytes, errors, discards, utilization, status) for a device's interface over a time window. Answers 'how is this port performing?' Resolves the Interface-family DataSource and the instance matching the interface name before fetching datapoints. | No |
-| `get_top_talkers` | Rank NetFlow flows on an exporter by bandwidth, packets, or flow count. Group by source IP, destination IP, protocol, application, or source->destination pair. Answers 'what is consuming my WAN?' | No |
+| `get_device_flows` | List a NetFlow exporter device's flow records over the last hours_back hours, rows as the API returns them (source and destination IP, port, DNS name and ASN, protocol, bytes). Answers FEATURE_DISABLED when the portal has NetFlow off for the device. | No |
+| `get_device_top_talkers` | A NetFlow exporter device's top talkers over the last hours_back hours: by=endpoint pages its top endpoints and by=port its top ports, with each one's usage and share, rows as the API returns them; by=graph returns its top talkers graph whole. Answers 'what is consuming my WAN?' Answers FEATURE_DISABLED when the portal has NetFlow off for the device. | No |
 | `get_link_flaps` | Identify interfaces with repeated up/down transitions in a time window. Answers 'which ports are unstable?' Common causes: bad cable, duplex mismatch, bad SFP, PoE power cycling, WAN instability. | No |
 | `get_power_events` | Filter alerts for UPS/PDU power-event signatures across APC, Liebert, and Eaton DataSources ('on battery', 'runtime remaining', 'input voltage lost') over a time window. Returns events matched by DataSource or alert name substring with counts per pattern. | No |
 
@@ -275,7 +276,6 @@ Network topology and connectivity
 | `get_topology_map` | Get network topology map data | No |
 | `get_device_neighbors` | Get neighboring devices/resources based on topology | No |
 | `get_device_interfaces` | Get network interfaces for a device (resource) | No |
-| `get_network_flows` | Get network flow data (NetFlow/sFlow) | No |
 | `get_device_connections` | Get device/resource relationships and connections | No |
 
 ## Audit

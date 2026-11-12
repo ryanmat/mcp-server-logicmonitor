@@ -430,6 +430,14 @@ _LM_ERROR_CODES: dict[str, str] = {
     "CONFIG_ERROR": "FEATURE_DISABLED",
 }
 
+# Portal refusals that mean a feature is off rather than a bad request: the message the
+# portal sends, and what it means for the caller. Each maps to FEATURE_DISABLED.
+_FEATURE_OFF_MESSAGES: dict[str, str] = {
+    "Netflow disabled": (
+        "LogicMonitor has NetFlow off for this device or portal, so it holds no flows to read."
+    ),
+}
+
 # Keys of a handler's error dict that the envelope reads; any other key is detail.
 _ERROR_DICT_KEYS = frozenset({"error", "code", "message", "suggestion", "details", "retry_after"})
 
@@ -493,6 +501,12 @@ def error_from_exception(error: Exception) -> list[TextContent]:
     :func:`handle_error` logs and then calls this; the dispatcher calls it
     directly after logging with the tool's name.
     """
+    if isinstance(error, LMError) and error.message in _FEATURE_OFF_MESSAGES:
+        return error_content(
+            "FEATURE_DISABLED",
+            f"{error.message}. {_FEATURE_OFF_MESSAGES[error.message]}",
+            details={"lm_code": error.code},
+        )
     if isinstance(error, LMError):
         code = lm_error_code(error)
         details: dict[str, Any] = {}

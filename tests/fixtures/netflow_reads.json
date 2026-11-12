@@ -1,0 +1,97 @@
+{
+ "source": "netflow_disabled and device_missing are live answers of the sandbox portal on 2026-11-12. The flows, ports and endpoints pages carry the properties of the swagger definitions NetFlowRecord, NetflowPort and NetflowEndpoint with placeholder values of the declared types. The graph is the swagger's GraphPlot, the topTalkersGraph answer, cut to its lines (one GraphPlotLine with placeholder values) and its timestamps, the keys get_graph_data reads. No portal with NetFlow data was read.",
+ "netflow_disabled": {
+  "request": "GET /device/devices/1786/flows",
+  "status": 400,
+  "body": {
+   "errorMessage": "Netflow disabled",
+   "errorCode": 1400,
+   "errorDetail": null
+  }
+ },
+ "device_missing": {
+  "request": "GET /device/devices/99999999/flows",
+  "status": 404,
+  "body": {
+   "errorMessage": "Resource not found (ID=99999999)",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "flows_page": {
+  "total": 1,
+  "items": [
+   {
+    "srcIP": "<srcIP>",
+    "percentUsage": 0.0,
+    "lastEpochInSec": 0,
+    "ifOut": 0,
+    "dataType": "<dataType>",
+    "usage": 0.0,
+    "srcASN": 0,
+    "dstDNS": "<dstDNS>",
+    "srcPort": 0,
+    "firstEpochInSec": 0,
+    "protocol": "<protocol>",
+    "dstPort": 0,
+    "ifIn": 0,
+    "sourceMBytes": 0.0,
+    "srcAsnName": "<srcAsnName>",
+    "srcDNS": "<srcDNS>",
+    "destinationMBytes": 0.0,
+    "dstASN": 0,
+    "dstIP": "<dstIP>",
+    "destAsnName": "<destAsnName>"
+   }
+  ]
+ },
+ "ports_page": {
+  "total": 1,
+  "items": [
+   {
+    "percentUsage": 0.0,
+    "port": 0,
+    "dataType": "<dataType>",
+    "usage": 0.0,
+    "description": "<description>"
+   }
+  ]
+ },
+ "endpoints_page": {
+  "total": 1,
+  "items": [
+   {
+    "lastSeen": 0,
+    "percentUsage": 0.0,
+    "dataType": "<dataType>",
+    "IP": "<IP>",
+    "usage": 0.0,
+    "dns": "<dns>",
+    "type": "<type>"
+   }
+  ]
+ },
+ "graph": {
+  "lines": [
+   {
+    "colorName": "<colorName>",
+    "std": {},
+    "visible": false,
+    "color": "<color>",
+    "data": [],
+    "max": {},
+    "legend": "<legend>",
+    "description": "<description>",
+    "label": "<label>",
+    "type": "<type>",
+    "min": {},
+    "avg": {},
+    "decimal": 0,
+    "useYMax": false
+   }
+  ],
+  "timestamps": [
+   0
+  ]
+ }
+}

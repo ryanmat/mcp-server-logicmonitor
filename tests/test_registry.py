@@ -746,3 +746,44 @@ class TestStep68Tools:
             for name, category in _STEP_68_CATEGORIES.items()
             if name not in categories[category]["tools"]
         ] == []
+
+
+# R3.7, Step 69: the device-scoped NetFlow reads replace the two /netflow/flows tools.
+_NETFLOW_TOOLS = ("get_device_flows", "get_device_top_talkers")
+
+
+class TestDeviceNetflowTools:
+    """R3.7: the two reads are registered read-only in networking and need a device id; the
+    /netflow/flows tools are gone."""
+
+    def test_each_is_read_only_with_its_handler_and_needs_a_device(self):
+        tools = {tool.name: tool for tool in TOOLS}
+
+        assert [tools[name].annotations.readOnlyHint for name in _NETFLOW_TOOLS] == [True, True]
+        assert [get_tool_handler(name).__name__ for name in _NETFLOW_TOOLS] == list(_NETFLOW_TOOLS)
+        assert [tools[name].inputSchema["required"] for name in _NETFLOW_TOOLS] == [
+            ["device_id"],
+            ["device_id"],
+        ]
+        assert tools["get_device_top_talkers"].inputSchema["properties"]["by"]["enum"] == [
+            "endpoint",
+            "port",
+            "graph",
+        ]
+
+    def test_the_netflow_flows_tools_are_gone(self):
+        names = {tool.name for tool in TOOLS}
+
+        assert {"get_network_flows", "get_top_talkers"} & names == set()
+
+    def test_the_networking_category_holds_them(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        categories = TOOL_CATEGORIES["categories"]
+        assert set(_NETFLOW_TOOLS) <= set(categories["networking"]["tools"])
+        assert [
+            name
+            for category in categories.values()
+            for name in category["tools"]
+            if name in {"get_network_flows", "get_top_talkers"}
+        ] == []

@@ -1,8 +1,9 @@
 # Description: Tests for network intelligence MCP tools.
-# Description: Validates interface metrics, top talkers, flap and power event tools.
+# Description: Validates interface metrics, device NetFlow, flap and power event tools.
 
 import json
 import time
+from pathlib import Path
 
 import httpx
 import pytest
@@ -12,6 +13,8 @@ from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
 from tests.alert_pages import alert_pages
+from tests.envelope import envelope
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -149,72 +152,6 @@ class TestGetInterfaceMetrics:
 
         result = await get_interface_metrics(client, device_id=789, interface="Gi99")
         assert "not found among instances" in result[0].text
-
-
-class TestGetTopTalkers:
-    @respx.mock
-    async def test_ranks_by_bytes(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {"srcIP": "10.0.0.1", "dstIP": "8.8.8.8", "bytes": 1000, "packets": 10},
-                        {"srcIP": "10.0.0.1", "dstIP": "8.8.8.8", "bytes": 2000, "packets": 20},
-                        {"srcIP": "10.0.0.2", "dstIP": "8.8.8.8", "bytes": 500, "packets": 5},
-                    ]
-                },
-            )
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42, n=2, group_by="src_ip")
-        data = json.loads(result[0].text)
-        assert data["flows_analyzed"] == 3
-        assert data["top_talkers"][0]["key"] == "10.0.0.1"
-        assert data["top_talkers"][0]["total_bytes"] == 3000
-        assert data["top_talkers"][0]["flow_count"] == 2
-
-    async def test_rejects_invalid_group_by(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        result = await get_top_talkers(client, exporter_device_id=42, group_by="invalid")
-        assert "group_by must be one of" in result[0].text
-
-    @respx.mock
-    async def test_handles_empty_flows(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(200, json={"items": []})
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42)
-        data = json.loads(result[0].text)
-        assert data["flows_analyzed"] == 0
-        assert "No flows exported" in data["note"]
-
-    @respx.mock
-    async def test_group_by_src_dst_pair(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "items": [
-                        {"srcIP": "10.0.0.1", "dstIP": "8.8.8.8", "bytes": 100, "packets": 1},
-                        {"srcIP": "10.0.0.1", "dstIP": "8.8.8.8", "bytes": 200, "packets": 2},
-                    ]
-                },
-            )
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42, group_by="src_dst_pair")
-        data = json.loads(result[0].text)
-        assert data["top_talkers"][0]["key"] == "10.0.0.1->8.8.8.8"
-        assert data["top_talkers"][0]["total_bytes"] == 300
 
 
 class TestGetLinkFlaps:
@@ -370,75 +307,6 @@ class TestNetworkingErrorHandling:
         assert is_error_result(result)
 
 
-class TestTopTalkersTruncation:
-    """R4.2: the flow list is read as one page, so get_top_talkers says when it is partial."""
-
-    @staticmethod
-    def _flows(n):
-        return [
-            {"srcIP": f"10.0.{i // 250}.{i % 250}", "dstIP": "8.8.8.8", "bytes": 10, "packets": 1}
-            for i in range(n)
-        ]
-
-    @respx.mock
-    async def test_one_page_of_more_flows_declares_truncation_since_flows_are_not_paged(
-        self, client
-    ):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        flows = self._flows(1500)
-        route = respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(200, json={"items": flows[:1000], "total": 1500})
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42)
-        data = json.loads(result[0].text)
-        assert data["flows_analyzed"] == 1000
-        assert data["total_bytes_in_window"] == 10_000
-        assert data["truncated"] is True
-        assert data["api_total"] == 1500
-        assert "offset" not in route.calls[0].request.url.params
-
-    @respx.mock
-    async def test_lower_bound_total_declares_truncation(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(200, json={"items": self._flows(1000), "total": -1001})
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42)
-        data = json.loads(result[0].text)
-        assert data["truncated"] is True
-        assert data["api_total"] is None
-
-    @respx.mock
-    async def test_full_page_without_a_total_declares_truncation(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(200, json={"items": self._flows(1000)})
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42)
-        data = json.loads(result[0].text)
-        assert data["truncated"] is True
-        assert data["api_total"] is None
-
-    @respx.mock
-    async def test_complete_window_is_not_truncated(self, client):
-        from lm_mcp.tools.networking import get_top_talkers
-
-        respx.get(f"{BASE}/netflow/flows").mock(
-            return_value=httpx.Response(200, json={"items": self._flows(3), "total": 3})
-        )
-
-        result = await get_top_talkers(client, exporter_device_id=42)
-        data = json.loads(result[0].text)
-        assert data["truncated"] is False
-        assert data["api_total"] == 3
-
-
 def _interface_power_alerts(n):
     """Alerts that are both interface flaps and power events, spread over the last hour."""
     now = int(time.time())
@@ -485,3 +353,174 @@ class TestCappedAlertToolsWarn:
         result = await getattr(networking, tool_name)(client)
         data = json.loads(result[0].text)
         assert "warning" not in data
+
+
+# NetFlow answers. netflow_disabled and device_missing are live (sandbox, 2026-11-12); the pages
+# carry the swagger definitions' properties with placeholder values, and the graph is the
+# swagger's GraphPlot cut to its lines and timestamps, the keys get_graph_data reads, since no
+# portal with NetFlow data was read (see the fixture's source entry).
+NETFLOW = json.loads((Path(__file__).parent.parent / "fixtures" / "netflow_reads.json").read_text())
+_DEVICE_1786 = f"{BASE}/device/devices/1786"
+
+
+def _window(route: respx.Route) -> tuple[int, int]:
+    """The start and end a NetFlow read sent."""
+    params = route.calls.last.request.url.params
+    return int(params["start"]), int(params["end"])
+
+
+class TestGetDeviceFlows:
+    """R3.7: a device's flows page through /device/devices/{id}/flows over a window."""
+
+    @respx.mock
+    async def test_reads_the_device_flows_over_the_window(self, client):
+        from lm_mcp.tools.networking import get_device_flows
+
+        route = respx.get(f"{_DEVICE_1786}/flows").mock(
+            return_value=httpx.Response(200, json=NETFLOW["flows_page"])
+        )
+        before = int(time.time())
+
+        body = json.loads(
+            (await get_device_flows(client, device_id=1786, hours_back=2, limit=5))[0].text
+        )
+
+        start, end = _window(route)
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"]) == ("5", "0")
+        assert end - start == 7200 and before <= end <= int(time.time())
+        assert (body["device_id"], body["window_hours"], body["total"]) == (1786, 2, 1)
+        assert body["flows"] == NETFLOW["flows_page"]["items"]
+
+    @respx.mock
+    async def test_netflow_disabled_is_feature_disabled(self, client):
+        from lm_mcp.tools.networking import get_device_flows
+
+        respx.get(f"{_DEVICE_1786}/flows").mock(
+            return_value=httpx.Response(400, json=NETFLOW["netflow_disabled"]["body"])
+        )
+
+        error = envelope(await get_device_flows(client, device_id=1786))
+
+        assert error["code"] == "FEATURE_DISABLED"
+        assert error["message"].startswith("Netflow disabled")
+        assert "Check the request parameters" not in error["message"]
+
+    @respx.mock
+    async def test_an_unknown_device_is_not_found(self, client):
+        from lm_mcp.tools.networking import get_device_flows
+
+        respx.get(f"{BASE}/device/devices/99999999/flows").mock(
+            return_value=httpx.Response(404, json=NETFLOW["device_missing"]["body"])
+        )
+
+        error = envelope(await get_device_flows(client, device_id=99999999))
+
+        assert error["code"] == "NOT_FOUND"
+
+
+class TestGetDeviceTopTalkers:
+    """R3.7: a device's top endpoints, top ports or top talkers graph over a window."""
+
+    @pytest.mark.parametrize(
+        ("by", "tail", "key", "page"),
+        [
+            ("endpoint", "endpoints", "endpoints", "endpoints_page"),
+            ("port", "ports", "ports", "ports_page"),
+        ],
+    )
+    @respx.mock
+    async def test_endpoints_and_ports_page_over_the_window(self, client, by, tail, key, page):
+        from lm_mcp.tools.networking import get_device_top_talkers
+
+        route = respx.get(f"{_DEVICE_1786}/{tail}").mock(
+            return_value=httpx.Response(200, json=NETFLOW[page])
+        )
+
+        body = json.loads(
+            (await get_device_top_talkers(client, device_id=1786, by=by, limit=3, offset=6))[0].text
+        )
+
+        start, end = _window(route)
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"]) == ("3", "6")
+        assert end - start == 3600
+        assert (body["device_id"], body["by"], body["window_hours"]) == (1786, by, 1)
+        assert body[key] == NETFLOW[page]["items"]
+
+    @respx.mock
+    async def test_the_graph_is_returned_as_read_with_no_paging(self, client):
+        from lm_mcp.tools.networking import get_device_top_talkers
+
+        route = respx.get(f"{_DEVICE_1786}/topTalkersGraph").mock(
+            return_value=httpx.Response(200, json=NETFLOW["graph"])
+        )
+
+        body = json.loads(
+            (await get_device_top_talkers(client, device_id=1786, by="graph", hours_back=24))[
+                0
+            ].text
+        )
+
+        start, end = _window(route)
+        assert end - start == 86400
+        assert "size" not in route.calls.last.request.url.params
+        assert body == {
+            "device_id": 1786,
+            "by": "graph",
+            "window_hours": 24,
+            "graph": NETFLOW["graph"],
+        }
+
+    @respx.mock
+    async def test_an_unknown_by_is_refused_before_any_call(self, client):
+        from lm_mcp.tools.networking import get_device_top_talkers
+
+        route = respx.get(url__regex=rf"^{_DEVICE_1786}/.*")
+
+        error = envelope(await get_device_top_talkers(client, device_id=1786, by="src_ip"))
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert not route.called
+
+    @pytest.mark.parametrize("by", ["endpoint", "port", "graph"])
+    @respx.mock
+    async def test_netflow_disabled_is_feature_disabled(self, client, by):
+        from lm_mcp.tools.networking import get_device_top_talkers
+
+        respx.get(url__regex=rf"^{_DEVICE_1786}/(endpoints|ports|topTalkersGraph)(\?.*)?$").mock(
+            return_value=httpx.Response(400, json=NETFLOW["netflow_disabled"]["body"])
+        )
+
+        error = envelope(await get_device_top_talkers(client, device_id=1786, by=by))
+
+        assert error["code"] == "FEATURE_DISABLED"
+
+
+class TestNetflowListPaging:
+    """R2.5: the flow, endpoint and port reads declare offset, send it, and read a negative
+    total as more."""
+
+    @respx.mock
+    async def test_flows_offset_is_declared_and_sent(self, client):
+        from lm_mcp.tools.networking import get_device_flows
+
+        await assert_offset_declared_and_sent(
+            client, get_device_flows, "/device/devices/7/flows", {"device_id": 7}
+        )
+
+    @respx.mock
+    async def test_flows_negative_total_reads_as_more(self, client):
+        from lm_mcp.tools.networking import get_device_flows
+
+        await assert_negative_total_reads_as_more(
+            client, get_device_flows, "/device/devices/7/flows", {"device_id": 7}
+        )
+
+    @respx.mock
+    async def test_top_talkers_offset_is_declared_and_sent(self, client):
+        from lm_mcp.tools.networking import get_device_top_talkers
+
+        await assert_offset_declared_and_sent(
+            client, get_device_top_talkers, "/device/devices/7/endpoints", {"device_id": 7}
+        )

@@ -3948,21 +3948,6 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="get_network_flows",
-            description="Get network flow data (NetFlow/sFlow)",
-            annotations=_READ_ONLY,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "device_id": {"type": "integer", "description": "Device ID"},
-                    "source_ip": {"type": "string", "description": "Filter by source IP"},
-                    "dest_ip": {"type": "string", "description": "Filter by destination IP"},
-                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
-                },
-            },
-        ),
-        Tool(
             name="get_device_connections",
             description="Get device/resource relationships and connections",
             annotations=_READ_ONLY,
@@ -6353,49 +6338,68 @@ TOOLS.extend(
             },
         ),
         Tool(
-            name="get_top_talkers",
+            name="get_device_flows",
             description=(
-                "Rank NetFlow flows on an exporter by bandwidth, packets, or flow count. "
-                "Group by source IP, destination IP, protocol, application, or "
-                "source->destination pair. Answers 'what is consuming my WAN?'"
+                "List a NetFlow exporter device's flow records over the last hours_back hours, "
+                "rows as the API returns them (source and destination IP, port, DNS name and "
+                "ASN, protocol, bytes). Answers FEATURE_DISABLED when the portal has NetFlow "
+                "off for the device."
             ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "exporter_device_id": {
+                    "device_id": {"type": "integer", "description": "NetFlow exporter device ID"},
+                    "hours_back": {
                         "type": "integer",
-                        "description": "NetFlow exporter device ID",
+                        "default": 1,
+                        "minimum": 1,
+                        "description": "Hours of flows to read, ending now",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["device_id"],
+            },
+        ),
+        Tool(
+            name="get_device_top_talkers",
+            description=(
+                "A NetFlow exporter device's top talkers over the last hours_back hours: "
+                "by=endpoint pages its top endpoints and by=port its top ports, with each "
+                "one's usage and share, rows as the API returns them; by=graph returns its top "
+                "talkers graph whole. Answers 'what is consuming my WAN?' Answers "
+                "FEATURE_DISABLED when the portal has NetFlow off for the device."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "NetFlow exporter device ID"},
+                    "by": {
+                        "type": "string",
+                        "enum": ["endpoint", "port", "graph"],
+                        "default": "endpoint",
+                        "description": "Top endpoints, top ports, or the top talkers graph",
                     },
                     "hours_back": {
                         "type": "integer",
                         "default": 1,
-                        "description": "Time window to aggregate (default: 1 hour)",
+                        "minimum": 1,
+                        "description": "Hours of flows to read, ending now",
                     },
-                    "n": {
+                    "limit": {
                         "type": "integer",
                         "default": 10,
-                        "description": "Number of top entries to return (default: 10)",
+                        "description": "Max rows (endpoint and port)",
                     },
-                    "group_by": {
-                        "type": "string",
-                        "enum": [
-                            "src_ip",
-                            "dst_ip",
-                            "application",
-                            "protocol",
-                            "src_dst_pair",
-                        ],
-                        "default": "src_ip",
-                        "description": "Aggregation dimension",
-                    },
-                    "min_bytes": {
+                    "offset": {
                         "type": "integer",
                         "default": 0,
-                        "description": "Drop aggregated entries below this byte threshold",
+                        "description": "Pagination offset (endpoint and port)",
                     },
                 },
-                "required": ["exporter_device_id"],
+                "required": ["device_id"],
             },
         ),
         Tool(
@@ -7012,7 +7016,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_collector_health": collectors.get_collector_health,
         # Network Intelligence (v3.8.0)
         "get_interface_metrics": networking.get_interface_metrics,
-        "get_top_talkers": networking.get_top_talkers,
+        "get_device_flows": networking.get_device_flows,
+        "get_device_top_talkers": networking.get_device_top_talkers,
         "get_link_flaps": networking.get_link_flaps,
         "get_power_events": networking.get_power_events,
         # Metrics
@@ -7198,7 +7203,6 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_topology_map": topology.get_topology_map,
         "get_device_neighbors": topology.get_device_neighbors,
         "get_device_interfaces": topology.get_device_interfaces,
-        "get_network_flows": topology.get_network_flows,
         "get_device_connections": topology.get_device_connections,
         # Batch Jobs
         "get_batchjobs": batchjobs.get_batchjobs,

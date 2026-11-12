@@ -1547,7 +1547,7 @@ class TestServerCallToolFlow:
         assert "get_integrations" in tool_names
         # v3.8.0 networking intelligence
         assert "get_interface_metrics" in tool_names
-        assert "get_top_talkers" in tool_names
+        assert "get_device_top_talkers" in tool_names
         assert "analyze_alerts" in tool_names
         assert "get_link_flaps" in tool_names
         assert "get_power_events" in tool_names
