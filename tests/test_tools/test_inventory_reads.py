@@ -16,9 +16,9 @@ from tests.list_paging import assert_negative_total_reads_as_more, assert_offset
 # Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 68 probe), each with its
 # request, parameters, status and body. Cuts: datasource_devices_1613 keeps the first 2 of its
 # 10 rows under the total sent; each delta row keeps the first 2 entries of each of its four
-# property lists, and drops one inherited property naming a private host. Replaced values: the
-# collector's internal AWS hostname (collector-host.internal), a private address (192.0.2.10)
-# and the portal name (sandbox). The sandbox lists no unmonitored device, so
+# property lists, a cut that also leaves out the collector's internal hostname and an inherited
+# property naming a private host. Replaced values: a private address (192.0.2.10) and the portal
+# name (sandbox). The sandbox lists no unmonitored device, so
 # unmonitored_swagger_item is the swagger UnmonitoredDevices definition's properties with
 # placeholder values of the declared types, not a live row.
 LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "inventory_reads.json").read_text())
