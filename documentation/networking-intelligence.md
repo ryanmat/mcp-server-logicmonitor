@@ -51,7 +51,7 @@ A NetFlow exporter device's flows and top talkers. `get_device_top_talkers` answ
 
 **Behavior:** `get_device_flows` pages `/device/devices/{id}/flows`. `get_device_top_talkers` pages `/endpoints` (`by=endpoint`) or `/ports` (`by=port`), each row with its usage and share, or returns `/topTalkersGraph` whole (`by=graph`). Rows come back as the API returns them: the only portal read has NetFlow off, so the row shapes are the API reference's, not checked against live data.
 
-**Errors surfaced:** `FEATURE_DISABLED` when the portal answers "Netflow disabled", as it did for every device on that portal; `NOT_FOUND` for an unknown device.
+**Errors surfaced:** `FEATURE_DISABLED` when the portal answers "Netflow disabled", as it did for both devices read on a portal where no device has NetFlow enabled; `NOT_FOUND` for an unknown device.
 
 ### get_link_flaps
 

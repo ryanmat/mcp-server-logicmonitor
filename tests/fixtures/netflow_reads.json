@@ -1,5 +1,5 @@
 {
- "source": "netflow_disabled and device_missing are live answers of the sandbox portal on 2026-11-12; every other entry is a page built from the swagger definitions (NetFlowRecord, NetflowPort, NetflowEndpoint, GraphPlotLine) with placeholder values of the declared types, since no portal with NetFlow data was read",
+ "source": "netflow_disabled and device_missing are live answers of the sandbox portal on 2026-11-12. The flows, ports and endpoints pages carry the properties of the swagger definitions NetFlowRecord, NetflowPort and NetflowEndpoint with placeholder values of the declared types. The swagger's GraphPlot, the topTalkersGraph answer, declares no properties, so the graph is one GraphPlotLine-shaped line under the lines and timestamps keys get_graph_data reads from a GraphPlot answer. No portal with NetFlow data was read.",
  "netflow_disabled": {
   "request": "GET /device/devices/1786/flows",
   "status": 400,
