@@ -37,6 +37,11 @@ _SESSION_WRITE = ToolAnnotations(
 # underscores), so a client refuses path characters before the call is made.
 _LM_STRING_ID_PATTERN = "^[A-Za-z0-9_-]+$"
 
+# Shape of a name sent as one URL path segment (an uploaded log file, a property): no
+# '/', '?' or '#', and no leading dot. Property names holding '/' (Kubernetes labels) are
+# refused here, as the portal answers 404 to them on a path and 400 to them encoded.
+_PATH_SEGMENT_NAME_PATTERN = "^[A-Za-z0-9_][A-Za-z0-9._-]*$"
+
 # Tool definitions organized by category
 TOOLS: list[Tool] = []
 
@@ -204,6 +209,22 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     "device_id": {"type": "integer", "description": "Device ID to recover"},
+                },
+                "required": ["device_id"],
+            },
+        ),
+        Tool(
+            name="run_auto_discovery",
+            description=(
+                "Run Active Discovery on a device/resource now, so its collector looks for "
+                "the device's instances (requires write permission). The portal answers at "
+                "once; the discovery runs on the collector afterwards."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
                 },
                 "required": ["device_id"],
             },
@@ -446,6 +467,27 @@ TOOLS.extend(
                     "note": {"type": "string", "description": "Note text to add"},
                 },
                 "required": ["alert_id", "note"],
+            },
+        ),
+        Tool(
+            name="escalate_alert",
+            description=(
+                "Escalate an alert along its escalation chain (requires write permission). "
+                "The portal refuses an acknowledged alert, and its answer carries no detail, "
+                "so the result does not say who was notified."
+                "\n\nCommon mistakes: alert_id works with or without the LMA prefix."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "alert_id": {
+                        "type": "string",
+                        "pattern": _LM_STRING_ID_PATTERN,
+                        "description": "Alert ID (with or without LMA prefix)",
+                    },
+                },
+                "required": ["alert_id"],
             },
         ),
         Tool(
@@ -804,7 +846,7 @@ TOOLS.extend(
                     "collector_id": {"type": "integer", "description": "Collector ID"},
                     "file_name": {
                         "type": "string",
-                        "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+                        "pattern": _PATH_SEGMENT_NAME_PATTERN,
                         "description": "Log file name, such as 82.postcheck.log.zip",
                     },
                     "max_bytes": {
@@ -2885,6 +2927,104 @@ TOOLS.extend(
                     "property_value": {"type": "string", "description": "Property value"},
                 },
                 "required": ["device_id", "property_name", "property_value"],
+            },
+        ),
+        Tool(
+            name="delete_device_property",
+            description=(
+                "Delete a property set on the device/resource itself (requires write "
+                "permission). A name the device only inherits answers not found; a system "
+                "property is refused."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "device_id": {"type": "integer", "description": "Device ID"},
+                    "property_name": {
+                        "type": "string",
+                        "pattern": _PATH_SEGMENT_NAME_PATTERN,
+                        "description": "Name of the device's own property",
+                    },
+                },
+                "required": ["device_id", "property_name"],
+            },
+        ),
+        Tool(
+            name="get_device_group_properties",
+            description=(
+                "Get a device group's (resource group's) properties: its own, the ones it "
+                "inherits and the system ones, each with the value in force, its type (custom, "
+                "inherit or system) and the ancestor groups that hold the same name, nearest "
+                "first; an inherited value is the nearest one's. property_name reads one "
+                "property."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Device group ID"},
+                    "property_name": {
+                        "type": "string",
+                        "pattern": _PATH_SEGMENT_NAME_PATTERN,
+                        "description": "Read only this property",
+                    },
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by property name (substring match)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Max results",
+                    },
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["group_id"],
+            },
+        ),
+        Tool(
+            name="update_device_group_property",
+            description=(
+                "Set a property on a device group/resource group (requires write permission). "
+                "A name the group only inherits, or does not hold, gets a value of the group's "
+                "own, which the groups and devices under it inherit unless they hold their own. "
+                "A system property is refused."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Device group ID"},
+                    "property_name": {
+                        "type": "string",
+                        "pattern": _PATH_SEGMENT_NAME_PATTERN,
+                        "description": "Property name",
+                    },
+                    "property_value": {"type": "string", "description": "Property value"},
+                },
+                "required": ["group_id", "property_name", "property_value"],
+            },
+        ),
+        Tool(
+            name="delete_device_group_property",
+            description=(
+                "Delete a property set on the device group/resource group itself (requires "
+                "write permission). A name the group only inherits answers not found; a "
+                "system property is refused."
+            ),
+            annotations=_DELETE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "group_id": {"type": "integer", "description": "Device group ID"},
+                    "property_name": {
+                        "type": "string",
+                        "pattern": _PATH_SEGMENT_NAME_PATTERN,
+                        "description": "Name of the group's own property",
+                    },
+                },
+                "required": ["group_id", "property_name"],
             },
         ),
     ]
@@ -6749,6 +6889,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_device": devices.update_device,
         "delete_device": devices.delete_device,
         "recover_device": devices.recover_device,
+        "run_auto_discovery": devices.run_auto_discovery,
         "bulk_delete_devices": devices.bulk_delete_devices,
         "create_device_group": devices.create_device_group,
         "update_device_group": devices.update_device_group,
@@ -6758,6 +6899,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_alert_details": alerts.get_alert_details,
         "acknowledge_alert": alerts.acknowledge_alert,
         "add_alert_note": alerts.add_alert_note,
+        "escalate_alert": alerts.escalate_alert,
         "bulk_acknowledge_alerts": alerts.bulk_acknowledge_alerts,
         # SDTs
         "get_sdts": sdts.get_sdts,
@@ -6908,6 +7050,10 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_device_properties": resources.get_device_properties,
         "get_device_property": resources.get_device_property,
         "update_device_property": resources.update_device_property,
+        "delete_device_property": resources.delete_device_property,
+        "get_device_group_properties": resources.get_device_group_properties,
+        "update_device_group_property": resources.update_device_group_property,
+        "delete_device_group_property": resources.delete_device_group_property,
         # Datasources
         "get_datasources": datasources.get_datasources,
         "get_datasource": datasources.get_datasource,

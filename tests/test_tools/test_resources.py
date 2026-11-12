@@ -1,7 +1,8 @@
 # Description: Tests for resource/property management MCP tools.
-# Description: Validates get_device_properties, get_device_property, update_device_property.
+# Description: Validates the device and device group property reads, writes and deletes.
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -10,6 +11,8 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -250,3 +253,397 @@ class TestUpdateDeviceProperty:
         assert data["success"] is True
         assert data["property"]["name"] == "new.prop"
         assert data["property"]["value"] == "hello"
+
+
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe). Group 3339 is a
+# throwaway group under the root, 3340 its child and 3341 the child's child. Its property page
+# held six rows; one, an inherited endpoint URL naming a private host, is cut, under the total
+# the portal sent. Each entry keeps the request, the status and the body as read.
+LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "property_ops.json").read_text())
+_BASE = "https://test.logicmonitor.com/santaba/rest"
+_GROUP_3339 = f"{_BASE}/device/groups/3339/properties"
+
+
+def _answer(name: str) -> httpx.Response:
+    """The fixture entry's status and body as an httpx response."""
+    return httpx.Response(LIVE[name]["status"], json=LIVE[name]["body"])
+
+
+def _writes(monkeypatch, enabled: bool = True) -> None:
+    """Set the portal and the write flag a write-gated property tool reads."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true" if enabled else "false")
+
+
+class TestGetDeviceGroupProperties:
+    """R3.6: a group's properties page through its properties path; one name reads alone."""
+
+    @respx.mock
+    async def test_projects_each_row_with_the_ancestors_holding_its_name(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        route = respx.get(_GROUP_3339).mock(return_value=_answer("group_properties_3339"))
+
+        body = json.loads((await get_device_group_properties(client, group_id=3339))[0].text)
+
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"]) == ("100", "0")
+        assert "filter" not in params
+        assert (body["group_id"], body["total"], body["count"]) == (3339, 6, 5)
+        assert body["properties"][:3] == [
+            {
+                "name": "netapp.ssl",
+                "value": "true",
+                "type": "inherit",
+                "ancestors": [{"group_id": 1, "path": "", "value": "true"}],
+            },
+            {"name": "lmmcp.seed", "value": "seed", "type": "custom", "ancestors": []},
+            {
+                "name": "system.deviceGroupId",
+                "value": "3339",
+                "type": "system",
+                "ancestors": [{"group_id": 1, "path": "", "value": "1"}],
+            },
+        ]
+
+    @respx.mock
+    async def test_ancestors_come_nearest_first_and_the_value_is_the_nearest(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        respx.get(f"{_BASE}/device/groups/3341/properties").mock(
+            return_value=_answer("grandchild_properties_3341")
+        )
+
+        body = json.loads((await get_device_group_properties(client, group_id=3341))[0].text)
+
+        order = next(row for row in body["properties"] if row["name"] == "lmmcp.order")
+        assert order == {
+            "name": "lmmcp.order",
+            "value": "child",
+            "type": "inherit",
+            "ancestors": [
+                {
+                    "group_id": 3340,
+                    "path": "lm-mcp-step67-probe/lm-mcp-step67-child",
+                    "value": "child",
+                },
+                {"group_id": 3339, "path": "lm-mcp-step67-probe", "value": "parent"},
+            ],
+        }
+
+    @respx.mock
+    async def test_pages_and_filters_by_name(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        route = respx.get(_GROUP_3339).mock(
+            return_value=_answer("group_properties_3339_size2_offset1")
+        )
+
+        body = json.loads(
+            (
+                await get_device_group_properties(
+                    client, group_id=3339, name_filter="lmmcp", limit=2, offset=1
+                )
+            )[0].text
+        )
+
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"], params["filter"]) == ("2", "1", 'name~"lmmcp"')
+        assert (body["count"], body["offset"], body["has_more"]) == (2, 1, True)
+
+    @respx.mock
+    async def test_property_name_reads_that_one_property(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        one = respx.get(f"{_BASE}/device/groups/3341/properties/lmmcp.order").mock(
+            return_value=_answer("grandchild_property_order")
+        )
+        page = respx.get(f"{_BASE}/device/groups/3341/properties")
+
+        body = json.loads(
+            (await get_device_group_properties(client, group_id=3341, property_name="lmmcp.order"))[
+                0
+            ].text
+        )
+
+        assert one.called and not page.called
+        assert body == {
+            "group_id": 3341,
+            "name": "lmmcp.order",
+            "value": "child",
+            "type": "inherit",
+            "ancestors": [
+                {
+                    "group_id": 3340,
+                    "path": "lm-mcp-step67-probe/lm-mcp-step67-child",
+                    "value": "child",
+                },
+                {"group_id": 3339, "path": "lm-mcp-step67-probe", "value": "parent"},
+            ],
+        }
+
+    @respx.mock
+    async def test_a_missing_name_and_a_missing_group_are_not_found(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        respx.get(f"{_GROUP_3339}/lmmcp.nothere").mock(
+            return_value=_answer("group_property_missing")
+        )
+        respx.get(f"{_BASE}/device/groups/99999999/properties").mock(
+            return_value=_answer("group_missing")
+        )
+
+        name = envelope(
+            await get_device_group_properties(client, group_id=3339, property_name="lmmcp.nothere")
+        )
+        group = envelope(await get_device_group_properties(client, group_id=99999999))
+
+        assert name["code"] == group["code"] == "NOT_FOUND"
+        assert "lmmcp.nothere" in name["message"]
+
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        await assert_offset_declared_and_sent(
+            client,
+            get_device_group_properties,
+            "/device/groups/3339/properties",
+            {"group_id": 3339},
+        )
+
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client):
+        from lm_mcp.tools.resources import get_device_group_properties
+
+        await assert_negative_total_reads_as_more(
+            client,
+            get_device_group_properties,
+            "/device/groups/3339/properties",
+            {"group_id": 3339},
+        )
+
+
+class TestUpdateDeviceGroupProperty:
+    """R3.6: a group property is set by PUT, and created by POST when the group holds no
+    value of its own under that name."""
+
+    @respx.mock
+    async def test_sets_the_groups_own_value(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import update_device_group_property
+
+        put = respx.put(f"{_GROUP_3339}/lmmcp.probe").mock(
+            return_value=_answer("group_property_put")
+        )
+        post = respx.post(_GROUP_3339)
+
+        body = json.loads(
+            (
+                await update_device_group_property(
+                    client, group_id=3339, property_name="lmmcp.probe", property_value="b"
+                )
+            )[0].text
+        )
+
+        assert json.loads(put.calls.last.request.content) == {"value": "b"}
+        assert not post.called
+        assert body == {
+            "success": True,
+            "group_id": 3339,
+            "property": {"name": "lmmcp.probe", "value": "b", "type": "custom"},
+        }
+
+    @respx.mock
+    async def test_an_inherited_name_gets_its_own_value_by_post(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import update_device_group_property
+
+        put = respx.put(f"{_BASE}/device/groups/3341/properties/lmmcp.order").mock(
+            return_value=_answer("grandchild_put_inherited")
+        )
+        post = respx.post(f"{_BASE}/device/groups/3341/properties").mock(
+            return_value=httpx.Response(
+                200, json={"type": "custom", "name": "lmmcp.order", "value": "x", "inheritList": []}
+            )
+        )
+
+        body = json.loads(
+            (
+                await update_device_group_property(
+                    client, group_id=3341, property_name="lmmcp.order", property_value="x"
+                )
+            )[0].text
+        )
+
+        assert put.called
+        assert json.loads(post.calls.last.request.content) == {"name": "lmmcp.order", "value": "x"}
+        assert body["property"] == {"name": "lmmcp.order", "value": "x", "type": "custom"}
+
+    @respx.mock
+    async def test_a_system_property_is_refused(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import update_device_group_property
+
+        respx.put(f"{_GROUP_3339}/system.groupType").mock(
+            return_value=httpx.Response(
+                400,
+                json={
+                    "errorMessage": "Property(name=system.groupType) is not allowed to update",
+                    "errorCode": 1400,
+                    "errorDetail": None,
+                },
+            )
+        )
+        post = respx.post(_GROUP_3339)
+
+        error = envelope(
+            await update_device_group_property(
+                client, group_id=3339, property_name="system.groupType", property_value="x"
+            )
+        )
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert not post.called
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.resources import update_device_group_property
+
+        put = respx.put(f"{_GROUP_3339}/lmmcp.probe")
+
+        error = envelope(
+            await update_device_group_property(
+                client, group_id=3339, property_name="lmmcp.probe", property_value="b"
+            )
+        )
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not put.called
+
+
+class TestDeleteDeviceGroupProperty:
+    """R3.6: a group's own property is deleted; an inherited or system one is not."""
+
+    @respx.mock
+    async def test_deletes_the_groups_own_property(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import delete_device_group_property
+
+        route = respx.delete(f"{_GROUP_3339}/lmmcp.probe").mock(
+            return_value=_answer("group_property_delete")
+        )
+
+        body = json.loads(
+            (
+                await delete_device_group_property(
+                    client, group_id=3339, property_name="lmmcp.probe"
+                )
+            )[0].text
+        )
+
+        assert route.called
+        assert body == {"success": True, "group_id": 3339, "deleted": "lmmcp.probe"}
+
+    @respx.mock
+    async def test_an_inherited_name_is_not_found_and_a_system_one_refused(
+        self, client, monkeypatch
+    ):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import delete_device_group_property
+
+        respx.delete(f"{_BASE}/device/groups/3341/properties/lmmcp.order").mock(
+            return_value=_answer("grandchild_delete_inherited")
+        )
+        respx.delete(f"{_GROUP_3339}/system.groupType").mock(
+            return_value=_answer("group_property_delete_system")
+        )
+
+        inherited = envelope(
+            await delete_device_group_property(client, group_id=3341, property_name="lmmcp.order")
+        )
+        system = envelope(
+            await delete_device_group_property(
+                client, group_id=3339, property_name="system.groupType"
+            )
+        )
+
+        assert inherited["code"] == "NOT_FOUND"
+        assert "own property" in inherited["message"]
+        assert system["code"] == "INVALID_REQUEST"
+        assert "not allowed to delete" in system["message"]
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.resources import delete_device_group_property
+
+        route = respx.delete(f"{_GROUP_3339}/lmmcp.probe")
+
+        error = envelope(
+            await delete_device_group_property(client, group_id=3339, property_name="lmmcp.probe")
+        )
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not route.called
+
+
+class TestDeleteDeviceProperty:
+    """R3.6: a device's own property is deleted; an inherited or system one is not."""
+
+    @respx.mock
+    async def test_deletes_the_devices_own_property(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import delete_device_property
+
+        route = respx.delete(f"{_BASE}/device/devices/1786/properties/lmmcp.probe").mock(
+            return_value=_answer("device_property_delete")
+        )
+
+        body = json.loads(
+            (await delete_device_property(client, device_id=1786, property_name="lmmcp.probe"))[
+                0
+            ].text
+        )
+
+        assert route.called
+        assert body == {"success": True, "device_id": 1786, "deleted": "lmmcp.probe"}
+
+    @pytest.mark.parametrize(
+        ("name", "fixture", "code", "words"),
+        [
+            ("snmp.version", "device_property_delete_inherited", "NOT_FOUND", "own property"),
+            ("system.hostname", "device_property_delete_system", "INVALID_REQUEST", "not allowed"),
+        ],
+    )
+    @respx.mock
+    async def test_an_inherited_name_is_not_found_and_a_system_one_refused(
+        self, client, monkeypatch, name, fixture, code, words
+    ):
+        _writes(monkeypatch)
+        from lm_mcp.tools.resources import delete_device_property
+
+        respx.delete(f"{_BASE}/device/devices/1786/properties/{name}").mock(
+            return_value=_answer(fixture)
+        )
+
+        error = envelope(await delete_device_property(client, device_id=1786, property_name=name))
+
+        assert error["code"] == code
+        assert words in error["message"]
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.resources import delete_device_property
+
+        route = respx.delete(f"{_BASE}/device/devices/1786/properties/lmmcp.probe")
+
+        error = envelope(
+            await delete_device_property(client, device_id=1786, property_name="lmmcp.probe")
+        )
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not route.called

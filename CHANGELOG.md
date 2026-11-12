@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 258:
-246 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 264:
+252 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
-With writes off, the default, `tools/list` shows 141 of them, or 145 in multi-portal mode, and
+With writes off, the default, `tools/list` shows 142 of them, or 146 in multi-portal mode, and
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
@@ -107,6 +107,17 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   threshold that does not parse is refused before any call, because the API stored a fourth
   value and answered 500 to an operator with no space after it; `delta` is the only comparison
   method accepted, the only one in the datasource definitions of the portal it was checked on.
+- Device group properties: `get_device_group_properties` reads a group's own, inherited and
+  system properties, each with the ancestor groups that hold the same name, nearest first, or
+  one property by `property_name`. Listed only with writes on: `update_device_group_property`
+  sets one, giving the group a value of its own when it only inherits the name, and
+  `delete_device_group_property` and `delete_device_property` delete a property the group or
+  device holds itself; the portal answers not found for an inherited name and refuses a system
+  property. `property_name` admits one path segment, so a name holding `/` is refused; the
+  portal answers 404 to such a name on a path and 400 to it encoded.
+- `run_auto_discovery` schedules Active Discovery on a device, and `escalate_alert` escalates an
+  alert along its escalation chain; the portal refuses an acknowledged alert. Both are listed
+  only with writes on.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.

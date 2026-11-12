@@ -1,8 +1,9 @@
 # Description: Tests for device MCP tools.
-# Description: Validates device and device group CRUD functions, including bulk operations.
+# Description: Validates device and group CRUD, bulk operations and Active Discovery scheduling.
 
 import json
 import re
+from pathlib import Path
 
 import httpx
 import pytest
@@ -11,6 +12,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
@@ -997,3 +999,63 @@ class TestDeviceListPaging:
         from lm_mcp.tools import devices
 
         await assert_negative_total_reads_as_more(client, getattr(devices, name), path, kwargs)
+
+
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe).
+LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "property_ops.json").read_text())
+_BASE = "https://test.logicmonitor.com/santaba/rest"
+
+
+def _writes(monkeypatch, enabled: bool = True) -> None:
+    """Set the portal and the write flag a write-gated device tool reads."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true" if enabled else "false")
+
+
+class TestRunAutoDiscovery:
+    """R3.6: run_auto_discovery schedules Active Discovery on one device."""
+
+    @respx.mock
+    async def test_posts_the_schedule_with_no_body(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.devices import run_auto_discovery
+
+        route = respx.post(f"{_BASE}/device/devices/1786/scheduleAutoDiscovery").mock(
+            return_value=httpx.Response(
+                LIVE["autodiscovery_1786"]["status"], json=LIVE["autodiscovery_1786"]["body"]
+            )
+        )
+
+        body = json.loads((await run_auto_discovery(client, device_id=1786))[0].text)
+
+        assert route.calls.last.request.content == b""
+        assert route.calls.last.request.url.params == httpx.QueryParams()
+        assert body["success"] is True
+        assert body["device_id"] == 1786
+
+    @respx.mock
+    async def test_an_unknown_device_is_not_found(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.devices import run_auto_discovery
+
+        missing = LIVE["autodiscovery_missing_device"]
+        respx.post(f"{_BASE}/device/devices/99999999/scheduleAutoDiscovery").mock(
+            return_value=httpx.Response(missing["status"], json=missing["body"])
+        )
+
+        error = envelope(await run_auto_discovery(client, device_id=99999999))
+
+        assert error["code"] == "NOT_FOUND"
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.devices import run_auto_discovery
+
+        route = respx.post(f"{_BASE}/device/devices/1786/scheduleAutoDiscovery")
+
+        error = envelope(await run_auto_discovery(client, device_id=1786))
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not route.called

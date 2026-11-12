@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 258 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 264 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -53,6 +53,7 @@ Device/resource management
 | `update_device` | Update an existing device/resource (requires write permission). Custom properties are merged with existing properties (not replaced). | Yes |
 | `delete_device` | Delete a device/resource (requires write permission). Soft delete by default. | Yes |
 | `recover_device` | Recover a soft-deleted device/resource (requires write permission). Only works within the recovery window. | Yes |
+| `run_auto_discovery` | Run Active Discovery on a device/resource now, so its collector looks for the device's instances (requires write permission). The portal answers at once; the discovery runs on the collector afterwards. | Yes |
 | `bulk_delete_devices` | Delete multiple devices/resources in one operation (max 100, requires write permission). Soft delete by default. | Yes |
 | `create_device_group` | Create a new device/resource group (requires write permission) | Yes |
 | `update_device_group` | Update a device/resource group (requires write permission). Custom properties are merged with existing. | Yes |
@@ -60,6 +61,10 @@ Device/resource management
 | `get_device_properties` | Get all properties of a device (resource) | No |
 | `get_device_property` | Get a specific property of a device (resource) | No |
 | `update_device_property` | Update or create a device/resource property (requires write permission) | Yes |
+| `delete_device_property` | Delete a property set on the device/resource itself (requires write permission). A name the device only inherits answers not found; a system property is refused. | Yes |
+| `get_device_group_properties` | Get a device group's (resource group's) properties: its own, the ones it inherits and the system ones, each with the value in force, its type (custom, inherit or system) and the ancestor groups that hold the same name, nearest first; an inherited value is the nearest one's. property_name reads one property. | No |
+| `update_device_group_property` | Set a property on a device group/resource group (requires write permission). A name the group only inherits, or does not hold, gets a value of the group's own, which the groups and devices under it inherit unless they hold their own. A system property is refused. | Yes |
+| `delete_device_group_property` | Delete a property set on the device group/resource group itself (requires write permission). A name the group only inherits answers not found; a system property is refused. | Yes |
 
 ## Alerts
 
@@ -71,6 +76,7 @@ Alert monitoring and management
 | `get_alert_details` | Get detailed information about a specific alert | No |
 | `acknowledge_alert` | Acknowledge an alert (requires write permission) Common mistakes: alert_id works with or without the LMA prefix. | Yes |
 | `add_alert_note` | Add a note to an alert without acknowledging (requires write permission) | Yes |
+| `escalate_alert` | Escalate an alert along its escalation chain (requires write permission). The portal refuses an acknowledged alert, and its answer carries no detail, so the result does not say who was notified. Common mistakes: alert_id works with or without the LMA prefix. | Yes |
 | `bulk_acknowledge_alerts` | Acknowledge multiple alerts at once (max 100, requires write permission) | Yes |
 | `get_alert_settings` | Read datapoint alert thresholds at instance, device or group level: each datapoint's threshold in force and the level it comes from (instance, instance_group, device_datasource, device_group with source_group, group or global), beside the level's own and the global threshold. Use it before tuning a noisy threshold with update_alert_settings. | No |
 | `update_alert_settings` | Set or clear one datapoint's alert threshold at instance or group level (requires write permission). threshold is an operator, a space and up to three values for warning, error and critical, such as '> 60 80 90'; '' clears the level's own threshold so it inherits again. A threshold that does not parse is refused before any call. The device level has no write. | Yes |
