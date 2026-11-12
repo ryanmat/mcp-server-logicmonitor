@@ -597,6 +597,10 @@ STATUS_CHECK_RUNNING_NOTE = (
     "The status check is still running; get_collector_health with this collector_id reads "
     "its latest result."
 )
+STATUS_CHECK_NOT_STARTED_NOTE = (
+    "The triggered check had not reported when the wait ended, so the other fields are the "
+    "check before it; get_collector_health with this collector_id reads the new one later."
+)
 
 
 @require_write_permission
@@ -636,11 +640,25 @@ async def run_collector_status_check(
             "triggered": triggered,
             **_status_check(check),
         }
-        if not (newer and result["finished"]):
+        if not newer:
+            result["finished"] = False
+            result["note"] = STATUS_CHECK_NOT_STARTED_NOTE
+        elif not (result["finished"] or result["aborted"]):
             result["note"] = STATUS_CHECK_RUNNING_NOTE
         return format_response(result)
     except Exception as e:
         return handle_error(e)
+
+
+# The restart's override fields, each read from the collector's record and sent back.
+_RESTART_OVERRIDES = (
+    "collectorSize",
+    "collectorConf",
+    "sbproxyConf",
+    "wrapperConf",
+    "watchdogConf",
+    "websiteConf",
+)
 
 
 @require_write_permission
@@ -648,7 +666,11 @@ async def restart_collector(
     client: LogicMonitorClient,
     collector_id: int,
 ) -> list[TextContent]:
-    """Restart a collector, with no configuration overrides.
+    """Restart a collector, sending its own size and config files back so neither changes.
+
+    The restart takes them as overrides and reads each one left out as an empty string: a
+    restart sent with none reset a Large collector to Custom (probe 2026-11-11). A record
+    with no collectorSize is refused rather than restarted.
 
     Args:
         client: LogicMonitor API client.
@@ -658,9 +680,22 @@ async def restart_collector(
         List of TextContent with the restart's async job id, or an error envelope.
     """
     try:
-        job = await client.post(
-            f"/setting/collector/collectors/{collector_id}/services/restart", json_body={}
-        )
+        path = f"/setting/collector/collectors/{collector_id}"
+        collector = await client.get(path)
+        if not collector.get("collectorSize"):
+            return format_response(
+                {
+                    "error": True,
+                    "code": "REJECTED_BY_TOOL",
+                    "message": f"Collector {collector_id}'s record carries no collectorSize, and "
+                    "a restart without one resets the collector's size. Restart it in the portal.",
+                    "collector_id": collector_id,
+                }
+            )
+        overrides = {
+            key: collector[key] for key in _RESTART_OVERRIDES if collector.get(key) is not None
+        }
+        job = await client.post(f"{path}/services/restart", json_body=overrides)
         return format_response({"collector_id": collector_id, "restart_job_id": job})
     except Exception as e:
         return handle_error(e)

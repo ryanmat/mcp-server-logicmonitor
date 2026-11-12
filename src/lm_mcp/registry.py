@@ -881,8 +881,9 @@ TOOLS.extend(
         Tool(
             name="restart_collector",
             description=(
-                "Restart a collector (requires write permission). It sends no configuration "
-                "overrides and returns the async job id of the restart."
+                "Restart a collector (requires write permission). It sends the collector's own "
+                "size and config files back with the restart, so neither changes, and returns "
+                "the async job id of the restart."
             ),
             annotations=_DESTRUCTIVE_RUN,
             inputSchema={

@@ -923,6 +923,50 @@ class TestRunCollectorStatusCheck:
         assert "get_collector_health" in body["note"]
 
     @respx.mock
+    async def test_a_new_check_that_aborts_returns_with_no_running_note(self, client, monkeypatch):
+        """No live check aborted; the running read is marked aborted to stand for one."""
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import run_collector_status_check
+
+        aborted = {**OPS["status_check_82_running"], "aborted": True}
+        respx.get(f"{_SERVICES_82}/getStatusCheck").mock(
+            side_effect=[
+                httpx.Response(200, json=OPS["status_check_82_finished"]),
+                httpx.Response(200, json=aborted),
+            ]
+        )
+        respx.post(f"{_SERVICES_82}/triggerStatusCheck").mock(
+            return_value=httpx.Response(200, json=OPS["trigger_82"])
+        )
+
+        body = json.loads((await run_collector_status_check(client, collector_id=82))[0].text)
+
+        assert (body["aborted"], body["finished"]) == (True, False)
+        assert "note" not in body
+
+    @respx.mock
+    async def test_no_newer_check_by_the_budget_reads_unfinished_and_says_so(
+        self, client, monkeypatch
+    ):
+        _writes(monkeypatch)
+        from lm_mcp.tools import collectors
+
+        monkeypatch.setattr(collectors, "STATUS_CHECK_BUDGET_SECONDS", 0)
+        respx.get(f"{_SERVICES_82}/getStatusCheck").mock(
+            return_value=httpx.Response(200, json=OPS["status_check_82_finished"])
+        )
+        respx.post(f"{_SERVICES_82}/triggerStatusCheck").mock(
+            return_value=httpx.Response(200, json=OPS["trigger_82"])
+        )
+
+        body = json.loads(
+            (await collectors.run_collector_status_check(client, collector_id=82))[0].text
+        )
+
+        assert body["finished"] is False
+        assert body["note"] == collectors.STATUS_CHECK_NOT_STARTED_NOTE
+
+    @respx.mock
     async def test_a_down_collector_refuses_the_trigger(self, client, monkeypatch):
         _writes(monkeypatch)
         from lm_mcp.tools.collectors import run_collector_status_check
@@ -953,25 +997,73 @@ class TestRunCollectorStatusCheck:
         assert not trigger.called
 
 
+# Collector 41's record as the restart reads it. The keys and the size are the live
+# record's; the five config files are placeholders, since the live ones carry the
+# collector's credentials. A restart sent with {} answered job 760 and reset 41's size
+# from Large to Custom (4G); one sent with these fields back changed nothing (probe
+# 2026-11-11, rul-b830622e8b).
+_COLLECTOR_41 = {
+    "id": 41,
+    "hostname": "lm-container-argus-0",
+    "isDown": False,
+    "collectorSize": "large",
+    "collectorConf": "agent.conf text",
+    "sbproxyConf": "sbproxy.conf text",
+    "wrapperConf": "wrapper.conf text",
+    "watchdogConf": "watchdog.conf text",
+    "websiteConf": "website.conf text",
+}
+
+
 class TestRestartCollector:
-    """R3.4: restart a collector through services/restart. The answer is the swagger's
-    (an async job id, example 10): the restart is probed live only on Ryan's go."""
+    """R3.4: restart a collector through services/restart, sending its own size and config
+    files back so the restart changes neither."""
 
     @respx.mock
-    async def test_posts_the_restart_with_no_overrides_and_returns_the_job(
+    async def test_sends_the_collectors_own_size_and_config_back_and_returns_the_job(
         self, client, monkeypatch
     ):
         _writes(monkeypatch)
         from lm_mcp.tools.collectors import restart_collector
 
-        route = respx.post(f"{_SERVICES_82}/restart").mock(
-            return_value=httpx.Response(200, json=10)
+        respx.get(f"{_BASE}/setting/collector/collectors/41").mock(
+            return_value=httpx.Response(200, json=_COLLECTOR_41)
+        )
+        route = respx.post(f"{_BASE}/setting/collector/collectors/41/services/restart").mock(
+            return_value=httpx.Response(200, json=760)
         )
 
-        body = json.loads((await restart_collector(client, collector_id=82))[0].text)
+        body = json.loads((await restart_collector(client, collector_id=41))[0].text)
 
-        assert json.loads(route.calls.last.request.content) == {}
-        assert body == {"collector_id": 82, "restart_job_id": 10}
+        assert json.loads(route.calls.last.request.content) == {
+            key: _COLLECTOR_41[key]
+            for key in (
+                "collectorSize",
+                "collectorConf",
+                "sbproxyConf",
+                "wrapperConf",
+                "watchdogConf",
+                "websiteConf",
+            )
+        }
+        assert body == {"collector_id": 41, "restart_job_id": 760}
+
+    @respx.mock
+    async def test_a_record_without_a_size_is_refused_before_the_restart(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import restart_collector
+
+        record = {key: value for key, value in _COLLECTOR_41.items() if key != "collectorSize"}
+        respx.get(f"{_BASE}/setting/collector/collectors/41").mock(
+            return_value=httpx.Response(200, json=record)
+        )
+        route = respx.post(f"{_BASE}/setting/collector/collectors/41/services/restart")
+
+        error = envelope(await restart_collector(client, collector_id=41))
+
+        assert error["code"] == "REJECTED_BY_TOOL"
+        assert "size" in error["message"]
+        assert not route.called
 
     @respx.mock
     async def test_refused_with_writes_off(self, client, monkeypatch):

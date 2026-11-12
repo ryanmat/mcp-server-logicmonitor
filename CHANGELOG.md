@@ -95,7 +95,8 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   most `max_bytes` bytes starting on a whole line, with `truncated`) and
   `get_collector_upgrade_history`. Collector operations, write-gated: `run_collector_status_check`
   (triggers a status check and waits up to 45 seconds for it), `restart_collector`
-  (annotated destructive) and `acknowledge_collector_down`. `get_collector_health` cites the
+  (annotated destructive; it sends the collector's own size and config files back, since a
+  restart sent without them reset a Large collector to Custom) and `acknowledge_collector_down`. `get_collector_health` cites the
   latest status check and five latest events as `evidence` for the collector asked for by id
   and each collector not known to be up, and `detect_site_outage`'s `collector_down` signal
   carries each down collector's evidence. `get_collectors` rows carry `is_down`, since
