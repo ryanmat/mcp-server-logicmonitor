@@ -356,9 +356,9 @@ class TestCappedAlertToolsWarn:
 
 
 # NetFlow answers. netflow_disabled and device_missing are live (sandbox, 2026-11-12); the pages
-# carry the swagger definitions' properties with placeholder values, and the graph the lines and
-# timestamps keys get_graph_data reads, since no portal with NetFlow data was read (see the
-# fixture's source entry).
+# carry the swagger definitions' properties with placeholder values, and the graph is the
+# swagger's GraphPlot cut to its lines and timestamps, the keys get_graph_data reads, since no
+# portal with NetFlow data was read (see the fixture's source entry).
 NETFLOW = json.loads((Path(__file__).parent.parent / "fixtures" / "netflow_reads.json").read_text())
 _DEVICE_1786 = f"{BASE}/device/devices/1786"
 
