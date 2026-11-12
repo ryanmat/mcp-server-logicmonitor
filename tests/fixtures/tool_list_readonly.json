@@ -20,6 +20,7 @@
   "get_alert_details",
   "get_alert_rule",
   "get_alert_rules",
+  "get_alert_settings",
   "get_alerts",
   "get_api_token",
   "get_api_tokens",

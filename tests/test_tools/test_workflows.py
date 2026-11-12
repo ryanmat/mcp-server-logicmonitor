@@ -1837,13 +1837,9 @@ class TestSearchTools:
         result = await search_tools(client, query="alert", category="alerts")
         data = json.loads(result[0].text)
         # All results should be from the alerts category
-        alert_tools = {
-            "get_alerts",
-            "get_alert_details",
-            "acknowledge_alert",
-            "add_alert_note",
-            "bulk_acknowledge_alerts",
-        }
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        alert_tools = set(TOOL_CATEGORIES["categories"]["alerts"]["tools"])
         for match in data["matches"]:
             assert match["name"] in alert_tools
 

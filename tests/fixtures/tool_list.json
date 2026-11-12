@@ -3041,6 +3041,67 @@
       "type": "object"
     }
   },
+  "get_alert_settings": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Read datapoint alert thresholds at instance, device or group level: each datapoint's threshold in force and the level it comes from (instance, instance_group, device_datasource, device_group with source_group, group or global), beside the level's own and the global threshold. Use it before tuning a noisy threshold with update_alert_settings.",
+    "inputSchema": {
+      "properties": {
+        "datapoint_id": {
+          "description": "One datapoint's setting (instance level)",
+          "type": "integer"
+        },
+        "datasource_id": {
+          "description": "Datasource ID (group level)",
+          "type": "integer"
+        },
+        "device_datasource_id": {
+          "description": "Device datasource ID, as get_device_datasources lists it (instance level)",
+          "type": "integer"
+        },
+        "device_id": {
+          "description": "Device ID (instance and device level)",
+          "type": "integer"
+        },
+        "group_id": {
+          "description": "Device group ID (group level)",
+          "type": "integer"
+        },
+        "instance_id": {
+          "description": "Instance ID (instance level)",
+          "type": "integer"
+        },
+        "level": {
+          "description": "instance: one device datasource instance (device_id, device_datasource_id, instance_id); device: every instance on device_id; group: a device group's settings for one datasource (group_id, datasource_id)",
+          "enum": [
+            "instance",
+            "device",
+            "group"
+          ],
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "type": "object"
+    }
+  },
   "get_alerts": {
     "annotations": {
       "destructiveHint": false,
@@ -7842,6 +7903,66 @@
       },
       "required": [
         "rule_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_alert_settings": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Set or clear one datapoint's alert threshold at instance or group level (requires write permission). threshold is an operator, a space and up to three values for warning, error and critical, such as '> 60 80 90'; '' clears the level's own threshold so it inherits again. A threshold that does not parse is refused before any call. The device level has no write.",
+    "inputSchema": {
+      "properties": {
+        "datapoint_id": {
+          "description": "Datapoint ID",
+          "type": "integer"
+        },
+        "datasource_id": {
+          "description": "Datasource ID (group level)",
+          "type": "integer"
+        },
+        "device_datasource_id": {
+          "description": "Device datasource ID, as get_device_datasources lists it (instance level)",
+          "type": "integer"
+        },
+        "device_id": {
+          "description": "Device ID (instance and device level)",
+          "type": "integer"
+        },
+        "group_id": {
+          "description": "Device group ID (group level)",
+          "type": "integer"
+        },
+        "instance_id": {
+          "description": "Instance ID (instance level)",
+          "type": "integer"
+        },
+        "level": {
+          "description": "instance: one device datasource instance (device_id, device_datasource_id, instance_id); device: every instance on device_id; group: a device group's settings for one datasource (group_id, datasource_id)",
+          "enum": [
+            "instance",
+            "device",
+            "group"
+          ],
+          "type": "string"
+        },
+        "note": {
+          "description": "Threshold history note (instance level)",
+          "type": "string"
+        },
+        "threshold": {
+          "description": "Threshold such as '> 60 80 90', 'delta> 5' or '( 00:00 12:00 ) > 90 , > 80'; '' to clear",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "threshold"
       ],
       "type": "object"
     }

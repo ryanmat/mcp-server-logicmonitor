@@ -443,6 +443,40 @@ class TestCollectorOperationTools:
         assert set(TOOL_CATEGORIES["categories"]["collectors"]["tools"]) >= _COLLECTOR_OPERATIONS
 
 
+class TestAlertSettingTools:
+    """R3.5: the threshold read and write are registered, gated and grouped."""
+
+    def test_the_read_is_read_only_and_the_write_is_a_write(self):
+        tools = {tool.name: tool for tool in TOOLS}
+
+        assert tools["get_alert_settings"].annotations.readOnlyHint is True
+        assert tools["update_alert_settings"].annotations.readOnlyHint is False
+        assert tools["update_alert_settings"].annotations.destructiveHint is False
+        assert "requires write permission" in tools["update_alert_settings"].description
+        assert {
+            name: get_tool_handler(name).__name__ for name in tools if "alert_settings" in name
+        } == {
+            "get_alert_settings": "get_alert_settings",
+            "update_alert_settings": "update_alert_settings",
+        }
+
+    def test_both_name_the_three_levels_and_the_write_needs_a_threshold(self):
+        schemas = {tool.name: tool.inputSchema for tool in TOOLS}
+
+        for name in ("get_alert_settings", "update_alert_settings"):
+            assert schemas[name]["properties"]["level"]["enum"] == ["instance", "device", "group"]
+        assert schemas["get_alert_settings"]["required"] == ["level"]
+        assert schemas["update_alert_settings"]["required"] == ["level", "threshold"]
+
+    def test_the_alerts_category_holds_them(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        assert set(TOOL_CATEGORIES["categories"]["alerts"]["tools"]) >= {
+            "get_alert_settings",
+            "update_alert_settings",
+        }
+
+
 class TestEdwinTools:
     """R3.1: the eight Edwin tools are registered, annotated and grouped."""
 

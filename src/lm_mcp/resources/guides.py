@@ -58,6 +58,8 @@ TOOL_CATEGORIES = {
                 "acknowledge_alert",
                 "add_alert_note",
                 "bulk_acknowledge_alerts",
+                "get_alert_settings",
+                "update_alert_settings",
             ],
         },
         "alert_rules": {

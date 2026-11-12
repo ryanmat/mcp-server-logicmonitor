@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 256 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 258 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -72,6 +72,8 @@ Alert monitoring and management
 | `acknowledge_alert` | Acknowledge an alert (requires write permission) Common mistakes: alert_id works with or without the LMA prefix. | Yes |
 | `add_alert_note` | Add a note to an alert without acknowledging (requires write permission) | Yes |
 | `bulk_acknowledge_alerts` | Acknowledge multiple alerts at once (max 100, requires write permission) | Yes |
+| `get_alert_settings` | Read datapoint alert thresholds at instance, device or group level: each datapoint's threshold in force and the level it comes from (instance, instance_group, device_datasource, device_group with source_group, group or global), beside the level's own and the global threshold. Use it before tuning a noisy threshold with update_alert_settings. | No |
+| `update_alert_settings` | Set or clear one datapoint's alert threshold at instance or group level (requires write permission). threshold is an operator, a space and up to three values for warning, error and critical, such as '> 60 80 90'; '' clears the level's own threshold so it inherits again. A threshold that does not parse is refused before any call. The device level has no write. | Yes |
 
 ## Alert Rules
 

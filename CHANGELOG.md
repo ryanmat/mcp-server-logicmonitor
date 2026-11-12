@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 256:
-244 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 258:
+246 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
-With writes off, the default, `tools/list` shows 140 of them, or 144 in multi-portal mode, and
+With writes off, the default, `tools/list` shows 141 of them, or 145 in multi-portal mode, and
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
@@ -102,6 +102,13 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   and each collector not known to be up, and `detect_site_outage`'s `collector_down` signal
   carries each down collector's evidence. `get_collectors` rows carry `is_down`, since
   `status` reads 1 whether a collector is up or down.
+- Alert thresholds: `get_alert_settings` reads a datapoint's threshold at instance, device or
+  group level with the level it comes from (instance, instance group, device datasource, device
+  group or global, in LogicMonitor's precedence), and `update_alert_settings` (write-gated) sets
+  or clears one at instance or group level, carrying the trigger, clear and no-data intervals in
+  force, which the API requires with a threshold. A threshold that does not parse is refused
+  before any call: the API stored a fourth value and answered 500 to an operator with no space
+  after it.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
