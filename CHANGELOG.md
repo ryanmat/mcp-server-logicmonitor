@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 249:
-237 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 253:
+241 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
-With writes off, the default, `tools/list` shows 136 of them, or 140 in multi-portal mode, and
+With writes off, the default, `tools/list` shows 140 of them, or 144 in multi-portal mode, and
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
@@ -89,6 +89,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   and active contract) and `get_log_usage`, in a `logs` category, with the `lm-logs` skill.
   There is no log search tool: `POST /log/search` at API version 3 applied neither the query
   nor the time range when probed.
+- Collector reads: `get_collector_events` (a collector's restarts, credential rotations and
+  down reports, newest first), `get_collector_log_files` (the log files a collector has
+  uploaded, as zip files), `get_collector_log_file` (the end of one uploaded file's text, at
+  most `max_bytes` bytes starting on a whole line, with `truncated`) and
+  `get_collector_upgrade_history`.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.

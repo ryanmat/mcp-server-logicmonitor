@@ -337,6 +337,72 @@ class TestLogTools:
         assert set(TOOL_CATEGORIES["categories"]["logs"]["tools"]) == _LOG_TOOLS
 
 
+_COLLECTOR_READS = {
+    "get_collector_events",
+    "get_collector_log_files",
+    "get_collector_log_file",
+    "get_collector_upgrade_history",
+}
+
+
+class TestCollectorReadTools:
+    """R3.4: the collector event, log file and upgrade history reads are registered,
+    read-only, handled and grouped."""
+
+    def test_each_is_registered_read_only_with_its_handler(self):
+        registered = {tool.name: tool for tool in TOOLS if tool.name in _COLLECTOR_READS}
+
+        assert set(registered) == _COLLECTOR_READS
+        assert all(tool.annotations.readOnlyHint is True for tool in registered.values())
+        assert {name: get_tool_handler(name).__name__ for name in _COLLECTOR_READS} == {
+            name: name for name in _COLLECTOR_READS
+        }
+
+    def test_the_schemas_declare_paging_ids_and_the_bounded_byte_cap(self):
+        tools = {tool.name: tool.inputSchema for tool in TOOLS}
+
+        for name in ("get_collector_events", "get_collector_log_files"):
+            assert {"collector_id", "limit", "offset"} <= set(tools[name]["properties"]), name
+            assert tools[name]["required"] == ["collector_id"], name
+        assert set(tools["get_collector_upgrade_history"]["properties"]) == {"limit", "offset"}
+        log_file = tools["get_collector_log_file"]
+        assert log_file["required"] == ["collector_id", "file_name"]
+        assert log_file["properties"]["max_bytes"] == {
+            "type": "integer",
+            "default": 20000,
+            "minimum": 1,
+            "maximum": 200000,
+            "description": log_file["properties"]["max_bytes"]["description"],
+        }
+
+    @pytest.mark.parametrize(
+        ("file_name", "valid"),
+        [
+            ("82.postcheck.log.zip", True),
+            ("stamp_1783411000000.48721.wrapper.1.log.zip", True),
+            ("a/b", False),
+            ("../x", False),
+            (".hidden", False),
+        ],
+    )
+    def test_file_name_admits_one_plain_path_segment(self, file_name, valid):
+        import jsonschema
+
+        (schema,) = [t.inputSchema for t in TOOLS if t.name == "get_collector_log_file"]
+        arguments = {"collector_id": 82, "file_name": file_name}
+
+        if valid:
+            jsonschema.validate(arguments, schema)
+        else:
+            with pytest.raises(jsonschema.ValidationError):
+                jsonschema.validate(arguments, schema)
+
+    def test_the_collectors_category_holds_them(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        assert set(TOOL_CATEGORIES["categories"]["collectors"]["tools"]) >= _COLLECTOR_READS
+
+
 class TestEdwinTools:
     """R3.1: the eight Edwin tools are registered, annotated and grouped."""
 

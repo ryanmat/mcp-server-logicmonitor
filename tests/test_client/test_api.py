@@ -152,6 +152,57 @@ class TestLogicMonitorClientRequests:
         assert "size=10" in str(route.calls.last.request.url)
 
 
+class TestGetBytes:
+    """get_bytes returns a body the API sends as a file, unparsed, through the same checks."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_returns_the_body_as_sent_with_the_query_and_signed_headers(self):
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/setting/x/logs/a.zip").mock(
+            return_value=Response(
+                200,
+                content=b"PK\x03\x04 not json",
+                headers={"content-type": "application/octet-stream"},
+            )
+        )
+
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=BearerAuth("test_token"),
+        ) as client:
+            body = await client.get_bytes("/setting/x/logs/a.zip", params={"format": "zip"})
+
+        assert body == b"PK\x03\x04 not json"
+        request = route.calls.last.request
+        assert request.url.params["format"] == "zip"
+        assert request.headers["Authorization"] == "Bearer test_token"
+        assert request.headers["X-Version"] == "3"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_404_raises_not_found(self):
+        from lm_mcp.auth.bearer import BearerAuth
+        from lm_mcp.client import LogicMonitorClient
+        from lm_mcp.exceptions import NotFoundError
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/setting/x/logs/b.zip").mock(
+            return_value=Response(
+                404,
+                json={"errorMessage": "No such log file found", "errorCode": 1404},
+            )
+        )
+
+        async with LogicMonitorClient(
+            base_url="https://test.logicmonitor.com/santaba/rest",
+            auth=BearerAuth("test_token"),
+        ) as client:
+            with pytest.raises(NotFoundError):
+                await client.get_bytes("/setting/x/logs/b.zip")
+
+
 class TestLogicMonitorClientErrors:
     """Tests for error handling."""
 
