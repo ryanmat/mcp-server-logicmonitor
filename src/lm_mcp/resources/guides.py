@@ -239,6 +239,7 @@ TOOL_CATEGORIES = {
                 "get_access_group",
                 "get_api_tokens",
                 "get_api_token",
+                "get_tenants",
             ],
         },
         "topology": {
@@ -312,6 +313,7 @@ TOOL_CATEGORIES = {
                 "get_services",
                 "get_service",
                 "get_service_groups",
+                "get_service_insights_rules",
                 "get_ops_notes",
                 "get_ops_note",
                 "add_ops_note",

@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 270 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -266,6 +266,7 @@ User, role, and access management
 | `get_access_group` | Get details about a specific access group | No |
 | `get_api_tokens` | List API tokens | No |
 | `get_api_token` | Get details about a specific API token | No |
+| `get_tenants` | List the portal's tenant names, as the tenants API answers them: names only, with no paging or detail. | No |
 
 ## Topology
 
@@ -351,6 +352,7 @@ Operations notes, OIDs, and services
 | `get_services` | List Service Insight business services (deviceType 6 devices, including APM trace services) | No |
 | `get_service` | Get details about a specific Service Insight service | No |
 | `get_service_groups` | List Service Insight service groups (BizService device groups) | No |
+| `get_service_insights_rules` | List the portal's Service Insights rules, rows as the API returns them. get_services lists the services themselves. | No |
 | `get_ops_notes` | List ops notes | No |
 | `get_ops_note` | Get details about a specific ops note | No |
 | `add_ops_note` | Add an ops note (requires write permission) | Yes |
