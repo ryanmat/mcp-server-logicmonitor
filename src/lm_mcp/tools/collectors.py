@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import time
@@ -27,11 +28,15 @@ logger = logging.getLogger(__name__)
 
 
 def _collector_row(item: dict) -> dict:
-    """Project one /setting/collector/collectors row onto the get_collectors fields."""
+    """Project one /setting/collector/collectors row onto the get_collectors fields.
+
+    status reads 1 whether the collector is up or down, so is_down carries isDown.
+    """
     return {
         "id": item.get("id"),
         "hostname": item.get("hostname"),
         "status": item.get("status"),
+        "is_down": item.get("isDown"),
         "device_count": item.get("numberOfHosts"),
     }
 
@@ -193,6 +198,8 @@ async def get_collector_health(
     (power outages, network partitions). Status is enriched with whether the
     collector is currently down, from the isDown field on its record, how many
     devices it monitors, and optionally alerts on a device named for its hostname.
+    The collector asked for by collector_id, and in a list each collector not known to
+    be up, carries evidence: its latest status check and its five latest events.
 
     Args:
         client: LogicMonitor API client.
@@ -219,7 +226,10 @@ async def get_collector_health(
 
         enriched: list[dict] = []
         for col in collectors:
-            enriched.append(await _enrich_collector(client, col, include_history, history_days))
+            with_evidence = collector_id is not None or col.get("isDown") is not False
+            enriched.append(
+                await _enrich_collector(client, col, include_history, history_days, with_evidence)
+            )
 
         down_count = sum(1 for c in enriched if c["is_down"])
         unknown_signal = sum(1 for c in enriched if c.get("down_signal_unavailable"))
@@ -247,8 +257,9 @@ async def _enrich_collector(
     col: dict,
     include_history: bool,
     history_days: int,
+    with_evidence: bool,
 ) -> dict:
-    """Attach the down state and downstream device count to a collector."""
+    """Attach the down state, downstream device count and, when asked, the evidence."""
     cid = col.get("id")
     hostname = col.get("hostname") or ""
     num_hosts_reported = col.get("numberOfHosts") or 0
@@ -301,7 +312,66 @@ async def _enrich_collector(
         record["collector_down_history"] = history
     if history_warning:
         record["history_warning"] = history_warning
+    if with_evidence:
+        record["evidence"], evidence_warning = await _collector_evidence(client, cid)
+        if evidence_warning:
+            record["evidence_warning"] = evidence_warning
     return record
+
+
+# Events cited as a collector's evidence, newest first.
+_EVIDENCE_EVENTS = 5
+
+
+def _status_check(body: dict) -> dict:
+    """Project a services/getStatusCheck answer: its progress and the checks not OK."""
+    points = body.get("checkPoints") or []
+    return {
+        "finished": body.get("finished"),
+        "aborted": body.get("aborted"),
+        "last_triggered": body.get("lastTriggeredMills"),
+        "last_updated": body.get("lastUpdateMills"),
+        "scripts_total": body.get("totalScriptCount"),
+        "scripts_finished": body.get("finishedScriptCount"),
+        "scripts_skipped": body.get("skippedScriptCount"),
+        "checks_ok": sum(1 for point in points if point.get("status") == "OK"),
+        "problems": [
+            {
+                "name": point.get("name"),
+                "status": point.get("status"),
+                "detail": point.get("detail"),
+            }
+            for point in points
+            if point.get("status") != "OK"
+        ],
+    }
+
+
+async def _collector_evidence(
+    client: LogicMonitorClient, collector_id: int | None
+) -> tuple[dict, str | None]:
+    """Read a collector's latest status check and recent events, once each.
+
+    A failed read leaves its part null, which does not mean the collector has no check
+    or events, and names the failure in the warning.
+    """
+    path = f"/setting/collector/collectors/{collector_id}"
+    evidence: dict = {"status_check": None, "recent_events": None}
+    warnings: list[str] = []
+    try:
+        evidence["status_check"] = _status_check(
+            await client.get(f"{path}/services/getStatusCheck")
+        )
+    except Exception as exc:
+        logger.warning("collector %s: status check read failed", collector_id, exc_info=True)
+        warnings.append(f"Status check read failed: {exc}")
+    try:
+        events = await client.get(f"{path}/events", params={"size": _EVIDENCE_EVENTS})
+        evidence["recent_events"] = [_event_row(item) for item in events.get("items", [])]
+    except Exception as exc:
+        logger.warning("collector %s: events read failed", collector_id, exc_info=True)
+        warnings.append(f"Events read failed: {exc}")
+    return evidence, "; ".join(warnings) or None
 
 
 async def _collector_down_history(
@@ -516,6 +586,158 @@ async def get_collector_upgrade_history(
         limit=limit,
         offset=offset,
     )
+
+
+# Seconds between status check reads, and the longest run_collector_status_check waits
+# for the check it triggered to finish.
+STATUS_CHECK_POLL_SECONDS = 5
+STATUS_CHECK_BUDGET_SECONDS = 45
+
+STATUS_CHECK_RUNNING_NOTE = (
+    "The status check is still running; get_collector_health with this collector_id reads "
+    "its latest result."
+)
+STATUS_CHECK_NOT_STARTED_NOTE = (
+    "The triggered check had not reported when the wait ended, so the other fields are the "
+    "check before it; get_collector_health with this collector_id reads the new one later."
+)
+
+
+@require_write_permission
+async def run_collector_status_check(
+    client: LogicMonitorClient,
+    collector_id: int,
+) -> list[TextContent]:
+    """Trigger a collector status check and read its result.
+
+    The check that was last triggered is read first; after the trigger the tool reads until
+    a newer check (one whose trigger time differs from the first read) finishes or aborts, or
+    STATUS_CHECK_BUDGET_SECONDS pass. A newer check still running then is returned with
+    finished false and STATUS_CHECK_RUNNING_NOTE; when no newer check has reported, finished
+    is false and STATUS_CHECK_NOT_STARTED_NOTE says the fields are the previous check's.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID.
+
+    Returns:
+        List of TextContent with the trigger's answer and the status check, or an error
+        envelope.
+    """
+    try:
+        path = f"/setting/collector/collectors/{collector_id}/services"
+        before = (await client.get(f"{path}/getStatusCheck")).get("lastTriggeredMills")
+        triggered = await client.post(f"{path}/triggerStatusCheck")
+        deadline = time.monotonic() + STATUS_CHECK_BUDGET_SECONDS
+        while True:
+            check = await client.get(f"{path}/getStatusCheck")
+            newer = check.get("lastTriggeredMills") != before
+            if (newer and (check.get("finished") or check.get("aborted"))) or (
+                time.monotonic() >= deadline
+            ):
+                break
+            await asyncio.sleep(STATUS_CHECK_POLL_SECONDS)
+        result: dict = {
+            "collector_id": collector_id,
+            "triggered": triggered,
+            **_status_check(check),
+        }
+        if not newer:
+            result["finished"] = False
+            result["note"] = STATUS_CHECK_NOT_STARTED_NOTE
+        elif not (result["finished"] or result["aborted"]):
+            result["note"] = STATUS_CHECK_RUNNING_NOTE
+        return format_response(result)
+    except Exception as e:
+        return handle_error(e)
+
+
+# The restart's override fields, each read from the collector's record and sent back.
+_RESTART_OVERRIDES = (
+    "collectorSize",
+    "collectorConf",
+    "sbproxyConf",
+    "wrapperConf",
+    "watchdogConf",
+    "websiteConf",
+)
+
+
+@require_write_permission
+async def restart_collector(
+    client: LogicMonitorClient,
+    collector_id: int,
+) -> list[TextContent]:
+    """Restart a collector, sending its own size and config files back so neither changes.
+
+    The restart takes them as overrides. A restart sent without collectorSize reset a Large
+    collector to Custom; one sent with only collectorSize left four config files byte-identical
+    and rewrote collectorConf for the new size (probe 2026-11-11). All five are sent back, so
+    the restart cannot change them. A record with no collectorSize is refused rather than
+    restarted.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID.
+
+    Returns:
+        List of TextContent with the restart's async job id and the size sent back, or an
+        error envelope.
+    """
+    try:
+        path = f"/setting/collector/collectors/{collector_id}"
+        collector = await client.get(path)
+        if not collector.get("collectorSize"):
+            return format_response(
+                {
+                    "error": True,
+                    "code": "REJECTED_BY_TOOL",
+                    "message": f"Collector {collector_id}'s record carries no collectorSize, and "
+                    "a restart without one resets the collector's size. Restart it in the portal.",
+                    "collector_id": collector_id,
+                }
+            )
+        overrides = {
+            key: collector[key] for key in _RESTART_OVERRIDES if collector.get(key) is not None
+        }
+        job = await client.post(f"{path}/services/restart", json_body=overrides)
+        return format_response(
+            {
+                "collector_id": collector_id,
+                "restart_job_id": job,
+                "collector_size": overrides["collectorSize"],
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def acknowledge_collector_down(
+    client: LogicMonitorClient,
+    collector_id: int,
+    comment: str,
+) -> list[TextContent]:
+    """Acknowledge a down collector's alert with a comment.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID.
+        comment: The acknowledgement comment.
+
+    Returns:
+        List of TextContent confirming the acknowledgement, or an error envelope.
+    """
+    try:
+        await client.post(
+            f"/setting/collector/collectors/{collector_id}/ackdown",
+            json_body={"comment": comment},
+        )
+        return format_response(
+            {"collector_id": collector_id, "acknowledged": True, "comment": comment}
+        )
+    except Exception as e:
+        return handle_error(e)
 
 
 @require_write_permission

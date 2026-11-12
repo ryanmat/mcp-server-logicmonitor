@@ -7,6 +7,7 @@ import json
 import re
 import time
 from contextlib import ExitStack
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -198,6 +199,12 @@ def _power_alert() -> dict:
     }
 
 
+# Collector answers of a sandbox portal on 2026-11-11 (tests/test_tools/test_collectors.py).
+_COLLECTOR_OPS = json.loads(
+    (Path(__file__).parent.parent / "fixtures" / "collector_ops.json").read_text()
+)
+
+
 def _mock_site_portal(
     devices: list[dict],
     collector: httpx.Response,
@@ -206,6 +213,7 @@ def _mock_site_portal(
 ) -> None:
     """Route one detect_site_outage run on group 42, served by collector 1.
 
+    Collector 1's evidence reads answer a down collector's status check and no events.
     The burst read is analyze_alerts on interface datasources: its active read gets
     burst and its cleared read an empty page. The power read carries no datasource
     clause and gets power.
@@ -218,6 +226,12 @@ def _mock_site_portal(
 
     respx.get(f"{_BASE}/device/devices").mock(side_effect=device_route)
     respx.get(f"{_BASE}/setting/collector/collectors/1").mock(return_value=collector)
+    respx.get(f"{_BASE}/setting/collector/collectors/1/services/getStatusCheck").mock(
+        return_value=_ok(_COLLECTOR_OPS["status_check_26_down"])
+    )
+    respx.get(f"{_BASE}/setting/collector/collectors/1/events").mock(
+        return_value=_ok({"total": 0, "items": []})
+    )
     respx.get(f"{_BASE}/device/groups/42").mock(
         return_value=_ok({"id": 42, "fullPath": "Sites/HQ"})
     )
@@ -2017,6 +2031,52 @@ class TestDetectSiteOutage:
         reset_config()
         yield
         reset_config()
+
+    async def test_the_collector_down_signal_cites_each_down_collectors_evidence(self, client):
+        """R3.4: the evidence get_collector_health read for each down collector, once per
+        collector, rides on the collector_down signal; an up collector adds none."""
+        from lm_mcp.tools.workflows import detect_site_outage
+
+        evidence = {
+            "status_check": {"finished": True, "checks_ok": 0, "problems": [{"name": "x"}]},
+            "recent_events": [{"message": "The collector is down or unreachable"}],
+        }
+        records = {
+            1: {"id": 1, "hostname": "col-01", "is_down": True, "evidence": evidence},
+            2: {"id": 2, "hostname": "col-02", "is_down": False, "evidence": {}},
+        }
+        health = AsyncMock(
+            side_effect=lambda client, collector_id, include_history: _mock_text(
+                {"collectors": [records[collector_id]]}
+            )
+        )
+        devices_data = {
+            "devices": [
+                {"id": 1, "status": "dead-collector", "collector_id": 1},
+                {"id": 2, "status": "normal", "collector_id": 2},
+            ]
+        }
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            patch("lm_mcp.tools.collectors.get_collector_health", health),
+            _patch_window(bursts={"bursts_detected": 0, "bursts": []}),
+            _patch_sub(
+                "lm_mcp.tools.networking.get_power_events",
+                {"total_power_events": 0, "events": []},
+            ),
+        ):
+            result = await detect_site_outage(client, group_id=42)
+
+        data = json.loads(result[0].text)
+        jsonschema.validate(data, DETECT_SITE_OUTAGE_OUTPUT_SCHEMA)
+        assert sorted(call.kwargs["collector_id"] for call in health.await_args_list) == [1, 2]
+        assert data["signals"]["collector_down"] == {
+            "triggered": True,
+            "count": 1,
+            "weight": 40,
+            "evidence": [{"collector_id": 1, "hostname": "col-01", "evidence": evidence}],
+        }
 
     async def test_all_signals_trigger_site_outage_detected(self, client):
         """CollectorDown + burst + power + silence → verdict = site_outage_detected.
