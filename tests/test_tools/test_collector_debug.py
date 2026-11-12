@@ -1,15 +1,20 @@
-# Description: Tests for collector_debug's builder, allowlist, argument checks, masking and parse.
-# Description: Hostile-input cases from PR #97 and its 2026-10-31 review; no transport is called.
+# Description: Tests for collector_debug: builder, allowlist, checks, masking, parse and transport.
+# Description: Hostile-input cases from PR #97 and its review; transport replies are live-shaped.
 # ruff: noqa: E501  (expected command lines and masked text are kept on one line to stay readable)
 
+import asyncio
 import dataclasses
+import gc
 import json
 import logging
 import time
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
 
+from lm_mcp.client import build_client
 from lm_mcp.exceptions import (
     AuthenticationError,
     LMError,
@@ -19,6 +24,7 @@ from lm_mcp.exceptions import (
 )
 from lm_mcp.logging import is_sensitive_key
 from lm_mcp.tools import collector_debug as cd
+from lm_mcp.tools import is_error_result
 from lm_mcp.tools.collector_debug import (
     ALLOWED_HEADS,
     BLOCKED,
@@ -32,16 +38,21 @@ from lm_mcp.tools.collector_debug import (
     build_cmdline,
     check_cmdline,
     check_request,
+    collector_debug,
     describe_failure,
     parse_health_check,
     parse_reply,
     redact,
     target_from_record,
 )
+from tests.envelope import envelope
 
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 # Collector 161's stored health check, read live on 2026-11-12 (docs/validation/probes-2026-11.md,
 # Step 72): 39 blocks, a WARN and a DISABLED checkpoint, one script at status 1.
-LIVE_HEALTH = (Path(__file__).parent.parent / "fixtures" / "collector_health_check.txt").read_text()
+LIVE_HEALTH = (FIXTURES / "collector_health_check.txt").read_text()
+# Live POST /debug and GET /debug/{sessionId} exchanges (probes-2026-11.md, Step 73), verbatim.
+LIVE = json.loads((FIXTURES / "collector_debug_exchanges.json").read_text())
 # Built in two parts, so the repository's private-key hook does not read a test as a key.
 PEM_BEGIN = "-----BEGIN RSA " + "PRIVATE KEY-----"
 PEM_END = "-----END RSA " + "PRIVATE KEY-----"
@@ -51,16 +62,22 @@ PGP_BEGIN = "-----BEGIN PGP " + "PRIVATE KEY BLOCK-----"
 def assert_linear(work, make, small: int = 50_000, large: int = 200_000) -> None:
     """Four times the input takes about four times as long; a square would take sixteen.
 
-    The best of three runs at each size is compared, the margin is wide for a loaded machine,
-    and a small run under 10 ms counts as 10 ms, so timer noise on tiny runs does not decide.
+    The best of three runs at each size is compared, each with the garbage collector paused so
+    a collection pause is not read as growth, the margin is wide for a loaded machine, and a
+    small run under 10 ms counts as 10 ms, so timer noise on tiny runs does not decide.
     """
 
     def best(text: str) -> float:
         times = []
         for _ in range(3):
-            started = time.perf_counter()
-            work(text)
-            times.append(time.perf_counter() - started)
+            gc.collect()
+            gc.disable()
+            try:
+                started = time.perf_counter()
+                work(text)
+                times.append(time.perf_counter() - started)
+            finally:
+                gc.enable()
         return min(times)
 
     fast, slow = best(make(small)), best(make(large))
@@ -143,8 +160,8 @@ class TestBuilder:
             ("firewallstatus", {}, "!firewallstatus"), ("ipaddress", {}, "!ipaddress"),
             ("tasklist", {}, "!tasklist"), ("adlist", {}, "!adlist"), ("nsplist", {}, "!nsplist"),
             ("dxlist", {}, "!dxlist"), ("tplist", {}, "!tplist"), ("macaddress", {}, "!macaddress 10.0.0.5"),
-            ("wmi", {"query": "select * from Win32_Process where User = 'svc'"},
-             "!wmi h=10.0.0.5 select * from Win32_Process where User = 'svc'"),
+            ("wmi", {"query": "select Name, ProcessId from Win32_Process where User = 'svc'"},
+             "!wmi h=10.0.0.5 select Name, ProcessId from Win32_Process where User = 'svc'"),
             ("snmpwalk", {"oid": ".1.3.6.1.2.1.2"}, "!snmpwalk 10.0.0.5 .1.3.6.1.2.1.2"),
             ("logsurf", {"n": ""}, "!logsurf level=error n=50 wrapper.log"),
             ("logsurf", {"files": ["wrapper.log", "wrapper.log"]}, "!logsurf level=error n=50 wrapper.log"),
@@ -244,8 +261,8 @@ class TestBuilder:
         "host,url",
         [
             ("device-example-1.example.net", "https://DEVICE-EXAMPLE-1.example.net/health"),
-            ("fe80::1", "https://[fe80::1]:8443/health"),
-            ("[fe80::1]", "https://[FE80::1]/health"),
+            ("2001:db8::1", "https://[2001:db8::1]:8443/health"),
+            ("[2001:db8::1]", "https://[2001:DB8::1]/health"),
             ("DEVICE-EXAMPLE-1.example.net", "https://device-example-1.example.net/health"),
         ],
     )
@@ -1098,3 +1115,1103 @@ class TestFailureLogging:
             result = parse_reply(parse_health_check, LIVE_HEALTH)
         assert result["parsed"]["checks_parsed"] == 39 and "parse_partial" not in result
         assert self.records(caplog) == []
+
+
+# ---------------------------------------------------------------- the tool and its transport
+
+PORTAL_HOST = "test.logicmonitor.com"
+# The device the live !ping ran against (probes-2026-11.md, Step 73), as its record reads.
+PROBED = {"id": 89818, "name": "127.0.0.1", "displayName": "example-vm", "currentCollectorId": 82}
+# A device on a routable address, for http, which never reaches a loopback host.
+WEB = {"id": 42, "name": "10.0.0.42", "displayName": "example-web", "currentCollectorId": 82}
+# The portal's 403 body, as test_execute_tool copies it from a live read.
+FORBIDDEN = {"errorMessage": "Permission denied", "errorCode": 1403, "errorDetail": None}
+LOGGER = "lm_mcp.tools.collector_debug"
+
+
+@pytest.fixture
+def client(monkeypatch):
+    """The client production builds, for a single portal with writes on."""
+    monkeypatch.setenv("LM_PORTAL", PORTAL_HOST)
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+    monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+    from lm_mcp.config import get_config
+
+    config = get_config()
+    return build_client(
+        config.portal,
+        bearer_token=config.bearer_token,
+        access_id=config.access_id,
+        access_key=config.access_key,
+    )
+
+
+@pytest.fixture
+def fast_polls(monkeypatch):
+    monkeypatch.setattr(cd, "POLL_SECONDS", 0.01)
+    cd._POSTS.clear()
+    cd._GETS.clear()
+
+
+def portal_error(status: int, message: str) -> dict:
+    """An error body in the portal's shape (LIVE["post_unknown_command"])."""
+    return {
+        "status": status,
+        "body": {"errorMessage": message, "errorCode": 1000 + status, "errorDetail": None},
+    }
+
+
+def mount(
+    replies=None, *, answer_form="with", post_error=None, post_body=None, device=None, pending=0
+):
+    """The debug API as the live portal answers it (LIVE). The POST gives a session id. A poll on
+    the read that is not answering says cancelled; the first `pending` polls on the answering
+    read say the agent is still working (HTTP 202); then the reply for the command line. replies
+    maps a command-line prefix to its output, or to "slow" for a session that never answers.
+    Returns the command lines sent."""
+    seen: list[str] = []
+    polls = [0]
+    sid = LIVE["post_accepted"]["body"]["sessionId"]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path.removeprefix("/santaba/rest")
+        if request.method == "POST" and path == "/debug":
+            cmdline = json.loads(request.content)["cmdline"]
+            seen.append(cmdline)
+            if post_error:
+                return httpx.Response(post_error["status"], json=post_error["body"])
+            body = (
+                post_body
+                if post_body is not None
+                else {**LIVE["post_accepted"]["body"], "cmdline": cmdline}
+            )
+            return httpx.Response(200, json=body)
+        if path == f"/debug/{sid}":
+            form = "with" if "collectorId" in request.url.params else "without"
+            if form != answer_form:
+                return httpx.Response(200, json=LIVE["poll_cancelled"]["body"])
+            polls[0] += 1
+            out = next((v for k, v in (replies or {}).items() if seen[-1].startswith(k)), "ok")
+            if polls[0] <= pending or out == "slow":
+                return httpx.Response(202, json=LIVE["poll_pending"]["body"])
+            return httpx.Response(200, json={**LIVE["poll_answer_ping"]["body"], "output": out})
+        if path.startswith("/device/devices/") and device is not None:
+            return httpx.Response(200, json=device)
+        return httpx.Response(
+            404, json={"errorMessage": "unmocked", "errorCode": 1404, "errorDetail": None}
+        )
+
+    respx.route(host=PORTAL_HOST).mock(side_effect=handler)
+    return seen
+
+
+async def run(client, **kw):
+    """Call the tool. An answer returns its body; an error returns the envelope's details with
+    its code, message and retry_after. _is_error is read from the result type."""
+    result = await collector_debug(client, **kw)
+    if is_error_result(result):
+        error = envelope(result)
+        data = {**(error["details"] or {}), "code": error["code"], "message": error["message"]}
+        data["retry_after"] = error["retry_after"]
+    else:
+        data = json.loads(result[0].text)
+    data["_is_error"] = is_error_result(result)
+    return data
+
+
+def posted(collector: int | None = None) -> list[dict]:
+    """The POST /debug calls respx saw, with their collectorId."""
+    return [
+        {"collectorId": c.request.url.params.get("collectorId"), **json.loads(c.request.content)}
+        for c in respx.calls
+        if c.request.method == "POST"
+    ]
+
+
+@pytest.mark.usefixtures("fast_polls")
+class TestTool:
+    @respx.mock
+    async def test_answers_and_parses_the_live_health_check(self, client):
+        seen = mount({"!shealthcheck": LIVE_HEALTH})
+        data = await run(client, command="health_check", collector_id=161)
+        assert data["status"] == "answered" and not data["_is_error"]
+        assert seen == ["!shealthcheck func=detail collector=161"] and data["cmdline"] == seen[0]
+        assert data["parsed"]["methods_by_all_nan_rate"][0]["method"] == "SCRIPT"
+        assert data["parsed"]["checkpoints_unreadable"] == []
+        assert data["output_chars"] == len(LIVE_HEALTH)
+        assert len(data["output"]) == 4000 and data["truncated"] is True
+        assert data["read_form"] == "with" and data["group"] == "collector"
+
+    @pytest.mark.parametrize("form", ["with", "without"])
+    @respx.mock
+    async def test_either_read_can_be_the_one_that_answers(self, client, form):
+        uptime = LIVE["poll_answer_uptime"]["body"]["output"]
+        mount({"!uptime": uptime}, answer_form=form)
+        data = await run(client, command="uptime", collector_id=82)
+        assert (
+            data["status"] == "answered" and data["output"] == uptime and data["read_form"] == form
+        )
+
+    @respx.mock
+    async def test_both_reads_are_asked_on_every_poll(self, client):
+        """Live, either read says cancelled while the other answers, on one portal."""
+        mount({"!uptime": "uptime=1h"}, answer_form="without", pending=2)
+        data = await run(client, command="uptime", collector_id=82)
+        reads = [
+            "collectorId" in c.request.url.params for c in respx.calls if c.request.method == "GET"
+        ]
+        assert reads == [True, False] * 3
+        assert data["status"] == "answered" and data["api_calls"] == 7
+
+    @respx.mock
+    async def test_the_live_ping_runs_on_the_records_collector_against_its_host(self, client):
+        ping = LIVE["poll_answer_ping"]["body"]["output"]
+        seen = mount({"!ping": ping}, device=PROBED)
+        data = await run(client, command="ping", device_id=89818)
+        assert seen == ["!ping 127.0.0.1"]
+        assert posted() == [{"collectorId": "82", "cmdline": "!ping 127.0.0.1"}]
+        assert data["collector_id"] == 82 and data["output"] == ping
+        assert data["device"] == {"device_id": 89818, "host_used": "127.0.0.1"}
+        assert data["group"] == "device"
+
+    @respx.mock
+    async def test_a_caller_host_cannot_override_the_record(self, client):
+        mount(device=PROBED)
+        data = await run(client, command="ping", device_id=89818, args={"host": "10.0.0.9"})
+        assert data["code"] == "REJECTED_BY_TOOL" and data["status"] == "rejected_by_tool"
+        assert "'host' is not accepted" in data["message"]
+        assert not respx.calls
+
+    @respx.mock
+    async def test_a_device_probe_without_device_id_sends_nothing(self, client):
+        mount()
+        data = await run(client, command="ping", collector_id=82)
+        assert data["code"] == "REJECTED_BY_TOOL" and "needs device_id" in data["message"]
+        assert not respx.calls
+
+    @pytest.mark.parametrize("name", ["bad host; !restart", "-n"])
+    @respx.mock
+    async def test_a_record_host_that_is_not_plain_is_refused(self, client, name):
+        seen = mount(device={**PROBED, "name": name})
+        data = await run(client, command="ping", device_id=89818)
+        assert data["code"] == "REJECTED_BY_TOOL" and "plain hostname" in data["message"]
+        assert seen == []
+
+    @pytest.mark.parametrize(
+        "command,args",
+        [("ping", {"count": 999}), ("ping", {"count": float("inf")}), ("ping", {"bogus": 1}),
+         ("wmi", {"query": "select * from X h=evil"}),
+         ("wmi", {"query": "select * from X where Name = 'a' !restart"}),
+         ("http", {"url": "https://admin:x@127.0.0.1/"}), ("http", {"url": "https://127.0.0.1/?password=x"}),
+         ("http", {"url": "ftp://127.0.0.1/"})],
+    )  # fmt: skip
+    @respx.mock
+    async def test_values_are_refused_before_the_device_is_read(self, client, command, args):
+        mount(device=PROBED)
+        data = await run(client, command=command, device_id=89818, args=args)
+        assert data["code"] == "REJECTED_BY_TOOL" and data["_is_error"]
+        assert not respx.calls
+
+    @respx.mock
+    async def test_http_runs_only_against_the_device_record(self, client):
+        seen = mount({"!http": "HTTP/1.1 200 OK"}, device=WEB)
+        ok = await run(
+            client, command="http", device_id=42, args={"url": "https://10.0.0.42/health"}
+        )
+        refused = await run(
+            client,
+            command="http",
+            device_id=42,
+            args={"url": "http://169.254.169.254/latest/meta-data/"},
+        )
+        assert ok["status"] == "answered" and refused["code"] == "REJECTED_BY_TOOL"
+        assert seen == ["!http https://10.0.0.42/health"]
+
+    @respx.mock
+    async def test_the_portal_check_targets_the_configured_portal(self, client):
+        seen = mount({"!checkserverconnectivity": "PING: Fail, HTTP: OK"})
+        data = await run(client, command="checkserverconnectivity", collector_id=82)
+        assert seen == [f"!checkserverconnectivity {PORTAL_HOST}"] and data["status"] == "answered"
+
+    @respx.mock
+    async def test_an_unknown_key_names_the_keys_the_command_takes(self, client):
+        mount(device=PROBED)
+        data = await run(
+            client, command="ping", device_id=89818, args={"bogus": "x", "community": "public"}
+        )
+        assert "ping takes count, type; not bogus, community" in data["message"]
+        assert not respx.calls
+
+    @respx.mock
+    async def test_args_must_be_an_object(self, client):
+        mount()
+        data = await run(client, command="uptime", collector_id=82, args=["x"])
+        assert data["code"] == "REJECTED_BY_TOOL" and "'args' must be an object" in data["message"]
+
+    @respx.mock
+    async def test_output_is_masked(self, client):
+        mount({"!logsurf": "connecting with password=hunter2 to host"})
+        data = await run(client, command="logsurf", collector_id=82)
+        assert "hunter2" not in json.dumps(data) and "password=***" in data["output"]
+
+    @respx.mock
+    async def test_a_probe_cannot_run_on_another_collector(self, client):
+        seen = mount(device=PROBED)
+        data = await run(client, command="ping", device_id=89818, collector_id=99)
+        assert "collector that serves the device (82), not collector 99" in data["message"]
+        assert seen == []
+
+    @pytest.mark.parametrize("record", [SERVICE, CLOUD])
+    @respx.mock
+    async def test_a_live_collectorless_device_is_refused(self, client, record):
+        seen = mount(device=record)
+        data = await run(client, command="ping", device_id=record["id"])
+        assert data["code"] == "REJECTED_BY_TOOL" and "names no collector" in data["message"]
+        assert seen == []
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [{"budget_seconds": float("nan")}, {"budget_seconds": float("inf")},
+         {"max_output_chars": float("nan")}, {"budget_seconds": "soon"}],
+    )  # fmt: skip
+    @respx.mock
+    async def test_budgets_that_are_not_finite_are_refused_before_any_call(self, client, kwargs):
+        mount()
+        data = await run(client, command="uptime", collector_id=82, **kwargs)
+        assert data["code"] == "REJECTED_BY_TOOL" and "finite" in data["message"]
+        assert not respx.calls
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [{"collector_id": "abc"}, {"collector_id": -5}, {"collector_id": 0},
+         {"collector_id": True}, {"device_id": "42"}, {"device_id": 4.0}],
+    )  # fmt: skip
+    @respx.mock
+    async def test_ids_are_checked_before_any_call(self, client, kwargs):
+        mount(device=PROBED)
+        data = await run(client, command="ping", **{"device_id": 89818, **kwargs})
+        assert data["code"] == "REJECTED_BY_TOOL" and "positive whole number" in data["message"]
+        assert not respx.calls
+
+    @respx.mock
+    async def test_the_portals_words_are_masked_in_the_error(self, client):
+        mount(post_error=portal_error(400, "bad request: password=hunter2"))
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["_is_error"] and "hunter2" not in json.dumps(data)
+        assert "password=***" in data["message"]
+
+    @respx.mock
+    async def test_a_pending_status_is_masked(self, client):
+        def handler(request):
+            if request.method == "POST":
+                return httpx.Response(200, json=LIVE["post_accepted"]["body"])
+            return httpx.Response(
+                202,
+                json={
+                    **LIVE["poll_pending"]["body"],
+                    "errorMessage": "agent has fetched the task, password=hunter2",
+                },
+            )
+
+        respx.route(host=PORTAL_HOST).mock(side_effect=handler)
+        data = await run(client, command="uptime", collector_id=82, budget_seconds=2)
+        assert data["status"] == "no_reply"
+        assert "password=***" in data["detail"] and "hunter2" not in json.dumps(data)
+
+    @respx.mock
+    async def test_budget_and_output_are_clamped(self, client):
+        mount({"!uptime": "x" * 3000})
+        data = await run(
+            client, command="uptime", collector_id=82, budget_seconds=1000, max_output_chars=600
+        )
+        assert data["budget_seconds"] == BUDGET_MAX
+        assert (
+            len(data["output"]) == 600
+            and data["truncated"] is True
+            and data["output_chars"] == 3000
+        )
+
+    @respx.mock
+    async def test_bad_api_credentials_are_not_called_a_missing_permission(self, client):
+        mount(post_error=portal_error(401, "Authentication failed"))
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "error" and data["code"] == "AUTH_FAILED"
+        assert "API credentials" in data["detail"]
+
+    @respx.mock
+    async def test_refused_without_the_debug_permission(self, client):
+        mount(post_error={"status": 403, "body": FORBIDDEN})
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "refused" and data["code"] == "AUTH_FAILED" and data["_is_error"]
+        assert data["message"].startswith("uptime: refused: ")
+
+    @respx.mock
+    async def test_the_live_unknown_command_reply_is_unsupported(self, client):
+        mount(post_error=LIVE["post_unknown_command"])
+        data = await run(client, command="nsplist", collector_id=82)
+        assert data["status"] == "unsupported" and data["code"] == "INVALID_REQUEST"
+        assert "Unknown debug command !nosuchcmd" in data["message"]
+
+    @respx.mock
+    async def test_the_live_unknown_collector_reply_carries_the_portals_words(self, client):
+        mount(post_error=LIVE["post_unknown_collector"])
+        data = await run(client, command="uptime", collector_id=999999)
+        assert data["status"] == "error" and data["_is_error"]
+        assert "No such collector<id=999999>" in data["message"]
+
+    @respx.mock
+    async def test_debug_disabled_on_the_collector(self, client):
+        mount(post_error=portal_error(400, "remote debug is disabled on this collector"))
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "disabled" and data["code"] == "FEATURE_DISABLED"
+
+    @respx.mock
+    async def test_an_answer_is_not_an_error(self, client):
+        mount({"!uptime": "uptime=1h"})
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "answered" and not data["_is_error"]
+
+    @respx.mock
+    async def test_no_reply_inside_the_budget_is_a_result(self, client):
+        mount({"!uptime": "slow"})
+        data = await run(client, command="uptime", collector_id=82, budget_seconds=2)
+        assert data["status"] == "no_reply" and not data["_is_error"]
+        assert "waiting for response" in data["detail"] and data["elapsed_ms"] < 3500
+
+    @respx.mock
+    async def test_the_live_still_working_reply_keeps_polling(self, client):
+        mount({"!ping": LIVE["poll_answer_ping"]["body"]["output"]}, device=PROBED, pending=3)
+        data = await run(client, command="ping", device_id=89818)
+        assert data["status"] == "answered" and data["output"].startswith("Sent: 10")
+
+    @respx.mock
+    async def test_a_usage_reply_is_flagged_as_the_commands_fault(self, client):
+        mount({"!sslcerts": "Usage: !sslcerts [timeout=XX] host port"}, device=PROBED)
+        data = await run(client, command="sslcerts", device_id=89818, args={"port": 443})
+        assert data["status"] == "answered" and "not the device" in data["note"]
+
+    @pytest.mark.parametrize("reply", ["cpu usage: 12%", "<title>Invalid URL</title>"])
+    @respx.mock
+    async def test_a_device_reply_is_not_read_as_a_usage_banner(self, client, reply):
+        mount({"!http": reply}, device=WEB)
+        data = await run(client, command="http", device_id=42, args={"url": "http://10.0.0.42/"})
+        assert data["status"] == "answered" and "note" not in data
+
+    @respx.mock
+    async def test_an_unknown_config_key_is_flagged(self, client):
+        mount({"!getconfig": "Configuration key [collector.zzz.threadpool] not found"})
+        data = await run(
+            client, command="getconfig", collector_id=82, args={"key": "collector.zzz.threadpool"}
+        )
+        assert data["status"] == "answered" and "agent.conf key" in data["note"]
+
+    @respx.mock
+    async def test_an_unknown_command_lists_the_safe_set(self, client):
+        mount()
+        data = await run(client, command="restart", collector_id=82)
+        assert data["code"] == "REJECTED_BY_TOOL" and "Commands: " in data["message"]
+        assert "uptime" in data["message"] and not respx.calls
+
+    @respx.mock
+    async def test_a_collector_is_required(self, client):
+        mount()
+        data = await run(client, command="uptime")
+        assert data["code"] == "REJECTED_BY_TOOL" and not respx.calls
+
+    @respx.mock
+    async def test_the_servers_own_post_budget(self, client, monkeypatch):
+        monkeypatch.setattr(cd, "POST_LIMIT", 0)
+        mount()
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "rate_limited" and data["code"] == "RATE_LIMITED"
+        assert not respx.calls
+
+    @respx.mock
+    async def test_the_servers_own_get_budget(self, client, monkeypatch):
+        monkeypatch.setattr(cd, "GET_LIMIT", 0)
+        mount({"!uptime": "uptime=1h"})
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "no_reply" and "GET budget" in data["detail"]
+        assert "may still run it" in data["detail"] and not data["_is_error"]
+
+    @respx.mock
+    async def test_no_session_id_is_an_error(self, client):
+        mount(post_body={"output": "", "cmdline": "!uptime", "cmdContext": ""})
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "error" and data["code"] == "UPSTREAM_ERROR"
+        assert "no session id" in data["detail"]
+
+    @respx.mock
+    async def test_the_output_floor_is_500_characters(self, client):
+        mount({"!uptime": "x" * 3000})
+        data = await run(client, command="uptime", collector_id=82, max_output_chars=10)
+        assert len(data["output"]) == 500 and data["truncated"] is True
+
+    @respx.mock
+    async def test_the_budget_floor_is_two_seconds(self, client):
+        mount({"!uptime": "uptime=1h"})
+        data = await run(client, command="uptime", collector_id=82, budget_seconds=0)
+        assert data["status"] == "answered" and data["budget_seconds"] == 2.0
+
+    @respx.mock
+    async def test_masked_output_that_grows_is_still_capped(self, client):
+        mount({"!logsurf": "pass=x\n" * (OUTPUT_MAX // 7)})
+        data = await run(client, command="logsurf", collector_id=82, max_output_chars=10**9)
+        assert data["output_chars"] <= OUTPUT_MAX
+        assert len(data["output"]) == OUTPUT_MAX and data["truncated"] is True
+
+    @respx.mock
+    async def test_the_output_is_capped_at_the_maximum(self, client):
+        mount({"!uptime": "x" * (OUTPUT_MAX + 500)})
+        data = await run(client, command="uptime", collector_id=82, max_output_chars=10**9)
+        assert len(data["output"]) == OUTPUT_MAX and data["truncated"] is True
+        assert data["output_chars"] == OUTPUT_MAX + 500
+
+    @respx.mock
+    async def test_truncated_follows_what_is_shown_after_masking(self, client):
+        mount({"!logsurf": "pass=x\n" * 2857})  # 19,999 characters that mask to more
+        grown = await run(client, command="logsurf", collector_id=82)
+        assert grown["output_chars"] < OUTPUT_DEFAULT and grown["truncated"] is True
+        mount({"!logsurf": "password=" + "y" * 25_000 + "\ntail"})
+        cut = await run(client, command="logsurf", collector_id=82)
+        assert cut["output"] == "password=***" and cut["truncated"] is True
+        mount({"!logsurf": "password=" + "y" * 15_000 + "\ntail"})
+        shrunk = await run(client, command="logsurf", collector_id=82)
+        assert shrunk["output"] == "password=***\ntail" and shrunk["truncated"] is False
+
+    @respx.mock
+    async def test_a_masked_value_does_not_break_the_health_check_parse(self, client):
+        """The parse reads the raw reply, and only its result is masked."""
+        reply = LIVE_HEALTH.replace(
+            '"detail": "The host has total 8192 MB physical memory and free memory is 0 MB',
+            '"detail": "The host has total 8192 MB physical memory and <password>hunter2',
+        )
+        mount({"!shealthcheck": reply})
+        data = await run(client, command="health_check", collector_id=161)
+        memory = next(n for n in data["parsed"]["not_ok"] if n["check"] == "basic.Memory")
+        assert memory["detail"].startswith(
+            "The host has total 8192 MB physical memory and <password>***"
+        )
+        assert data["parsed"]["methods_by_all_nan_rate"][0]["method"] == "SCRIPT"
+        assert "hunter2" not in json.dumps(data)
+
+    @respx.mock
+    async def test_a_long_health_check_is_parsed_as_far_as_the_cut(self, client):
+        mount({"!shealthcheck": LIVE_HEALTH + "x" * OUTPUT_MAX})
+        data = await run(client, command="health_check", collector_id=161)
+        assert data["parsed"]["checks_parsed"] == 39 and data["parse_partial"] is True
+
+    @respx.mock
+    async def test_a_parse_fault_leaves_the_answer_standing(self, client, monkeypatch, caplog):
+        def broken(text):
+            raise RecursionError
+
+        monkeypatch.setattr(cd, "parse_health_check", broken)
+        mount({"!shealthcheck": LIVE_HEALTH})
+        with caplog.at_level(logging.ERROR, logger=LOGGER):
+            data = await run(client, command="health_check", collector_id=161)
+        assert data["status"] == "answered" and not data["_is_error"]
+        assert data["parse_error"] == "RecursionError" and data["output"]
+        assert any(r.exc_info for r in caplog.records if r.name == LOGGER)
+
+    @respx.mock
+    async def test_a_failure_reads_as_an_error_to_composite_callers(self, client):
+        from lm_mcp.tools import call_sub_tool
+
+        mount(post_error={"status": 403, "body": FORBIDDEN})
+        with pytest.raises(RuntimeError, match="uptime: refused"):
+            await call_sub_tool(collector_debug, client, command="uptime", collector_id=82)
+
+    async def test_a_transport_refusal_is_rejected_by_the_tool(self, client, monkeypatch):
+        async def refused(*a, **kw):
+            return {"status": "rejected_by_tool", "detail": "not a debug command"}
+
+        monkeypatch.setattr(cd, "run_debug", refused)
+        data = await run(client, command="uptime", collector_id=82)
+        assert data["code"] == "REJECTED_BY_TOOL" and "not a debug command" in data["message"]
+
+    @respx.mock
+    async def test_a_device_record_that_is_not_an_object_is_refused(self, client):
+        respx.get(f"https://{PORTAL_HOST}/santaba/rest/device/devices/49").mock(
+            return_value=httpx.Response(200, json=[1, 2])
+        )
+        data = await run(client, command="ping", device_id=49)
+        assert data["code"] == "REJECTED_BY_TOOL" and "could not be read" in data["message"]
+
+    @respx.mock
+    async def test_a_missing_device_is_not_found(self, client):
+        respx.get(f"https://{PORTAL_HOST}/santaba/rest/device/devices/48").mock(
+            return_value=httpx.Response(
+                404, json={"errorMessage": "No such device", "errorCode": 1404, "errorDetail": None}
+            )
+        )
+        data = await run(client, command="ping", device_id=48)
+        assert data["code"] == "NOT_FOUND" and not [
+            c for c in respx.calls if c.request.method == "POST"
+        ]
+
+
+@pytest.mark.usefixtures("fast_polls")
+class TestRunDebug:
+    """run_debug guards itself, whoever calls it."""
+
+    async def test_a_spent_budget_sends_nothing_and_says_so(self, client):
+        with respx.mock(assert_all_called=False) as router:
+            route = router.route(host=PORTAL_HOST).mock(httpx.Response(200, json={}))
+            result = await cd.run_debug(client, 82, "!uptime", time.monotonic() - 1)
+        assert result["status"] == "error" and result["envelope"]["code"] == "TIMEOUT"
+        assert "nothing was sent" in result["detail"] and route.call_count == 0
+
+    async def test_it_refuses_an_unchecked_line_without_a_call(self, client):
+        with respx.mock(assert_all_called=False) as router:
+            route = router.route(host=PORTAL_HOST).mock(httpx.Response(200, json={}))
+            result = await cd.run_debug(client, 82, "!restart", time.monotonic() + 5)
+        assert (
+            result["status"] == "rejected_by_tool" and "changes the collector" in result["detail"]
+        )
+        assert route.call_count == 0
+
+    @respx.mock
+    async def test_it_cuts_the_output_before_masking(self, client, monkeypatch):
+        seen = []
+        monkeypatch.setattr(cd, "redact", lambda text: seen.append(len(text)) or text)
+        mount({"!uptime": "y" * (OUTPUT_MAX * 3)})
+        result = await cd.run_debug(client, 82, "!uptime", time.monotonic() + 5)
+        assert result["status"] == "answered"
+        assert seen == [OUTPUT_MAX + cd._MASK_MARGIN] and len(result["output"]) == OUTPUT_MAX
+        assert result["output_chars"] == OUTPUT_MAX * 3 and result["truncated"] is True
+
+    @pytest.mark.parametrize(
+        "secret",
+        ["http://bob:hunter2@10.0.0.1/x", '{"name": "db.password", "value": "hunter2"}',
+         '<add key="DbPassword" value="hunter2"/>', "mongodb://bob:hunter2@10.0.0.1/db"],
+    )  # fmt: skip
+    @respx.mock
+    async def test_a_secret_the_cut_splits_is_still_masked(self, client, secret):
+        keep = 1000
+        cut_at = secret.index("hunter2") + 3  # the cut lands inside the value
+        mount({"!uptime": "x" * (keep - cut_at) + secret + " tail"})
+        result = await cd.run_debug(client, 82, "!uptime", time.monotonic() + 5, keep=keep)
+        assert "hun" not in result["output"] and len(result["output"]) <= keep
+
+
+@pytest.mark.usefixtures("fast_polls")
+class TestBudget:
+    """The device read, the POST and every poll are held to the time budget, and a budget
+    that ends the call is logged with its stack trace."""
+
+    @staticmethod
+    def slow(paths: tuple[str, ...]):
+        async def handler(request: httpx.Request) -> httpx.Response:
+            path = request.url.path.removeprefix("/santaba/rest")
+            if any(path.startswith(p) for p in paths) and not (
+                request.method == "GET" and path == "/debug"
+            ):
+                await asyncio.sleep(30)
+            if request.method == "POST":
+                return httpx.Response(200, json=LIVE["post_accepted"]["body"])
+            if path.startswith("/device/devices/"):
+                return httpx.Response(200, json=PROBED)
+            return httpx.Response(200, json=LIVE["poll_answer_uptime"]["body"])
+
+        return handler
+
+    def budget_records(self, caplog):
+        return [r for r in caplog.records if r.name == LOGGER and r.levelno == logging.WARNING]
+
+    @respx.mock
+    async def test_a_slow_post_is_cut_off_at_the_budget(self, client, caplog):
+        respx.route(host=PORTAL_HOST).mock(side_effect=self.slow(("/debug",)))
+        started = time.monotonic()
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            data = await run(client, command="uptime", collector_id=82, budget_seconds=2)
+        assert data["status"] == "no_reply" and "did not accept the command" in data["detail"]
+        assert time.monotonic() - started < 3
+        (record,) = self.budget_records(caplog)
+        assert record.exc_info and isinstance(record.exc_info[1], cd._BudgetSpentError)
+
+    @respx.mock
+    async def test_a_slow_device_read_is_cut_off_at_the_budget(self, client, caplog):
+        respx.route(host=PORTAL_HOST).mock(side_effect=self.slow(("/device/devices/",)))
+        started = time.monotonic()
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            data = await run(client, command="ping", device_id=89818, budget_seconds=2)
+        assert data["status"] == "error" and data["code"] == "TIMEOUT" and data["_is_error"]
+        assert "device record" in data["detail"] and "nothing was sent" in data["detail"]
+        assert time.monotonic() - started < 3
+        assert not [c for c in respx.calls if c.request.method == "POST"]
+        (record,) = self.budget_records(caplog)
+        assert record.exc_info and isinstance(record.exc_info[1], cd._BudgetSpentError)
+
+    @respx.mock
+    async def test_a_slow_poll_is_cut_off_at_the_budget(self, client, caplog):
+        respx.route(host=PORTAL_HOST).mock(
+            side_effect=self.slow((f"/debug/{LIVE['post_accepted']['body']['sessionId']}",))
+        )
+        started = time.monotonic()
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            data = await run(client, command="uptime", collector_id=82, budget_seconds=2)
+        assert data["status"] == "no_reply"
+        assert time.monotonic() - started < 3
+        (record,) = self.budget_records(caplog)
+        assert record.exc_info and isinstance(record.exc_info[1], cd._BudgetSpentError)
+
+    @respx.mock
+    async def test_a_still_working_poll_is_logged_with_its_stack(self, client, caplog):
+        mount({"!uptime": "uptime=1h"}, pending=1)
+        with caplog.at_level(logging.DEBUG, logger=LOGGER):
+            data = await run(client, command="uptime", collector_id=82)
+        assert data["status"] == "answered"
+        (record,) = [r for r in caplog.records if r.name == LOGGER and r.levelno == logging.DEBUG]
+        assert record.exc_info is not None and "API_ERROR_1202" in str(record.exc_info[1].code)
+
+
+class TestWithin:
+    async def test_a_spent_budget_refuses_before_calling(self):
+        """No call starts once the deadline has passed, and the coroutine is closed."""
+        calls = []
+
+        async def call():
+            calls.append(1)
+
+        coro = call()
+        with pytest.raises(cd._BudgetSpentError):
+            await cd._within(time.monotonic() - 1, coro)
+        assert calls == [] and coro.cr_frame is None
+
+
+class TestWriteGate:
+    async def test_disabled_writes_refuse_before_any_call(self, client, monkeypatch):
+        from lm_mcp.config import reset_config
+        from lm_mcp.registry import get_tool_handler
+
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        reset_config()
+        handler = get_tool_handler("collector_debug")
+        with respx.mock(assert_all_called=False) as router:
+            route = router.route(host=PORTAL_HOST).mock(httpx.Response(200, json={}))
+            result = await handler(client, command="uptime", collector_id=82)
+        assert envelope(result)["code"] == "WRITE_DISABLED" and route.call_count == 0
+
+    def test_it_is_audited_as_a_write(self):
+        from lm_mcp.logging import is_write_tool
+
+        assert is_write_tool("collector_debug")
+
+
+class TestRegistry:
+    @staticmethod
+    def tool():
+        from lm_mcp.registry import TOOLS
+
+        return next(t for t in TOOLS if t.name == "collector_debug")
+
+    def test_the_command_enum_is_the_allowlisted_set(self):
+        assert sorted(self.tool().inputSchema["properties"]["command"]["enum"]) == sorted(COMMANDS)
+
+    def test_the_args_description_names_every_commands_keys(self):
+        text = self.tool().inputSchema["properties"]["args"]["description"]
+        for name, command in COMMANDS.items():
+            if command.keys:
+                assert f"{name}: " in text, name
+                for key in command.keys:
+                    assert key in text.split(f"{name}: ", 1)[1].split(". ", 1)[0], (name, key)
+
+    def test_it_is_a_destructive_write(self):
+        annotations = self.tool().annotations
+        assert annotations.readOnlyHint is False and annotations.destructiveHint is True
+
+    def test_it_is_listed_with_the_collector_tools(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        assert "collector_debug" in TOOL_CATEGORIES["categories"]["collectors"]["tools"]
+
+    def test_the_handler_is_the_tool(self):
+        from lm_mcp.registry import get_tool_handler
+
+        assert get_tool_handler("collector_debug") is collector_debug
+
+
+class TestSecurityReview:
+    """The 2026-11-12 security review (docs/validation/collector-debug-review-2026-11.md),
+    one test group per finding folded into the module."""
+
+    # H1: one prefix followed by one long run made two masking patterns quadratic; a call then
+    # held the event loop for 32.6 s against a 2 s budget.
+    @pytest.mark.parametrize(
+        "prefix",
+        [
+            "-u ",
+            "--user ",
+            "--user=",
+            "-u=",
+            "-----BEGIN ",
+            "-----BEGIN RSA ",
+            "password=",
+            "Authorization: ",
+            "http://",
+            '<entry key="',
+        ],
+    )
+    @pytest.mark.parametrize("filler", ["=", " ", "A", ":"])
+    def test_one_prefix_then_one_long_run_masks_in_linear_time(self, prefix, filler):
+        assert_linear(redact, lambda n: prefix + filler * n, small=20_000, large=80_000)
+
+    @pytest.mark.parametrize("unit", ["PRIVATE KEY", "PRIVATE KEY ", "RSA PRIVATE KEY"])
+    def test_a_pem_header_of_repeated_words_masks_in_linear_time(self, unit):
+        assert_linear(
+            redact,
+            lambda n: "-----BEGIN " + (unit * (n // len(unit) + 1))[:n],
+            small=20_000,
+            large=80_000,
+        )
+
+    @pytest.mark.parametrize(
+        "text,expected",
+        [("curl -u admin:hunter2 https://h/", "curl -u admin:*** https://h/"),
+         ("--user=ops:s3cret", "--user=ops:***"),
+         (f"{PEM_BEGIN}\nMIIabc\n{PEM_END}", f"{PEM_BEGIN}***{PEM_END}")],
+    )  # fmt: skip
+    def test_the_bounded_patterns_still_mask(self, text, expected):
+        assert redact(text) == expected
+
+    # M1 and M2: http never reaches a loopback, unspecified, link-local or cloud metadata host,
+    # which a device record named for one would otherwise point it at.
+    @pytest.mark.parametrize(
+        "host",
+        ["127.0.0.1", "127.8.9.1", "::1", "[::1]", "0.0.0.0", "::", "localhost", "LOCALHOST",
+         "api.localhost", "169.254.169.254", "169.254.1.7", "fe80::1", "[fe80::1]",
+         "100.100.100.200", "fd00:ec2::254", "192.0.0.192", "::ffff:127.0.0.1",
+         "metadata", "metadata.google.internal", "127.1", "2130706433", "0x7f000001"],
+    )  # fmt: skip
+    def test_http_never_reaches_a_loopback_link_local_or_metadata_host(self, host):
+        url_host = f"[{host.strip('[]')}]" if ":" in host else host
+        target = Target(collector_id=7, host=host)
+        with pytest.raises(ToolRejectionError, match="loopback, link-local or cloud metadata"):
+            build_cmdline("http", {"url": f"http://{url_host}/"}, target)
+
+    @pytest.mark.parametrize(
+        "host", ["10.0.0.5", "192.168.1.20", "fe80example.net", "metadata-db-01", "2001:db8::5"]
+    )
+    def test_http_still_reaches_an_ordinary_device_host(self, host):
+        url_host = f"[{host}]" if ":" in host else host
+        cmdline = build_cmdline(
+            "http", {"url": f"https://{url_host}:8443/x"}, Target(collector_id=7, host=host)
+        )
+        assert cmdline == f"!http https://{url_host}:8443/x"
+
+    def test_other_probes_still_run_on_a_loopback_device(self):
+        """A device named 127.0.0.1 is the collector host itself; ping and snmp reach it."""
+        target = Target(collector_id=82, host="127.0.0.1")
+        assert build_cmdline("ping", {}, target) == "!ping 127.0.0.1"
+
+    @respx.mock
+    async def test_a_loopback_url_is_refused_before_the_device_is_read(self, client):
+        mount(device=PROBED)
+        data = await run(
+            client,
+            command="http",
+            device_id=89818,
+            args={"url": "http://127.0.0.1:8500/v1/kv/?recurse"},
+        )
+        assert data["code"] == "REJECTED_BY_TOOL" and "loopback" in data["message"]
+        assert not respx.calls
+
+    @respx.mock
+    async def test_a_metadata_device_record_is_refused_after_the_read(self, client):
+        """A record renamed to the metadata address (by create_device or update_device)."""
+        seen = mount(device={**WEB, "name": "169.254.169.254"})
+        data = await run(
+            client,
+            command="http",
+            device_id=42,
+            args={"url": "http://169.254.169.254/latest/meta-data/"},
+        )
+        assert data["code"] == "REJECTED_BY_TOOL" and seen == []
+
+    # M3: a WQL or CIM class that changes the device, walks its disks or holds secrets by design.
+    @pytest.mark.parametrize(
+        "query,why",
+        [("select * from Win32_Product", "Win32_Product"),
+         ("SELECT Name FROM win32_product WHERE Name = 'x'", "Win32_Product"),
+         ("select * from CIM_DataFile where Drive = 'c:'", "CIM_DataFile"),
+         ("select * from CIM_Directory", "CIM_Directory"),
+         ("select * from Win32_Directory", "Win32_Directory"),
+         ("select * from Win32_Environment", "Win32_Environment"),
+         ("select * from Win32_Process", "CommandLine"),
+         ("select Name, CommandLine from Win32_Process", "CommandLine"),
+         ("select * from Win32_NTLogEvent", "WHERE")],
+    )  # fmt: skip
+    def test_a_risky_wmi_class_is_refused(self, query, why):
+        with pytest.raises(ToolRejectionError, match=why):
+            build_cmdline("wmi", {"query": query}, T)
+
+    @pytest.mark.parametrize(
+        "query",
+        ["select Name, ProcessId from Win32_Process",
+         "select * from Win32_NTLogEvent where Logfile = 'System' AND EventCode = 41",
+         "select * from Win32_Service"],
+    )  # fmt: skip
+    def test_the_useful_shapes_of_those_classes_still_build(self, query):
+        assert build_cmdline("wmi", {"query": query}, T) == f"!wmi h=10.0.0.5 {query}"
+
+    @pytest.mark.parametrize("cls", ["CIM_DataFile", "cim_directory", "Win32_Product"])
+    def test_a_risky_cim_class_is_refused(self, cls):
+        with pytest.raises(ToolRejectionError, match="class"):
+            build_cmdline("cim", {"class": cls}, T)
+
+    # L1: an undotted compound key the audit log masks is masked in the output too.
+    @pytest.mark.parametrize(
+        "key",
+        ["snmp_auth", "ssh_key", "sshKey", "snmpPriv", "snmp-auth", "privKey", "authKey", "x_auth"],
+    )
+    def test_an_undotted_compound_key_follows_the_audit_rule(self, key):
+        assert is_sensitive_key(key)
+        assert redact(f"{key}=hunter2") == f"{key}=***"
+
+    @pytest.mark.parametrize(
+        "text", ["key=abc", "auth: ok", "priv=3", "device_id=7", "sort_keyword=x"]
+    )
+    def test_a_bare_word_or_identifier_is_not_masked(self, text):
+        assert redact(text) == text
+
+    # L2: one-letter password and community flags, a cut that splits a secret, and the SNMP
+    # tables that hold communities and users.
+    @pytest.mark.parametrize(
+        "text,expected",
+        [("sqlcmd -S db -U sa -P Sup3rS3cret -Q x", "sqlcmd -S db -U sa -P *** -Q x"),
+         ("sshpass -p hunter2 ssh host", "sshpass -p *** ssh host"),
+         ("snmpwalk -v2c -c private 10.0.0.5", "snmpwalk -v2c -c *** 10.0.0.5")],
+    )  # fmt: skip
+    def test_one_letter_secret_flags_are_masked(self, text, expected):
+        assert redact(text) == expected
+
+    def test_a_checkpoint_detail_is_masked_before_it_is_cut(self):
+        detail = "x" * (cd.PARSE_TEXT_MAX - 20) + " http://admin:hunter2@10.0.0.5/"
+        body = json.dumps({"name": "module.Collector", "detail": detail, "status": "OK"})
+        p = parse_health_check(f"=====x=====\n:checkpoints:[{body}]\n")
+        assert "hunter2" not in json.dumps(p) and "hun" not in p["facts"]["module.Collector"]
+        assert len(p["facts"]["module.Collector"]) <= cd.PARSE_TEXT_MAX
+
+    @respx.mock
+    async def test_a_pending_status_is_masked_before_it_is_cut(self, client):
+        words = "agent has fetched the task, " + "x" * 155 + " http://admin:hunter2@10.0.0.5/"
+        assert words.index("hunter2") + 3 == 200  # the 200-character cut lands inside the value
+
+        def handler(request):
+            if request.method == "POST":
+                return httpx.Response(200, json=LIVE["post_accepted"]["body"])
+            return httpx.Response(202, json={**LIVE["poll_pending"]["body"], "errorMessage": words})
+
+        respx.route(host=PORTAL_HOST).mock(side_effect=handler)
+        cd._POSTS.clear()
+        cd._GETS.clear()
+        data = await run(client, command="uptime", collector_id=82, budget_seconds=2)
+        assert data["status"] == "no_reply" and "hun" not in data["detail"]
+
+    @pytest.mark.parametrize("oid", [".1.3.6.1.6.3", ".1.3.6.1.6"])
+    def test_a_walk_above_the_community_and_user_tables_is_refused(self, oid):
+        with pytest.raises(ToolRejectionError, match="community or user"):
+            build_cmdline("snmpwalk", {"oid": oid}, T)
+
+    @pytest.mark.parametrize(
+        "oid", [".1.3.6.1.6.3.18", ".1.3.6.1.6.3.18.1.1", "1.3.6.1.6.3.15.1.2.2"]
+    )
+    @pytest.mark.parametrize("command", ["snmpwalk", "snmpget", "snmpdiagnose"])
+    def test_the_snmp_community_and_user_tables_are_refused(self, oid, command):
+        args = {"oid": oid} if command == "snmpwalk" else {"oids": [oid]}
+        with pytest.raises(ToolRejectionError, match="community or user"):
+            build_cmdline(command, args, T)
+
+    # L3: a decodable array of things that are not checkpoints is not read as clean.
+    @pytest.mark.parametrize(
+        "array",
+        ['[{"name": "basic.Memory", "detail": "90% used"}]', '[1, "FAILED", null]',
+         '[{"name": "basic.Memory", "detail": "x", "status": 3}]'],
+    )  # fmt: skip
+    def test_entries_that_are_not_checkpoints_make_the_block_unreadable(self, array):
+        p = parse_health_check(f"=====x=====\n:checkpoints:{array}\n")
+        assert p["checkpoints_unreadable"] == ["x"]
+
+    # L4: a builder fault is logged with its stack before it becomes a refusal.
+    def test_a_builder_fault_is_logged_with_its_stack(self, monkeypatch, caplog):
+        def trips(a, t):
+            raise TypeError("unsupported operand")
+
+        monkeypatch.setitem(
+            COMMANDS, "uptime", dataclasses.replace(COMMANDS["uptime"], build=trips)
+        )
+        with caplog.at_level(logging.ERROR, logger=LOGGER), pytest.raises(ToolRejectionError):
+            build_cmdline("uptime", {}, T)
+        (record,) = [r for r in caplog.records if r.name == LOGGER]
+        assert record.exc_info and isinstance(record.exc_info[1], TypeError)
+
+    async def test_a_line_the_final_guard_refuses_in_run_debug_is_logged(self, client, caplog):
+        with (
+            respx.mock(assert_all_called=False) as router,
+            caplog.at_level(logging.WARNING, logger=LOGGER),
+        ):
+            router.route(host=PORTAL_HOST).mock(httpx.Response(200, json={}))
+            result = await cd.run_debug(client, 82, "!restart", time.monotonic() + 5)
+        assert result["status"] == "rejected_by_tool"
+        (record,) = [r for r in caplog.records if r.name == LOGGER]
+        assert record.levelno == logging.WARNING and "!restart" in record.getMessage()
+
+    # L5: a comparison operator stands alone, and no second command head rides on a line.
+    @pytest.mark.parametrize(
+        "where",
+        [
+            "h!=evilhost",
+            "h>=evilhost",
+            "h<=evilhost",
+            "Name = 'a' !=x",
+            "Name ='x'",
+            "ProcessId >=4",
+        ],
+    )
+    def test_an_operator_with_an_equals_stands_alone_between_spaces(self, where):
+        with pytest.raises(ToolRejectionError, match="key=value"):
+            build_cmdline("wmi", {"query": f"select * from Win32_Service where {where}"}, T)
+
+    @pytest.mark.parametrize(
+        "line", ["!uptime !restart", "!ping 10.0.0.5 !groovy", "!perf type=ds\t!restart"]
+    )
+    def test_the_final_guard_refuses_a_second_command_head(self, line):
+        with pytest.raises(ToolRejectionError):
+            check_cmdline(line)
+
+    def test_a_not_equals_comparison_is_not_a_second_head(self):
+        check_cmdline("!wmi h=10.0.0.5 select * from Win32_Service where State != 'Running'")
+
+    # L7: what was sent, where, is logged before it is sent.
+    @respx.mock
+    async def test_the_command_line_collector_and_host_are_logged_before_sending(
+        self, client, caplog, monkeypatch
+    ):
+        monkeypatch.setattr(cd, "POLL_SECONDS", 0.01)
+        cd._POSTS.clear()
+        cd._GETS.clear()
+        mount({"!ping": "Sent: 1"}, device=PROBED)
+        with caplog.at_level(logging.INFO, logger=LOGGER):
+            await run(client, command="ping", device_id=89818)
+        (record,) = [r for r in caplog.records if r.name == LOGGER and r.levelno == logging.INFO]
+        message = record.getMessage()
+        assert "!ping 127.0.0.1" in message and "collector 82" in message
+        assert "device 89818" in message and "host 127.0.0.1" in message
+
+    # Threat 3: portal words with a line break cannot forge a second log line.
+    def test_portal_words_are_logged_on_one_line(self, caplog):
+        error = LMError("bad request\nWARNING forged line", code="HTTP_400", details="a\r\nb")
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            describe_failure(error)
+        (record,) = [r for r in caplog.records if r.name == LOGGER]
+        assert "\n" not in record.getMessage() and "\r" not in record.getMessage()
+
+
+class TestSecurityReviewRecheck:
+    """The re-check of the folded module (collector-debug-review-2026-11.md, Re-verification)."""
+
+    # R1: a parent class returns its subclasses' rows, so the parents of the refused classes
+    # are refused too, and CIM_Process follows Win32_Process's column rule.
+    @pytest.mark.parametrize(
+        "query",
+        ["select * from CIM_Product", "select * from CIM_LogicalFile", "select * from CIM_LogicalElement",
+         "select * from CIM_ManagedSystemElement", "select * from CIM_SystemResource",
+         "select * from Win32_ShortcutFile", "select * from Win32_CodecFile", "select * from cim_process",
+         "select Name, CommandLine from CIM_Process"],
+    )  # fmt: skip
+    def test_a_parent_or_subclass_of_a_refused_class_is_refused(self, query):
+        with pytest.raises(ToolRejectionError, match=r"not queried|is not read"):
+            build_cmdline("wmi", {"query": query}, T)
+
+    @pytest.mark.parametrize(
+        "cls", ["CIM_LogicalFile", "cim_product", "Win32_Process", "CIM_Process"]
+    )
+    def test_cim_refuses_the_parents_and_the_process_classes(self, cls):
+        with pytest.raises(ToolRejectionError, match="class"):
+            build_cmdline("cim", {"class": cls}, T)
+
+    # R2: a refused column cannot be read back through the WHERE clause.
+    @pytest.mark.parametrize(
+        "where",
+        [
+            "CommandLine LIKE '%-P S%'",
+            "commandline = 'x'",
+            "Name = 'a' AND (CommandLine LIKE 'x%')",
+        ],
+    )
+    def test_a_refused_column_in_the_where_clause_is_refused(self, where):
+        with pytest.raises(ToolRejectionError, match="CommandLine"):
+            build_cmdline(
+                "wmi", {"query": f"select Name, ProcessId from Win32_Process where {where}"}, T
+            )
+
+    def test_a_refused_column_name_inside_quotes_is_a_value(self):
+        query = "select Name, ProcessId from Win32_Process where Name = 'CommandLine'"
+        assert build_cmdline("wmi", {"query": query}, T) == f"!wmi h=10.0.0.5 {query}"
+
+    # Notes: command lines in other classes, and classes that enumerate a domain.
+    @pytest.mark.parametrize(
+        "query,why",
+        [("select Command from Win32_StartupCommand", "Command"),
+         ("select * from Win32_ScheduledJob", "Command"),
+         ("select * from Win32_UserAccount", "WHERE"),
+         ("select * from Win32_Group", "WHERE")],
+    )  # fmt: skip
+    def test_command_columns_and_domain_wide_classes(self, query, why):
+        with pytest.raises(ToolRejectionError, match=why):
+            build_cmdline("wmi", {"query": query}, T)
+
+    def test_a_local_account_query_builds(self):
+        query = "select Name from Win32_UserAccount where LocalAccount = True"
+        assert build_cmdline("wmi", {"query": query}, T) == f"!wmi h=10.0.0.5 {query}"
+
+    # R4: an IPvFuture literal is refused as a value, with no traceback logged.
+    def test_an_ipvfuture_url_is_refused_without_a_traceback(self, caplog):
+        with (
+            caplog.at_level(logging.DEBUG, logger=LOGGER),
+            pytest.raises(ToolRejectionError, match="loopback"),
+        ):
+            request("http", collector_id=None, device_id=5, args={"url": "http://[v1.a:b]/"})
+        assert [r for r in caplog.records if r.name == LOGGER] == []
+
+    # R3 and R7: names that resolve to loopback or metadata, wildcard DNS, the 0.0.0.0/8 range,
+    # platform endpoints, and an IPv4 address carried inside an IPv6 form.
+    @pytest.mark.parametrize(
+        "host",
+        ["localhost.localdomain", "ip6-localhost", "ip6-loopback", "localhost4", "localhost6",
+         "instance-data", "instance-data.ec2.internal", "metadata.tencentyun.com", "metadata.goog",
+         "169.254.169.254.nip.io", "127.0.0.1.sslip.io", "localtest.me", "app.lvh.me",
+         "0.0.0.1", "0.1.2.3", "168.63.129.16", "fd00:ec2::23", "::7f00:1", "::127.0.0.1",
+         "::ffff:0:7f00:1", "64:ff9b::a9fe:a9fe", "64:ff9b:1::a9fe:a9fe", "2002:a9fe:a9fe::"],
+    )  # fmt: skip
+    def test_http_never_reaches_these_hosts_either(self, host):
+        url_host = f"[{host}]" if ":" in host else host
+        with pytest.raises(ToolRejectionError, match="loopback, link-local or cloud metadata"):
+            build_cmdline("http", {"url": f"http://{url_host}/"}, Target(collector_id=7, host=host))
+
+    @pytest.mark.parametrize(
+        "host", ["64:ff9b::a00:5", "2002:a00:5::", "nip.io.example.net", "myinstance-data.net"]
+    )
+    def test_an_ordinary_embedded_or_lookalike_host_still_builds(self, host):
+        url_host = f"[{host}]" if ":" in host else host
+        cmdline = build_cmdline(
+            "http", {"url": f"http://{url_host}/"}, Target(collector_id=7, host=host)
+        )
+        assert cmdline == f"!http http://{url_host}/"
+
+    # R5: the -C community flag, and a portal error body masked before it is cut.
+    def test_a_capital_c_community_flag_is_masked(self):
+        assert redact("check_snmp -H h -C s3cretcomm -o x") == "check_snmp -H h -C *** -o x"
+
+    def test_the_error_body_is_masked_before_it_is_cut(self):
+        words = "x" * 3983 + " http://admin:hunter2@10.0.0.5/"
+        assert words.index("hunter2") < 4000 < words.index("hunter2") + len("hunter2")
+        failure = describe_failure(LMError(words, code="HTTP_400"))
+        assert "hun" not in failure["error_body"] and len(failure["error_body"]) <= 4000
+
+    # Note: a second head of any name characters.
+    def test_the_final_guard_refuses_a_second_head_of_any_name(self):
+        with pytest.raises(ToolRejectionError):
+            check_cmdline("!uptime !_x")

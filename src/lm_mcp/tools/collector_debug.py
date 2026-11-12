@@ -1,8 +1,11 @@
-# Description: Collector debug: the command allowlist, typed arguments, request checks, output
-# Description: masking and the stored health-check parse, each bounded against hostile text.
+# Description: collector_debug: run one allowlisted collector debug command, write-gated, and
+# Description: return what the collector said, masked and time-boxed against hostile replies.
 
-"""Collector debug: the command builder, the checks made before anything is sent, and what is
-done with what comes back.
+"""Collector debug: one allowlisted debug command, sent to a collector and read back.
+
+It is gated as a destructive write. Every allowed command is meant to read, but the call runs it
+on the collector and opens a debug session the portal records in its Audit Log, and http sends
+a GET that a device can act on, so collector_debug needs LM_ENABLE_WRITE_OPERATIONS.
 
 Callers never send free text. They name a command from COMMANDS and pass that command's typed
 arguments; any other argument key is refused, and this module builds the command line.
@@ -32,22 +35,50 @@ arguments; any other argument key is refused, and this module builds the command
 - A failure is logged before it becomes a status: describe_failure() logs an LMError at WARNING
   with the portal's words and anything else with its stack trace, and parse_reply() logs a parse
   fault with its stack trace and leaves the answer standing.
+- One wall-clock budget per call holds the device read, the POST and every poll, each cut off by
+  asyncio.timeout. A command the collector does not answer in time returns no_reply.
+- Honest states: answered and no_reply are results; refused, disabled, unsupported, rate_limited
+  and error come back in the error envelope with the call's record in its details, and a
+  request refused before anything is sent is REJECTED_BY_TOOL. Never a guessed success.
+
+Transport, as the sandbox portal answered on 2026-11-12 (docs/validation/probes-2026-11.md):
+
+- POST /debug?collectorId=N with {"cmdline": ...} returns a session id; the collector fetches the
+  command on its next check-in, and GET /debug/{sessionId} reads the result.
+- On one portal, the read with collectorId and the read without it have each said "cancelled"
+  while the other answered, from one session to the next, so both are asked on every poll.
+- While the collector runs the command, a read answers HTTP 202 with errorCode 1202 ("agent has
+  fetched the task, waiting for response"); a single word such as "cancelled" or "pending" is a
+  session status, not output.
+- The portal allows 200 POSTs and 500 GETs a minute; this module counts its own calls and stops
+  short of both.
 """
 
 from __future__ import annotations
 
+import asyncio
 import bisect
+import ipaddress
 import json
 import logging
 import math
 import re
-from collections.abc import Callable
+import time
+from collections import deque
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 from urllib.parse import SplitResult, parse_qsl, urlsplit
+
+import httpx
+from mcp.types import TextContent
 
 from lm_mcp.exceptions import AuthenticationError, LMError, LMPermissionError, RateLimitError
 from lm_mcp.logging import is_sensitive_key
+from lm_mcp.tools import format_response, handle_error, lm_error_code, require_write_permission
+
+if TYPE_CHECKING:
+    from lm_mcp.client import LogicMonitorClient
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +87,8 @@ BUDGET_MIN = 2.0
 BUDGET_MAX = 60.0
 OUTPUT_DEFAULT = 20_000
 OUTPUT_MIN = 500
-OUTPUT_MAX = 100_000  # the most of a reply a parse reads
+OUTPUT_MAX = 100_000  # the most of a reply a parse reads or a caller is shown
+HEALTH_SHOWN_MAX = 4_000  # raw characters shown beside the parsed health check
 MAX_CMDLINE = 2048
 _ID_MAX = 10**12  # the largest id or count read as one
 
@@ -108,7 +140,25 @@ _CLASS_RE = re.compile(r"^[A-Za-z0-9_]+$")
 # The root and the tops of mgmt, mib-2, private and enterprises: a walk there is the whole device.
 _ROOT_OIDS = {(0,), (1,), (2,), (1, 3), (1, 3, 6), (1, 3, 6, 1), (1, 3, 6, 1, 2),
               (1, 3, 6, 1, 2, 1), (1, 3, 6, 1, 4), (1, 3, 6, 1, 4, 1)}  # fmt: skip
+# SNMP-USER-BASED-SM-MIB (users and their keys) and SNMP-COMMUNITY-MIB (community strings):
+# reading either returns the device's own credentials, and walking a parent of one reads it.
+_SECRET_OIDS = ((1, 3, 6, 1, 6, 3, 15), (1, 3, 6, 1, 6, 3, 18))
 LOG_FILES = ("wrapper.log", "sbproxy.log", "watchdog.log")
+
+
+def _oid_arcs(oid: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in oid.strip(".").split("."))
+
+
+def _check_oid(oid: str, *, walk: bool) -> None:
+    """Refuse an OID in the SNMP community or user tables, and for a walk, one above them."""
+    arcs = _oid_arcs(oid)
+    for secret in _SECRET_OIDS:
+        if arcs[: len(secret)] == secret or (walk and secret[: len(arcs)] == arcs):
+            raise ToolRejectionError(
+                f"'{oid}' reads the SNMP community or user tables, which hold the device's "
+                "credentials"
+            )
 
 
 def _device(t: Target) -> str:
@@ -206,19 +256,67 @@ def _b_ping(a: dict[str, Any], t: Target) -> str:
 
 def _b_snmpwalk(a: dict[str, Any], t: Target) -> str:
     oid = _opt(a, "oid", pattern=_OID_RE) or ".1.3.6.1.2.1.1"
-    if tuple(int(part) for part in oid.strip(".").split(".")) in _ROOT_OIDS:
+    if _oid_arcs(oid) in _ROOT_OIDS:
         raise ToolRejectionError(
             "walking from the root of the tree, or the top of mib-2 or enterprises, is "
             "refused; walk a subtree"
         )
+    _check_oid(oid, walk=True)
     return _join("!snmpwalk", _kv("timeout", _int(a, "timeout", 1, 120)), _device(t), oid)
 
 
 _IDENT = r"[A-Za-z_][A-Za-z0-9_]*"
 _WQL_RE = re.compile(
-    rf"^SELECT\s+(\*|{_IDENT}(\s*,\s*{_IDENT})*)\s+FROM\s+{_IDENT}(\s+WHERE\s+(?P<where>.+))?$",
+    rf"^SELECT\s+(?P<cols>\*|{_IDENT}(\s*,\s*{_IDENT})*)\s+FROM\s+(?P<cls>{_IDENT})"
+    r"(\s+WHERE\s+(?P<where>.+))?$",
     re.IGNORECASE,
 )
+# WMI and CIM classes never queried, by lower-case name: the name as written, and why.
+_REFUSED_CLASSES = {
+    "win32_product": (
+        "Win32_Product",
+        "reading it starts a Windows Installer consistency check that can repair every "
+        "installed package",
+    ),
+    "cim_datafile": ("CIM_DataFile", "it walks every file on every disk"),
+    "cim_directory": ("CIM_Directory", "it walks every directory on every disk"),
+    "win32_directory": ("Win32_Directory", "it walks every directory on every disk"),
+    "win32_environment": (
+        "Win32_Environment",
+        "it holds environment variables, secrets among them",
+    ),
+    # A query on a class also returns its subclasses' rows, so their parents are refused too.
+    "cim_product": ("CIM_Product", "it returns Win32_Product's rows"),
+    "cim_logicalfile": ("CIM_LogicalFile", "it returns every file and directory on every disk"),
+    "cim_systemresource": ("CIM_SystemResource", "it returns Win32_Environment's rows"),
+    "cim_logicalelement": (
+        "CIM_LogicalElement",
+        "it returns the file, process and resource classes' rows",
+    ),
+    "cim_managedsystemelement": (
+        "CIM_ManagedSystemElement",
+        "it returns the rows of every class beneath it",
+    ),
+    "win32_shortcutfile": ("Win32_ShortcutFile", "it walks every disk to find its rows"),
+    "win32_codecfile": ("Win32_CodecFile", "it walks every disk to find its rows"),
+}
+# Classes read only with a WHERE clause, as their rows run to a whole event log or domain:
+# the name as written, and an example clause.
+_WHERE_CLASSES = {
+    "win32_ntlogevent": ("Win32_NTLogEvent", "Logfile = 'System'"),
+    "win32_useraccount": ("Win32_UserAccount", "LocalAccount = True"),
+    "win32_group": ("Win32_Group", "LocalAccount = True"),
+}
+# Columns never read, by class, in the SELECT list or the WHERE clause: each holds a command
+# line, whose arguments can carry passwords, and * includes it. A process's rows also answer
+# a query on CIM_Process.
+_REFUSED_COLUMNS = {
+    "win32_process": ("Win32_Process", {"commandline": "CommandLine"}),
+    "cim_process": ("CIM_Process", {"commandline": "CommandLine"}),
+    "win32_startupcommand": ("Win32_StartupCommand", {"command": "Command"}),
+    "win32_scheduledjob": ("Win32_ScheduledJob", {"command": "Command"}),
+}
+_QUOTED_VALUE_RE = re.compile(r"'[^']*'?")
 _WHERE_CHARS_RE = re.compile(r"^[A-Za-z0-9_ '%.,:\\/\-<>=!()]+$")
 
 
@@ -234,11 +332,22 @@ def _check_where(where: str) -> None:
     for i, ch in enumerate(where):
         if ch == "!" and where[i + 1 : i + 2] != "=":
             raise ToolRejectionError("in the WHERE clause '!' is allowed only as '!='")
-        if ch == "=" and (i == 0 or where[i - 1] not in " <>!"):
-            raise ToolRejectionError(
-                "a key=value token in the query would become a !wmi parameter; "
-                "write comparisons with a space before the operator, e.g. Name = 'x'"
-            )
+        if ch == "=":
+            # The operator (=, <=, >=, !=) stands alone, with a space on each side.
+            start = i - 1 if i > 0 and where[i - 1] in "<>!" else i
+            if start == 0 or where[start - 1] != " " or where[i + 1 : i + 2] != " ":
+                raise ToolRejectionError(
+                    "a key=value token in the query would become a !wmi parameter; "
+                    "write comparisons with a space on each side of the operator, "
+                    "e.g. Name = 'x'"
+                )
+
+
+def _check_class(name: str) -> None:
+    """Refuse a WMI or CIM class that changes the device, walks its disks or holds secrets."""
+    refused = _REFUSED_CLASSES.get(name.lower())
+    if refused:
+        raise ToolRejectionError(f"the class {refused[0]} is not queried: {refused[1]}")
 
 
 def _b_wmi(a: dict[str, Any], t: Target) -> str:
@@ -249,7 +358,28 @@ def _b_wmi(a: dict[str, Any], t: Target) -> str:
         raise ToolRejectionError(
             "'query' must be one WQL SELECT: SELECT * | col[, col] FROM Class [WHERE ...]"
         )
+    cls = match.group("cls").lower()
+    _check_class(cls)
     where = match.group("where")
+    if cls in _WHERE_CLASSES and not where:
+        written, example = _WHERE_CLASSES[cls]
+        raise ToolRejectionError(f"{written} is read only with a WHERE clause, e.g. {example}")
+    if cls in _REFUSED_COLUMNS:
+        written, refused = _REFUSED_COLUMNS[cls]
+        cols = {c.strip().lower() for c in match.group("cols").split(",")}
+        # Outside its quoted values, a name in the WHERE clause is a column it tests.
+        tested = {
+            w.lower()
+            for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", _QUOTED_VALUE_RE.sub(" ", where or ""))
+        }
+        hit = sorted(set(refused) & (cols | tested))
+        if "*" in cols or hit:
+            column = refused[hit[0]] if hit else next(iter(refused.values()))
+            raise ToolRejectionError(
+                f"{written}'s {column} is not read or tested: it holds a command line, whose "
+                f"arguments can carry passwords; name the columns, e.g. select Name from "
+                f"{written}"
+            )
     if where:
         _check_where(where)
     auth = _opt(a, "authType", ("NTLMv2", "Kerberos"))
@@ -296,6 +426,81 @@ def _bare(host: str) -> str:
     return host.strip("[]").lower()
 
 
+# Hosts http never reaches. A device named for one would point the probe at the collector
+# host's own loopback services, or at a cloud metadata service from inside the network.
+_METADATA_ADDRESSES = frozenset(
+    ipaddress.ip_address(a)
+    for a in (
+        "100.100.100.200",  # Alibaba Cloud
+        "fd00:ec2::254",  # AWS, IPv6
+        "fd00:ec2::23",  # EKS Pod Identity
+        "192.0.0.192",  # Oracle Cloud
+        "168.63.129.16",  # Azure WireServer
+    )
+)
+_LOOPBACK_NAMES = frozenset({
+    "localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback", "localhost4",
+    "localhost6", "localhost4.localdomain4", "localhost6.localdomain6",
+})  # fmt: skip
+_METADATA_NAMES = frozenset({
+    "metadata", "metadata.google.internal", "metadata.goog", "instance-data",
+    "instance-data.ec2.internal", "metadata.tencentyun.com",
+})  # fmt: skip
+# Public DNS that answers any name under it with the address written in the name.
+_WILDCARD_DNS = ("nip.io", "sslip.io", "xip.io", "localtest.me", "lvh.me")
+_THIS_NETWORK = ipaddress.ip_network("0.0.0.0/8")
+# IPv6 forms that carry an IPv4 address in their low 32 bits: IPv4-compatible, SIIT, and NAT64.
+_IPV4_IN_LOW_BITS = tuple(
+    ipaddress.ip_network(n) for n in ("::/96", "::ffff:0:0:0/96", "64:ff9b::/96", "64:ff9b:1::/48")
+)
+_IPV6_LITERAL_RE = re.compile(r"^[0-9a-f:.]+(?:%[\w.-]+)?$")
+_DOTTED_QUAD_RE = re.compile(
+    r"^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}"
+    r"(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$"
+)
+# 127.1, 2130706433, 0x7f000001: forms a resolver reads as an address but no device is named.
+_NUMERIC_HOST_RE = re.compile(r"^(?:0x[0-9a-f]+|[0-9]+)(?:\.(?:0x[0-9a-f]+|[0-9]+)){0,3}$")
+
+
+def _unreachable_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    if (
+        address.is_loopback
+        or address.is_link_local
+        or address.is_unspecified
+        or address in _METADATA_ADDRESSES
+    ):
+        return True
+    if isinstance(address, ipaddress.IPv4Address):
+        return address in _THIS_NETWORK
+    carried = [address.ipv4_mapped, address.sixtofour, *(address.teredo or ())]
+    if any(address in network for network in _IPV4_IN_LOW_BITS):
+        carried.append(ipaddress.IPv4Address(int(address) & 0xFFFFFFFF))
+    return any(v4 is not None and _unreachable_address(v4) for v4 in carried)
+
+
+def _unreachable_http_host(host: str) -> bool:
+    """True for a host http never reaches: loopback, unspecified, link-local or a cloud
+    metadata service, by name, by address or carried inside an IPv6 address; a name under a
+    public DNS that answers with the address written in it; an address in a numeric form other
+    than four decimal parts; and a bracketed literal that is not IPv6 (IPvFuture)."""
+    bare = _bare(host).rstrip(".")
+    if (
+        bare in _LOOPBACK_NAMES
+        or bare.endswith(".localhost")
+        or bare in _METADATA_NAMES
+        or any(bare == d or bare.endswith(f".{d}") for d in _WILDCARD_DNS)
+    ):
+        return True
+    if _NUMERIC_HOST_RE.match(bare) and not _DOTTED_QUAD_RE.match(bare):
+        return True
+    if ":" in bare and not _IPV6_LITERAL_RE.match(bare):
+        return True
+    if not (_DOTTED_QUAD_RE.match(bare) or ":" in bare):
+        return False
+    # urlsplit has checked a bracketed literal, and the URL's host equals the device's.
+    return _unreachable_address(ipaddress.ip_address(bare))
+
+
 def _parse_url(url: str) -> SplitResult:
     """Split a URL, or refuse it: a port out of range or a broken IPv6 literal is not a URL."""
     try:
@@ -326,6 +531,11 @@ def _b_http(a: dict[str, Any], t: Target) -> str:
     if _bare(parts.hostname) != _bare(device):
         raise ToolRejectionError(
             f"'url' must point at the device itself ({device}), not another host"
+        )
+    if _unreachable_http_host(device):
+        raise ToolRejectionError(
+            f"'url' points at {device}, a loopback, link-local or cloud metadata address, "
+            "which http does not reach"
         )
     for name, _value in parse_qsl(parts.query, keep_blank_values=True):
         if _is_secret_param(name):
@@ -427,16 +637,29 @@ def _b_mac(_a: dict[str, Any], t: Target) -> str:
     return _join("!macaddress", _device(t))
 
 
+def _oids(a: dict[str, Any], lo: int, hi: int) -> list[str]:
+    oids = _list(a, "oids", _OID_RE, lo, hi)
+    for oid in oids:
+        _check_oid(oid, walk=False)
+    return oids
+
+
 def _b_snmpdiagnose(a: dict[str, Any], t: Target) -> str:
-    return _join("!snmpdiagnose", _device(t), *_list(a, "oids", _OID_RE, 0, 5))
+    return _join("!snmpdiagnose", _device(t), *_oids(a, 0, 5))
 
 
 def _b_snmpget(a: dict[str, Any], t: Target) -> str:
-    return _join("!snmpget", _device(t), *_list(a, "oids", _OID_RE, 1, 10))
+    return _join("!snmpget", _device(t), *_oids(a, 1, 10))
 
 
 def _b_cim(a: dict[str, Any], t: Target) -> str:
     cls = _opt(a, "class", pattern=_CLASS_RE) or _required(a, "class")
+    _check_class(cls)
+    if cls.lower() in _REFUSED_COLUMNS:
+        raise ToolRejectionError(
+            f"the class {_REFUSED_COLUMNS[cls.lower()][0]} is not queried with cim, which "
+            "returns every column, a command line among them"
+        )
     return _join("!cim", f"h={_device(t)}", f"c={cls}")
 
 
@@ -509,6 +732,8 @@ ALLOWED_HEADS = frozenset({
     "tplist", "nsplist", "dxlist", "tlist", "ping", "nslookup", "macaddress", "snmpdiagnose",
     "snmpget", "snmpwalk", "wmi", "winrm", "cim", "http", "sslcerts",
 })  # fmt: skip
+# A second command head after the first: whitespace, then "!" and a letter ("!=" is a comparison).
+_SECOND_HEAD_RE = re.compile(r"\s![A-Za-z0-9_]")
 _FIXED_FORMS = {
     "shealthcheck": re.compile(r"^!shealthcheck func=detail collector=[0-9]{1,12}$"),
     "getconfig": re.compile(r"^!getconfig collector\.[a-z][a-z0-9]*\.(threadpool|timeout)$"),
@@ -542,6 +767,7 @@ def build_cmdline(command: str, args: dict[str, Any], target: Target) -> str:
     except ToolRejectionError:
         raise
     except (TypeError, ValueError) as e:
+        logger.exception("collector_debug: the %s builder raised; refused", command)
         raise ToolRejectionError(f"an argument has a value of the wrong type ({e})") from e
     check_cmdline(cmdline)
     return cmdline
@@ -564,6 +790,8 @@ def check_cmdline(cmdline: str) -> None:
     form = _FIXED_FORMS.get(name)
     if form and not form.match(cmdline):
         raise CommandLineRejectionError(f"!{name} is sent only in its fixed form")
+    if _SECOND_HEAD_RE.search(cmdline):
+        raise CommandLineRejectionError("a command line carries one command head, never a second")
     if not all(" " <= ch <= "~" for ch in cmdline):  # also refuses a second line
         raise CommandLineRejectionError("a command line takes printable ASCII characters only")
     if len(cmdline) > MAX_CMDLINE:
@@ -705,18 +933,19 @@ _SHORT_WORD = 4  # words this long or shorter need a boundary before them
 _ASCII_LOWER_OR_DIGIT = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
 _ASCII_UPPER = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 _JVM_FLAG_RE = re.compile(r"^-+D?")
+_COMPOUND_KEY_RE = re.compile(r"[._-]|[a-z0-9][A-Z]")  # a key of more than one word
 
 
 def _is_secret_key(key: str) -> bool:
     """True when a key (wmi.pass, -Ddb.password, clientSecret, snmp.authtoken) names a secret.
 
-    A dotted key is also a secret wherever lm_mcp.logging.is_sensitive_key says so (ssh.key,
-    snmp.auth, snmp.priv, meraki.api.key), so one rule decides the audit line and the masked
-    output. An undotted word such as key or auth is left to the list above, so a log's
+    A key of more than one word (ssh.key, snmp_auth, snmpPriv, meraki.api.key) is also a secret
+    wherever lm_mcp.logging.is_sensitive_key says so, so one rule decides the audit line and
+    the masked output. A bare word such as key or auth is left to the list above, so a log's
     "key=value" or "auth: ok" is not masked.
     """
     key = _JVM_FLAG_RE.sub("", key)  # -Dwmi.pass, --password
-    if "." in key and is_sensitive_key(key):
+    if _COMPOUND_KEY_RE.search(key) and is_sensitive_key(key):
         return True
     low = key.lower()
     for word in _SECRET_KEY_WORDS:
@@ -732,6 +961,7 @@ def _is_secret_key(key: str) -> bool:
 
 
 _CAP = 512  # sets how far a <name> element and a bracketed value are read
+_MASK_MARGIN = _CAP * 8  # masked past a cut, so a secret the cut splits is still seen whole
 # key=value, key: value, "key": "value", -Dkey=value. The key is one token: word characters,
 # dots and dashes, starting where the previous token ended.
 _KEYED_RE = re.compile(r"""(?<![\w.-])["']?([\w.-]+)["']?[ \t]*([=:])""")
@@ -766,7 +996,7 @@ _KEY_LINE_RE = re.compile(r"""["']?[\w.-]+["']?[ \t]*[=:]|[-#]""")
 # Authorization: Bearer xxx is a key; a bare "Bearer xxx" in a log line is caught here.
 _BEARER_RE = re.compile(r"(?<![\w-])(bearer[ \t]+)([A-Za-z0-9._~+/=-]+)", re.IGNORECASE)
 # A PEM private key block: a BEGIN line naming a PRIVATE KEY, the body, an END line.
-_PEM_RE = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----")
+_PEM_RE = re.compile(r"-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY[A-Z ]{0,20}-----")
 # name="wmi.pass" ... value="x", in either order, anywhere inside one XML tag or one JSON
 # object: the text between two of the characters { } < >.
 _SEGMENT_RE = re.compile(r"[^{}<>]+")
@@ -796,7 +1026,10 @@ _SCHEME_RE = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?://|\\/\\
 # holds (quotes, < > \ { } |), and at a comma, where text lists one URL after another.
 _AUTHORITY_END_RE = re.compile(r"""[\s/?#"'<>\\{}|,]""")
 # curl -u user:password, --user user:password
-_USER_FLAG_RE = re.compile(r"(?<![\w.-])(--user|-u)([ \t=]+[^\s:]+:)(\S+)")
+# The separator and the user cannot both match "=", so a long run of either is read once.
+_USER_FLAG_RE = re.compile(r"(?<![\w.-])(--user|-u)((?:[ \t]+|=)[^\s:=]{1,256}:)(\S+)")
+# sqlcmd -P password, sshpass -p password, snmpwalk -c community, check_snmp -C community
+_SHORT_FLAG_RE = re.compile(r"(?<![\w.-])(-[pPcC])([ \t]+)(\S+)")
 
 
 def _mask_value(text: str, pos: int, out: list[str], sep: str = "=") -> int:
@@ -895,8 +1128,10 @@ def _mask_flags(text: str) -> str:
 
 
 def _mask_user_flags(text: str) -> str:
-    """curl -u user:password and --user user:password keep the user."""
-    return _USER_FLAG_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}***", text)
+    """curl -u user:password and --user user:password keep the user; -P, -p and -c values,
+    a password or a community in sqlcmd, sshpass and the SNMP tools, are masked."""
+    text = _USER_FLAG_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}***", text)
+    return _SHORT_FLAG_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}***", text)
 
 
 def _mask_pem(text: str) -> str:
@@ -1053,6 +1288,11 @@ def redact(text: str) -> str:
     return out
 
 
+def _masked(text: str, keep: int) -> str:
+    """The text masked, then cut to keep characters, reading a margin past the cut."""
+    return redact(text[: keep + _MASK_MARGIN])[:keep]
+
+
 def redact_values(data: Any) -> Any:
     """Mask a parsed structure: every string, the value under a secret-named key, and the
     value beside a name/key field that names a secret."""
@@ -1074,6 +1314,11 @@ def redact_values(data: Any) -> Any:
 
 
 # ---------------------------------------------------------------- failures
+
+
+def _one_line(text: str) -> str:
+    """Text on one line, so portal words cannot start a log line of their own."""
+    return " ".join(text.split())
 
 
 def _error_text(error: Exception) -> str:
@@ -1107,13 +1352,13 @@ def describe_failure(error: Exception) -> dict[str, str]:
         logger.warning(
             "collector_debug %s: %s%s",
             error.code,
-            redact(error.message),
-            f" (details: {redact(error.details)})" if error.details else "",
+            _one_line(redact(error.message)),
+            f" (details: {_one_line(redact(error.details))})" if error.details else "",
         )
     else:
         logger.exception("collector_debug: unexpected error in the debug call", exc_info=error)
     status, detail = _classify_error(error)
-    return {"status": status, "detail": detail, "error_body": redact(_error_text(error)[:4000])}
+    return {"status": status, "detail": detail, "error_body": _masked(_error_text(error), 4000)}
 
 
 # ---------------------------------------------------------------- health check parsing
@@ -1189,7 +1434,7 @@ def _detail_text(detail: Any) -> str | None:
     if detail is None:
         return None
     text = detail if isinstance(detail, str) else json.dumps(detail, default=str)
-    return text[:PARSE_TEXT_MAX]
+    return _masked(text, PARSE_TEXT_MAX)
 
 
 def parse_health_check(output: str) -> dict[str, Any]:
@@ -1216,12 +1461,14 @@ def parse_health_check(output: str) -> dict[str, Any]:
             if sched.group(3) != "0":
                 not_ok.append({"check": name, "detail": f"script status {sched.group(3)}"})
         checkpoints = _checkpoints(name, body)
-        if checkpoints is None:
+        if checkpoints is None or not all(
+            isinstance(cp, dict) and isinstance(cp.get("status"), str) and cp["status"]
+            for cp in checkpoints
+        ):
+            # An array that does not decode, or holds entries that are not checkpoints.
             unreadable.append(name)
             continue
         for cp in checkpoints:
-            if not isinstance(cp, dict):
-                continue
             cp_name = str(cp.get("name", ""))[:200]
             detail = cp.get("detail")
             status = str(cp.get("status", ""))[:40]
@@ -1293,3 +1540,403 @@ def parse_reply(parse: Callable[[str], Any], output: str) -> dict[str, Any]:
     if len(output) > OUTPUT_MAX:
         result["parse_partial"] = True
     return result
+
+
+# ---------------------------------------------------------------- transport
+
+POLL_SECONDS = 1.0
+RATE_WINDOW = 60.0
+POST_LIMIT = 180  # the portal allows 200 a minute; this server stops short
+GET_LIMIT = 450  # the portal allows 500 a minute
+SESSION_WORDS = frozenset({
+    "cancelled", "canceled", "pending", "queued", "scheduled", "running", "timeout", "timedout",
+    "expired", "unknown",
+})  # fmt: skip
+_POSTS: deque[float] = deque()
+_GETS: deque[float] = deque()
+# The still-working read: HTTP 202 with errorCode 1202, which the client raises as this code.
+_PENDING_CODE = "API_ERROR_1202"
+_PENDING_RE = re.compile(
+    r"waiting for response|fetched the task|not (yet )?finished|still running|in progress"
+)
+
+
+def is_session_word(text: str) -> bool:
+    """True when a read's output is a session status (cancelled, pending), not the answer."""
+    return (text or "").strip().lower() in SESSION_WORDS
+
+
+def is_pending_error(error: Exception) -> bool:
+    """True when a read's error only says the collector is still running the command."""
+    if isinstance(error, LMError) and error.code == _PENDING_CODE:
+        return True
+    text = f"{getattr(error, 'message', '')} {getattr(error, 'details', '') or ''} {error}".lower()
+    return bool(_PENDING_RE.search(text))
+
+
+def _rate_ok(bucket: deque[float], limit: int) -> bool:
+    now = time.monotonic()
+    while bucket and now - bucket[0] > RATE_WINDOW:
+        bucket.popleft()
+    return len(bucket) < limit
+
+
+_T = TypeVar("_T")
+
+
+class _BudgetSpentError(Exception):
+    """The time budget ran out before or during a call to the portal."""
+
+
+async def _within(deadline: float, call: Awaitable[_T]) -> _T:
+    """Await one portal call, cut off at the deadline; a spent budget starts no call."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        if asyncio.iscoroutine(call):
+            call.close()
+        raise _BudgetSpentError
+    try:
+        async with asyncio.timeout(remaining):
+            return await call
+    except TimeoutError as e:
+        raise _BudgetSpentError from e
+
+
+def _failure_head(error: Exception, status: str) -> dict[str, Any]:
+    """The error envelope's code, and retry_after when the portal gave one, for a debug call
+    that raised."""
+    if status == "disabled":
+        return {"error": True, "code": "FEATURE_DISABLED"}
+    if status == "unsupported":
+        return {"error": True, "code": "INVALID_REQUEST"}
+    if isinstance(error, LMError):
+        retry_after = getattr(error, "retry_after", None)
+        return {
+            "error": True,
+            "code": lm_error_code(error),
+            "retry_after": retry_after if isinstance(retry_after, int) else None,
+        }
+    if isinstance(error, httpx.TimeoutException):
+        return {"error": True, "code": "TIMEOUT"}
+    return {"error": True, "code": "UPSTREAM_ERROR"}
+
+
+def _no_reply_detail(last_status: str | None) -> str:
+    detail = "no answer inside the time budget; the collector may still run the command"
+    return f"{detail}; last session status '{last_status}'" if last_status else detail
+
+
+async def run_debug(
+    client: LogicMonitorClient,
+    collector_id: int,
+    cmdline: str,
+    deadline: float,
+    *,
+    counter: list[int] | None = None,
+    parse: Callable[[str], Any] | None = None,
+    keep: int = OUTPUT_MAX,
+) -> dict[str, Any]:
+    """Send one checked command line and poll for its output until the deadline; never raises.
+
+    The POST and every read are cut off at the deadline, and a budget that ends the call is
+    logged with its stack trace. A failed call carries its error envelope's head (the code, and
+    retry_after when the portal gave one) under ``envelope``. The
+    output is masked to a margin past keep characters (at most OUTPUT_MAX) and cut to keep;
+    output_chars is the length the collector sent, and truncated says whether any of it is not
+    shown. A parse, when given, reads the raw output through parse_reply.
+    """
+    started = time.monotonic()
+    result: dict[str, Any] = {"cmdline": cmdline, "collector_id": collector_id}
+
+    def done(**kw: Any) -> dict[str, Any]:
+        result.update(kw)
+        result["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        return result
+
+    def count() -> None:
+        if counter is not None:
+            counter[0] += 1
+
+    try:
+        check_cmdline(cmdline)
+    except ToolRejectionError as e:
+        # A line the builders composed and the final guard refuses: the two disagree.
+        logger.warning("collector_debug: the final guard refused %r: %s", cmdline, e, exc_info=True)
+        return done(status="rejected_by_tool", detail=str(e))
+    if not _rate_ok(_POSTS, POST_LIMIT):
+        return done(
+            status="rate_limited",
+            envelope={"error": True, "code": "RATE_LIMITED"},
+            detail="this server's own POST budget is spent; nothing was sent",
+        )
+    if time.monotonic() >= deadline:
+        return done(
+            status="error",
+            envelope={"error": True, "code": "TIMEOUT"},
+            detail="the time budget ran out before the command was sent; nothing was sent",
+        )
+    try:
+        _POSTS.append(time.monotonic())
+        count()
+        try:
+            sub = await _within(
+                deadline,
+                client.request(
+                    "POST",
+                    "/debug",
+                    params={"collectorId": collector_id},
+                    json_body={"cmdline": cmdline},
+                ),
+            )
+        except _BudgetSpentError:
+            logger.warning(
+                "collector_debug: %s on collector %s was not accepted inside the budget",
+                cmdline,
+                collector_id,
+                exc_info=True,
+            )
+            return done(
+                status="no_reply",
+                detail=(
+                    "the portal did not accept the command inside the time budget; "
+                    "the collector may still run it"
+                ),
+            )
+        session_id = sub.get("sessionId") if isinstance(sub, dict) else None
+        if not session_id:
+            return done(
+                status="error",
+                envelope={"error": True, "code": "UPSTREAM_ERROR"},
+                detail="the debug API returned no session id",
+            )
+        reads: tuple[tuple[str, dict[str, int] | None], ...] = (
+            ("with", {"collectorId": collector_id}),
+            ("without", None),
+        )
+        last_status: str | None = None
+        while time.monotonic() + POLL_SECONDS < deadline:
+            await asyncio.sleep(POLL_SECONDS)
+            for form, params in reads:
+                if not _rate_ok(_GETS, GET_LIMIT):
+                    # The command was sent, so this is no answer yet, not a refusal.
+                    return done(
+                        status="no_reply",
+                        detail=(
+                            "this server's own GET budget is spent; the command was sent and "
+                            "the collector may still run it"
+                        ),
+                    )
+                _GETS.append(time.monotonic())
+                count()
+                try:
+                    reply = await _within(
+                        deadline, client.get(f"/debug/{session_id}", params=params)
+                    )
+                except _BudgetSpentError:
+                    logger.warning(
+                        "collector_debug: a read of session %s ran past the budget",
+                        session_id,
+                        exc_info=True,
+                    )
+                    return done(status="no_reply", detail=_no_reply_detail(last_status))
+                except LMError as e:
+                    if not is_pending_error(e):
+                        raise
+                    logger.debug(
+                        "collector_debug: session %s is still running", session_id, exc_info=True
+                    )
+                    last_status = _masked(_error_text(e), 200)
+                    continue
+                output = str(reply.get("output") or "") if isinstance(reply, dict) else ""
+                if output and not is_session_word(output):
+                    if parse is not None:
+                        result.update(parse_reply(parse, output))
+                    shown = min(keep, OUTPUT_MAX)
+                    masked = redact(output[: shown + _MASK_MARGIN])
+                    return done(
+                        status="answered",
+                        read_form=form,
+                        output=masked[:shown],
+                        output_chars=len(output),
+                        truncated=len(output) > shown or len(masked) > shown,
+                    )
+                if output and (last_status is None or is_session_word(last_status)):
+                    last_status = output.strip()
+        return done(status="no_reply", detail=_no_reply_detail(last_status))
+    except Exception as e:
+        failure = describe_failure(e)
+        return done(**failure, envelope=_failure_head(e, failure["status"]))
+
+
+# ---------------------------------------------------------------- the tool
+
+# Statuses that mean the command did not run as asked: errors in the envelope, so the write
+# audit and the client's isError see a failure. answered and no_reply are results.
+FAILED_STATUSES = frozenset({"refused", "disabled", "unsupported", "rate_limited", "error"})
+# The collector's own words when it rejects a command line, at the start of a line, so a
+# device's "cpu usage: 12%" or an "Invalid URL" page title is not read as one.
+_USAGE_RE = re.compile(
+    r"^[ \t]*(?:invalid input argument|invalid debug command|usage[ \t]*:|invalid host\."
+    r"|invalid url)",
+    re.MULTILINE,
+)
+_DEVICE_FIELDS = "id,name,displayName,currentCollectorId"
+
+
+def _suggestion(command: Any, error: ToolRejectionError) -> str | None:
+    """The command list for an unknown command, and the command's keys for a refused argument."""
+    if not isinstance(command, str) or command not in COMMANDS:
+        return f"Commands: {', '.join(sorted(COMMANDS))}"
+    if isinstance(error, CommandLineRejectionError):
+        return None
+    keys = sorted(COMMANDS[command].keys)
+    return f"{command} takes {', '.join(keys)}" if keys else f"{command} takes no arguments"
+
+
+def _rejected(command: Any, detail: str, suggestion: str | None = None) -> list[TextContent]:
+    """A request refused before anything was sent."""
+    return format_response(
+        {
+            "error": True,
+            "code": "REJECTED_BY_TOOL",
+            "message": f"{command}: {detail}",
+            "suggestion": suggestion,
+            "command": command,
+            "status": "rejected_by_tool",
+        }
+    )
+
+
+def _failed(response: dict[str, Any], head: dict[str, Any]) -> list[TextContent]:
+    """A command that did not run as asked: the envelope head its cause decided, the portal's
+    masked words in the message, and the call's record in the details."""
+    message = f"{response['command']}: {response['status']}: {response.get('detail', '')}"
+    if response.get("error_body"):
+        message += f" ({' '.join(str(response['error_body'])[:200].split())})"
+    return format_response({**head, "message": message, "details": response})
+
+
+@require_write_permission
+async def collector_debug(
+    client: LogicMonitorClient,
+    command: str,
+    collector_id: int | None = None,
+    device_id: int | None = None,
+    args: dict[str, Any] | None = None,
+    budget_seconds: float = BUDGET_DEFAULT,
+    max_output_chars: int = OUTPUT_DEFAULT,
+) -> list[TextContent]:
+    """Run one allowlisted collector debug command and return what the collector said.
+
+    Write-gated. Device probes need device_id and take their host from the device record, which
+    also names the collector the command runs on. Everything the caller passed is checked
+    before any call, and the whole call is held to budget_seconds.
+    """
+    try:
+        started = time.monotonic()
+        portal_host = urlsplit(client.base_url).hostname
+        try:
+            req = check_request(
+                command,
+                collector_id=collector_id,
+                device_id=device_id,
+                args=args,
+                budget_seconds=budget_seconds,
+                max_output_chars=max_output_chars,
+                portal_host=portal_host,
+            )
+        except ToolRejectionError as e:
+            return _rejected(command, str(e), _suggestion(command, e))
+        deadline = started + req.budget_seconds
+        calls = [0]
+        device_note = None
+        if req.device_id is None:
+            # check_request refuses a request with neither id.
+            target = Target(collector_id=cast(int, req.collector_id), portal_host=portal_host)
+        else:
+            calls[0] += 1
+            try:
+                record = await _within(
+                    deadline,
+                    client.get(
+                        f"/device/devices/{req.device_id}", params={"fields": _DEVICE_FIELDS}
+                    ),
+                )
+            except _BudgetSpentError:
+                logger.warning(
+                    "collector_debug: device %s's record did not arrive inside the budget",
+                    req.device_id,
+                    exc_info=True,
+                )
+                return _failed(
+                    {
+                        "command": req.command,
+                        "status": "error",
+                        "detail": (
+                            "the device record did not arrive inside the time budget; "
+                            "nothing was sent"
+                        ),
+                        "budget_seconds": req.budget_seconds,
+                        "api_calls": calls[0],
+                        "elapsed_ms": int((time.monotonic() - started) * 1000),
+                    },
+                    {"error": True, "code": "TIMEOUT"},
+                )
+            try:
+                target = target_from_record(req.command, record, req.collector_id, portal_host)
+            except ToolRejectionError as e:
+                return _rejected(req.command, str(e), _suggestion(req.command, e))
+            device_note = {"device_id": record.get("id"), "host_used": target.host}
+        try:
+            cmdline = build_cmdline(req.command, req.args, target)
+        except ToolRejectionError as e:
+            return _rejected(req.command, str(e), _suggestion(req.command, e))
+
+        logger.info(
+            "collector_debug: sending %r to collector %s%s",
+            cmdline,
+            target.collector_id,
+            f" for device {req.device_id}, host {target.host}" if req.device_id is not None else "",
+        )
+        health = req.command == "health_check"
+        result = await run_debug(
+            client,
+            target.collector_id,
+            cmdline,
+            deadline,
+            counter=calls,
+            parse=parse_health_check if health else None,
+            keep=min(req.max_output_chars, HEALTH_SHOWN_MAX) if health else req.max_output_chars,
+        )
+        if result.get("status") == "rejected_by_tool":
+            return _rejected(req.command, str(result.get("detail", "")))
+        head = result.pop("envelope", None)
+        response: dict[str, Any] = {
+            "command": req.command,
+            "group": COMMANDS[req.command].group,
+            **result,
+            "budget_seconds": req.budget_seconds,
+            "api_calls": calls[0],
+        }
+        if device_note:
+            response["device"] = device_note
+        opening = str(response.get("output") or "")[:300].lower()
+        if "configuration key [" in opening and "not found" in opening:
+            response["note"] = (
+                "The collector has no such agent.conf key. Check the method name in the key, "
+                "e.g. collector.wmi.threadpool. This is about the command, not the collector."
+            )
+        elif _USAGE_RE.search(opening):
+            response["note"] = (
+                "The collector rejected the command syntax and printed its usage. This is "
+                "about the command, not the device."
+            )
+        for key in ("parsed", "output"):  # the long parts last
+            if key in response:
+                response[key] = response.pop(key)
+        response["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        if response.get("status") in FAILED_STATUSES:
+            return _failed(response, head or {"error": True, "code": "UPSTREAM_ERROR"})
+        return format_response(response)
+    except Exception as e:
+        return handle_error(e)

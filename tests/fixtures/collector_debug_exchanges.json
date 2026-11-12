@@ -1,0 +1,63 @@
+{
+  "_source": "Live POST /debug and GET /debug/{sessionId} exchanges on the sandbox portal, 2026-11-12 (docs/validation/probes-2026-11.md, Step 73). Bodies verbatim.",
+  "post_accepted": {
+    "status": 200,
+    "body": {
+      "output": "",
+      "sessionId": "1797233312",
+      "cmdline": "!ping 127.0.0.1",
+      "cmdContext": ""
+    }
+  },
+  "poll_cancelled": {
+    "status": 200,
+    "body": {
+      "output": "cancelled",
+      "sessionId": "1797233312",
+      "cmdline": null,
+      "cmdContext": ""
+    }
+  },
+  "poll_pending": {
+    "status": 202,
+    "body": {
+      "errorMessage": "agent has fetched the task, waiting for response",
+      "errorCode": 1202,
+      "errorDetail": null
+    }
+  },
+  "poll_answer_ping": {
+    "status": 200,
+    "body": {
+      "output": "Sent: 10, Recv: 10, Min: 0, Max: 0, Avg: 0",
+      "sessionId": "1797233312",
+      "cmdline": null,
+      "cmdContext": ""
+    }
+  },
+  "poll_answer_uptime": {
+    "status": 200,
+    "body": {
+      "output": "uptime=21h 10m 41s, realUptime=21h 10m 41s, confVer=1794483129",
+      "sessionId": "1797233319",
+      "cmdline": null,
+      "cmdContext": ""
+    }
+  },
+  "post_unknown_command": {
+    "status": 400,
+    "body": {
+      "errorMessage": "Unknown debug command !nosuchcmd",
+      "errorCode": 1400,
+      "errorDetail": null
+    }
+  },
+  "post_unknown_collector": {
+    "status": 400,
+    "body": {
+      "errorMessage": "No such collector<id=999999>",
+      "errorCode": 1400,
+      "errorDetail": null
+    }
+  }
+}

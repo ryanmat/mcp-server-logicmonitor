@@ -8,8 +8,8 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 270:
-258 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 271:
+259 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
 With writes off, the default, `tools/list` shows 148 of them, or 152 in multi-portal mode, and
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
@@ -99,6 +99,25 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   destructive, restarts a collector with its own size and config files sent back and reports the
   size it kept, because a restart sent without them reset a Large collector to Custom; and
   `acknowledge_collector_down` acknowledges a down collector's alert with a comment.
+- `collector_debug`, listed only with writes on and annotated destructive, runs one of 29
+  allowlisted collector debug commands (`uptime`, `health_check`, `perf`, `getconfig`, `ping`,
+  `snmpwalk`, `wmi`, `http` and the rest) and returns what the collector said. Callers pass a
+  command and its typed arguments, never a command line; a device probe takes its host from the
+  device record and runs on the collector that serves the device, `http` reaches only that
+  host and never a loopback, link-local or cloud metadata address, and a command that changes
+  the collector, runs code on its host or carries a credential is never sent. A WMI WHERE
+  clause allows `!` only as `!=`, and each comparison operator stands alone between spaces;
+  `wmi` and `cim` refuse Win32_Product, the file, directory and environment classes and
+  their parent classes, and never read or test a command-line column; `snmpwalk` never reads
+  the SNMP community or user tables.
+  Output is masked by the credential rule the audit log uses, and the masking and the
+  `health_check` parse grow with the length of the reply. `health_check` leads
+  with each collection method's share of tasks returning NaN for every datapoint and names any
+  checkpoint array it cannot read under `checkpoints_unreadable`. One budget, 2 to 60 seconds,
+  holds the device read, the POST and every poll; `answered` and `no_reply` are results, and a
+  refusal comes back as `REJECTED_BY_TOOL`, `AUTH_FAILED`, `FEATURE_DISABLED` or the portal's
+  code. The command set, the builder and the health-check parse come from #97 by GitHub user
+  barunagarwal.
 - Alert thresholds: `get_alert_settings` reads a datapoint's threshold at instance, device or
   group level with the level it comes from (instance, instance group, device datasource, device
   group or global, in LogicMonitor's precedence). `update_alert_settings`, listed only with

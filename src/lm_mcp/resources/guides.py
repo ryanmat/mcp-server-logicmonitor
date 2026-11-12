@@ -113,6 +113,7 @@ TOOL_CATEGORIES = {
                 "update_collector_group",
                 "delete_collector_group",
                 "get_collector_health",
+                "collector_debug",
             ],
         },
         "networking": {
