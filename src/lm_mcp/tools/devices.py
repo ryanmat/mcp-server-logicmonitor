@@ -134,7 +134,8 @@ async def get_device_delta(
     Without delta_id it lists the devices whose display name contains name_filter, or every
     device, and starts a delta whose id it returns; each such read starts another. With
     delta_id it lists the devices changed since that delta started, every change since then on
-    each read, and takes no name_filter, since the portal applied none there.
+    each read, and takes no name_filter, since the portal answered a filtered read there with an
+    empty page that left out a changed device.
 
     Args:
         client: LogicMonitor API client.

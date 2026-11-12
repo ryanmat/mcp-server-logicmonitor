@@ -123,10 +123,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   them), `get_website_checkpoints` (the checkpoint locations; each id is the `smg_id` a website's
   checkpoints carry) and `get_device_delta`. A delta read without `delta_id` lists devices and
   starts a delta, returning its `delta_id`; a read with it lists the devices changed since, with
-  `change`, and refuses `name_filter`, which the portal does not apply there.
-- NetFlow on the device paths: `get_device_flows` and `get_device_top_talkers` (rows), replacing
-  `get_network_flows` and `get_top_talkers`. A portal answer of "Netflow disabled" is
-  `FEATURE_DISABLED`, not `INVALID_REQUEST`.
+  `change`, and refuses `name_filter`, since the portal answered a filtered read there with an
+  empty page that left out a changed device.
+- NetFlow on the device paths: `get_device_flows` pages a device's flow records, and
+  `get_device_top_talkers` its endpoints or ports or returns its top talkers graph, each over
+  `hours_back`. They replace `get_network_flows` and `get_top_talkers` (see Removed). Rows come
+  back as the API returns them; the only portal read has NetFlow off, so the row shapes and the
+  paging are unverified. A portal answer of "Netflow disabled" is `FEATURE_DISABLED`, where it
+  was `INVALID_REQUEST`.
 - `get_service_insights_rules` pages the portal's Service Insights rules, and `get_tenants` lists
   its tenant names; both read endpoints of LogicMonitor v247 that the public API reference does
   not list, so the rules come back as the API returns them.
@@ -230,7 +234,7 @@ instead.
 | `export_alert_rule` | removed | `get_alert_rule` with `raw=true`. |
 | `export_escalation_chain` | removed | `get_escalation_chain` with `raw=true`. |
 | `get_network_flows` | removed | `get_device_flows`, which reads `/device/devices/{id}/flows` for one device, `device_id` required, over `hours_back`; `/netflow/flows` answered 404. `source_ip` and `dest_ip` leave, and rows come back as the API returns them. |
-| `get_top_talkers` | removed | `get_device_top_talkers`, which reads the device's top endpoints (`by="endpoint"`), top ports (`by="port"`) or top talkers graph (`by="graph"`) as the portal ranks them, where the tool ranked `/netflow/flows` rows itself. `exporter_device_id` becomes `device_id`; `n` becomes `limit`; `group_by` and `min_bytes` leave. |
+| `get_top_talkers` | removed | `get_device_top_talkers`, which reads the device's endpoints (`by="endpoint"`), ports (`by="port"`) or top talkers graph (`by="graph"`) from the portal, where the tool ranked `/netflow/flows` rows itself. `exporter_device_id` becomes `device_id`; `n` becomes `limit`; `group_by` and `min_bytes` leave. |
 | `list_sdts` | `get_sdts` | Renamed. |
 | `list_session_history` | `get_session_history` | Renamed. |
 | `list_portals` | `get_portals` | Renamed. |

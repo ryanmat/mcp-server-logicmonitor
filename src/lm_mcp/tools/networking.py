@@ -233,7 +233,7 @@ async def get_device_top_talkers(
 ) -> list[TextContent]:
     """Read a device's NetFlow top talkers over the last hours_back hours.
 
-    by="endpoint" pages its top endpoints and by="port" its top ports, rows as the API
+    by="endpoint" pages the endpoints it saw and by="port" the ports, rows as the API
     returns them; by="graph" returns its top talkers graph whole, with no paging.
 
     Args:
