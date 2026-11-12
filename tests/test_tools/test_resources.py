@@ -256,7 +256,8 @@ class TestUpdateDeviceProperty:
 
 
 # Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe). Group 3339 is a
-# throwaway group under the root, 3340 its child and 3341 the child's child. Its property page
+# throwaway group under the root, 3340 its child and 3341 the child's child; 3343 is a child of
+# another throwaway group, 3342, whose lmmcp.order it inherits. Its property page
 # held six rows; one, an inherited endpoint URL naming a private host, is cut, under the total
 # the portal sent. Each entry keeps the request, the status and the body as read.
 LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "property_ops.json").read_text())
@@ -460,19 +461,17 @@ class TestUpdateDeviceGroupProperty:
         _writes(monkeypatch)
         from lm_mcp.tools.resources import update_device_group_property
 
-        put = respx.put(f"{_BASE}/device/groups/3341/properties/lmmcp.order").mock(
-            return_value=_answer("grandchild_put_inherited")
+        put = respx.put(f"{_BASE}/device/groups/3343/properties/lmmcp.order").mock(
+            return_value=_answer("child_put_inherited")
         )
-        post = respx.post(f"{_BASE}/device/groups/3341/properties").mock(
-            return_value=httpx.Response(
-                200, json={"type": "custom", "name": "lmmcp.order", "value": "x", "inheritList": []}
-            )
+        post = respx.post(f"{_BASE}/device/groups/3343/properties").mock(
+            return_value=_answer("child_post_inherited")
         )
 
         body = json.loads(
             (
                 await update_device_group_property(
-                    client, group_id=3341, property_name="lmmcp.order", property_value="x"
+                    client, group_id=3343, property_name="lmmcp.order", property_value="x"
                 )
             )[0].text
         )
@@ -487,14 +486,7 @@ class TestUpdateDeviceGroupProperty:
         from lm_mcp.tools.resources import update_device_group_property
 
         respx.put(f"{_GROUP_3339}/system.groupType").mock(
-            return_value=httpx.Response(
-                400,
-                json={
-                    "errorMessage": "Property(name=system.groupType) is not allowed to update",
-                    "errorCode": 1400,
-                    "errorDetail": None,
-                },
-            )
+            return_value=_answer("group_property_put_system")
         )
         post = respx.post(_GROUP_3339)
 
