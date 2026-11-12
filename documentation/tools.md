@@ -352,7 +352,7 @@ Operations notes, OIDs, and services
 | `get_services` | List Service Insight business services (deviceType 6 devices, including APM trace services) | No |
 | `get_service` | Get details about a specific Service Insight service | No |
 | `get_service_groups` | List Service Insight service groups (BizService device groups) | No |
-| `get_service_insights_rules` | List the portal's Service Insights rules, rows as the API returns them. get_services lists the services themselves. | No |
+| `get_service_insights_rules` | List the portal's Service Insights rules, rows as the API returns them. offset must be a multiple of limit; the portal answers any other offset with a 400. get_services lists the services themselves. | No |
 | `get_ops_notes` | List ops notes | No |
 | `get_ops_note` | Get details about a specific ops note | No |
 | `add_ops_note` | Add an ops note (requires write permission) | Yes |

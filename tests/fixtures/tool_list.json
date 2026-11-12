@@ -6666,7 +6666,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "List the portal's Service Insights rules, rows as the API returns them. get_services lists the services themselves.",
+    "description": "List the portal's Service Insights rules, rows as the API returns them. offset must be a multiple of limit; the portal answers any other offset with a 400. get_services lists the services themselves.",
     "inputSchema": {
       "properties": {
         "limit": {
@@ -6676,7 +6676,7 @@
         },
         "offset": {
           "default": 0,
-          "description": "Pagination offset",
+          "description": "Pagination offset, a multiple of limit",
           "type": "integer"
         }
       },

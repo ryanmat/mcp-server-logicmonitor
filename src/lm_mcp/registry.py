@@ -3697,27 +3697,32 @@ TOOLS.extend(
                 },
             },
         ),
-    ]
-)
-
-# Ops Notes
-TOOLS.extend(
-    [
         Tool(
             name="get_service_insights_rules",
             description=(
                 "List the portal's Service Insights rules, rows as the API returns them. "
-                "get_services lists the services themselves."
+                "offset must be a multiple of limit; the portal answers any other offset with "
+                "a 400. get_services lists the services themselves."
             ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
-                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pagination offset, a multiple of limit",
+                    },
                 },
             },
         ),
+    ]
+)
+
+# Ops Notes
+TOOLS.extend(
+    [
         Tool(
             name="get_ops_notes",
             description="List ops notes",
