@@ -558,3 +558,132 @@ class TestListToolGuard:
             and _formats_own_page_query(tree)
         )
         assert not own, f"move these onto list_tool: {own}"
+
+
+# R3.6, Step 67: the device and group property tools, Active Discovery and escalation.
+_STEP_67_ANNOTATIONS = {
+    "get_device_group_properties": (True, False),
+    "update_device_group_property": (False, False),
+    "delete_device_group_property": (False, True),
+    "delete_device_property": (False, True),
+    "run_auto_discovery": (False, False),
+    "escalate_alert": (False, False),
+}
+# Tools whose property_name goes into a URL path segment.
+_PROPERTY_PATH_TOOLS = (
+    "get_device_group_properties",
+    "update_device_group_property",
+    "delete_device_group_property",
+    "delete_device_property",
+)
+
+
+class TestStep67Tools:
+    """R3.6: the six tools are registered with their handlers, gated, grouped, and refuse a
+    property name that is not one path segment."""
+
+    def test_each_has_its_handler_and_its_read_and_destructive_hints(self):
+        tools = {tool.name: tool for tool in TOOLS if tool.name in _STEP_67_ANNOTATIONS}
+
+        assert {
+            name: (tool.annotations.readOnlyHint, tool.annotations.destructiveHint)
+            for name, tool in tools.items()
+        } == _STEP_67_ANNOTATIONS
+        assert {name: get_tool_handler(name).__name__ for name in _STEP_67_ANNOTATIONS} == {
+            name: name for name in _STEP_67_ANNOTATIONS
+        }
+
+    def test_each_write_says_it_requires_write_permission(self):
+        tools = {tool.name: tool for tool in TOOLS}
+
+        assert [
+            name
+            for name, (read_only, _) in _STEP_67_ANNOTATIONS.items()
+            if not read_only and "requires write permission" not in tools[name].description
+        ] == []
+
+    def test_the_schemas_name_their_ids_and_required_arguments(self):
+        schemas = {tool.name: tool.inputSchema for tool in TOOLS}
+
+        assert {name: schemas[name]["required"] for name in _STEP_67_ANNOTATIONS} == {
+            "get_device_group_properties": ["group_id"],
+            "update_device_group_property": ["group_id", "property_name", "property_value"],
+            "delete_device_group_property": ["group_id", "property_name"],
+            "delete_device_property": ["device_id", "property_name"],
+            "run_auto_discovery": ["device_id"],
+            "escalate_alert": ["alert_id"],
+        }
+        assert {"limit", "offset", "name_filter", "property_name"} <= set(
+            schemas["get_device_group_properties"]["properties"]
+        )
+
+    def test_the_group_write_uses_the_argument_pair_the_audit_masks(self):
+        from lm_mcp.logging import redact_arguments
+
+        (schema,) = [t.inputSchema for t in TOOLS if t.name == "update_device_group_property"]
+        arguments = {"group_id": 3339, "property_name": "snmp.community", "property_value": "s"}
+
+        assert set(arguments) == set(schema["properties"])
+        assert redact_arguments(arguments)["property_value"] == "***"
+
+    @pytest.mark.parametrize("tool_name", _PROPERTY_PATH_TOOLS)
+    @pytest.mark.parametrize(
+        ("property_name", "valid"),
+        [
+            ("lmmcp.seed", True),
+            ("snmp.community", True),
+            ("system.categories", True),
+            ("kubernetes-label_x.1", True),
+            ("..", False),
+            (".", False),
+            ("../5", False),
+            ("kubernetes.io/metadata.name", False),
+            ("a?b", False),
+            ("a#b", False),
+            ("", False),
+        ],
+    )
+    def test_property_name_admits_one_plain_path_segment(self, tool_name, property_name, valid):
+        import jsonschema
+
+        (schema,) = [t.inputSchema for t in TOOLS if t.name == tool_name]
+        arguments = {
+            "group_id": 3339,
+            "device_id": 1786,
+            "property_name": property_name,
+            "property_value": "x",
+        }
+        arguments = {key: value for key, value in arguments.items() if key in schema["properties"]}
+
+        if valid:
+            jsonschema.validate(arguments, schema)
+        else:
+            with pytest.raises(jsonschema.ValidationError):
+                jsonschema.validate(arguments, schema)
+
+    def test_the_alert_id_admits_an_lm_id_and_refuses_a_path(self):
+        import jsonschema
+
+        (schema,) = [t.inputSchema for t in TOOLS if t.name == "escalate_alert"]
+
+        for bad in ("../x", "a/b", "1?x=y", ""):
+            with pytest.raises(jsonschema.ValidationError):
+                jsonschema.validate({"alert_id": bad}, schema)
+        for good in ("DS362817020", "LMA123", "LMD33315752"):
+            jsonschema.validate({"alert_id": good}, schema)
+
+    def test_the_device_tools_mention_resource(self):
+        tools = {tool.name: tool for tool in TOOLS}
+
+        assert [
+            name
+            for name in _STEP_67_ANNOTATIONS
+            if name != "escalate_alert" and "resource" not in tools[name].description.lower()
+        ] == []
+
+    def test_the_devices_and_alerts_categories_hold_them(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        categories = TOOL_CATEGORIES["categories"]
+        assert set(categories["devices"]["tools"]) >= set(_STEP_67_ANNOTATIONS) - {"escalate_alert"}
+        assert "escalate_alert" in categories["alerts"]["tools"]

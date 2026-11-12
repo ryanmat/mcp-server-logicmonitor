@@ -1,0 +1,378 @@
+{
+ "group_properties_3339": {
+  "request": "GET /device/groups/3339/properties",
+  "status": 200,
+  "body": {
+   "total": 6,
+   "items": [
+    {
+     "type": "inherit",
+     "name": "netapp.ssl",
+     "value": "true",
+     "inheritList": [
+      {
+       "fullpath": "",
+       "id": 1,
+       "value": "true",
+       "type": "group"
+      }
+     ]
+    },
+    {
+     "type": "custom",
+     "name": "lmmcp.seed",
+     "value": "seed",
+     "inheritList": []
+    },
+    {
+     "type": "system",
+     "name": "system.deviceGroupId",
+     "value": "3339",
+     "inheritList": [
+      {
+       "fullpath": "",
+       "id": 1,
+       "value": "1",
+       "type": "group"
+      }
+     ]
+    },
+    {
+     "type": "inherit",
+     "name": "maxsslcerttime",
+     "value": "32",
+     "inheritList": [
+      {
+       "fullpath": "",
+       "id": 1,
+       "value": "32",
+       "type": "group"
+      }
+     ]
+    },
+    {
+     "type": "inherit",
+     "name": "system.categories",
+     "value": "",
+     "inheritList": [
+      {
+       "fullpath": "",
+       "id": 1,
+       "value": "",
+       "type": "group"
+      }
+     ]
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "group_properties_3339_size2_offset1": {
+  "request": "GET /device/groups/3339/properties",
+  "status": 200,
+  "body": {
+   "total": 6,
+   "items": [
+    {
+     "type": "custom",
+     "name": "lmmcp.seed",
+     "value": "seed",
+     "inheritList": []
+    },
+    {
+     "type": "system",
+     "name": "system.deviceGroupId",
+     "value": "3339",
+     "inheritList": [
+      {
+       "fullpath": "",
+       "id": 1,
+       "value": "1",
+       "type": "group"
+      }
+     ]
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "group_property_seed": {
+  "request": "GET /device/groups/3339/properties/lmmcp.seed",
+  "status": 200,
+  "body": {
+   "type": "custom",
+   "name": "lmmcp.seed",
+   "value": "seed",
+   "inheritList": []
+  }
+ },
+ "group_property_missing": {
+  "request": "GET /device/groups/3339/properties/lmmcp.nothere",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.nothere) is not found in device group<3339>",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "group_property_put_missing": {
+  "request": "PUT /device/groups/3339/properties/lmmcp.nothere",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.nothere) cannot be found in device group(id=3339)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "group_property_post": {
+  "request": "POST /device/groups/3339/properties",
+  "status": 200,
+  "body": {
+   "type": "custom",
+   "name": "lmmcp.probe",
+   "value": "a",
+   "inheritList": []
+  }
+ },
+ "group_property_put": {
+  "request": "PUT /device/groups/3339/properties/lmmcp.probe",
+  "status": 200,
+  "body": {
+   "type": "custom",
+   "name": "lmmcp.probe",
+   "value": "b",
+   "inheritList": []
+  }
+ },
+ "group_property_delete": {
+  "request": "DELETE /device/groups/3339/properties/lmmcp.probe",
+  "status": 200,
+  "body": {}
+ },
+ "group_property_delete_again": {
+  "request": "DELETE /device/groups/3339/properties/lmmcp.probe",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.probe) cannot be found in device group(id=3339)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "group_property_delete_system": {
+  "request": "DELETE /device/groups/3339/properties/system.groupType",
+  "status": 400,
+  "body": {
+   "errorMessage": "Property(name=system.groupType) is not allowed to delete",
+   "errorCode": 1400,
+   "errorDetail": null
+  }
+ },
+ "group_missing": {
+  "request": "GET /device/groups/99999999/properties",
+  "status": 404,
+  "body": {
+   "errorMessage": "Device Group<99999999> is not found",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "grandchild_properties_3341": {
+  "request": "GET /device/groups/3341/properties",
+  "status": 200,
+  "body": {
+   "total": 2,
+   "items": [
+    {
+     "type": "inherit",
+     "name": "lmmcp.seed",
+     "value": "seed2",
+     "inheritList": [
+      {
+       "fullpath": "lm-mcp-step67-probe",
+       "id": 3339,
+       "value": "seed2",
+       "type": "group"
+      }
+     ]
+    },
+    {
+     "type": "inherit",
+     "name": "lmmcp.order",
+     "value": "child",
+     "inheritList": [
+      {
+       "fullpath": "lm-mcp-step67-probe/lm-mcp-step67-child",
+       "id": 3340,
+       "value": "child",
+       "type": "group"
+      },
+      {
+       "fullpath": "lm-mcp-step67-probe",
+       "id": 3339,
+       "value": "parent",
+       "type": "group"
+      }
+     ]
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "grandchild_property_order": {
+  "request": "GET /device/groups/3341/properties/lmmcp.order",
+  "status": 200,
+  "body": {
+   "type": "inherit",
+   "name": "lmmcp.order",
+   "value": "child",
+   "inheritList": [
+    {
+     "fullpath": "lm-mcp-step67-probe/lm-mcp-step67-child",
+     "id": 3340,
+     "value": "child",
+     "type": "group"
+    },
+    {
+     "fullpath": "lm-mcp-step67-probe",
+     "id": 3339,
+     "value": "parent",
+     "type": "group"
+    }
+   ]
+  }
+ },
+ "grandchild_put_inherited": {
+  "request": "PUT /device/groups/3341/properties/lmmcp.order",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.order) cannot be found in device group(id=3341)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "grandchild_delete_inherited": {
+  "request": "DELETE /device/groups/3341/properties/lmmcp.order",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.order) cannot be found in device group(id=3341)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "device_property_delete": {
+  "request": "DELETE /device/devices/1786/properties/lmmcp.probe",
+  "status": 200,
+  "body": {}
+ },
+ "device_property_delete_again": {
+  "request": "DELETE /device/devices/1786/properties/lmmcp.probe",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.probe) cannot be found in device(id=1786)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "device_property_delete_system": {
+  "request": "DELETE /device/devices/1786/properties/system.hostname",
+  "status": 400,
+  "body": {
+   "errorMessage": "Property(name=system.hostname) are not allowed to delete.",
+   "errorCode": 1400,
+   "errorDetail": null
+  }
+ },
+ "device_property_delete_inherited": {
+  "request": "DELETE /device/devices/1786/properties/snmp.version",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=snmp.version) cannot be found in device(id=1786)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "device_property_delete_missing_device": {
+  "request": "DELETE /device/devices/99999999/properties/lmmcp.probe",
+  "status": 404,
+  "body": {
+   "errorMessage": "Device is not found",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "autodiscovery_1786": {
+  "request": "POST /device/devices/1786/scheduleAutoDiscovery",
+  "status": 200,
+  "body": {}
+ },
+ "autodiscovery_missing_device": {
+  "request": "POST /device/devices/99999999/scheduleAutoDiscovery",
+  "status": 404,
+  "body": {
+   "errorMessage": "Device <99999999> not found",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "escalate_missing": {
+  "request": "POST /alert/alerts/LMD999999999/escalate",
+  "status": 500,
+  "body": {
+   "errorMessage": "Unknown error",
+   "errorCode": 1500,
+   "errorDetail": null
+  }
+ },
+ "escalate_DS362817020": {
+  "request": "POST /alert/alerts/DS362817020/escalate",
+  "status": 200,
+  "body": {}
+ },
+ "escalate_acked_DS362333940": {
+  "request": "POST /alert/alerts/DS362333940/escalate",
+  "status": 400,
+  "body": {
+   "errorMessage": "Escalation failed. Alert was acknowledged at current stage.",
+   "errorCode": 1400,
+   "errorDetail": null
+  }
+ },
+ "group_property_put_system": {
+  "request": "PUT /device/groups/3339/properties/system.groupType",
+  "status": 400,
+  "body": {
+   "errorMessage": "Property(name=system.groupType) is not allowed to update",
+   "errorCode": 1400,
+   "errorDetail": null
+  }
+ },
+ "child_put_inherited": {
+  "request": "PUT /device/groups/3343/properties/lmmcp.order",
+  "status": 404,
+  "body": {
+   "errorMessage": "Property(name=lmmcp.order) cannot be found in device group(id=3343)'s own property",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "child_post_inherited": {
+  "request": "POST /device/groups/3343/properties",
+  "status": 200,
+  "body": {
+   "type": "custom",
+   "name": "lmmcp.order",
+   "value": "x",
+   "inheritList": [
+    {
+     "fullpath": "lm-mcp-step67-capture",
+     "id": 3342,
+     "value": "parent",
+     "type": "group"
+    }
+   ]
+  }
+ }
+}

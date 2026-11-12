@@ -1,5 +1,5 @@
 # Description: Device management tools for LogicMonitor MCP server.
-# Description: Provides device and device group CRUD functions.
+# Description: Provides device and device group CRUD functions and Active Discovery scheduling.
 
 from __future__ import annotations
 
@@ -421,6 +421,35 @@ async def recover_device(
                 "message": f"Device '{device_name}' recovered",
                 "device_id": result.get("id", device_id),
                 "device_name": device_name,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def run_auto_discovery(
+    client: LogicMonitorClient,
+    device_id: int,
+) -> list[TextContent]:
+    """Schedule Active Discovery on one device, so its collector looks for instances now.
+
+    The portal answers an empty object; the discovery itself runs on the collector.
+
+    Args:
+        client: LogicMonitor API client.
+        device_id: Device ID.
+
+    Returns:
+        List of TextContent with the scheduling result or error.
+    """
+    try:
+        await client.post(f"/device/devices/{device_id}/scheduleAutoDiscovery")
+        return format_response(
+            {
+                "success": True,
+                "device_id": device_id,
+                "message": f"Active Discovery scheduled for device {device_id}",
             }
         )
     except Exception as e:

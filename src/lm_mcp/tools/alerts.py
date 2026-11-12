@@ -1,6 +1,7 @@
 # Description: Alert management tools for LogicMonitor MCP server.
 # Description: Provides get_alerts, get_alert_details, acknowledge_alert, add_alert_note,
-# and paginate_alerts and read_cleared_and_active, the alert-window reads the analytics share.
+# escalate_alert, and paginate_alerts and read_cleared_and_active, the alert-window reads the
+# analytics share.
 
 from __future__ import annotations
 
@@ -334,6 +335,36 @@ async def add_alert_note(
                 "success": True,
                 "message": f"Note added to alert {alert_id}",
                 "result": result,
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+@require_write_permission
+async def escalate_alert(
+    client: LogicMonitorClient,
+    alert_id: str,
+) -> list[TextContent]:
+    """Escalate an alert along its escalation chain.
+
+    The portal refuses an acknowledged alert and answers an empty object otherwise.
+
+    Args:
+        client: LogicMonitor API client.
+        alert_id: Alert ID (with or without LMA prefix).
+
+    Returns:
+        List of TextContent with result or error.
+    """
+    try:
+        clean_id = _normalize_alert_id(alert_id)
+        await client.post(f"/alert/alerts/{clean_id}/escalate")
+        return format_response(
+            {
+                "success": True,
+                "alert_id": alert_id,
+                "message": f"Alert {alert_id} escalated",
             }
         )
     except Exception as e:

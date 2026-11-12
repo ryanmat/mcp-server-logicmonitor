@@ -61,6 +61,7 @@
   "get_device_datasources",
   "get_device_eventsources",
   "get_device_group",
+  "get_device_group_properties",
   "get_device_groups",
   "get_device_instances",
   "get_device_interfaces",

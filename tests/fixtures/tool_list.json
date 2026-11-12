@@ -2192,6 +2192,34 @@
       "type": "object"
     }
   },
+  "delete_device_group_property": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete a property set on the device group/resource group itself (requires write permission). A name the group only inherits answers not found; a system property is refused.",
+    "inputSchema": {
+      "properties": {
+        "group_id": {
+          "description": "Device group ID",
+          "type": "integer"
+        },
+        "property_name": {
+          "description": "Name of the group's own property",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id",
+        "property_name"
+      ],
+      "type": "object"
+    }
+  },
   "delete_device_instance": {
     "annotations": {
       "destructiveHint": true,
@@ -2220,6 +2248,34 @@
         "device_id",
         "device_datasource_id",
         "instance_id"
+      ],
+      "type": "object"
+    }
+  },
+  "delete_device_property": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Delete a property set on the device/resource itself (requires write permission). A name the device only inherits answers not found; a system property is refused.",
+    "inputSchema": {
+      "properties": {
+        "device_id": {
+          "description": "Device ID",
+          "type": "integer"
+        },
+        "property_name": {
+          "description": "Name of the device's own property",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id",
+        "property_name"
       ],
       "type": "object"
     }
@@ -2706,6 +2762,29 @@
         "mcp_name",
         "tool_name",
         "parameters"
+      ],
+      "type": "object"
+    }
+  },
+  "escalate_alert": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Escalate an alert along its escalation chain (requires write permission). The portal refuses an acknowledged alert, and its answer carries no detail, so the result does not say who was notified.\n\nCommon mistakes: alert_id works with or without the LMA prefix.",
+    "inputSchema": {
+      "properties": {
+        "alert_id": {
+          "description": "Alert ID (with or without LMA prefix)",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "alert_id"
       ],
       "type": "object"
     }
@@ -4410,6 +4489,47 @@
         "group_id": {
           "description": "Device group ID",
           "type": "integer"
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_device_group_properties": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Get a device group's (resource group's) properties: its own, the ones it inherits and the system ones, each with the value in force, its type (custom, inherit or system) and the ancestor groups that hold the same name, nearest first; an inherited value is the nearest one's. property_name reads one property.",
+    "inputSchema": {
+      "properties": {
+        "group_id": {
+          "description": "Device group ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 100,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by property name (substring match)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        },
+        "property_name": {
+          "description": "Read only this property",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+          "type": "string"
         }
       },
       "required": [
@@ -7438,6 +7558,28 @@
       "type": "object"
     }
   },
+  "run_auto_discovery": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Run Active Discovery on a device/resource now, so its collector looks for the device's instances (requires write permission). The portal answers at once; the discovery runs on the collector afterwards.",
+    "inputSchema": {
+      "properties": {
+        "device_id": {
+          "description": "Device ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "device_id"
+      ],
+      "type": "object"
+    }
+  },
   "run_collector_status_check": {
     "annotations": {
       "destructiveHint": false,
@@ -8241,6 +8383,39 @@
       },
       "required": [
         "group_id"
+      ],
+      "type": "object"
+    }
+  },
+  "update_device_group_property": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Set a property on a device group/resource group (requires write permission). A name the group only inherits, or does not hold, gets a value of the group's own, which the groups and devices under it inherit unless they hold their own. A system property is refused.",
+    "inputSchema": {
+      "properties": {
+        "group_id": {
+          "description": "Device group ID",
+          "type": "integer"
+        },
+        "property_name": {
+          "description": "Property name",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+          "type": "string"
+        },
+        "property_value": {
+          "description": "Property value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_id",
+        "property_name",
+        "property_value"
       ],
       "type": "object"
     }

@@ -1,7 +1,8 @@
 # Description: Tests for alert MCP tools.
-# Description: Validates get_alerts, get_alert_details, acknowledge_alert, add_alert_note.
+# Description: Validates get_alerts, get_alert_details, acknowledge, notes and escalate_alert.
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -793,3 +794,81 @@ class TestAlertListPaging:
         from lm_mcp.tools import alerts
 
         await assert_negative_total_reads_as_more(client, getattr(alerts, name), path, kwargs)
+
+
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe). DS362817020 was
+# an unacknowledged alert on a one-stage chain; DS362333940 an acknowledged one.
+LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "property_ops.json").read_text())
+_BASE = "https://test.logicmonitor.com/santaba/rest"
+
+
+def _answer(name: str) -> httpx.Response:
+    """The fixture entry's status and body as an httpx response."""
+    return httpx.Response(LIVE[name]["status"], json=LIVE[name]["body"])
+
+
+def _writes(monkeypatch, enabled: bool = True) -> None:
+    """Set the portal and the write flag a write-gated alert tool reads."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true" if enabled else "false")
+
+
+class TestEscalateAlert:
+    """R3.6: escalate_alert posts the alert's escalate path; the portal refuses an
+    acknowledged alert."""
+
+    @respx.mock
+    async def test_posts_the_escalate_path_with_no_body(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.alerts import escalate_alert
+
+        route = respx.post(f"{_BASE}/alert/alerts/DS362817020/escalate").mock(
+            return_value=_answer("escalate_DS362817020")
+        )
+
+        body = json.loads((await escalate_alert(client, alert_id="DS362817020"))[0].text)
+
+        assert route.calls.last.request.content == b""
+        assert body["success"] is True
+        assert body["alert_id"] == "DS362817020"
+
+    @respx.mock
+    async def test_an_acknowledged_alert_is_refused(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.alerts import escalate_alert
+
+        respx.post(f"{_BASE}/alert/alerts/DS362333940/escalate").mock(
+            return_value=_answer("escalate_acked_DS362333940")
+        )
+
+        error = envelope(await escalate_alert(client, alert_id="DS362333940"))
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert "acknowledged" in error["message"]
+
+    @respx.mock
+    async def test_an_unknown_alert_is_an_upstream_error_sent_once(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.alerts import escalate_alert
+
+        route = respx.post(f"{_BASE}/alert/alerts/LMD999999999/escalate").mock(
+            return_value=_answer("escalate_missing")
+        )
+
+        error = envelope(await escalate_alert(client, alert_id="LMD999999999"))
+
+        assert error["code"] == "UPSTREAM_ERROR"
+        assert route.call_count == 1
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.alerts import escalate_alert
+
+        route = respx.post(f"{_BASE}/alert/alerts/DS362817020/escalate")
+
+        error = envelope(await escalate_alert(client, alert_id="DS362817020"))
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not route.called
