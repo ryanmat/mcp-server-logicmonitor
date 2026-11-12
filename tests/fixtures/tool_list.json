@@ -3680,7 +3680,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "List the portal's collector version upgrades, each row as the API returns it.",
+    "description": "List the portal's collector version upgrades a page at a time (limit, offset), each row as the API returns it.",
     "inputSchema": {
       "properties": {
         "limit": {
@@ -7919,7 +7919,7 @@
     "inputSchema": {
       "properties": {
         "datapoint_id": {
-          "description": "Datapoint ID",
+          "description": "The datapoint whose threshold changes (required)",
           "type": "integer"
         },
         "datasource_id": {
@@ -7943,7 +7943,7 @@
           "type": "integer"
         },
         "level": {
-          "description": "instance: one device datasource instance (device_id, device_datasource_id, instance_id); device: every instance on device_id; group: a device group's settings for one datasource (group_id, datasource_id)",
+          "description": "instance: one device datasource instance (device_id, device_datasource_id, instance_id); group: a device group's settings for one datasource (group_id, datasource_id); device has no write",
           "enum": [
             "instance",
             "device",

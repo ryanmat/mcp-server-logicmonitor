@@ -821,7 +821,8 @@ TOOLS.extend(
         Tool(
             name="get_collector_upgrade_history",
             description=(
-                "List the portal's collector version upgrades, each row as the API returns it."
+                "List the portal's collector version upgrades a page at a time (limit, offset), "
+                "each row as the API returns it."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -2383,7 +2384,7 @@ TOOLS.extend(
 )
 
 # Alert thresholds
-_ALERT_SETTING_IDS = {
+_ALERT_SETTING_IDS: dict[str, dict[str, Any]] = {
     "level": {
         "type": "string",
         "enum": ["instance", "device", "group"],
@@ -2444,6 +2445,19 @@ TOOLS.extend(
                 "type": "object",
                 "properties": {
                     **_ALERT_SETTING_IDS,
+                    "level": {
+                        **_ALERT_SETTING_IDS["level"],
+                        "description": (
+                            "instance: one device datasource instance (device_id, "
+                            "device_datasource_id, instance_id); group: a device group's "
+                            "settings for one datasource (group_id, datasource_id); device has "
+                            "no write"
+                        ),
+                    },
+                    "datapoint_id": {
+                        "type": "integer",
+                        "description": "The datapoint whose threshold changes (required)",
+                    },
                     "threshold": {
                         "type": "string",
                         "description": (
