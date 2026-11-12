@@ -610,9 +610,11 @@ async def run_collector_status_check(
 ) -> list[TextContent]:
     """Trigger a collector status check and read its result.
 
-    The check that was last triggered is read first; after the trigger the tool reads
-    until a check triggered later finishes or STATUS_CHECK_BUDGET_SECONDS pass, and a
-    check still running then is returned with finished false and a note.
+    The check that was last triggered is read first; after the trigger the tool reads until
+    a newer check (one whose trigger time differs from the first read) finishes or aborts, or
+    STATUS_CHECK_BUDGET_SECONDS pass. A newer check still running then is returned with
+    finished false and STATUS_CHECK_RUNNING_NOTE; when no newer check has reported, finished
+    is false and STATUS_CHECK_NOT_STARTED_NOTE says the fields are the previous check's.
 
     Args:
         client: LogicMonitor API client.
