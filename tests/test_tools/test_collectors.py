@@ -1046,7 +1046,7 @@ class TestRestartCollector:
                 "websiteConf",
             )
         }
-        assert body == {"collector_id": 41, "restart_job_id": 760}
+        assert body == {"collector_id": 41, "restart_job_id": 760, "collector_size": "large"}
 
     @respx.mock
     async def test_a_record_without_a_size_is_refused_before_the_restart(self, client, monkeypatch):

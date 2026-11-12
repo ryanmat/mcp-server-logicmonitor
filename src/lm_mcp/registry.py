@@ -883,7 +883,7 @@ TOOLS.extend(
             description=(
                 "Restart a collector (requires write permission). It sends the collector's own "
                 "size and config files back with the restart, so neither changes, and returns "
-                "the async job id of the restart."
+                "the async job id of the restart and the size it kept."
             ),
             annotations=_DESTRUCTIVE_RUN,
             inputSchema={

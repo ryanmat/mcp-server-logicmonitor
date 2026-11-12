@@ -668,16 +668,18 @@ async def restart_collector(
 ) -> list[TextContent]:
     """Restart a collector, sending its own size and config files back so neither changes.
 
-    The restart takes them as overrides and reads each one left out as an empty string: a
-    restart sent with none reset a Large collector to Custom (probe 2026-11-11). A record
-    with no collectorSize is refused rather than restarted.
+    The restart takes them as overrides. A restart sent without collectorSize reset a Large
+    collector to Custom, while config files left out came back unchanged (probe 2026-11-11);
+    the files are sent back anyway, so the restart cannot change them. A record with no
+    collectorSize is refused rather than restarted.
 
     Args:
         client: LogicMonitor API client.
         collector_id: Collector ID.
 
     Returns:
-        List of TextContent with the restart's async job id, or an error envelope.
+        List of TextContent with the restart's async job id and the size sent back, or an
+        error envelope.
     """
     try:
         path = f"/setting/collector/collectors/{collector_id}"
@@ -696,7 +698,13 @@ async def restart_collector(
             key: collector[key] for key in _RESTART_OVERRIDES if collector.get(key) is not None
         }
         job = await client.post(f"{path}/services/restart", json_body=overrides)
-        return format_response({"collector_id": collector_id, "restart_job_id": job})
+        return format_response(
+            {
+                "collector_id": collector_id,
+                "restart_job_id": job,
+                "collector_size": overrides["collectorSize"],
+            }
+        )
     except Exception as e:
         return handle_error(e)
 
