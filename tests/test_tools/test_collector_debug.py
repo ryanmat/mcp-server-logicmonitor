@@ -1,5 +1,5 @@
-# Description: Tests for collector_debug: builder, allowlist, checks, masking, parse and transport.
-# Description: Hostile-input cases from PR #97 and its review; transport replies are live-shaped.
+# Description: Tests for collector_debug (spec R3.9): builder, allowlist, checks, masking, parse,
+# Description: transport. Hostile inputs from PR #97 and its reviews; transport replies are live-shaped.
 # ruff: noqa: E501  (expected command lines and masked text are kept on one line to stay readable)
 
 import asyncio
@@ -2116,7 +2116,7 @@ class TestSecurityReviewRecheck:
     # are refused too, and CIM_Process follows Win32_Process's column rule.
     @pytest.mark.parametrize(
         "query",
-        ["select * from CIM_Product", "select * from CIM_LogicalFile", "select * from CIM_LogicalElement",
+        ["select * from CIM_Product", "select * from CIM_Job", "select Command from cim_setting", "select * from CIM_LogicalFile", "select * from CIM_LogicalElement",
          "select * from CIM_ManagedSystemElement", "select * from CIM_SystemResource",
          "select * from Win32_ShortcutFile", "select * from Win32_CodecFile", "select * from cim_process",
          "select Name, CommandLine from CIM_Process"],
@@ -2126,7 +2126,15 @@ class TestSecurityReviewRecheck:
             build_cmdline("wmi", {"query": query}, T)
 
     @pytest.mark.parametrize(
-        "cls", ["CIM_LogicalFile", "cim_product", "Win32_Process", "CIM_Process"]
+        "cls",
+        [
+            "CIM_LogicalFile",
+            "cim_product",
+            "Win32_Process",
+            "CIM_Process",
+            "CIM_Setting",
+            "cim_job",
+        ],
     )
     def test_cim_refuses_the_parents_and_the_process_classes(self, cls):
         with pytest.raises(ToolRejectionError, match="class"):

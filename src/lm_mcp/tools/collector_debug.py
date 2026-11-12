@@ -21,8 +21,8 @@ arguments; any other argument key is refused, and this module builds the command
   information or a credential-named query parameter is refused, and a credential written as a
   parameter anywhere in the line is refused again by check_cmdline.
 - A WMI query is one WQL SELECT. The collector reads any key=value token on the line as a
-  parameter of !wmi, so the WHERE clause allows ``!`` only as ``!=`` and ``=`` only after a
-  space, ``<``, ``>`` or ``!``: no command head and no parameter can ride in it.
+  parameter of !wmi, so the WHERE clause allows ``!`` only as ``!=``, and each operator that
+  holds ``=`` stands alone between spaces: no command head and no parameter can ride in it.
 - Output is the device's and so hostile input. redact() masks the secret values a collector or
   device prints (key=value, key: value, JSON, XML, URL user information, PEM blocks) by the
   credential rule the audit log uses, and every scan grows with the length of the text, never
@@ -50,8 +50,8 @@ Transport, as the sandbox portal answered on 2026-11-12 (docs/validation/probes-
 - While the collector runs the command, a read answers HTTP 202 with errorCode 1202 ("agent has
   fetched the task, waiting for response"); a single word such as "cancelled" or "pending" is a
   session status, not output.
-- The portal allows 200 POSTs and 500 GETs a minute; this module counts its own calls and stops
-  short of both.
+- #97 gives the portal's limits as 200 POSTs and 500 GETs a minute, a figure the probes here did
+  not measure; this module counts its own calls and stops short of both.
 """
 
 from __future__ import annotations
@@ -289,6 +289,8 @@ _REFUSED_CLASSES = {
     "cim_product": ("CIM_Product", "it returns Win32_Product's rows"),
     "cim_logicalfile": ("CIM_LogicalFile", "it returns every file and directory on every disk"),
     "cim_systemresource": ("CIM_SystemResource", "it returns Win32_Environment's rows"),
+    "cim_setting": ("CIM_Setting", "it returns Win32_StartupCommand's rows, Command among them"),
+    "cim_job": ("CIM_Job", "it returns Win32_ScheduledJob's rows, Command among them"),
     "cim_logicalelement": (
         "CIM_LogicalElement",
         "it returns the file, process and resource classes' rows",
@@ -324,8 +326,8 @@ def _check_where(where: str) -> None:
     """Refuse a WHERE clause that could carry a command head or a key=value token.
 
     ``!`` stands only directly before ``=`` (``!=``), so no ``!restart`` rides after a
-    comparison. ``=`` stands only after a space, ``<``, ``>`` or ``!`` (``Name = 'x'``,
-    ``<=``, ``>=``, ``!=``), so no token reads as key=value, quoted or not.
+    comparison. Each operator that holds ``=`` (``=``, ``<=``, ``>=``, ``!=``) stands alone, with
+    a space on each side (``Name = 'x'``), so no token reads as key=value, quoted or not.
     """
     if not _WHERE_CHARS_RE.match(where):
         raise ToolRejectionError("the WHERE clause holds a character the tool does not allow")
@@ -426,8 +428,9 @@ def _bare(host: str) -> str:
     return host.strip("[]").lower()
 
 
-# Hosts http never reaches. A device named for one would point the probe at the collector
-# host's own loopback services, or at a cloud metadata service from inside the network.
+# Hosts http refuses, by address or by a known name. A device named for one would point the
+# probe at the collector host's own loopback services, or at a cloud metadata service from
+# inside the network. A DNS name outside these lists that resolves to one is not caught.
 _METADATA_ADDRESSES = frozenset(
     ipaddress.ip_address(a)
     for a in (
@@ -479,7 +482,7 @@ def _unreachable_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address)
 
 
 def _unreachable_http_host(host: str) -> bool:
-    """True for a host http never reaches: loopback, unspecified, link-local or a cloud
+    """True for a host http refuses: loopback, unspecified, link-local or a cloud
     metadata service, by name, by address or carried inside an IPv6 address; a name under a
     public DNS that answers with the address written in it; an address in a numeric form other
     than four decimal parts; and a bracketed literal that is not IPv6 (IPvFuture)."""

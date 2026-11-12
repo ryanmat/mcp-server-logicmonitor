@@ -487,7 +487,7 @@ class TestWriteOutcomeFromResult:
 
     @respx.mock
     async def test_collector_debug_refusal_audits_failure(self, write_portal, caplog):
-        """A collector_debug request the tool refuses is a failed write, before any call."""
+        """R3.9: a collector_debug request the tool refuses is a failed write, before any call."""
         from lm_mcp.server import execute_tool
 
         with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
@@ -504,7 +504,7 @@ class TestWriteOutcomeFromResult:
 
     @respx.mock
     async def test_collector_debug_portal_refusal_audits_failure(self, write_portal, caplog):
-        """A debug POST the portal refuses is an error in the envelope and a failed write."""
+        """R3.9: a debug POST the portal refuses is an error in the envelope and a failed write."""
         respx.post("https://test.logicmonitor.com/santaba/rest/debug").mock(
             return_value=httpx.Response(403, json=FORBIDDEN)
         )
@@ -521,6 +521,7 @@ class TestWriteOutcomeFromResult:
 
     @respx.mock
     async def test_collector_debug_answer_audits_success(self, write_portal, caplog, monkeypatch):
+        """R3.9: an answered collector_debug call is a successful write."""
         from lm_mcp.tools import collector_debug as cd
 
         monkeypatch.setattr(cd, "POLL_SECONDS", 0.01)

@@ -6601,9 +6601,11 @@ TOOLS.extend(
                             "command-line columns are refused, and Win32_NTLogEvent, "
                             "Win32_UserAccount and Win32_Group need a WHERE clause), authType. "
                             "winrm: auth, useSSL, certCheck, timeout. "
-                            "cim: class. http: url (the device's own host, never a loopback, "
-                            "link-local or cloud metadata address, and no credentials), "
-                            "timeout. sslcerts: port. The other commands take no arguments"
+                            "cim: class. http: url (the device's own host and no credentials; "
+                            "a host written as a loopback, link-local or cloud metadata "
+                            "address, or a known name for one, is refused, but a DNS name that "
+                            "resolves to one is not caught), timeout. sslcerts: port. The "
+                            "other commands take no arguments"
                         ),
                     },
                     "budget_seconds": {
