@@ -2384,7 +2384,7 @@ TOOLS.extend(
 )
 
 # Alert thresholds
-_ALERT_SETTING_IDS = {
+_ALERT_SETTING_IDS: dict[str, dict[str, Any]] = {
     "level": {
         "type": "string",
         "enum": ["instance", "device", "group"],
