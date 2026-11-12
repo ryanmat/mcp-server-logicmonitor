@@ -90,25 +90,23 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   There is no log search tool: `POST /log/search` at API version 3 applied neither the query
   nor the time range when probed.
 - Collector reads: `get_collector_events` (a collector's restarts, credential rotations and
-  down reports, newest first), `get_collector_log_files` (the log files a collector has
-  uploaded, as zip files), `get_collector_log_file` (the end of one uploaded file's text, at
-  most `max_bytes` bytes starting on a whole line, with `truncated`) and
-  `get_collector_upgrade_history`. Collector operations, write-gated: `run_collector_status_check`
-  (triggers a status check and waits up to 45 seconds for it), `restart_collector`
-  (annotated destructive; it sends the collector's own size and config files back, since a
-  restart sent without them reset a Large collector to Custom, and reports the size it kept) and
-  `acknowledge_collector_down`. `get_collector_health` cites the
-  latest status check and five latest events as `evidence` for the collector asked for by id
-  and each collector not known to be up, and `detect_site_outage`'s `collector_down` signal
-  carries each down collector's evidence. `get_collectors` rows carry `is_down`, since
-  `status` reads 1 whether a collector is up or down.
+  unreachable reports, newest first), `get_collector_log_files` (the log files a collector has
+  uploaded, as zip files; an empty list means none was uploaded), `get_collector_log_file` (the
+  end of one uploaded file's text, at most `max_bytes` bytes starting on a whole line, with
+  `truncated`) and `get_collector_upgrade_history`.
+- Collector operations, listed only with writes on: `run_collector_status_check` triggers a
+  status check and waits up to 45 seconds for its result; `restart_collector`, annotated
+  destructive, restarts a collector with its own size and config files sent back and reports the
+  size it kept, because a restart sent without them reset a Large collector to Custom; and
+  `acknowledge_collector_down` acknowledges a down collector's alert with a comment.
 - Alert thresholds: `get_alert_settings` reads a datapoint's threshold at instance, device or
   group level with the level it comes from (instance, instance group, device datasource, device
-  group or global, in LogicMonitor's precedence), and `update_alert_settings` (write-gated) sets
-  or clears one at instance or group level, carrying the trigger, clear and no-data intervals in
-  force, which the API requires with a threshold. A threshold that does not parse is refused
-  before any call: the API stored a fourth value and answered 500 to an operator with no space
-  after it.
+  group or global, in LogicMonitor's precedence). `update_alert_settings`, listed only with
+  writes on, sets or clears one at instance or group level and sends the trigger, clear and
+  no-data intervals in force with it, since the API refuses a threshold without them. A
+  threshold that does not parse is refused before any call, because the API stored a fourth
+  value and answered 500 to an operator with no space after it; `delta` is the only comparison
+  method accepted, the only one in the datasource definitions of the portal it was checked on.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
@@ -508,6 +506,15 @@ instead.
 - The `lm-capacity`, `lm-health` and `lm-remediate` skills call `analyze_metric` in place of the
   tools it replaces. `lm-health` grades the mean of |`z_score`| across a device's datapoints at
   1.33 and 3.33, the points where the removed health score crossed 80 and 50.
+- `get_collector_health` returns `evidence` for the collector asked for by id and for each
+  collector in a list not known to be up: its latest status check (script counts and the checks
+  that are not OK) and its five latest events. A failed read leaves its part null with
+  `evidence_warning`. `detect_site_outage` lists each down collector's evidence on its
+  `collector_down` signal.
+- `get_collectors` rows carry `is_down`, since `status` reads 1 whether a collector is up or
+  down.
+- The `lm-portal` skill finds down collectors by `is_down`, reads each one's evidence, and runs a
+  collector operation only after asking the user.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
   pyjwt 2.15.1 and websockets 17.4.
