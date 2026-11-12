@@ -403,6 +403,46 @@ class TestCollectorReadTools:
         assert set(TOOL_CATEGORIES["categories"]["collectors"]["tools"]) >= _COLLECTOR_READS
 
 
+_COLLECTOR_OPERATIONS = {
+    "run_collector_status_check",
+    "restart_collector",
+    "acknowledge_collector_down",
+}
+
+
+class TestCollectorOperationTools:
+    """R3.4: the status check, restart and down acknowledgement are write tools; the
+    restart alone is destructive."""
+
+    def test_each_is_a_write_tool_with_its_handler_and_says_so(self):
+        registered = {tool.name: tool for tool in TOOLS if tool.name in _COLLECTOR_OPERATIONS}
+
+        assert set(registered) == _COLLECTOR_OPERATIONS
+        assert {name: tool.annotations.readOnlyHint for name, tool in registered.items()} == {
+            name: False for name in _COLLECTOR_OPERATIONS
+        }
+        assert {name: tool.annotations.destructiveHint for name, tool in registered.items()} == {
+            "run_collector_status_check": False,
+            "restart_collector": True,
+            "acknowledge_collector_down": False,
+        }
+        assert all("requires write permission" in tool.description for tool in registered.values())
+        assert {name: get_tool_handler(name).__name__ for name in _COLLECTOR_OPERATIONS} == {
+            name: name for name in _COLLECTOR_OPERATIONS
+        }
+
+    def test_the_acknowledgement_requires_a_comment(self):
+        (schema,) = [t.inputSchema for t in TOOLS if t.name == "acknowledge_collector_down"]
+
+        assert schema["required"] == ["collector_id", "comment"]
+        assert schema["properties"]["comment"]["minLength"] == 1
+
+    def test_the_collectors_category_holds_them(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        assert set(TOOL_CATEGORIES["categories"]["collectors"]["tools"]) >= _COLLECTOR_OPERATIONS
+
+
 class TestEdwinTools:
     """R3.1: the eight Edwin tools are registered, annotated and grouped."""
 

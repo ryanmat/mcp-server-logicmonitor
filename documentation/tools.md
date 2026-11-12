@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 253 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 256 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -114,12 +114,15 @@ Collector status and management
 | `get_collector_log_files` | List the log files a collector has uploaded to the portal, as zip files with their size and upload time. A collector uploads them through Send Logs to LogicMonitor in the portal or the !uploadlog debug command, so an empty list means nothing was uploaded. Read one with get_collector_log_file. | No |
 | `get_collector_log_file` | Read one uploaded collector log file, named as get_collector_log_files lists it, and return the end of its text: at most max_bytes bytes, starting on a whole line. truncated says whether earlier lines were left out. | No |
 | `get_collector_upgrade_history` | List the portal's collector version upgrades, each row as the API returns it. | No |
+| `run_collector_status_check` | Trigger a collector status check (requires write permission) and wait up to 45 seconds for its result: script counts and the checks that are not OK. An unreachable collector refuses the trigger. A check still running after the wait returns finished false; get_collector_health with the collector_id reads it later. | Yes |
+| `restart_collector` | Restart a collector (requires write permission). It sends no configuration overrides and returns the async job id of the restart. | Yes |
+| `acknowledge_collector_down` | Acknowledge a down collector's alert with a comment (requires write permission). The portal refuses it for a collector that is up. | Yes |
 | `update_collector` | Update a collector (requires write permission). Change group, description, failback, or escalation chain. | Yes |
 | `delete_collector` | Delete a collector (requires write permission). Blocks if devices are still assigned. | Yes |
 | `create_collector_group` | Create a collector group (requires write permission) | Yes |
 | `update_collector_group` | Update a collector group (requires write permission) | Yes |
 | `delete_collector_group` | Delete a collector group (requires write permission). Blocks if collectors are still assigned. | Yes |
-| `get_collector_health` | Enriched collector status: whether each collector is down, downstream device count, uptime, and optional alert history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages. | No |
+| `get_collector_health` | Enriched collector status: whether each collector is down, downstream device count, uptime, and optional alert history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages. The collector asked for by collector_id, and each collector not known to be up, carries evidence: its latest status check and its five latest events. | No |
 
 ## Networking
 

@@ -1,11 +1,15 @@
 ---
 name: lm-portal
-description: "Portal-wide health overview -- one portal_overview call for alert volume, clusters, noise, collectors, active SDTs, open critical and error alerts and dead devices, then down collectors, the devices behind them, and the changes and bursts in the window."
+description: "Portal-wide health overview -- one portal_overview call for alert volume, clusters, noise, collectors, active SDTs, open critical and error alerts and dead devices, then down collectors with their status check and events, the devices behind them, and the changes and bursts in the window; collector operations only on the user's word."
 argument-hint: "[hours_back]"
 allowed-tools:
   - mcp__logicmonitor__portal_overview
   - mcp__logicmonitor__analyze_alerts
   - mcp__logicmonitor__get_collectors
+  - mcp__logicmonitor__get_collector_health
+  - mcp__logicmonitor__run_collector_status_check
+  - mcp__logicmonitor__acknowledge_collector_down
+  - mcp__logicmonitor__restart_collector
   - mcp__logicmonitor__get_devices
 ---
 
@@ -35,7 +39,8 @@ Call `portal_overview` with `hours_back` and `detail_level="full"`. One call ret
   signature (datasource and datapoint)
 - `noise`: `noise_score` from 0 to 100, the noisiest devices and datasources, and
   `recommendations`
-- `collectors`: the first page of collectors (`id`, `hostname`, `device_count`)
+- `collectors`: the first page of collectors (`id`, `hostname`, `status`, `is_down`,
+  `device_count`)
 - `active_sdts`: the first page of active SDTs (`type`, `device` or `device_group`,
   `start_time`, `end_time`, `comment`, `created_by`)
 - `critical_alerts` and `error_alerts`: up to 20 open alerts of each severity across
@@ -61,19 +66,36 @@ than 20.
 
 ### Step 3: Collectors
 
-The `collectors` rows cannot tell an up collector from a down one: their `status`
-reads 1 either way. Call `get_collectors` with `filter="isDown:true"` for the down
-collectors, paging with `offset` while `has_more` is true.
+Go by each row's `is_down`: `status` reads 1 whether a collector is up or down. When
+`collectors.has_more` is true, call `get_collectors` with `filter="isDown:true"` for the
+down collectors past the first page, paging with `offset` while `has_more` is true.
+
+For each down collector, call `get_collector_health` with its `collector_id`. Its
+`evidence` holds the latest status check, whose `problems` are the checks that are not
+OK (`module.Collector` reads "down or unreachable" with the hours since it last
+reported), and the five latest events: restarts, credential rotations, unreachable
+reports. A null part with `evidence_warning` means that read failed, not that there is
+nothing to show.
 
 ```
-| Collector | ID   | Devices behind it |
-|-----------|------|-------------------|
-| [hostname]| [id] | [device_count]    |
+| Collector | ID   | Devices behind it | Last report and latest event |
+|-----------|------|-------------------|------------------------------|
+| [hostname]| [id] | [device_count]    | [problems; recent_events[0]] |
 ```
 
 A down collector leaves its devices unmonitored, so this is a high-priority finding.
 Those devices read `dead-collector`, not `dead`, so `dead_devices` leaves them out:
 call `get_devices` with `status="dead-collector"` to count them.
+
+Collector operations change the portal and need writes on. Offer them where they fit,
+and run one only after you ask the user and they say yes:
+- `acknowledge_collector_down` with a comment, for a down collector someone is working
+  on; the portal refuses it for a collector that is up.
+- `run_collector_status_check` for an up collector whose evidence shows problems; a down
+  collector refuses the trigger, and a check still running after 45 seconds comes back
+  with `finished` false.
+- `restart_collector` restarts the collector and is destructive: name the collector and
+  the devices behind it when you ask.
 
 ### Step 4: Maintenance windows
 

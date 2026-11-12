@@ -1,0 +1,182 @@
+{
+ "status_check_82_finished": {
+  "checkPoints": [
+   {
+    "name": "module.Collector",
+    "detail": "The collector is alive and last updated 0h 0m 0s ago. ",
+    "status": "OK"
+   },
+   {
+    "name": "module.Watchdog",
+    "detail": "The collector watchdog is alive and last updated 0h 0m 2s ago. ",
+    "status": "OK"
+   },
+   {
+    "name": "OSVersion",
+    "detail": "10.0.26100",
+    "status": "OK"
+   },
+   {
+    "name": "OSDistribution",
+    "detail": "Microsoft Windows Server 2025 Datacenter Azure Edition",
+    "status": "OK"
+   },
+   {
+    "name": "basic.OS",
+    "detail": "Microsoft Windows Server 2025 Datacenter Azure Edition on 64 bit ",
+    "status": "OK"
+   },
+   {
+    "name": "basic.Processors",
+    "detail": "2 Cores Intel(R) Xeon(R) Platinum 8171M CPU @ 2.60GHz",
+    "status": "OK"
+   }
+  ],
+  "lastUpdateMills": 1794428073978,
+  "lastTriggeredMills": 1794428068833,
+  "totalScriptCount": 44,
+  "skippedScriptCount": 7,
+  "finishedScriptCount": 37,
+  "aborted": false,
+  "finished": true
+ },
+ "status_check_82_running": {
+  "checkPoints": [
+   {
+    "name": "module.Collector",
+    "detail": "The collector is alive and last updated 0h 0m 1s ago. ",
+    "status": "OK"
+   },
+   {
+    "name": "module.Watchdog",
+    "detail": "The collector watchdog is alive and last updated 0h 0m 4s ago. ",
+    "status": "OK"
+   }
+  ],
+  "lastUpdateMills": 1794446198549,
+  "lastTriggeredMills": 1794446198549,
+  "totalScriptCount": 44,
+  "skippedScriptCount": 0,
+  "finishedScriptCount": 0,
+  "aborted": false,
+  "finished": false
+ },
+ "status_check_26_down": {
+  "checkPoints": [
+   {
+    "name": "module.Collector",
+    "detail": "The collector is down or unreachable. The collector last updated 199h 39m 27s ago. Restart on 309h 26m 44s ago.Restart on 285h 25m 26s ago.Restart on 261h 24m 13s ago.Restart on 237h 22m 54s ago.Restart on 213h 21m 30s ago.Please run the tool under agentInstallDir/diagnosetool/diagnose.sh to find more details. ",
+    "status": "ERROR"
+   },
+   {
+    "name": "module.Watchdog",
+    "detail": "The collector watchdog is down. The collector watchdog last updated 199h 39m 24s ago. ",
+    "status": "WARN"
+   }
+  ],
+  "lastUpdateMills": 1794446328793,
+  "lastTriggeredMills": 1794446328793,
+  "totalScriptCount": 44,
+  "skippedScriptCount": 8,
+  "finishedScriptCount": 36,
+  "aborted": false,
+  "finished": true
+ },
+ "status_check_unknown_collector": {
+  "errorMessage": "No such a collector(id = 999999)",
+  "errorCode": 1404,
+  "errorDetail": null
+ },
+ "trigger_82": "Collector 82 status check triggered",
+ "trigger_26_down": {
+  "errorCode": 1400,
+  "errorMessage": "Scheduled healthcheck for collector 26 failed - Collector is down or unreachable",
+  "errorDetail": null
+ },
+ "ackdown_26": {},
+ "ackdown_82_up": {
+  "errorMessage": "The agent is alive(id = 82)",
+  "errorCode": 1400,
+  "errorDetail": null
+ },
+ "ackdown_no_comment": {
+  "errorMessage": "comment  can\\'t be null\n",
+  "errorCode": 1400,
+  "errorDetail": null
+ },
+ "collector_26": {
+  "id": 26,
+  "hostname": "ip-10-55-119-55.us-west-2.compute.internal",
+  "status": 1,
+  "isDown": true,
+  "numberOfHosts": 3,
+  "collectorGroupId": 9,
+  "collectorGroupName": "Linux Collectors",
+  "platform": "linux",
+  "upTime": 49323
+ },
+ "status_check_82_finished_new": {
+  "checkPoints": [
+   {
+    "name": "module.Collector",
+    "detail": "The collector is alive and last updated 0h 0m 1s ago. ",
+    "status": "OK"
+   },
+   {
+    "name": "module.Watchdog",
+    "detail": "The collector watchdog is alive and last updated 0h 0m 4s ago. ",
+    "status": "OK"
+   },
+   {
+    "name": "OSVersion",
+    "detail": "10.0.26100",
+    "status": "OK"
+   },
+   {
+    "name": "OSDistribution",
+    "detail": "Microsoft Windows Server 2025 Datacenter Azure Edition",
+    "status": "OK"
+   },
+   {
+    "name": "basic.OS",
+    "detail": "Microsoft Windows Server 2025 Datacenter Azure Edition on 64 bit ",
+    "status": "OK"
+   },
+   {
+    "name": "basic.Processors",
+    "detail": "2 Cores Intel(R) Xeon(R) Platinum 8171M CPU @ 2.60GHz",
+    "status": "OK"
+   }
+  ],
+  "lastUpdateMills": 1794446528850,
+  "lastTriggeredMills": 1794446525370,
+  "totalScriptCount": 44,
+  "skippedScriptCount": 7,
+  "finishedScriptCount": 37,
+  "aborted": false,
+  "finished": true
+ },
+ "collectors_page": {
+  "total": 2,
+  "items": [
+   {
+    "id": 26,
+    "status": 1,
+    "build": "39200",
+    "platform": "linux",
+    "isDown": true,
+    "hostname": "ip-10-55-119-55.us-west-2.compute.internal",
+    "collectorGroupId": 9
+   },
+   {
+    "id": 82,
+    "status": 1,
+    "build": "40000",
+    "platform": "windows",
+    "isDown": false,
+    "hostname": "rm-collector",
+    "collectorGroupId": 10
+   }
+  ]
+ }
+}

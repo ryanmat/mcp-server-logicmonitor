@@ -3,6 +3,7 @@
 
 import io
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -356,6 +357,7 @@ class TestGetCollectorHealth:
             return_value=httpx.Response(200, json={"items": [], "total": 42})
         )
 
+        _mock_evidence()
         result = await get_collector_health(client, collector_id=1)
         data = json.loads(result[0].text)
 
@@ -390,6 +392,7 @@ class TestGetCollectorHealth:
             return_value=httpx.Response(200, json={"items": [], "total": 30})
         )
 
+        _mock_evidence()
         result = await get_collector_health(client, collector_id=2)
         data = json.loads(result[0].text)
 
@@ -414,6 +417,7 @@ class TestGetCollectorHealth:
             return_value=httpx.Response(200, json={"items": []})
         )
 
+        _mock_evidence()
         result = await get_collector_health(client, collector_id=1)
         data = json.loads(result[0].text)
 
@@ -440,6 +444,7 @@ class TestGetCollectorHealth:
             return_value=httpx.Response(200, json={"items": [], "total": 5})
         )
 
+        _mock_evidence()
         result = await get_collector_health(client)
         data = json.loads(result[0].text)
 
@@ -469,6 +474,7 @@ class TestGetCollectorHealth:
             return_value=httpx.Response(200, json={"items": [], "total": 0})
         )
 
+        _mock_evidence()
         result = await get_collector_health(client)
         data = json.loads(result[0].text)
         assert data["total_collectors"] == 2
@@ -507,6 +513,7 @@ class TestGetCollectorHealth:
             )
         )
 
+        _mock_evidence()
         result = await get_collector_health(
             client, collector_id=3, include_history=True, history_days=3
         )
@@ -539,6 +546,7 @@ class TestGetCollectorHealth:
             return_value=httpx.Response(500, json={"errorMessage": "portal unavailable"})
         )
 
+        _mock_evidence()
         result = await get_collector_health(client, collector_id=3, include_history=True)
 
         collector = json.loads(result[0].text)["collectors"][0]
@@ -558,6 +566,29 @@ _BASE = "https://test.logicmonitor.com/santaba/rest"
 # holds the first 6 lines of the file's one zip member, postcheck.log (26,553 bytes): the
 # rest names the portal and that UUID, so the tests zip the lines under the member's name.
 LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "collector_reads.json").read_text())
+
+# Answers of the same portal on 2026-11-11 to the status check and the down acknowledgement.
+# status_check_82_finished is collector 82's check before a trigger and
+# status_check_82_finished_new a later finished one, each cut to its first 6 of 68
+# checkpoints; status_check_82_running was read 5 s after the trigger. Collector 26 is
+# down: its trigger answers 400 and its check reads the ERROR and WARN it keeps.
+# collectors_page holds rows 26 and 82 of the collector list.
+OPS = json.loads((Path(__file__).parent.parent / "fixtures" / "collector_ops.json").read_text())
+
+
+def _mock_evidence(
+    collector_id: str = r"\d+", status_check: dict | None = None, events: dict | None = None
+) -> tuple[respx.Route, respx.Route]:
+    """Route a collector's evidence reads, its latest status check and its events, for
+    get_collector_health; by default any collector answers a finished check and no events."""
+    collectors = re.escape(f"{_BASE}/setting/collector/collectors/")
+    status = respx.get(url__regex=rf"^{collectors}{collector_id}/services/getStatusCheck$").mock(
+        return_value=httpx.Response(200, json=status_check or OPS["status_check_82_finished_new"])
+    )
+    events_route = respx.get(url__regex=rf"^{collectors}{collector_id}/events(\?.*)?$").mock(
+        return_value=httpx.Response(200, json=events or {"total": 0, "items": []})
+    )
+    return status, events_route
 
 
 def _zip(members: dict[str, bytes]) -> bytes:
@@ -778,6 +809,360 @@ class TestGetCollectorUpgradeHistory:
         params = route.calls.last.request.url.params
         assert (params["size"], params["offset"]) == ("50", "5")
         assert body == {"total": 0, "count": 0, "offset": 5, "has_more": False, "upgrades": []}
+
+
+def _writes(monkeypatch, enabled: bool = True) -> None:
+    """Set the portal and the write flag a write-gated collector tool reads."""
+    monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+    monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+    monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true" if enabled else "false")
+
+
+_SERVICES_82 = f"{_BASE}/setting/collector/collectors/82/services"
+
+
+class TestGetCollectorsIsDown:
+    """Step 51 Finding: a row's status reads 1 up or down, so it carries isDown as is_down."""
+
+    @respx.mock
+    async def test_rows_carry_is_down_from_the_record(self, client):
+        from lm_mcp.tools.collectors import get_collectors
+
+        respx.get(f"{_BASE}/setting/collector/collectors").mock(
+            return_value=httpx.Response(200, json=OPS["collectors_page"])
+        )
+
+        rows = json.loads((await get_collectors(client))[0].text)["collectors"]
+
+        assert [(r["id"], r["status"], r["is_down"]) for r in rows] == [
+            (26, 1, True),
+            (82, 1, False),
+        ]
+
+
+class TestRunCollectorStatusCheck:
+    """R3.4: trigger a status check, then read until a check newer than the last finishes."""
+
+    @pytest.fixture(autouse=True)
+    def _no_wait(self, monkeypatch):
+        from lm_mcp.tools import collectors
+
+        monkeypatch.setattr(collectors, "STATUS_CHECK_POLL_SECONDS", 0)
+
+    @respx.mock
+    async def test_reads_until_a_check_newer_than_the_last_finishes(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import run_collector_status_check
+
+        order: list[str] = []
+        reads = iter(
+            [
+                OPS["status_check_82_finished"],
+                OPS["status_check_82_finished"],
+                OPS["status_check_82_running"],
+                OPS["status_check_82_finished_new"],
+            ]
+        )
+
+        def read(request: httpx.Request) -> httpx.Response:
+            order.append("read")
+            return httpx.Response(200, json=next(reads))
+
+        def trigger(request: httpx.Request) -> httpx.Response:
+            order.append("trigger")
+            return httpx.Response(200, json=OPS["trigger_82"])
+
+        respx.get(f"{_SERVICES_82}/getStatusCheck").mock(side_effect=read)
+        respx.post(f"{_SERVICES_82}/triggerStatusCheck").mock(side_effect=trigger)
+
+        body = json.loads((await run_collector_status_check(client, collector_id=82))[0].text)
+
+        assert order == ["read", "trigger", "read", "read", "read"]
+        assert body == {
+            "collector_id": 82,
+            "triggered": "Collector 82 status check triggered",
+            "finished": True,
+            "aborted": False,
+            "last_triggered": 1794446525370,
+            "last_updated": 1794446528850,
+            "scripts_total": 44,
+            "scripts_finished": 37,
+            "scripts_skipped": 7,
+            "checks_ok": 6,
+            "problems": [],
+        }
+
+    @respx.mock
+    async def test_a_check_still_running_at_the_budget_is_returned_unfinished(
+        self, client, monkeypatch
+    ):
+        _writes(monkeypatch)
+        from lm_mcp.tools import collectors
+
+        monkeypatch.setattr(collectors, "STATUS_CHECK_BUDGET_SECONDS", 0)
+        reads = respx.get(f"{_SERVICES_82}/getStatusCheck").mock(
+            side_effect=[
+                httpx.Response(200, json=OPS["status_check_82_finished"]),
+                httpx.Response(200, json=OPS["status_check_82_running"]),
+            ]
+        )
+        respx.post(f"{_SERVICES_82}/triggerStatusCheck").mock(
+            return_value=httpx.Response(200, json=OPS["trigger_82"])
+        )
+
+        body = json.loads(
+            (await collectors.run_collector_status_check(client, collector_id=82))[0].text
+        )
+
+        assert reads.call_count == 2
+        assert (body["finished"], body["scripts_finished"], body["last_triggered"]) == (
+            False,
+            0,
+            1794446198549,
+        )
+        assert "get_collector_health" in body["note"]
+
+    @respx.mock
+    async def test_a_down_collector_refuses_the_trigger(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import run_collector_status_check
+
+        services = f"{_BASE}/setting/collector/collectors/26/services"
+        respx.get(f"{services}/getStatusCheck").mock(
+            return_value=httpx.Response(200, json=OPS["status_check_26_down"])
+        )
+        respx.post(f"{services}/triggerStatusCheck").mock(
+            return_value=httpx.Response(400, json=OPS["trigger_26_down"])
+        )
+
+        error = envelope(await run_collector_status_check(client, collector_id=26))
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert "Collector is down or unreachable" in error["message"]
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.collectors import run_collector_status_check
+
+        trigger = respx.post(f"{_SERVICES_82}/triggerStatusCheck")
+
+        error = envelope(await run_collector_status_check(client, collector_id=82))
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not trigger.called
+
+
+class TestRestartCollector:
+    """R3.4: restart a collector through services/restart. The answer is the swagger's
+    (an async job id, example 10): the restart is probed live only on Ryan's go."""
+
+    @respx.mock
+    async def test_posts_the_restart_with_no_overrides_and_returns_the_job(
+        self, client, monkeypatch
+    ):
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import restart_collector
+
+        route = respx.post(f"{_SERVICES_82}/restart").mock(
+            return_value=httpx.Response(200, json=10)
+        )
+
+        body = json.loads((await restart_collector(client, collector_id=82))[0].text)
+
+        assert json.loads(route.calls.last.request.content) == {}
+        assert body == {"collector_id": 82, "restart_job_id": 10}
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.collectors import restart_collector
+
+        route = respx.post(f"{_SERVICES_82}/restart")
+
+        error = envelope(await restart_collector(client, collector_id=82))
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not route.called
+
+
+class TestAcknowledgeCollectorDown:
+    """R3.4: acknowledge a down collector's alert with a comment through ackdown."""
+
+    @respx.mock
+    async def test_posts_the_comment_and_reports_the_acknowledgement(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import acknowledge_collector_down
+
+        route = respx.post(f"{_BASE}/setting/collector/collectors/26/ackdown").mock(
+            return_value=httpx.Response(200, json=OPS["ackdown_26"])
+        )
+
+        body = json.loads(
+            (await acknowledge_collector_down(client, 26, comment="lm-mcp Step 65 probe"))[0].text
+        )
+
+        assert json.loads(route.calls.last.request.content) == {"comment": "lm-mcp Step 65 probe"}
+        assert body == {"collector_id": 26, "acknowledged": True, "comment": "lm-mcp Step 65 probe"}
+
+    @respx.mock
+    async def test_an_up_collector_refuses_the_acknowledgement(self, client, monkeypatch):
+        _writes(monkeypatch)
+        from lm_mcp.tools.collectors import acknowledge_collector_down
+
+        respx.post(f"{_BASE}/setting/collector/collectors/82/ackdown").mock(
+            return_value=httpx.Response(400, json=OPS["ackdown_82_up"])
+        )
+
+        error = envelope(await acknowledge_collector_down(client, 82, comment="x"))
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert "The agent is alive" in error["message"]
+
+    @respx.mock
+    async def test_refused_with_writes_off(self, client, monkeypatch):
+        _writes(monkeypatch, enabled=False)
+        from lm_mcp.tools.collectors import acknowledge_collector_down
+
+        route = respx.post(f"{_BASE}/setting/collector/collectors/26/ackdown")
+
+        error = envelope(await acknowledge_collector_down(client, 26, comment="x"))
+
+        assert error["code"] == "WRITE_DISABLED"
+        assert not route.called
+
+
+_DOWN_26_EVIDENCE = {
+    "status_check": {
+        "finished": True,
+        "aborted": False,
+        "last_triggered": 1794446328793,
+        "last_updated": 1794446328793,
+        "scripts_total": 44,
+        "scripts_finished": 36,
+        "scripts_skipped": 8,
+        "checks_ok": 0,
+        "problems": [
+            {
+                "name": "module.Collector",
+                "status": "ERROR",
+                "detail": OPS["status_check_26_down"]["checkPoints"][0]["detail"],
+            },
+            {
+                "name": "module.Watchdog",
+                "status": "WARN",
+                "detail": OPS["status_check_26_down"]["checkPoints"][1]["detail"],
+            },
+        ],
+    },
+    "recent_events": [
+        {
+            "id": "qzGSS6euRTWf6BWUjh04QA",
+            "reported_on": 1793727768,
+            "event_code": 8,
+            "message": "The collector is down or unreachable",
+            "collector_build": "39200",
+            "collector_platform": "linux",
+        },
+        {
+            "id": "kPCwInVFSiaWQbAo58B4Jw",
+            "reported_on": 1793678241,
+            "event_code": 4,
+            "message": "Agent successfully restarted.",
+            "collector_build": "39200",
+            "collector_platform": "linux",
+        },
+    ],
+}
+
+
+class TestCollectorHealthEvidence:
+    """R3.4: get_collector_health cites each collector's latest status check and recent
+    events as evidence, read once each: for one collector asked by id, and in a list for
+    the collectors not known to be up."""
+
+    @respx.mock
+    async def test_a_down_collector_carries_its_status_check_and_recent_events(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get(f"{_BASE}/setting/collector/collectors/26").mock(
+            return_value=httpx.Response(200, json=OPS["collector_26"])
+        )
+        respx.get(f"{_BASE}/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 3})
+        )
+        events_page = {"total": -6, "items": LIVE["events_26"]["items"][:2]}
+        status, events = _mock_evidence("26", OPS["status_check_26_down"], events_page)
+
+        body = json.loads((await get_collector_health(client, collector_id=26))[0].text)
+
+        assert (status.call_count, events.call_count) == (1, 1)
+        assert events.calls.last.request.url.params["size"] == "5"
+        record = body["collectors"][0]
+        assert record["is_down"] is True
+        assert record["evidence"] == _DOWN_26_EVIDENCE
+        assert "evidence_warning" not in record
+
+    @respx.mock
+    async def test_one_up_collector_asked_by_id_carries_evidence_too(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get(f"{_BASE}/setting/collector/collectors/82").mock(
+            return_value=httpx.Response(200, json=OPS["collectors_page"]["items"][1])
+        )
+        respx.get(f"{_BASE}/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        _mock_evidence("82")
+
+        record = json.loads((await get_collector_health(client, collector_id=82))[0].text)[
+            "collectors"
+        ][0]
+
+        assert record["evidence"]["status_check"]["checks_ok"] == 6
+        assert record["evidence"]["status_check"]["problems"] == []
+        assert record["evidence"]["recent_events"] == []
+
+    @respx.mock
+    async def test_a_list_reads_evidence_only_for_collectors_not_known_up(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get(f"{_BASE}/setting/collector/collectors").mock(
+            return_value=httpx.Response(200, json=OPS["collectors_page"])
+        )
+        respx.get(f"{_BASE}/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 0})
+        )
+        down = _mock_evidence("26", OPS["status_check_26_down"])
+        up = _mock_evidence("82")
+
+        records = json.loads((await get_collector_health(client))[0].text)["collectors"]
+
+        assert [r["id"] for r in records] == [26, 82]
+        assert records[0]["evidence"]["status_check"]["checks_ok"] == 0
+        assert "evidence" not in records[1]
+        assert [route.call_count for route in (*down, *up)] == [1, 1, 0, 0]
+
+    @respx.mock
+    async def test_a_failed_read_leaves_its_part_null_with_a_warning(self, client):
+        from lm_mcp.tools.collectors import get_collector_health
+
+        respx.get(f"{_BASE}/setting/collector/collectors/26").mock(
+            return_value=httpx.Response(200, json=OPS["collector_26"])
+        )
+        respx.get(f"{_BASE}/device/devices").mock(
+            return_value=httpx.Response(200, json={"items": [], "total": 3})
+        )
+        status, events = _mock_evidence("26")
+        status.mock(return_value=httpx.Response(403, json={"errorMessage": "Permission denied"}))
+
+        record = json.loads((await get_collector_health(client, collector_id=26))[0].text)[
+            "collectors"
+        ][0]
+
+        assert record["evidence"] == {"status_check": None, "recent_events": []}
+        assert record["evidence_warning"].startswith("Status check read failed:")
+        assert events.call_count == 1
 
 
 # (handler name, endpoint path, extra required arguments)

@@ -861,6 +861,59 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="run_collector_status_check",
+            description=(
+                "Trigger a collector status check (requires write permission) and wait up to "
+                "45 seconds for its result: script counts and the checks that are not OK. An "
+                "unreachable collector refuses the trigger. A check still running after the wait "
+                "returns finished false; get_collector_health with the collector_id reads it "
+                "later."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID"},
+                },
+                "required": ["collector_id"],
+            },
+        ),
+        Tool(
+            name="restart_collector",
+            description=(
+                "Restart a collector (requires write permission). It sends no configuration "
+                "overrides and returns the async job id of the restart."
+            ),
+            annotations=_DESTRUCTIVE_RUN,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID"},
+                },
+                "required": ["collector_id"],
+            },
+        ),
+        Tool(
+            name="acknowledge_collector_down",
+            description=(
+                "Acknowledge a down collector's alert with a comment (requires write "
+                "permission). The portal refuses it for a collector that is up."
+            ),
+            annotations=_WRITE,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID"},
+                    "comment": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Acknowledgement comment",
+                    },
+                },
+                "required": ["collector_id", "comment"],
+            },
+        ),
+        Tool(
             name="delete_collector",
             description=(
                 "Delete a collector (requires write permission)."
@@ -6075,7 +6128,9 @@ TOOLS.extend(
                 "Enriched collector status: whether each collector is down, downstream "
                 "device count, uptime, and optional alert history. Leading indicator for "
                 "site-level events. Prefer this over `get_collectors` when investigating "
-                "potential outages."
+                "potential outages. The collector asked for by collector_id, and each "
+                "collector not known to be up, carries evidence: its latest status check and "
+                "its five latest events."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6626,6 +6681,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_collector_log_files": collectors.get_collector_log_files,
         "get_collector_log_file": collectors.get_collector_log_file,
         "get_collector_upgrade_history": collectors.get_collector_upgrade_history,
+        "run_collector_status_check": collectors.run_collector_status_check,
+        "restart_collector": collectors.restart_collector,
+        "acknowledge_collector_down": collectors.acknowledge_collector_down,
         "update_collector": collectors.update_collector,
         "delete_collector": collectors.delete_collector,
         "create_collector_group": collectors.create_collector_group,

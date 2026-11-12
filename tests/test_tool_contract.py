@@ -261,8 +261,9 @@ if __name__ == "__main__":
     print(f"wrote {READONLY_FIXTURE} ({len(readonly)} tools)")
 
 
-# POST paths whose call runs a script that changes a monitored host (rul-43402c07ec).
-_DESTRUCTIVE_POSTS = ("/setting/remediationsources/executemanually",)
+# POST paths whose call changes a monitored host or the collector serving it: a remediation
+# run (rul-43402c07ec) and a collector restart (spec R3.4).
+_DESTRUCTIVE_POSTS = ("/setting/remediationsources/executemanually", "/services/restart")
 
 
 def _handler_sources(tool_name: str) -> str:
@@ -287,7 +288,7 @@ def _handler_sources(tool_name: str) -> str:
 @pytest.mark.parametrize("tool", TOOLS, ids=lambda t: t.name)
 def test_a_tool_that_deletes_or_runs_a_remediation_is_destructive(tool):
     """R2.9: a handler that issues a DELETE, itself or through a helper of its module, or
-    POSTs a remediation run carries destructiveHint=true."""
+    POSTs a remediation run or a collector restart carries destructiveHint=true."""
     source = _handler_sources(tool.name)
 
     if "client.delete(" in source or any(path in source for path in _DESTRUCTIVE_POSTS):

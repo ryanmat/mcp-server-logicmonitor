@@ -25,6 +25,34 @@
       "type": "object"
     }
   },
+  "acknowledge_collector_down": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Acknowledge a down collector's alert with a comment (requires write permission). The portal refuses it for a collector that is up.",
+    "inputSchema": {
+      "properties": {
+        "collector_id": {
+          "description": "Collector ID",
+          "type": "integer"
+        },
+        "comment": {
+          "description": "Acknowledgement comment",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "collector_id",
+        "comment"
+      ],
+      "type": "object"
+    }
+  },
   "add_alert_note": {
     "annotations": {
       "destructiveHint": false,
@@ -3491,7 +3519,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Enriched collector status: whether each collector is down, downstream device count, uptime, and optional alert history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages.",
+    "description": "Enriched collector status: whether each collector is down, downstream device count, uptime, and optional alert history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages. The collector asked for by collector_id, and each collector not known to be up, carries evidence: its latest status check and its five latest events.",
     "inputSchema": {
       "properties": {
         "collector_group_id": {
@@ -7323,6 +7351,50 @@
       },
       "required": [
         "device_id"
+      ],
+      "type": "object"
+    }
+  },
+  "restart_collector": {
+    "annotations": {
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Restart a collector (requires write permission). It sends no configuration overrides and returns the async job id of the restart.",
+    "inputSchema": {
+      "properties": {
+        "collector_id": {
+          "description": "Collector ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "collector_id"
+      ],
+      "type": "object"
+    }
+  },
+  "run_collector_status_check": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true,
+      "readOnlyHint": false,
+      "title": null
+    },
+    "description": "Trigger a collector status check (requires write permission) and wait up to 45 seconds for its result: script counts and the checks that are not OK. An unreachable collector refuses the trigger. A check still running after the wait returns finished false; get_collector_health with the collector_id reads it later.",
+    "inputSchema": {
+      "properties": {
+        "collector_id": {
+          "description": "Collector ID",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "collector_id"
       ],
       "type": "object"
     }

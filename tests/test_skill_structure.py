@@ -282,3 +282,19 @@ def test_lm_edwin_says_a_ci_with_one_alert_forms_no_device_cluster():
     assert cluster_by_device([alert]) == []
     assert cluster_by_device([alert, {**alert, "id": "LMA2"}]) != []
     assert "forms no device cluster" in _step("lm-edwin", "Step 4")
+
+
+def test_lm_portal_grants_and_names_the_collector_operations():
+    """R3.4: lm-portal reads a down collector's evidence and offers the collector
+    operations, which change the portal, only on the user's word."""
+    operations = {
+        "get_collector_health",
+        "run_collector_status_check",
+        "acknowledge_collector_down",
+        "restart_collector",
+    }
+    assert sorted(operations - _allowed("lm-portal")) == []
+    assert sorted(operations - _body_tool_names("lm-portal")) == []
+    collectors = _step("lm-portal", "Step 3")
+    assert "is_down" in collectors
+    assert "ask the user" in collectors

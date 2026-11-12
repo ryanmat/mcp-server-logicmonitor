@@ -1741,6 +1741,14 @@ _SITE_OUTAGE_SIGNAL = {
         "dead_devices": _COUNT,
         "threshold": {**_COUNT, "description": "Dead devices that trigger device_silence."},
         "weight": {**_COUNT, "description": "Confidence a triggered signal adds."},
+        "evidence": {
+            "type": "array",
+            "items": {"type": "object"},
+            "description": (
+                "collector_down: each down collector's status check and recent events, as "
+                "get_collector_health read them."
+            ),
+        },
     },
     "required": ["triggered"],
     "additionalProperties": False,
@@ -1848,7 +1856,8 @@ async def detect_site_outage(
     """Composite detector for site-level outages across a device group.
 
     Chains four signals into a single verdict:
-      A) CollectorDown — any collector serving devices in this group is down
+      A) CollectorDown — any collector serving devices in this group is down; the
+         signal cites each down collector's status check and recent events
       B) Mass interface-down burst — analyze_alerts bursts on interface datasources
       C) Power events — UPS/PDU alerts in the last hour
       D) Device silence — count of dead devices in the group
@@ -1995,6 +2004,15 @@ async def detect_site_outage(
                 "triggered": True,
                 "count": collector_down_count,
                 "weight": _SITE_OUTAGE_WEIGHTS["collector_down"],
+                "evidence": [
+                    {
+                        "collector_id": entry.get("id"),
+                        "hostname": entry.get("hostname"),
+                        "evidence": entry.get("evidence"),
+                    }
+                    for entry in collectors_inspected
+                    if entry.get("is_down")
+                ],
             }
         else:
             signals_breakdown["collector_down"] = {"triggered": False, "count": 0}
