@@ -669,9 +669,10 @@ async def restart_collector(
     """Restart a collector, sending its own size and config files back so neither changes.
 
     The restart takes them as overrides. A restart sent without collectorSize reset a Large
-    collector to Custom, while config files left out came back unchanged (probe 2026-11-11);
-    the files are sent back anyway, so the restart cannot change them. A record with no
-    collectorSize is refused rather than restarted.
+    collector to Custom; one sent with only collectorSize left four config files byte-identical
+    and rewrote collectorConf for the new size (probe 2026-11-11). All five are sent back, so
+    the restart cannot change them. A record with no collectorSize is refused rather than
+    restarted.
 
     Args:
         client: LogicMonitor API client.
