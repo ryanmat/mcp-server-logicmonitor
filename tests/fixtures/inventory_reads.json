@@ -1,0 +1,1010 @@
+{
+ "datasource_devices_1679": {
+  "request": "GET /setting/datasources/1679/devices",
+  "params": {
+   "size": 3,
+   "offset": 0
+  },
+  "status": 200,
+  "body": {
+   "total": 875,
+   "items": [
+    {
+     "id": 1786,
+     "name": "127.0.0.1",
+     "displayName": "rm-aws-ubuntu",
+     "description": "",
+     "instance": [
+      {
+       "id": 370242186,
+       "name": "Ping",
+       "alias": ""
+      }
+     ],
+     "hasMore": 0,
+     "hasActiveInstance": true
+    },
+    {
+     "id": 6682,
+     "name": "sandbox.logicmonitor.com",
+     "displayName": "sandbox.logicmonitor.com",
+     "description": "",
+     "instance": [
+      {
+       "id": 370282374,
+       "name": "Ping",
+       "alias": ""
+      }
+     ],
+     "hasMore": 0,
+     "hasActiveInstance": true
+    },
+    {
+     "id": 89818,
+     "name": "127.0.0.1",
+     "displayName": "vergeos-demo-vm",
+     "description": "",
+     "instance": [
+      {
+       "id": 371267579,
+       "name": "Ping",
+       "alias": ""
+      }
+     ],
+     "hasMore": 0,
+     "hasActiveInstance": true
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "datasource_devices_1679_filter": {
+  "request": "GET /setting/datasources/1679/devices",
+  "params": {
+   "size": 3,
+   "filter": "displayName~\"ubuntu\""
+  },
+  "status": 200,
+  "body": {
+   "total": 1,
+   "items": [
+    {
+     "id": 1786,
+     "name": "127.0.0.1",
+     "displayName": "rm-aws-ubuntu",
+     "description": "",
+     "instance": [
+      {
+       "id": 370242186,
+       "name": "Ping",
+       "alias": ""
+      }
+     ],
+     "hasMore": 0,
+     "hasActiveInstance": true
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "datasource_devices_1613": {
+  "request": "GET /setting/datasources/1613/devices",
+  "params": {
+   "size": 10
+  },
+  "status": 200,
+  "body": {
+   "total": 13,
+   "items": [
+    {
+     "id": 89818,
+     "name": "127.0.0.1",
+     "displayName": "vergeos-demo-vm",
+     "description": "",
+     "instance": [
+      {
+       "id": 371267764,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-ScriptADTask",
+       "alias": "ScriptADTask"
+      },
+      {
+       "id": 371267771,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-PortADTask",
+       "alias": "PortADTask"
+      },
+      {
+       "id": 371267772,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-WMIADTask",
+       "alias": "WMIADTask"
+      },
+      {
+       "id": 371267769,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-DummyADTask",
+       "alias": "DummyADTask"
+      },
+      {
+       "id": 371267773,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-PDHADTask",
+       "alias": "PDHADTask"
+      },
+      {
+       "id": 371267770,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-EC2ADTask",
+       "alias": "EC2ADTask"
+      },
+      {
+       "id": 371267761,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-XenADTask",
+       "alias": "XenADTask"
+      },
+      {
+       "id": 371267759,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-NetAppADTask",
+       "alias": "NetAppADTask"
+      },
+      {
+       "id": 371267760,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-SnmpADTask",
+       "alias": "SnmpADTask"
+      },
+      {
+       "id": 371267762,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-JMXADTask",
+       "alias": "JMXADTask"
+      }
+     ],
+     "hasMore": 1,
+     "hasActiveInstance": true
+    },
+    {
+     "id": 110751,
+     "name": "127.0.0.1",
+     "displayName": "linux-dev-collector",
+     "description": "",
+     "instance": [
+      {
+       "id": 371361435,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-PortADTask",
+       "alias": "PortADTask"
+      },
+      {
+       "id": 371361434,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-EC2ADTask",
+       "alias": "EC2ADTask"
+      },
+      {
+       "id": 371361431,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-CIMADTask",
+       "alias": "CIMADTask"
+      },
+      {
+       "id": 371361432,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-JDBCADTask",
+       "alias": "JDBCADTask"
+      },
+      {
+       "id": 371361429,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-ESXADTask",
+       "alias": "ESXADTask"
+      },
+      {
+       "id": 371361433,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-DummyADTask",
+       "alias": "DummyADTask"
+      },
+      {
+       "id": 371361430,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-SdkScriptADTask",
+       "alias": "SdkScriptADTask"
+      },
+      {
+       "id": 371361426,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-JMXADTask",
+       "alias": "JMXADTask"
+      },
+      {
+       "id": 371361427,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-HTTPADTask",
+       "alias": "HTTPADTask"
+      },
+      {
+       "id": 371361428,
+       "name": "LogicMonitor_Collector_ActiveDiscoveryTasks-ScriptADTask",
+       "alias": "ScriptADTask"
+      }
+     ],
+     "hasMore": 1,
+     "hasActiveInstance": true
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "datasource_missing": {
+  "request": "GET /setting/datasources/99999999/devices",
+  "params": {
+   "size": 3
+  },
+  "status": 404,
+  "body": {
+   "errorMessage": "DataSource<99999999> is not found",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "unmonitored_empty": {
+  "request": "GET /device/unmonitoreddevices",
+  "params": {
+   "size": 3,
+   "offset": 0
+  },
+  "status": 200,
+  "body": {
+   "total": 0,
+   "items": [],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "checkpoints": {
+  "request": "GET /website/smcheckpoints",
+  "params": {
+   "size": 50,
+   "offset": 0
+  },
+  "status": 200,
+  "body": {
+   "total": 5,
+   "items": [
+    {
+     "id": 2,
+     "name": "US - Washington DC",
+     "geoInfo": "US - Washington DC",
+     "description": "This is DC7 group",
+     "displayPrio": 60,
+     "isEnabledInRoot": true
+    },
+    {
+     "id": 4,
+     "name": "Europe - Dublin",
+     "geoInfo": "Europe - Dublin",
+     "description": "Europe - Dublin",
+     "displayPrio": 30,
+     "isEnabledInRoot": true
+    },
+    {
+     "id": 3,
+     "name": "US - Oregon",
+     "geoInfo": "US - Oregon",
+     "description": "US - Oregon",
+     "displayPrio": 50,
+     "isEnabledInRoot": true
+    },
+    {
+     "id": 5,
+     "name": "Asia - Singapore",
+     "geoInfo": "Asia - Singapore",
+     "description": "Asia - Singapore",
+     "displayPrio": 10,
+     "isEnabledInRoot": true
+    },
+    {
+     "id": 6,
+     "name": "Australia - Sydney",
+     "geoInfo": "Australia - Sydney",
+     "description": "Australia - Sydney",
+     "displayPrio": 20,
+     "isEnabledInRoot": true
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "checkpoints_size2_offset1": {
+  "request": "GET /website/smcheckpoints",
+  "params": {
+   "size": 2,
+   "offset": 1
+  },
+  "status": 200,
+  "body": {
+   "total": 5,
+   "items": [
+    {
+     "id": 4,
+     "name": "Europe - Dublin",
+     "geoInfo": "Europe - Dublin",
+     "description": "Europe - Dublin",
+     "displayPrio": 30,
+     "isEnabledInRoot": true
+    },
+    {
+     "id": 3,
+     "name": "US - Oregon",
+     "geoInfo": "US - Oregon",
+     "description": "US - Oregon",
+     "displayPrio": 50,
+     "isEnabledInRoot": true
+    }
+   ],
+   "searchId": null,
+   "isMin": false
+  }
+ },
+ "delta_first_page": {
+  "request": "GET /device/devices/delta",
+  "params": {
+   "size": 3,
+   "offset": 0
+  },
+  "status": 200,
+  "body": {
+   "total": 5847,
+   "searchId": null,
+   "items": [
+    {
+     "id": 1786,
+     "name": "127.0.0.1",
+     "displayName": "rm-aws-ubuntu",
+     "type": "",
+     "deviceType": 0,
+     "relatedDeviceId": -1,
+     "currentCollectorId": 26,
+     "preferredCollectorId": 26,
+     "autoBalancedCollectorGroupId": 0,
+     "preferredCollectorGroupId": 9,
+     "preferredCollectorGroupName": "Linux Collectors",
+     "description": "",
+     "createdOn": 1726231991,
+     "updatedOn": 1793727540,
+     "disableAlerting": false,
+     "autoPropsAssignedOn": 0,
+     "autoPropsUpdatedOn": 0,
+     "scanConfigId": 0,
+     "link": "",
+     "enableNetflow": false,
+     "netflowCollectorId": 0,
+     "netflowCollectorGroupId": 0,
+     "netflowCollectorGroupName": null,
+     "isPreferredLogCollectorConfigured": false,
+     "currentLogCollectorId": 0,
+     "logCollectorId": 0,
+     "logCollectorDescription": null,
+     "logCollectorGroupId": 0,
+     "logCollectorGroupName": null,
+     "dedicatedLogCollectorGroupId": 0,
+     "isPreferredLogCollectorGroupConfigured": false,
+     "lastDataTime": 0,
+     "lastRawdataTime": 0,
+     "hostGroupIds": "16,13,120,209",
+     "sdtStatus": "none-none-none",
+     "userPermission": "write",
+     "rolePrivileges": [],
+     "hostStatus": "dead-collector",
+     "alertStatus": "unconfirmed-critical-none",
+     "alertStatusPriority": 1,
+     "awsState": 1,
+     "azureState": 1,
+     "gcpState": 1,
+     "alertDisableStatus": "none-none-none",
+     "alertingDisabledOn": null,
+     "collectorDescription": "AWS Ubuntu Server",
+     "netflowCollectorDescription": null,
+     "customProperties": [
+      {
+       "name": "openmetrics.url",
+       "value": "http://192.0.2.10:9273/metrics"
+      },
+      {
+       "name": "system.categories",
+       "value": "ModBus"
+      }
+     ],
+     "resourceIds": null,
+     "op": null,
+     "containsMultiValue": false,
+     "upTimeInSeconds": 0,
+     "deletedTimeInMs": 0,
+     "toDeleteTimeInMs": 0,
+     "hasDisabledSubResource": false,
+     "ancestorHasDisabledLogicModule": false,
+     "systemProperties": [
+      {
+       "name": "system.enablenetflow",
+       "value": "false"
+      },
+      {
+       "name": "system.collectorarch",
+       "value": "x64"
+      }
+     ],
+     "autoProperties": [
+      {
+       "name": "auto.network.names",
+       "value": "localhost"
+      },
+      {
+       "name": "auto.lm.last_check_time",
+       "value": "Tue Nov 03 03:29:24 UTC 2026"
+      }
+     ],
+     "inheritedProperties": [
+      {
+       "name": "netapp.ssl",
+       "value": "true"
+      },
+      {
+       "name": "maxsslcerttime",
+       "value": "32"
+      }
+     ],
+     "syntheticsCollectorIds": [],
+     "status": ""
+    },
+    {
+     "id": 1966,
+     "name": "sandbox-imageprovider",
+     "displayName": "sandbox-imageprovider",
+     "type": "",
+     "deviceType": 6,
+     "relatedDeviceId": -1,
+     "currentCollectorId": -4,
+     "preferredCollectorId": -4,
+     "autoBalancedCollectorGroupId": 0,
+     "preferredCollectorGroupId": 1,
+     "preferredCollectorGroupName": "@default",
+     "description": "",
+     "createdOn": 1726245480,
+     "updatedOn": 1769452619,
+     "disableAlerting": false,
+     "autoPropsAssignedOn": 0,
+     "autoPropsUpdatedOn": 0,
+     "scanConfigId": 0,
+     "link": "",
+     "enableNetflow": false,
+     "netflowCollectorId": 0,
+     "netflowCollectorGroupId": 0,
+     "netflowCollectorGroupName": null,
+     "isPreferredLogCollectorConfigured": false,
+     "currentLogCollectorId": 0,
+     "logCollectorId": 0,
+     "logCollectorDescription": null,
+     "logCollectorGroupId": 0,
+     "logCollectorGroupName": null,
+     "dedicatedLogCollectorGroupId": 0,
+     "isPreferredLogCollectorGroupConfigured": false,
+     "lastDataTime": 0,
+     "lastRawdataTime": 0,
+     "hostGroupIds": "238",
+     "sdtStatus": "none-none-none",
+     "userPermission": "write",
+     "rolePrivileges": [],
+     "hostStatus": "normal",
+     "alertStatus": "none",
+     "alertStatusPriority": 100000,
+     "awsState": 1,
+     "azureState": 1,
+     "gcpState": 1,
+     "alertDisableStatus": "none-none-none",
+     "alertingDisabledOn": null,
+     "collectorDescription": "Service Data Aggregator",
+     "netflowCollectorDescription": null,
+     "customProperties": [
+      {
+       "name": "traces.namespace",
+       "value": "sandbox"
+      },
+      {
+       "name": "predef.bizservice.evalMembersInterval",
+       "value": "30"
+      }
+     ],
+     "resourceIds": null,
+     "op": null,
+     "containsMultiValue": false,
+     "upTimeInSeconds": 0,
+     "deletedTimeInMs": 0,
+     "toDeleteTimeInMs": 0,
+     "hasDisabledSubResource": false,
+     "ancestorHasDisabledLogicModule": false,
+     "systemProperties": [
+      {
+       "name": "system.enablenetflow",
+       "value": "false"
+      },
+      {
+       "name": "system.pushmodules",
+       "value": "LogicMonitor_APM_Services,LogicMonitor_APM_Operations"
+      }
+     ],
+     "autoProperties": [
+      {
+       "name": "predef.externalResourceID",
+       "value": "service_1966"
+      },
+      {
+       "name": "predef.externalResourceType",
+       "value": "Service"
+      }
+     ],
+     "inheritedProperties": [
+      {
+       "name": "netapp.ssl",
+       "value": "true"
+      },
+      {
+       "name": "maxsslcerttime",
+       "value": "32"
+      }
+     ],
+     "syntheticsCollectorIds": [],
+     "status": ""
+    },
+    {
+     "id": 1967,
+     "name": "sandbox-frontend-web",
+     "displayName": "sandbox-frontend-web",
+     "type": "",
+     "deviceType": 6,
+     "relatedDeviceId": -1,
+     "currentCollectorId": -4,
+     "preferredCollectorId": -4,
+     "autoBalancedCollectorGroupId": 0,
+     "preferredCollectorGroupId": 1,
+     "preferredCollectorGroupName": "@default",
+     "description": "",
+     "createdOn": 1726245480,
+     "updatedOn": 1769452629,
+     "disableAlerting": false,
+     "autoPropsAssignedOn": 0,
+     "autoPropsUpdatedOn": 0,
+     "scanConfigId": 0,
+     "link": "",
+     "enableNetflow": false,
+     "netflowCollectorId": 0,
+     "netflowCollectorGroupId": 0,
+     "netflowCollectorGroupName": null,
+     "isPreferredLogCollectorConfigured": false,
+     "currentLogCollectorId": 0,
+     "logCollectorId": 0,
+     "logCollectorDescription": null,
+     "logCollectorGroupId": 0,
+     "logCollectorGroupName": null,
+     "dedicatedLogCollectorGroupId": 0,
+     "isPreferredLogCollectorGroupConfigured": false,
+     "lastDataTime": 0,
+     "lastRawdataTime": 0,
+     "hostGroupIds": "238",
+     "sdtStatus": "none-none-none",
+     "userPermission": "write",
+     "rolePrivileges": [],
+     "hostStatus": "normal",
+     "alertStatus": "none",
+     "alertStatusPriority": 100000,
+     "awsState": 1,
+     "azureState": 1,
+     "gcpState": 1,
+     "alertDisableStatus": "none-none-none",
+     "alertingDisabledOn": null,
+     "collectorDescription": "Service Data Aggregator",
+     "netflowCollectorDescription": null,
+     "customProperties": [
+      {
+       "name": "traces.namespace",
+       "value": "sandbox"
+      },
+      {
+       "name": "traces.telemetry.sdk.language",
+       "value": "webjs"
+      }
+     ],
+     "resourceIds": null,
+     "op": null,
+     "containsMultiValue": false,
+     "upTimeInSeconds": 0,
+     "deletedTimeInMs": 0,
+     "toDeleteTimeInMs": 0,
+     "hasDisabledSubResource": false,
+     "ancestorHasDisabledLogicModule": false,
+     "systemProperties": [
+      {
+       "name": "system.enablenetflow",
+       "value": "false"
+      },
+      {
+       "name": "system.pushmodules",
+       "value": "LogicMonitor_APM_Services,LogicMonitor_APM_Operations"
+      }
+     ],
+     "autoProperties": [
+      {
+       "name": "predef.externalResourceID",
+       "value": "service_1967"
+      },
+      {
+       "name": "predef.externalResourceType",
+       "value": "Service"
+      }
+     ],
+     "inheritedProperties": [
+      {
+       "name": "netapp.ssl",
+       "value": "true"
+      },
+      {
+       "name": "maxsslcerttime",
+       "value": "32"
+      }
+     ],
+     "syntheticsCollectorIds": [],
+     "status": ""
+    }
+   ],
+   "deltaId": "a11654364568495ba22ffa4c4c61a259"
+  }
+ },
+ "delta_by_id_after_change": {
+  "request": "GET /device/devices/delta/a11654364568495ba22ffa4c4c61a259",
+  "params": {
+   "size": 50
+  },
+  "status": 200,
+  "body": {
+   "total": 2,
+   "searchId": null,
+   "items": [
+    {
+     "id": 1786,
+     "name": "127.0.0.1",
+     "displayName": "rm-aws-ubuntu",
+     "type": "",
+     "deviceType": 0,
+     "relatedDeviceId": -1,
+     "currentCollectorId": 26,
+     "preferredCollectorId": 26,
+     "autoBalancedCollectorGroupId": 0,
+     "preferredCollectorGroupId": 9,
+     "preferredCollectorGroupName": "Linux Collectors",
+     "description": "",
+     "createdOn": 1726231991,
+     "updatedOn": 1793727540,
+     "disableAlerting": false,
+     "autoPropsAssignedOn": 0,
+     "autoPropsUpdatedOn": 0,
+     "scanConfigId": 0,
+     "link": "",
+     "enableNetflow": false,
+     "netflowCollectorId": 0,
+     "netflowCollectorGroupId": 0,
+     "netflowCollectorGroupName": null,
+     "isPreferredLogCollectorConfigured": false,
+     "currentLogCollectorId": 0,
+     "logCollectorId": 0,
+     "logCollectorDescription": null,
+     "logCollectorGroupId": 0,
+     "logCollectorGroupName": null,
+     "dedicatedLogCollectorGroupId": 0,
+     "isPreferredLogCollectorGroupConfigured": false,
+     "lastDataTime": 0,
+     "lastRawdataTime": 0,
+     "hostGroupIds": "16,13,120,209",
+     "sdtStatus": "none-none-none",
+     "userPermission": "write",
+     "rolePrivileges": [],
+     "hostStatus": "dead-collector",
+     "alertStatus": "unconfirmed-critical-none",
+     "alertStatusPriority": 1,
+     "awsState": 1,
+     "azureState": 1,
+     "gcpState": 1,
+     "alertDisableStatus": "none-none-none",
+     "alertingDisabledOn": null,
+     "collectorDescription": "AWS Ubuntu Server",
+     "netflowCollectorDescription": null,
+     "customProperties": [
+      {
+       "name": "openmetrics.url",
+       "value": "http://192.0.2.10:9273/metrics"
+      },
+      {
+       "name": "system.categories",
+       "value": "ModBus"
+      }
+     ],
+     "resourceIds": null,
+     "op": null,
+     "containsMultiValue": false,
+     "upTimeInSeconds": 0,
+     "deletedTimeInMs": 0,
+     "toDeleteTimeInMs": 0,
+     "hasDisabledSubResource": false,
+     "ancestorHasDisabledLogicModule": false,
+     "systemProperties": [
+      {
+       "name": "system.enablenetflow",
+       "value": "false"
+      },
+      {
+       "name": "system.collectorarch",
+       "value": "x64"
+      }
+     ],
+     "autoProperties": [
+      {
+       "name": "auto.network.names",
+       "value": "localhost"
+      },
+      {
+       "name": "auto.lm.last_check_time",
+       "value": "Tue Nov 03 03:29:24 UTC 2026"
+      }
+     ],
+     "inheritedProperties": [
+      {
+       "name": "netapp.ssl",
+       "value": "true"
+      },
+      {
+       "name": "maxsslcerttime",
+       "value": "32"
+      }
+     ],
+     "syntheticsCollectorIds": [],
+     "status": "updated"
+    },
+    {
+     "id": 451886,
+     "name": "observability-rbac-query-proxy-deploy-open-cluster-management-observability",
+     "displayName": "observability-rbac-query-proxy-deploy-open-cluster-management-observability-rm-aro-cluster",
+     "type": "",
+     "deviceType": 8,
+     "relatedDeviceId": -1,
+     "currentCollectorId": 161,
+     "preferredCollectorId": 161,
+     "autoBalancedCollectorGroupId": 47,
+     "preferredCollectorGroupId": 47,
+     "preferredCollectorGroupName": "Kubernetes Cluster: rm-aro-cluster",
+     "description": "",
+     "createdOn": 1775441415,
+     "updatedOn": 1775441415,
+     "disableAlerting": false,
+     "autoPropsAssignedOn": 0,
+     "autoPropsUpdatedOn": 0,
+     "scanConfigId": 0,
+     "link": "",
+     "enableNetflow": false,
+     "netflowCollectorId": 0,
+     "netflowCollectorGroupId": 0,
+     "netflowCollectorGroupName": null,
+     "isPreferredLogCollectorConfigured": false,
+     "currentLogCollectorId": 0,
+     "logCollectorId": 0,
+     "logCollectorDescription": null,
+     "logCollectorGroupId": 0,
+     "logCollectorGroupName": null,
+     "dedicatedLogCollectorGroupId": 0,
+     "isPreferredLogCollectorGroupConfigured": false,
+     "lastDataTime": 0,
+     "lastRawdataTime": 0,
+     "hostGroupIds": "3103",
+     "sdtStatus": "none-none-none",
+     "userPermission": "write",
+     "rolePrivileges": [],
+     "hostStatus": "normal",
+     "alertStatus": "unconfirmed-error-none",
+     "alertStatusPriority": 10,
+     "awsState": 1,
+     "azureState": 1,
+     "gcpState": 1,
+     "alertDisableStatus": "none-none-none",
+     "alertingDisabledOn": null,
+     "collectorDescription": "Kubernetes Cluster: rm-aro-cluster-0",
+     "netflowCollectorDescription": null,
+     "customProperties": [
+      {
+       "name": "kubernetes.annotation.deployment.kubernetes.io/revision",
+       "value": "3"
+      },
+      {
+       "name": "kubernetes.resourceCreatedOn",
+       "value": "1775441406"
+      }
+     ],
+     "resourceIds": null,
+     "op": null,
+     "containsMultiValue": false,
+     "upTimeInSeconds": 0,
+     "deletedTimeInMs": 0,
+     "toDeleteTimeInMs": 0,
+     "hasDisabledSubResource": false,
+     "ancestorHasDisabledLogicModule": false,
+     "systemProperties": [
+      {
+       "name": "system.enablenetflow",
+       "value": "false"
+      },
+      {
+       "name": "system.collectorarch",
+       "value": "x64"
+      }
+     ],
+     "autoProperties": [
+      {
+       "name": "auto.clustername",
+       "value": "rm-aro-cluster"
+      },
+      {
+       "name": "auto.createdBy",
+       "value": "LogicMonitor/Argus: v18.0.0"
+      }
+     ],
+     "inheritedProperties": [
+      {
+       "name": "argus.helm-chart",
+       "value": "argus-15.1.0"
+      },
+      {
+       "name": "argus.helm-revision",
+       "value": "1"
+      }
+     ],
+     "syntheticsCollectorIds": [],
+     "status": "updated"
+    }
+   ],
+   "deltaId": "a11654364568495ba22ffa4c4c61a259"
+  }
+ },
+ "delta_by_id_size1_offset1": {
+  "request": "GET /device/devices/delta/a11654364568495ba22ffa4c4c61a259",
+  "params": {
+   "size": 1,
+   "offset": 1
+  },
+  "status": 200,
+  "body": {
+   "total": 6,
+   "searchId": null,
+   "items": [
+    {
+     "id": 451843,
+     "name": "search-postgres-deploy-open-cluster-management",
+     "displayName": "search-postgres-deploy-open-cluster-management-rm-aro-cluster",
+     "type": "",
+     "deviceType": 8,
+     "relatedDeviceId": -1,
+     "currentCollectorId": 161,
+     "preferredCollectorId": 161,
+     "autoBalancedCollectorGroupId": 47,
+     "preferredCollectorGroupId": 47,
+     "preferredCollectorGroupName": "Kubernetes Cluster: rm-aro-cluster",
+     "description": "",
+     "createdOn": 1775441344,
+     "updatedOn": 1775441344,
+     "disableAlerting": false,
+     "autoPropsAssignedOn": 1794503037,
+     "autoPropsUpdatedOn": 1794416637,
+     "scanConfigId": 0,
+     "link": "",
+     "enableNetflow": false,
+     "netflowCollectorId": 0,
+     "netflowCollectorGroupId": 0,
+     "netflowCollectorGroupName": null,
+     "isPreferredLogCollectorConfigured": false,
+     "currentLogCollectorId": 0,
+     "logCollectorId": 0,
+     "logCollectorDescription": null,
+     "logCollectorGroupId": 0,
+     "logCollectorGroupName": null,
+     "dedicatedLogCollectorGroupId": 0,
+     "isPreferredLogCollectorGroupConfigured": false,
+     "lastDataTime": 0,
+     "lastRawdataTime": 0,
+     "hostGroupIds": "3101",
+     "sdtStatus": "none-none-none",
+     "userPermission": "write",
+     "rolePrivileges": [],
+     "hostStatus": "normal",
+     "alertStatus": "none",
+     "alertStatusPriority": 100000,
+     "awsState": 1,
+     "azureState": 1,
+     "gcpState": 1,
+     "alertDisableStatus": "none-none-none",
+     "alertingDisabledOn": null,
+     "collectorDescription": "Kubernetes Cluster: rm-aro-cluster-0",
+     "netflowCollectorDescription": null,
+     "customProperties": [
+      {
+       "name": "kubernetes.annotation.deployment.kubernetes.io/revision",
+       "value": "3"
+      },
+      {
+       "name": "kubernetes.resourceCreatedOn",
+       "value": "1775441344"
+      }
+     ],
+     "resourceIds": null,
+     "op": null,
+     "containsMultiValue": false,
+     "upTimeInSeconds": 0,
+     "deletedTimeInMs": 0,
+     "toDeleteTimeInMs": 0,
+     "hasDisabledSubResource": false,
+     "ancestorHasDisabledLogicModule": false,
+     "systemProperties": [
+      {
+       "name": "system.enablenetflow",
+       "value": "false"
+      },
+      {
+       "name": "system.collectorarch",
+       "value": "x64"
+      }
+     ],
+     "autoProperties": [
+      {
+       "name": "auto.clustername",
+       "value": "rm-aro-cluster"
+      },
+      {
+       "name": "auto.createdBy",
+       "value": "LogicMonitor/Argus: v18.0.0"
+      }
+     ],
+     "inheritedProperties": [
+      {
+       "name": "argus.helm-chart",
+       "value": "argus-15.1.0"
+      },
+      {
+       "name": "argus.helm-revision",
+       "value": "1"
+      }
+     ],
+     "syntheticsCollectorIds": [],
+     "status": "updated"
+    }
+   ],
+   "deltaId": "a11654364568495ba22ffa4c4c61a259"
+  }
+ },
+ "delta_unknown_id": {
+  "request": "GET /device/devices/delta/notadelta",
+  "params": null,
+  "status": 404,
+  "body": {
+   "errorMessage": "delta id not found notadelta",
+   "errorCode": 1404,
+   "errorDetail": null
+  }
+ },
+ "unmonitored_swagger_item": {
+  "source": "swagger definition UnmonitoredDevices, placeholder values",
+  "item": {
+   "deviceType": "<deviceType>",
+   "nspId": 0,
+   "forwardIp": "<forwardIp>",
+   "endDate": "<endDate>",
+   "ip": "<ip>",
+   "dns": "<dns>",
+   "collectorId": 0,
+   "ports": "<ports>",
+   "nspName": "<nspName>",
+   "deviceStatus": "<deviceStatus>",
+   "manufacturer": "<manufacturer>",
+   "collectorDescription": "<collectorDescription>",
+   "displayAs": "<displayAs>",
+   "sysName": "<sysName>",
+   "nseId": 0,
+   "id": 0,
+   "endTimestamp": 0,
+   "status": "<status>",
+   "nseScanId": "<nseScanId>"
+  }
+ }
+}

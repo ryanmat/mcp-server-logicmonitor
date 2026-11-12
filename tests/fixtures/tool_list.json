@@ -4166,6 +4166,42 @@
       "type": "object"
     }
   },
+  "get_datasource_devices": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the devices/resources a datasource applies to, each with up to 10 of its instances; more_instances says it has others, which get_device_instances lists.",
+    "inputSchema": {
+      "properties": {
+        "datasource_id": {
+          "description": "Datasource ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by device display name (substring match)",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "datasource_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_datasources": {
     "annotations": {
       "destructiveHint": false,
@@ -4440,6 +4476,40 @@
       "required": [
         "device_id"
       ],
+      "type": "object"
+    }
+  },
+  "get_device_delta": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List devices/resources through the device delta, to follow what changed. Without delta_id it lists the devices whose display name contains name_filter, or every device, and returns a delta_id; each such read starts a new delta, so keep the first page's. With delta_id it lists the devices changed since that delta started (change says how), every change since then on each read; name_filter is refused there, as the portal applies none.",
+    "inputSchema": {
+      "properties": {
+        "delta_id": {
+          "description": "The delta_id an earlier read returned",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "name_filter": {
+          "description": "Filter by display name (substring), without delta_id",
+          "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
       "type": "object"
     }
   },
@@ -6792,6 +6862,31 @@
       "type": "object"
     }
   },
+  "get_unmonitored_devices": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the portal's unmonitored devices/resources, found by a NetScan and not monitored, rows as the API returns them.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_upcoming_sdts": {
     "annotations": {
       "destructiveHint": false,
@@ -6896,6 +6991,31 @@
       "required": [
         "website_id"
       ],
+      "type": "object"
+    }
+  },
+  "get_website_checkpoints": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the portal's website checkpoint locations, the places website checks run from; each id is the smg_id a website's checkpoints carry in get_website.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
       "type": "object"
     }
   },

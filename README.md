@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 264 tools, 3 workflow prompts, and 25 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 268 tools, 3 workflow prompts, and 25 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 264 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
+The 268 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search by name and description over the tools your settings list, so with writes off it names no write tool; an optional `category` narrows it to one group
-- the `lm://guide/tool-categories` resource: all 264 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 268 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -121,12 +121,12 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Area | Tools |
 |------|-------|
 | Alerts | Query, acknowledge, bulk acknowledge, escalate and add notes to alerts; full CRUD for alert rules; datapoint thresholds, read at instance, device or group level with the level each one comes from, and set or cleared at instance or group level |
-| Devices | Full CRUD for devices and groups, device and group properties, and manual datasource instances; scheduling Active Discovery on a device |
-| Metrics | Datasources, instances, metric data, graphs, and native OTLP metrics through PromQL range and instant queries; `analyze_metric(source="otlp")` analyzes a PromQL series |
+| Devices | Full CRUD for devices and groups, device and group properties, and manual datasource instances; scheduling Active Discovery on a device; the device delta, to follow what changed; unmonitored devices a NetScan found |
+| Metrics | Datasources and the devices each applies to, instances, metric data, graphs, and native OTLP metrics through PromQL range and instant queries; `analyze_metric(source="otlp")` analyzes a PromQL series |
 | Dashboards | Full CRUD for dashboards, widgets, and groups |
 | SDT | Create, list, bulk create, and bulk delete scheduled downtime |
 | Collectors | Collectors and collector groups, each collector's events and uploaded log files, and the upgrade history; with writes on, status checks, restarts and acknowledging a down collector. OpenTelemetry (lmotel) collectors are not among them, since the v3 API the server reads does not list them |
-| Websites | Full CRUD for synthetic checks and website groups |
+| Websites | Full CRUD for synthetic checks and website groups; the checkpoint locations checks run from |
 | Reports | List, view, run, and schedule reports |
 | Escalations | Full CRUD for escalation chains and recipient groups |
 | Users and audit | Users, roles, access groups, API tokens, audit logs, ops notes, login and change audits |
@@ -304,7 +304,7 @@ Clients read these through the standard MCP resource and prompt calls.
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 264 tools organized by domain category |
+| `lm://guide/tool-categories` | All 268 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |
