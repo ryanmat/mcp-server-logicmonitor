@@ -1,5 +1,5 @@
 # Description: DataSource tools for LogicMonitor MCP server.
-# Description: Provides DataSource CRUD functions including list, get, create, update, delete.
+# Description: Provides DataSource CRUD functions and the devices each DataSource applies to.
 
 from __future__ import annotations
 
@@ -58,6 +58,53 @@ async def get_datasources(
         offset=offset,
         filter=filter,
         named={"name~": name_filter, "appliesTo~": applies_to_filter},
+    )
+
+
+def _datasource_device_row(item: dict) -> dict:
+    """Project one device a DataSource applies to: the portal lists at most 10 of its
+    instances and sets hasMore to 1 when it has others."""
+    return {
+        "device_id": item.get("id"),
+        "name": item.get("displayName"),
+        "host": item.get("name"),
+        "instances": [
+            {"id": inst.get("id"), "name": inst.get("name"), "alias": inst.get("alias")}
+            for inst in item.get("instance") or []
+        ],
+        "more_instances": item.get("hasMore") == 1,
+        "has_active_instance": item.get("hasActiveInstance"),
+    }
+
+
+async def get_datasource_devices(
+    client: LogicMonitorClient,
+    datasource_id: int,
+    name_filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List the devices a DataSource applies to, each with up to 10 of its instances.
+
+    Args:
+        client: LogicMonitor API client.
+        datasource_id: DataSource ID.
+        name_filter: Keep devices whose display name contains this text.
+        limit: Maximum number of devices to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the devices or error.
+    """
+    return await list_tool(
+        client,
+        f"/setting/datasources/{datasource_id}/devices",
+        key="devices",
+        project=_datasource_device_row,
+        limit=limit,
+        offset=offset,
+        named={"displayName~": name_filter},
+        extra={"datasource_id": datasource_id},
     )
 
 

@@ -1,5 +1,5 @@
 # Description: Device management tools for LogicMonitor MCP server.
-# Description: Provides device and device group CRUD functions and Active Discovery scheduling.
+# Description: Device and group CRUD, Active Discovery, the device delta and unmonitored devices.
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from lm_mcp.tools import (
     list_tool,
     portal_url,
     require_write_permission,
+    validation_error,
 )
 
 if TYPE_CHECKING:
@@ -113,6 +114,80 @@ async def get_device(
         return format_response(result)
     except Exception as e:
         return handle_error(e)
+
+
+def _delta_row(item: dict) -> dict:
+    """Project one device delta row onto the get_devices fields and the change it records:
+    "updated" on a read with a delta id, "" on the read that starts the delta."""
+    return {**_device_row(item), "change": item.get("status")}
+
+
+async def get_device_delta(
+    client: LogicMonitorClient,
+    delta_id: str | None = None,
+    name_filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List devices through the device delta.
+
+    Without delta_id it lists the devices whose display name contains name_filter, or every
+    device, and starts a delta whose id it returns; each such read starts another. With
+    delta_id it lists the devices changed since that delta started, every change since then on
+    each read, and takes no name_filter, since the portal applied none there.
+
+    Args:
+        client: LogicMonitor API client.
+        delta_id: The delta_id an earlier read returned.
+        name_filter: Keep devices whose display name contains this text (without delta_id).
+        limit: Maximum number of devices to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the devices and the delta_id, or error.
+    """
+    if delta_id and name_filter:
+        return validation_error(
+            "INVALID_REQUEST",
+            "name_filter applies only to a read without delta_id",
+            suggestion="Leave name_filter out when passing delta_id.",
+        )
+    return await list_tool(
+        client,
+        f"/device/devices/delta/{delta_id}" if delta_id else "/device/devices/delta",
+        key="devices",
+        project=_delta_row,
+        limit=limit,
+        offset=offset,
+        named={"displayName~": name_filter},
+        carry={"deltaId": "delta_id"},
+    )
+
+
+async def get_unmonitored_devices(
+    client: LogicMonitorClient,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List the portal's unmonitored devices, found by a NetScan and not monitored, rows as
+    the API returns them.
+
+    Args:
+        client: LogicMonitor API client.
+        limit: Maximum number of devices to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the devices or error.
+    """
+    return await list_tool(
+        client,
+        "/device/unmonitoreddevices",
+        key="devices",
+        project=dict,
+        limit=limit,
+        offset=offset,
+    )
 
 
 def _device_group_row(item: dict) -> dict:

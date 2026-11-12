@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 264 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 268 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -54,6 +54,8 @@ Device/resource management
 | `delete_device` | Delete a device/resource (requires write permission). Soft delete by default. | Yes |
 | `recover_device` | Recover a soft-deleted device/resource (requires write permission). Only works within the recovery window. | Yes |
 | `run_auto_discovery` | Run Active Discovery on a device/resource now, so its collector looks for the device's instances (requires write permission). The portal answers at once; the discovery runs on the collector afterwards. | Yes |
+| `get_device_delta` | List devices/resources through the device delta, to follow what changed. Without delta_id it lists the devices whose display name contains name_filter, or every device, and returns a delta_id; each such read starts a new delta, so keep the first page's. With delta_id it lists the devices changed since that delta started (change says how), every change since then on each read; name_filter is refused there, as the portal applies none. | No |
+| `get_unmonitored_devices` | List the portal's unmonitored devices/resources, found by a NetScan and not monitored, rows as the API returns them. | No |
 | `bulk_delete_devices` | Delete multiple devices/resources in one operation (max 100, requires write permission). Soft delete by default. | Yes |
 | `create_device_group` | Create a new device/resource group (requires write permission) | Yes |
 | `update_device_group` | Update a device/resource group (requires write permission). Custom properties are merged with existing. | Yes |
@@ -158,6 +160,7 @@ DataSource and instance monitoring
 | `get_graph_data` | Get graph image data for visualization | No |
 | `get_datasources` | List datasources from LogicMonitor | No |
 | `get_datasource` | Get details about a specific datasource | No |
+| `get_datasource_devices` | List the devices/resources a datasource applies to, each with up to 10 of its instances; more_instances says it has others, which get_device_instances lists. | No |
 | `create_datasource` | Create a DataSource via REST API from a full definition dict (requires write permission). Accepts REST API format (same as get_datasource with raw=true). Use for round-tripping exports or building definitions from scratch. For LM Exchange format, use import_datasource. Script DataSource datapoints require appropriate type values. | Yes |
 | `delete_datasource` | Delete a DataSource definition (requires write permission). Existing collected data is retained. | Yes |
 
@@ -193,6 +196,7 @@ Website monitoring
 | `get_website` | Get detailed information about a specific website | No |
 | `get_website_groups` | List website groups | No |
 | `get_website_data` | Get synthetic check data for a website | No |
+| `get_website_checkpoints` | List the portal's website checkpoint locations, the places website checks run from; each id is the smg_id a website's checkpoints carry in get_website. | No |
 | `create_website` | Create a website check in LogicMonitor (requires write permission) | Yes |
 | `update_website` | Update a website check in LogicMonitor (requires write permission) | Yes |
 | `delete_website` | Delete a website check from LogicMonitor (requires write permission) | Yes |

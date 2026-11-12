@@ -309,3 +309,42 @@ class TestListToolKeep:
         data = json.loads(result[0].text)
         assert "dropped" not in data
         assert "next_offset" not in data
+
+
+class TestListToolCarry:
+    """R3.6: carry copies named keys of the API answer into the response beside the page."""
+
+    @respx.mock
+    async def test_carried_keys_are_renamed_and_a_missing_one_is_none(self, client):
+        respx.get(f"{BASE_URL}/device/devices/delta").mock(
+            return_value=httpx.Response(
+                200, json={"total": 1, "items": _rows(1), "deltaId": "a1b2"}
+            )
+        )
+
+        result = await list_tool(
+            client,
+            "/device/devices/delta",
+            key="devices",
+            project=_project,
+            limit=1,
+            carry={"deltaId": "delta_id", "searchId": "search_id"},
+        )
+
+        body = json.loads(result[0].text)
+        assert (body["delta_id"], body["search_id"]) == ("a1b2", None)
+        assert body["devices"] == [{"id": 0, "name": "row0"}]
+
+    @respx.mock
+    async def test_without_carry_no_answer_key_is_copied(self, client):
+        respx.get(f"{BASE_URL}/device/devices/delta").mock(
+            return_value=httpx.Response(
+                200, json={"total": 1, "items": _rows(1), "deltaId": "a1b2"}
+            )
+        )
+
+        result = await list_tool(
+            client, "/device/devices/delta", key="devices", project=_project, limit=1
+        )
+
+        assert "deltaId" not in result[0].text

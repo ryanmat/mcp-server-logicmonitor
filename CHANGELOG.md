@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 264:
-252 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 268:
+256 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
-With writes off, the default, `tools/list` shows 142 of them, or 146 in multi-portal mode, and
+With writes off, the default, `tools/list` shows 146 of them, or 150 in multi-portal mode, and
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
@@ -118,6 +118,12 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - `run_auto_discovery` schedules Active Discovery on a device, and `escalate_alert` escalates an
   alert along its escalation chain; the portal refuses an acknowledged alert. Both are listed
   only with writes on.
+- Inventory reads: `get_datasource_devices` (the devices a datasource applies to, each with up to
+  10 of its instances and `more_instances`), `get_unmonitored_devices` (rows as the API returns
+  them), `get_website_checkpoints` (the checkpoint locations; each id is the `smg_id` a website's
+  checkpoints carry) and `get_device_delta`. A delta read without `delta_id` lists devices and
+  starts a delta, returning its `delta_id`; a read with it lists the devices changed since, with
+  `change`, and refuses `name_filter`, which the portal does not apply there.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.

@@ -1,5 +1,5 @@
 # Description: Website/Synthetic monitoring tools for LogicMonitor MCP server.
-# Description: Provides CRUD operations for websites and website groups.
+# Description: Provides website and website group CRUD and the checkpoint location list.
 
 from __future__ import annotations
 
@@ -168,6 +168,44 @@ async def get_website_groups(
         offset=offset,
         named={"name~": name_filter},
         clauses=[f"parentId:{parent_id}"] if parent_id is not None else [],
+    )
+
+
+def _checkpoint_row(item: dict) -> dict:
+    """Project one website checkpoint location."""
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "geo_info": item.get("geoInfo"),
+        "description": item.get("description"),
+        "display_priority": item.get("displayPrio"),
+        "enabled_in_root": item.get("isEnabledInRoot"),
+    }
+
+
+async def get_website_checkpoints(
+    client: LogicMonitorClient,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List the portal's website checkpoint locations; each id is the smg_id a website's
+    checkpoints carry.
+
+    Args:
+        client: LogicMonitor API client.
+        limit: Maximum number of locations to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the locations or error.
+    """
+    return await list_tool(
+        client,
+        "/website/smcheckpoints",
+        key="checkpoints",
+        project=_checkpoint_row,
+        limit=limit,
+        offset=offset,
     )
 
 

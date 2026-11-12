@@ -230,6 +230,49 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="get_device_delta",
+            description=(
+                "List devices/resources through the device delta, to follow what changed. "
+                "Without delta_id it lists the devices whose display name contains "
+                "name_filter, or every device, and returns a delta_id; each such read starts "
+                "a new delta, so keep the first page's. With delta_id it lists the devices "
+                "changed since that delta started (change says how), every change since then "
+                "on each read; name_filter is refused there, as the portal applies none."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "delta_id": {
+                        "type": "string",
+                        "pattern": _LM_STRING_ID_PATTERN,
+                        "description": "The delta_id an earlier read returned",
+                    },
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by display name (substring), without delta_id",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+            },
+        ),
+        Tool(
+            name="get_unmonitored_devices",
+            description=(
+                "List the portal's unmonitored devices/resources, found by a NetScan and not "
+                "monitored, rows as the API returns them."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+            },
+        ),
+        Tool(
             name="bulk_delete_devices",
             description=(
                 "Delete multiple devices/resources in one operation"
@@ -1618,6 +1661,21 @@ TOOLS.extend(
                         "description": "Filter by group name (substring match)",
                     },
                     "parent_id": {"type": "integer", "description": "Filter by parent group ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+            },
+        ),
+        Tool(
+            name="get_website_checkpoints",
+            description=(
+                "List the portal's website checkpoint locations, the places website checks "
+                "run from; each id is the smg_id a website's checkpoints carry in get_website."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
@@ -3053,6 +3111,28 @@ TOOLS.extend(
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
                 },
+            },
+        ),
+        Tool(
+            name="get_datasource_devices",
+            description=(
+                "List the devices/resources a datasource applies to, each with up to 10 of "
+                "its instances; more_instances says it has others, which "
+                "get_device_instances lists."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "datasource_id": {"type": "integer", "description": "Datasource ID"},
+                    "name_filter": {
+                        "type": "string",
+                        "description": "Filter by device display name (substring match)",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["datasource_id"],
             },
         ),
         Tool(
@@ -6890,6 +6970,8 @@ def get_tool_handler(tool_name: str) -> Any:
         "delete_device": devices.delete_device,
         "recover_device": devices.recover_device,
         "run_auto_discovery": devices.run_auto_discovery,
+        "get_device_delta": devices.get_device_delta,
+        "get_unmonitored_devices": devices.get_unmonitored_devices,
         "bulk_delete_devices": devices.bulk_delete_devices,
         "create_device_group": devices.create_device_group,
         "update_device_group": devices.update_device_group,
@@ -6962,6 +7044,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_websites": websites.get_websites,
         "get_website": websites.get_website,
         "get_website_groups": websites.get_website_groups,
+        "get_website_checkpoints": websites.get_website_checkpoints,
         "get_website_data": websites.get_website_data,
         "create_website": websites.create_website,
         "update_website": websites.update_website,
@@ -7056,6 +7139,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "delete_device_group_property": resources.delete_device_group_property,
         # Datasources
         "get_datasources": datasources.get_datasources,
+        "get_datasource_devices": datasources.get_datasource_devices,
         "get_datasource": datasources.get_datasource,
         "create_datasource": datasources.create_datasource,
         "delete_datasource": datasources.delete_datasource,

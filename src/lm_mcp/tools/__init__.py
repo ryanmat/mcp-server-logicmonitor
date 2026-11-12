@@ -190,6 +190,7 @@ async def list_tool(
     params: Mapping[str, Any] | None = None,
     extra: Mapping[str, Any] | None = None,
     keep: Callable[[dict[str, Any]], bool] | None = None,
+    carry: Mapping[str, str] | None = None,
 ) -> list[TextContent]:
     """Fetch one page of a LogicMonitor collection as a list tool response.
 
@@ -217,6 +218,8 @@ async def list_tool(
         keep: Predicate over each API row; a row it rejects is dropped after the
             fetch. Paging still follows the fetched page, count is the rows kept,
             and the response adds dropped and next_offset.
+        carry: API answer key to response key, for fields the answer carries beside
+            its rows, such as the device delta's deltaId; an absent key reads None.
 
     Returns:
         List of TextContent with the page, or an ErrorContent from
@@ -247,6 +250,8 @@ async def list_tool(
             rows.append(await row if inspect.isawaitable(row) else row)
 
         response = {**paginated_response(items, result, offset), key: rows, **(extra or {})}
+        for source, target in (carry or {}).items():
+            response[target] = result.get(source)
         if keep is not None:
             response["count"] = len(rows)
             response["dropped"] = len(items) - len(kept)

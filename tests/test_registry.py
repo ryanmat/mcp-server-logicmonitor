@@ -687,3 +687,62 @@ class TestStep67Tools:
         categories = TOOL_CATEGORIES["categories"]
         assert set(categories["devices"]["tools"]) >= set(_STEP_67_ANNOTATIONS) - {"escalate_alert"}
         assert "escalate_alert" in categories["alerts"]["tools"]
+
+
+# R3.6, Step 68: the four reads and the category each joins.
+_STEP_68_CATEGORIES = {
+    "get_datasource_devices": "datasources",
+    "get_unmonitored_devices": "devices",
+    "get_website_checkpoints": "websites",
+    "get_device_delta": "devices",
+}
+
+
+class TestStep68Tools:
+    """R3.6: the four reads are registered read-only with their handlers and grouped."""
+
+    def test_each_is_read_only_with_its_handler(self):
+        tools = {tool.name: tool for tool in TOOLS if tool.name in _STEP_68_CATEGORIES}
+
+        assert {name: tool.annotations.readOnlyHint for name, tool in tools.items()} == {
+            name: True for name in _STEP_68_CATEGORIES
+        }
+        assert {name: get_tool_handler(name).__name__ for name in _STEP_68_CATEGORIES} == {
+            name: name for name in _STEP_68_CATEGORIES
+        }
+
+    def test_the_schemas(self):
+        schemas = {tool.name: tool.inputSchema for tool in TOOLS}
+
+        assert schemas["get_datasource_devices"]["required"] == ["datasource_id"]
+        assert {"name_filter", "limit", "offset"} <= set(
+            schemas["get_datasource_devices"]["properties"]
+        )
+        assert set(schemas["get_unmonitored_devices"]["properties"]) == {"limit", "offset"}
+        assert set(schemas["get_website_checkpoints"]["properties"]) == {"limit", "offset"}
+        assert set(schemas["get_device_delta"]["properties"]) == {
+            "delta_id",
+            "name_filter",
+            "limit",
+            "offset",
+        }
+
+    def test_the_delta_id_admits_a_delta_id_and_refuses_a_path(self):
+        import jsonschema
+
+        (schema,) = [t.inputSchema for t in TOOLS if t.name == "get_device_delta"]
+
+        jsonschema.validate({"delta_id": "a11654364568495ba22ffa4c4c61a259"}, schema)
+        for bad in ("../x", "a/b", ""):
+            with pytest.raises(jsonschema.ValidationError):
+                jsonschema.validate({"delta_id": bad}, schema)
+
+    def test_each_category_holds_its_tool(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        categories = TOOL_CATEGORIES["categories"]
+        assert [
+            name
+            for name, category in _STEP_68_CATEGORIES.items()
+            if name not in categories[category]["tools"]
+        ] == []
