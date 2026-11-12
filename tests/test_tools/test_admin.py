@@ -1,5 +1,5 @@
-# Description: Tests for admin MCP tools (Dashboard Groups, API Tokens, Access Groups, OIDs).
-# Description: Covers CRUD operations and error handling for administrative resources.
+# Description: Tests for admin MCP tools (Dashboard Groups, API Tokens, Access Groups, OIDs,
+# Description: tenants): CRUD operations, the tenant list, and error handling.
 
 import json
 from unittest.mock import patch
@@ -422,3 +422,49 @@ class TestOids:
         result = await get_oid(client, oid_id=1)
         data = json.loads(result[0].text)
         assert data["oid"] == "1.3.6.1.2.1.1.1"
+
+
+# The sandbox portal's answer to GET /tenants on 2026-11-12 (Step 70 probe), the same as on
+# 2026-11-06; it ignored size and offset.
+_TENANTS = {"tenants": ["argus"]}
+
+
+class TestGetTenants:
+    """R3.8: get_tenants reads the portal's tenant names whole."""
+
+    @respx.mock
+    async def test_returns_the_names_and_their_count(self, client):
+        from lm_mcp.tools.admin import get_tenants
+
+        route = respx.get("https://test.logicmonitor.com/santaba/rest/tenants").mock(
+            return_value=httpx.Response(200, json=_TENANTS)
+        )
+
+        body = json.loads((await get_tenants(client))[0].text)
+
+        assert route.calls.last.request.url.params == httpx.QueryParams()
+        assert body == {"tenants": ["argus"], "count": 1}
+
+    @respx.mock
+    async def test_an_answer_without_tenants_is_an_empty_list(self, client):
+        from lm_mcp.tools.admin import get_tenants
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/tenants").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        body = json.loads((await get_tenants(client))[0].text)
+
+        assert body == {"tenants": [], "count": 0}
+
+    @respx.mock
+    async def test_an_api_error_is_an_error_envelope(self, client):
+        from lm_mcp.tools.admin import get_tenants
+
+        respx.get("https://test.logicmonitor.com/santaba/rest/tenants").mock(
+            return_value=httpx.Response(403, json={"errorMessage": "Permission denied"})
+        )
+
+        error = envelope(await get_tenants(client))
+
+        assert error["code"] == "AUTH_FAILED"

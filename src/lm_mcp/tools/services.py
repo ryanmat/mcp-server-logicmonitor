@@ -1,5 +1,5 @@
 # Description: Service Insight tools for LogicMonitor MCP server.
-# Description: Lists business services (deviceType 6 devices) and BizService groups.
+# Description: Lists business services (deviceType 6 devices), BizService groups and rules.
 
 from __future__ import annotations
 
@@ -143,4 +143,29 @@ async def get_service_groups(
         offset=offset,
         named={"name~": name_filter},
         clauses=['groupType:"BizService"'],
+    )
+
+
+async def get_service_insights_rules(
+    client: LogicMonitorClient,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List the portal's Service Insights rules, rows as the API returns them.
+
+    Args:
+        client: LogicMonitor API client.
+        limit: Maximum number of rules to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the rules or error.
+    """
+    return await list_tool(
+        client,
+        "/serviceinsights/rules",
+        key="rules",
+        project=dict,
+        limit=limit,
+        offset=offset,
     )

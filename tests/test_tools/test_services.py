@@ -1,5 +1,5 @@
 # Description: Tests for Service Insight MCP tools.
-# Description: Covers deviceType 6 service listing, detail, and BizService groups.
+# Description: Covers deviceType 6 services, BizService groups and Service Insights rules.
 
 import json
 
@@ -9,6 +9,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
 @pytest.fixture
@@ -152,3 +153,54 @@ class TestGetServiceGroups:
         sent_filter = route.calls[0].request.url.params["filter"]
         assert sent_filter.startswith('groupType:"BizService",')
         assert 'name~"petclinic"' in sent_filter
+
+
+# The sandbox portal's answer to GET /serviceinsights/rules on 2026-11-12 (Step 70 probe): no
+# rules. The endpoint (LogicMonitor v247) is not in the public swagger, so no rule's fields
+# have been read; the tool returns rows as the API sends them.
+_RULES_EMPTY = {"total": 0, "items": [], "searchId": None, "isMin": False}
+_RULES = "https://test.logicmonitor.com/santaba/rest/serviceinsights/rules"
+
+
+class TestGetServiceInsightsRules:
+    """R3.8: Service Insights rules page through /serviceinsights/rules, rows as returned."""
+
+    @respx.mock
+    async def test_an_empty_portal_is_an_empty_page(self, client):
+        from lm_mcp.tools.services import get_service_insights_rules
+
+        route = respx.get(_RULES).mock(return_value=httpx.Response(200, json=_RULES_EMPTY))
+
+        body = json.loads((await get_service_insights_rules(client, limit=5, offset=5))[0].text)
+
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"]) == ("5", "5")
+        assert (body["total"], body["has_more"], body["rules"]) == (0, False, [])
+
+    @respx.mock
+    async def test_rows_are_returned_as_the_api_sends_them(self, client):
+        from lm_mcp.tools.services import get_service_insights_rules
+
+        # An opaque row, not a portal shape: the test checks the row is passed through.
+        row = {"id": 1, "anyField": {"nested": [1, 2]}}
+        respx.get(_RULES).mock(return_value=httpx.Response(200, json={"total": 1, "items": [row]}))
+
+        body = json.loads((await get_service_insights_rules(client))[0].text)
+
+        assert body["rules"] == [row]
+
+    @respx.mock
+    async def test_offset_is_declared_and_sent(self, client):
+        from lm_mcp.tools.services import get_service_insights_rules
+
+        await assert_offset_declared_and_sent(
+            client, get_service_insights_rules, "/serviceinsights/rules", {}
+        )
+
+    @respx.mock
+    async def test_negative_total_reads_as_more(self, client):
+        from lm_mcp.tools.services import get_service_insights_rules
+
+        await assert_negative_total_reads_as_more(
+            client, get_service_insights_rules, "/serviceinsights/rules", {}
+        )

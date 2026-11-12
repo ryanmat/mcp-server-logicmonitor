@@ -787,3 +787,36 @@ class TestDeviceNetflowTools:
             for name in category["tools"]
             if name in {"get_network_flows", "get_top_talkers"}
         ] == []
+
+
+# R3.8, Step 70: Service Insights rules and tenants, each read-only in its category.
+_STEP_70_CATEGORIES = {"get_service_insights_rules": "ops", "get_tenants": "users"}
+
+
+class TestStep70Tools:
+    """R3.8: the two reads are registered read-only with their handlers and grouped."""
+
+    def test_each_is_read_only_with_its_handler_and_category(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        tools = {tool.name: tool for tool in TOOLS}
+        categories = TOOL_CATEGORIES["categories"]
+
+        assert [tools[name].annotations.readOnlyHint for name in _STEP_70_CATEGORIES] == [
+            True,
+            True,
+        ]
+        assert [get_tool_handler(name).__name__ for name in _STEP_70_CATEGORIES] == list(
+            _STEP_70_CATEGORIES
+        )
+        assert [
+            name
+            for name, category in _STEP_70_CATEGORIES.items()
+            if name not in categories[category]["tools"]
+        ] == []
+
+    def test_the_schemas(self):
+        schemas = {tool.name: tool.inputSchema for tool in TOOLS}
+
+        assert set(schemas["get_service_insights_rules"]["properties"]) == {"limit", "offset"}
+        assert schemas["get_tenants"]["properties"] == {}

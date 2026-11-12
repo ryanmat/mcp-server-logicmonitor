@@ -6658,6 +6658,31 @@
       "type": "object"
     }
   },
+  "get_service_insights_rules": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the portal's Service Insights rules, rows as the API returns them. offset must be a multiple of limit; the portal answers any other offset with a 400. get_services lists the services themselves.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset, a multiple of limit",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
   "get_services": {
     "annotations": {
       "destructiveHint": false,
@@ -6740,6 +6765,20 @@
       "required": [
         "name"
       ],
+      "type": "object"
+    }
+  },
+  "get_tenants": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the portal's tenant names, as the tenants API answers them: names only, with no paging or detail.",
+    "inputSchema": {
+      "properties": {},
       "type": "object"
     }
   },

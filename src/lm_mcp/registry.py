@@ -2932,6 +2932,15 @@ TOOLS.extend(
                 "required": ["token_id"],
             },
         ),
+        Tool(
+            name="get_tenants",
+            description=(
+                "List the portal's tenant names, as the tenants API answers them: names only, "
+                "with no paging or detail."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 )
 
@@ -3685,6 +3694,26 @@ TOOLS.extend(
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+            },
+        ),
+        Tool(
+            name="get_service_insights_rules",
+            description=(
+                "List the portal's Service Insights rules, rows as the API returns them. "
+                "offset must be a multiple of limit; the portal answers any other offset with "
+                "a 400. get_services lists the services themselves."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Pagination offset, a multiple of limit",
+                    },
                 },
             },
         ),
@@ -6895,6 +6924,7 @@ def get_tool_handler(tool_name: str) -> Any:
     from lm_mcp.tools import (
         access_groups,
         actions,
+        admin,
         alert_rules,
         alert_settings,
         alerts,
@@ -7134,6 +7164,7 @@ def get_tool_handler(tool_name: str) -> Any:
         # API Tokens
         "get_api_tokens": api_tokens.get_api_tokens,
         "get_api_token": api_tokens.get_api_token,
+        "get_tenants": admin.get_tenants,
         # Resources
         "get_device_properties": resources.get_device_properties,
         "get_device_property": resources.get_device_property,
@@ -7191,6 +7222,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_services": services.get_services,
         "get_service": services.get_service,
         "get_service_groups": services.get_service_groups,
+        "get_service_insights_rules": services.get_service_insights_rules,
         # Ops Notes
         "get_ops_notes": ops.get_ops_notes,
         "get_ops_note": ops.get_ops_note,
