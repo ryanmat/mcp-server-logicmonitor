@@ -1236,7 +1236,7 @@ class TestCollectorHealthEvidence:
         assert [route.call_count for route in (*down, *up)] == [1, 1, 0, 0]
 
     @respx.mock
-    async def test_a_failed_read_leaves_its_part_null_with_a_warning(self, client):
+    async def test_a_failed_read_leaves_its_part_null_with_a_warning(self, client, caplog):
         from lm_mcp.tools.collectors import get_collector_health
 
         respx.get(f"{_BASE}/setting/collector/collectors/26").mock(
@@ -1255,6 +1255,12 @@ class TestCollectorHealthEvidence:
         assert record["evidence"] == {"status_check": None, "recent_events": []}
         assert record["evidence_warning"].startswith("Status check read failed:")
         assert events.call_count == 1
+        (logged,) = [r for r in caplog.records if r.name == "lm_mcp.tools.collectors"]
+        assert (logged.levelname, logged.getMessage(), logged.exc_info is not None) == (
+            "WARNING",
+            "collector 26: status check read failed",
+            True,
+        )
 
 
 # (handler name, endpoint path, extra required arguments)
