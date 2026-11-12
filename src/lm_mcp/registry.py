@@ -237,7 +237,8 @@ TOOLS.extend(
                 "name_filter, or every device, and returns a delta_id; each such read starts "
                 "a new delta, so keep the first page's. With delta_id it lists the devices "
                 "changed since that delta started (change says how), every change since then "
-                "on each read; name_filter is refused there, as the portal applies none."
+                "on each read. name_filter is refused there, since the portal answered a "
+                "filtered read with an empty page that left out a changed device."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6365,9 +6366,9 @@ TOOLS.extend(
             name="get_device_flows",
             description=(
                 "List a NetFlow exporter device's flow records over the last hours_back hours, "
-                "rows as the API returns them (source and destination IP, port, DNS name and "
-                "ASN, protocol, bytes). Answers FEATURE_DISABLED when the portal has NetFlow "
-                "off for the device."
+                "rows as the API returns them; the API reference gives each flow its source and "
+                "destination IP, port, DNS name and ASN, its protocol and its bytes. Answers "
+                "FEATURE_DISABLED when the portal has NetFlow off for the device."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6389,10 +6390,10 @@ TOOLS.extend(
         Tool(
             name="get_device_top_talkers",
             description=(
-                "A NetFlow exporter device's top talkers over the last hours_back hours: "
-                "by=endpoint pages its top endpoints and by=port its top ports, with each "
-                "one's usage and share, rows as the API returns them; by=graph returns its top "
-                "talkers graph whole. Answers 'what is consuming my WAN?' Answers "
+                "A NetFlow exporter device's top talkers over the last hours_back hours, for "
+                "'what is consuming my WAN?': by=endpoint pages the endpoints it saw and "
+                "by=port the ports, rows as the API returns them (the API reference gives each "
+                "a usage and a share); by=graph returns its top talkers graph whole. Answers "
                 "FEATURE_DISABLED when the portal has NetFlow off for the device."
             ),
             annotations=_READ_ONLY,
@@ -6404,7 +6405,7 @@ TOOLS.extend(
                         "type": "string",
                         "enum": ["endpoint", "port", "graph"],
                         "default": "endpoint",
-                        "description": "Top endpoints, top ports, or the top talkers graph",
+                        "description": "Endpoints, ports, or the top talkers graph",
                     },
                     "hours_back": {
                         "type": "integer",

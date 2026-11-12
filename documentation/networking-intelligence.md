@@ -49,9 +49,9 @@ A NetFlow exporter device's flows and top talkers. `get_device_top_talkers` answ
 - `by` (str, `get_device_top_talkers` only, default `endpoint`) -- `endpoint`, `port` or `graph`
 - `limit` and `offset` (int, optional) -- paging; the graph is not paged
 
-**Behavior:** `get_device_flows` pages `/device/devices/{id}/flows`. `get_device_top_talkers` pages `/endpoints` (`by=endpoint`) or `/ports` (`by=port`), each row with its usage and share, or returns `/topTalkersGraph` whole (`by=graph`). Rows come back as the API returns them: the only portal read has NetFlow off, so the row shapes are the API reference's, not checked against live data.
+**Behavior:** `get_device_flows` pages `/device/devices/{id}/flows`. `get_device_top_talkers` pages `/endpoints` (`by=endpoint`) or `/ports` (`by=port`), or returns `/topTalkersGraph` whole (`by=graph`). Rows come back as the API returns them. The only portal read has NetFlow off, so the row shapes (the API reference gives each endpoint and port a usage and a share) and the paging are unverified.
 
-**Errors surfaced:** `FEATURE_DISABLED` when the portal answers "Netflow disabled", as it did for every device on that portal; `NOT_FOUND` for an unknown device.
+**Errors surfaced:** `FEATURE_DISABLED` when the portal answers "Netflow disabled", as it did for both devices read on a portal where no device has NetFlow enabled; `NOT_FOUND` for an unknown device.
 
 ### get_link_flaps
 
@@ -186,7 +186,7 @@ The tools degrade gracefully when prerequisites are missing, but detection fidel
 
 - **For `detect_site_outage` to trigger the UPS signal:** UPS and PDU devices must be onboarded as LM resources (APC, Liebert, or Eaton DataSources applied). Without them, Signal C always reports zero and the verdict relies on the other three signals.
 - **For `get_interface_metrics`:** the target device must have an Interface-family DataSource applied (typically `SNMP_Network_Interfaces`), which requires SNMP credentials on the device.
-- **For `get_device_flows` and `get_device_top_talkers`:** the exporter device must be forwarding NetFlow/sFlow/IPFIX records to LM collectors, and NetFlow ingestion must be enabled on the portal; otherwise they answer `FEATURE_DISABLED`.
+- **For `get_device_flows` and `get_device_top_talkers`:** the exporter device must be forwarding NetFlow/sFlow/IPFIX records to LM collectors, and NetFlow ingestion must be enabled on the portal. Where the portal has NetFlow off for the device, they answer `FEATURE_DISABLED`.
 - **For `get_collector_health` downstream-count accuracy:** the `currentCollectorId` field must be populated on devices; falls back to the collector's stale `numberOfHosts` when the filter endpoint is unavailable.
 
 Run `audit_network_monitoring_coverage` first when onboarding a new customer or investigating repeated missed detections -- it surfaces the prerequisite gaps before they matter operationally.
