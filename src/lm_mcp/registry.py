@@ -753,6 +753,86 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="get_collector_events",
+            description=(
+                "List one collector's events, newest first: agent and sbproxy restarts, "
+                "credential rotation, and reports that the collector is unreachable, each with "
+                "its time and build. Use it for a collector's recent history; "
+                "get_collector_health gives its current state."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["collector_id"],
+            },
+        ),
+        Tool(
+            name="get_collector_log_files",
+            description=(
+                "List the log files a collector has uploaded to the portal, as zip files with "
+                "their size and upload time. A collector uploads them through Send Logs to "
+                "LogicMonitor in the portal or the !uploadlog debug command, so an empty list "
+                "means nothing was uploaded. Read one with get_collector_log_file."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID"},
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+                "required": ["collector_id"],
+            },
+        ),
+        Tool(
+            name="get_collector_log_file",
+            description=(
+                "Read one uploaded collector log file, named as get_collector_log_files lists "
+                "it, and return the end of its text: at most max_bytes bytes, starting on a "
+                "whole line. truncated says whether earlier lines were left out."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "collector_id": {"type": "integer", "description": "Collector ID"},
+                    "file_name": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+                        "description": "Log file name, such as 82.postcheck.log.zip",
+                    },
+                    "max_bytes": {
+                        "type": "integer",
+                        "default": 20000,
+                        "minimum": 1,
+                        "maximum": 200000,
+                        "description": "Most bytes of the log's end to return",
+                    },
+                },
+                "required": ["collector_id", "file_name"],
+            },
+        ),
+        Tool(
+            name="get_collector_upgrade_history",
+            description=(
+                "List the portal's collector version upgrades, each row as the API returns it."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                },
+            },
+        ),
+        Tool(
             name="update_collector",
             description=(
                 "Update a collector (requires write permission)."
@@ -6542,6 +6622,10 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_collector": collectors.get_collector,
         "get_collector_groups": collectors.get_collector_groups,
         "get_collector_group": collectors.get_collector_group,
+        "get_collector_events": collectors.get_collector_events,
+        "get_collector_log_files": collectors.get_collector_log_files,
+        "get_collector_log_file": collectors.get_collector_log_file,
+        "get_collector_upgrade_history": collectors.get_collector_upgrade_history,
         "update_collector": collectors.update_collector,
         "delete_collector": collectors.delete_collector,
         "create_collector_group": collectors.create_collector_group,

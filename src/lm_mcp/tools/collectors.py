@@ -1,10 +1,12 @@
 # Description: Collector management tools for LogicMonitor MCP server.
-# Description: Provides collector and collector group CRUD functions.
+# Description: Collector and collector group CRUD, health, events, uploaded logs, upgrades.
 
 from __future__ import annotations
 
+import io
 import logging
 import time
+import zipfile
 from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
@@ -344,6 +346,176 @@ async def _collector_down_history(
             }
         )
     return history, None
+
+
+def _event_row(item: dict) -> dict:
+    """Project one /setting/collector/collectors/{id}/events row onto the event fields."""
+    return {
+        "id": item.get("id"),
+        "reported_on": item.get("reportedOn"),
+        "event_code": item.get("eCode"),
+        "message": item.get("eventMsg"),
+        "collector_build": item.get("collectorBuild"),
+        "collector_platform": item.get("collectorPlatform"),
+    }
+
+
+async def get_collector_events(
+    client: LogicMonitorClient,
+    collector_id: int,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List a collector's events (agent restarts, credential rotation, down), newest first.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID.
+        limit: Maximum number of events to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the page of events, or an error envelope.
+    """
+    return await list_tool(
+        client,
+        f"/setting/collector/collectors/{collector_id}/events",
+        key="events",
+        project=_event_row,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def _log_file_row(item: dict) -> dict:
+    """Project one /setting/collector/collectors/{id}/logs row onto the log file fields."""
+    return {
+        "file_name": item.get("fileName"),
+        "size": item.get("size"),
+        "last_modified": item.get("lastModified"),
+        "uploaded": item.get("uploaded"),
+    }
+
+
+async def get_collector_log_files(
+    client: LogicMonitorClient,
+    collector_id: int,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List the log files a collector has uploaded to the portal, as zip files.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID.
+        limit: Maximum number of files to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the page of log_files, or an error envelope.
+    """
+    return await list_tool(
+        client,
+        f"/setting/collector/collectors/{collector_id}/logs",
+        key="log_files",
+        project=_log_file_row,
+        limit=limit,
+        offset=offset,
+    )
+
+
+# Bytes read from a zip member at a time; only the last max_bytes + 1 are kept.
+_LOG_CHUNK = 65536
+
+
+def _member_tail(archive: zipfile.ZipFile, name: str, max_bytes: int) -> tuple[bytes, int]:
+    """Read a zip member and return its last max_bytes bytes and its full size.
+
+    The bytes are cut to start on a whole line when the member is longer than max_bytes;
+    a last line longer than max_bytes keeps its end.
+    """
+    window = bytearray()
+    size = 0
+    with archive.open(name) as member:
+        while chunk := member.read(_LOG_CHUNK):
+            size += len(chunk)
+            window += chunk
+            del window[: -(max_bytes + 1)]
+    if size <= max_bytes:
+        return bytes(window), size
+    # The window holds the byte before the cap; a newline there or later, short of the
+    # one that ends the last line, marks where the first whole line starts.
+    cut = window.find(b"\n", 0, len(window) - 1)
+    return bytes(window[cut + 1 :] if cut != -1 else window[1:]), size
+
+
+async def get_collector_log_file(
+    client: LogicMonitorClient,
+    collector_id: int,
+    file_name: str,
+    max_bytes: int = 20000,
+) -> list[TextContent]:
+    """Read one uploaded collector log file and return the end of its text.
+
+    The portal sends the file as a zip archive; the tool reads its first file and returns
+    at most max_bytes bytes from its end, starting on a whole line.
+
+    Args:
+        client: LogicMonitor API client.
+        collector_id: Collector ID.
+        file_name: The file's name as get_collector_log_files lists it.
+        max_bytes: Most bytes of the log's end to return.
+
+    Returns:
+        List of TextContent with member, size, truncated, text and other_members, or an
+        error envelope.
+    """
+    try:
+        content = await client.get_bytes(
+            f"/setting/collector/collectors/{collector_id}/logs/{file_name}",
+            params={"format": "zip"},
+        )
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            names = [info.filename for info in archive.infolist() if not info.is_dir()]
+            tail, size = _member_tail(archive, names[0], max_bytes)
+        return format_response(
+            {
+                "collector_id": collector_id,
+                "file_name": file_name,
+                "member": names[0],
+                "size": size,
+                "truncated": size > max_bytes,
+                "text": tail.decode("utf-8", errors="replace"),
+                "other_members": names[1:],
+            }
+        )
+    except Exception as e:
+        return handle_error(e)
+
+
+async def get_collector_upgrade_history(
+    client: LogicMonitorClient,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TextContent]:
+    """List the portal's collector upgrade history, each row as the API returns it.
+
+    Args:
+        client: LogicMonitor API client.
+        limit: Maximum number of rows to return.
+        offset: Number of results to skip for pagination.
+
+    Returns:
+        List of TextContent with the page of upgrades, or an error envelope.
+    """
+    return await list_tool(
+        client,
+        "/setting/collector/collectors/upgradeHistory",
+        key="upgrades",
+        project=dict,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @require_write_permission

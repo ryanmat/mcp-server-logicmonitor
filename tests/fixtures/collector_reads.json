@@ -1,0 +1,118 @@
+{
+ "events_26": {
+  "total": -51,
+  "items": [
+   {
+    "id": "qzGSS6euRTWf6BWUjh04QA",
+    "reportDateOnLocal": "2026-11-03 12:42:48 EST",
+    "eCode": 8,
+    "eventMsg": "The collector is down or unreachable",
+    "collectorId": 26,
+    "collectorBuild": "39200",
+    "collectorPlatform": "linux",
+    "collectorDescription": "AWS Ubuntu Server",
+    "reportedOn": 1793727768
+   },
+   {
+    "id": "kPCwInVFSiaWQbAo58B4Jw",
+    "reportDateOnLocal": "2026-11-02 22:57:21 EST",
+    "eCode": 4,
+    "eventMsg": "Agent successfully restarted.",
+    "collectorId": 26,
+    "collectorBuild": "39200",
+    "collectorPlatform": "linux",
+    "collectorDescription": "AWS Ubuntu Server",
+    "reportedOn": 1793678241
+   },
+   {
+    "id": "H0s-TdOPSJqDqFGzp0nK-A",
+    "reportDateOnLocal": "2026-11-02 22:57:15 EST",
+    "eCode": 8,
+    "eventMsg": "Sbproxy successfully started.",
+    "collectorId": 26,
+    "collectorBuild": "39200",
+    "collectorPlatform": "linux",
+    "collectorDescription": "AWS Ubuntu Server",
+    "reportedOn": 1793678235
+   },
+   {
+    "id": "P81gshRCTqidtrH3nZvHSQ",
+    "reportDateOnLocal": "2026-11-02 22:57:02 EST",
+    "eCode": 8,
+    "eventMsg": "Credential is rotated. Agent will restart.",
+    "collectorId": 26,
+    "collectorBuild": "39200",
+    "collectorPlatform": "linux",
+    "collectorDescription": "AWS Ubuntu Server",
+    "reportedOn": 1793678222
+   },
+   {
+    "id": "UL0wWVNtSiu8_oOoirCngQ",
+    "reportDateOnLocal": "2026-11-01 22:55:59 EST",
+    "eCode": 4,
+    "eventMsg": "Agent successfully restarted.",
+    "collectorId": 26,
+    "collectorBuild": "39200",
+    "collectorPlatform": "linux",
+    "collectorDescription": "AWS Ubuntu Server",
+    "reportedOn": 1793591759
+   }
+  ],
+  "searchId": "db95e0ac-2842-4efb-8ebb-787a40a99fc3",
+  "isMin": false
+ },
+ "events_unknown_collector": {
+  "errorMessage": "No such collector, id: 999999",
+  "errorCode": 1404,
+  "errorDetail": null
+ },
+ "logs_41": {
+  "total": 0,
+  "items": [],
+  "searchId": null,
+  "isMin": false
+ },
+ "logs_82": {
+  "total": 1,
+  "items": [
+   {
+    "fileName": "82.postcheck.log.zip",
+    "size": 3759,
+    "lastModifiedOnOnLocal": "2025-11-24 22:11:56 EST",
+    "lastModified": 1764040316,
+    "uploaded": 1794445292
+   }
+  ],
+  "searchId": null,
+  "isMin": false
+ },
+ "log_file_82": {
+  "fileName": "82.postcheck.log.zip",
+  "size": 3759,
+  "lastModifiedOnOnLocal": "2025-11-24 22:11:56 EST",
+  "lastModified": 1764040316,
+  "uploaded": 1794445292
+ },
+ "upgrade_history": {
+  "total": 0,
+  "items": [],
+  "searchId": null,
+  "isMin": false
+ },
+ "postcheck_member": {
+  "name": "postcheck.log",
+  "lines": [
+   "[2025-11-25 03:11:38.367 GMT] [MSG] [INFO] [main:::] [Config._getSetting:84] Get settings, CONTEXT=file=C:\\Program Files\\LogicMonitor\\Agent\\conf\\agent.conf, key=agent.status.port, value=null\r\n",
+   "[2025-11-25 03:11:38.420 GMT] [MSG] [DEBUG] [main:::] [CommandExecutor.execute:76] Try to execute command, CONTEXT=cmdArray=[cmd.exe, /c, netstat -anop tcp | findstr \":7212\" | findstr LISTENING]\r\n",
+   "[2025-11-25 03:11:39.359 GMT] [MSG] [INFO] [main:::] [CommandExecutor$AsyncProcessWaiter.await:177] Finished to run command, CONTEXT=command=[cmd.exe, /c, netstat -anop tcp | findstr \":7212\" | findstr LISTENING], exit=1, elapsed=864ms\r\n",
+   "[2025-11-25 03:11:39.389 GMT] [MSG] [DEBUG] [main:::] [CommandExecutor.execute:98] Finished to execute command array, CONTEXT=cmdArray=[cmd.exe, /c, netstat -anop tcp | findstr \":7212\" | findstr LISTENING], exit=1, stdout=, stderr=\r\n",
+   "[2025-11-25 03:11:39.391 GMT] [MSG] [INFO] [main:::] [ProcessChecks._checkPort:251] No process use port, CONTEXT=port=7212, service=LogicMonitor Collector\r\n",
+   "[2025-11-25 03:11:39.488 GMT] [MSG] [INFO] [main:::] [Config._getSetting:84] Get settings, CONTEXT=file=C:\\Program Files\\LogicMonitor\\Agent\\conf\\agent.conf, key=watchdog.status.port, value=null\r\n"
+  ]
+ },
+ "log_file_missing_zip": {
+  "errorMessage": "The file is not found or restrict read-access, file=/usr/local/logicmonitor/data/companies/00000000-0000-0000-0000-000000000000/no-such-file.log",
+  "errorCode": 1404,
+  "errorDetail": null
+ }
+}

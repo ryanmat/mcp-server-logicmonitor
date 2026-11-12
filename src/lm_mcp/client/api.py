@@ -337,6 +337,19 @@ class LogicMonitorClient:
             ServerError: For 5xx responses.
             ValidationError: If a path segment could escape its resource.
         """
+        response = await self._send(method, path, params, json_body)
+        data = response.json()
+        self._check_response_body_errors(data)
+        return data
+
+    async def _send(
+        self,
+        method: str,
+        path: str,
+        params: dict | None,
+        json_body: dict | None,
+    ) -> httpx.Response:
+        """Send a signed request with retry and raise the mapped error for a 4xx or 5xx."""
         _check_path(path)
         url = f"{self.base_url}{path}"
         # ``json_body`` is checked against None rather than truthiness so that an
@@ -377,9 +390,7 @@ class LogicMonitorClient:
 
         elapsed = time.monotonic() - request_start
         log_api_response(response.status_code, elapsed, path)
-        data = response.json()
-        self._check_response_body_errors(data)
-        return data
+        return response
 
     async def get(self, path: str, params: dict | None = None) -> dict:
         """Make a GET request.
@@ -392,6 +403,19 @@ class LogicMonitorClient:
             Parsed JSON response.
         """
         return await self.request("GET", path, params=params)
+
+    async def get_bytes(self, path: str, params: dict | None = None) -> bytes:
+        """Make a GET request for a body the API sends as a file, such as a zip.
+
+        Args:
+            path: API resource path.
+            params: Query parameters.
+
+        Returns:
+            The response body, unparsed.
+        """
+        response = await self._send("GET", path, params, None)
+        return response.content
 
     async def post(self, path: str, json_body: dict | None = None) -> dict:
         """Make a POST request.

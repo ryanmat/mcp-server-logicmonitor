@@ -1,7 +1,10 @@
 # Description: Tests for collector MCP tools.
 # Description: Validates collector read, update, and delete functions.
 
+import io
 import json
+import zipfile
+from pathlib import Path
 
 import httpx
 import pytest
@@ -10,6 +13,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.envelope import envelope
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
 
@@ -543,10 +547,246 @@ class TestGetCollectorHealth:
         assert "alertType" not in alerts.calls.last.request.url.params["filter"]
 
 
+_BASE = "https://test.logicmonitor.com/santaba/rest"
+
+# Answers of a sandbox portal at X-Version 3 on 2026-11-11, as read but for two cuts.
+# events_26 keeps the first 5 of the 50 rows its page held, under the total the portal
+# sent (-51). logs_82 lists the one file uploaded from collector 82 with the !uploadlog
+# debug command; logs_41 is a collector with none. log_file_82 is that file read without
+# format=zip, which answers its metadata. log_file_missing_zip is the 404 a missing file
+# answers with format=zip; its path names the company UUID, zeroed here. postcheck_member
+# holds the first 6 lines of the file's one zip member, postcheck.log (26,553 bytes): the
+# rest names the portal and that UUID, so the tests zip the lines under the member's name.
+LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "collector_reads.json").read_text())
+
+
+def _zip(members: dict[str, bytes]) -> bytes:
+    """Zip the members into one archive, as the portal sends a log file with format=zip."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return buffer.getvalue()
+
+
+_POSTCHECK_LINES = [line.encode() for line in LIVE["postcheck_member"]["lines"]]
+_POSTCHECK = b"".join(_POSTCHECK_LINES)
+
+
+class TestGetCollectorEvents:
+    """R3.4: a collector's events page through its events path, each row projected."""
+
+    @respx.mock
+    async def test_projects_each_event_and_reads_the_negative_total_as_more(self, client):
+        from lm_mcp.tools.collectors import get_collector_events
+
+        route = respx.get(f"{_BASE}/setting/collector/collectors/26/events").mock(
+            return_value=httpx.Response(200, json=LIVE["events_26"])
+        )
+
+        body = json.loads((await get_collector_events(client, collector_id=26, limit=5))[0].text)
+
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"]) == ("5", "0")
+        assert "total" not in body
+        assert body["has_more"] is True
+        assert len(body["events"]) == 5
+        assert body["events"][0] == {
+            "id": "qzGSS6euRTWf6BWUjh04QA",
+            "reported_on": 1793727768,
+            "event_code": 8,
+            "message": "The collector is down or unreachable",
+            "collector_build": "39200",
+            "collector_platform": "linux",
+        }
+        assert [e["message"] for e in body["events"][1:3]] == [
+            "Agent successfully restarted.",
+            "Sbproxy successfully started.",
+        ]
+
+    @respx.mock
+    async def test_an_unknown_collector_is_not_found(self, client):
+        from lm_mcp.tools.collectors import get_collector_events
+
+        respx.get(f"{_BASE}/setting/collector/collectors/999999/events").mock(
+            return_value=httpx.Response(404, json=LIVE["events_unknown_collector"])
+        )
+
+        error = envelope(await get_collector_events(client, collector_id=999999))
+        assert error["code"] == "NOT_FOUND"
+
+
+class TestGetCollectorLogFiles:
+    """R3.4: the log files a collector has uploaded, one page, each row projected."""
+
+    @respx.mock
+    async def test_projects_each_uploaded_file(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_files
+
+        route = respx.get(f"{_BASE}/setting/collector/collectors/82/logs").mock(
+            return_value=httpx.Response(200, json=LIVE["logs_82"])
+        )
+
+        body = json.loads((await get_collector_log_files(client, collector_id=82))[0].text)
+
+        assert route.calls.last.request.url.params["size"] == "50"
+        assert "format" not in route.calls.last.request.url.params
+        assert body["total"] == 1
+        assert body["has_more"] is False
+        assert body["log_files"] == [
+            {
+                "file_name": "82.postcheck.log.zip",
+                "size": 3759,
+                "last_modified": 1764040316,
+                "uploaded": 1794445292,
+            }
+        ]
+
+    @respx.mock
+    async def test_a_collector_with_no_uploaded_file_is_an_empty_page(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_files
+
+        respx.get(f"{_BASE}/setting/collector/collectors/41/logs").mock(
+            return_value=httpx.Response(200, json=LIVE["logs_41"])
+        )
+
+        body = json.loads((await get_collector_log_files(client, collector_id=41))[0].text)
+
+        assert (body["total"], body["log_files"]) == (0, [])
+
+
+class TestGetCollectorLogFile:
+    """R3.4: one uploaded log file read as its zip, the member's text capped from the end."""
+
+    @respx.mock
+    async def test_reads_the_zip_form_and_returns_the_member_text_whole(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_file
+
+        route = respx.get(
+            f"{_BASE}/setting/collector/collectors/82/logs/82.postcheck.log.zip"
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                content=_zip({"postcheck.log": _POSTCHECK}),
+                headers={"content-type": "application/octet-stream"},
+            )
+        )
+
+        body = json.loads(
+            (await get_collector_log_file(client, 82, "82.postcheck.log.zip"))[0].text
+        )
+
+        assert dict(route.calls.last.request.url.params) == {"format": "zip"}
+        assert body == {
+            "collector_id": 82,
+            "file_name": "82.postcheck.log.zip",
+            "member": "postcheck.log",
+            "size": len(_POSTCHECK),
+            "truncated": False,
+            "text": _POSTCHECK.decode(),
+            "other_members": [],
+        }
+
+    @pytest.mark.parametrize("spare", [40, 0], ids=["mid-line", "on-a-line-boundary"])
+    @respx.mock
+    async def test_a_longer_member_keeps_its_last_whole_lines_within_max_bytes(self, client, spare):
+        from lm_mcp.tools.collectors import get_collector_log_file
+
+        respx.get(f"{_BASE}/setting/collector/collectors/82/logs/82.postcheck.log.zip").mock(
+            return_value=httpx.Response(200, content=_zip({"postcheck.log": _POSTCHECK}))
+        )
+        cap = len(b"".join(_POSTCHECK_LINES[-2:])) + spare
+
+        body = json.loads(
+            (await get_collector_log_file(client, 82, "82.postcheck.log.zip", max_bytes=cap))[
+                0
+            ].text
+        )
+
+        assert body["truncated"] is True
+        assert body["size"] == len(_POSTCHECK)
+        assert body["text"] == b"".join(_POSTCHECK_LINES[-2:]).decode()
+
+    @respx.mock
+    async def test_a_last_line_longer_than_max_bytes_keeps_its_end(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_file
+
+        respx.get(f"{_BASE}/setting/collector/collectors/82/logs/82.postcheck.log.zip").mock(
+            return_value=httpx.Response(200, content=_zip({"postcheck.log": _POSTCHECK}))
+        )
+
+        body = json.loads(
+            (await get_collector_log_file(client, 82, "82.postcheck.log.zip", max_bytes=30))[0].text
+        )
+
+        assert (body["truncated"], body["text"]) == (True, _POSTCHECK[-30:].decode())
+
+    @respx.mock
+    async def test_an_archive_with_more_files_names_the_others(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_file
+
+        respx.get(f"{_BASE}/setting/collector/collectors/82/logs/two.zip").mock(
+            return_value=httpx.Response(
+                200, content=_zip({"postcheck.log": _POSTCHECK, "setup.log": b"x\r\n"})
+            )
+        )
+
+        body = json.loads((await get_collector_log_file(client, 82, "two.zip"))[0].text)
+
+        assert (body["member"], body["other_members"]) == ("postcheck.log", ["setup.log"])
+
+    @respx.mock
+    async def test_a_missing_file_is_not_found(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_file
+
+        respx.get(f"{_BASE}/setting/collector/collectors/82/logs/no-such-file.log").mock(
+            return_value=httpx.Response(404, json=LIVE["log_file_missing_zip"])
+        )
+
+        error = envelope(await get_collector_log_file(client, 82, "no-such-file.log"))
+        assert error["code"] == "NOT_FOUND"
+        assert error["message"].startswith("The file is not found or restrict read-access")
+
+    @respx.mock
+    async def test_an_answer_that_is_not_a_zip_is_an_upstream_error(self, client):
+        from lm_mcp.tools.collectors import get_collector_log_file
+
+        respx.get(f"{_BASE}/setting/collector/collectors/82/logs/82.postcheck.log.zip").mock(
+            return_value=httpx.Response(200, json=LIVE["log_file_82"])
+        )
+
+        error = envelope(await get_collector_log_file(client, 82, "82.postcheck.log.zip"))
+        assert (error["code"], error["details"]) == (
+            "UPSTREAM_ERROR",
+            {"exception": "BadZipFile"},
+        )
+
+
+class TestGetCollectorUpgradeHistory:
+    """R3.4: the portal's collector upgrade history, one page, rows as the API returns them."""
+
+    @respx.mock
+    async def test_pages_the_upgrade_history_path(self, client):
+        from lm_mcp.tools.collectors import get_collector_upgrade_history
+
+        route = respx.get(f"{_BASE}/setting/collector/collectors/upgradeHistory").mock(
+            return_value=httpx.Response(200, json=LIVE["upgrade_history"])
+        )
+
+        body = json.loads((await get_collector_upgrade_history(client, offset=5))[0].text)
+
+        params = route.calls.last.request.url.params
+        assert (params["size"], params["offset"]) == ("50", "5")
+        assert body == {"total": 0, "count": 0, "offset": 5, "has_more": False, "upgrades": []}
+
+
 # (handler name, endpoint path, extra required arguments)
 _COLLECTORS_LISTS = [
     ("get_collectors", "/setting/collector/collectors", {}),
     ("get_collector_groups", "/setting/collector/groups", {}),
+    ("get_collector_events", "/setting/collector/collectors/26/events", {"collector_id": 26}),
+    ("get_collector_log_files", "/setting/collector/collectors/82/logs", {"collector_id": 82}),
+    ("get_collector_upgrade_history", "/setting/collector/collectors/upgradeHistory", {}),
 ]
 
 

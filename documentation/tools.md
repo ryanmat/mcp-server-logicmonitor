@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 249 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 253 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -110,6 +110,10 @@ Collector status and management
 | `get_collector` | Get detailed information about a specific collector | No |
 | `get_collector_groups` | List collector groups | No |
 | `get_collector_group` | Get details about a specific collector group | No |
+| `get_collector_events` | List one collector's events, newest first: agent and sbproxy restarts, credential rotation, and reports that the collector is unreachable, each with its time and build. Use it for a collector's recent history; get_collector_health gives its current state. | No |
+| `get_collector_log_files` | List the log files a collector has uploaded to the portal, as zip files with their size and upload time. A collector uploads them through Send Logs to LogicMonitor in the portal or the !uploadlog debug command, so an empty list means nothing was uploaded. Read one with get_collector_log_file. | No |
+| `get_collector_log_file` | Read one uploaded collector log file, named as get_collector_log_files lists it, and return the end of its text: at most max_bytes bytes, starting on a whole line. truncated says whether earlier lines were left out. | No |
+| `get_collector_upgrade_history` | List the portal's collector version upgrades, each row as the API returns it. | No |
 | `update_collector` | Update a collector (requires write permission). Change group, description, failback, or escalation chain. | Yes |
 | `delete_collector` | Delete a collector (requires write permission). Blocks if devices are still assigned. | Yes |
 | `create_collector_group` | Create a collector group (requires write permission) | Yes |

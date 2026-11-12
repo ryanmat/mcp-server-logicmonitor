@@ -3396,6 +3396,38 @@
       "type": "object"
     }
   },
+  "get_collector_events": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List one collector's events, newest first: agent and sbproxy restarts, credential rotation, and reports that the collector is unreachable, each with its time and build. Use it for a collector's recent history; get_collector_health gives its current state.",
+    "inputSchema": {
+      "properties": {
+        "collector_id": {
+          "description": "Collector ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "collector_id"
+      ],
+      "type": "object"
+    }
+  },
   "get_collector_group": {
     "annotations": {
       "destructiveHint": false,
@@ -3479,6 +3511,98 @@
           "default": false,
           "description": "Include recent alerts on a device named for the collector's hostname. A collector with no such device returns an empty list, which does not show it stayed up. The API cannot narrow rows to CollectorDown; each row's alert_type names what it is. A failed read is null with history_warning, not an empty list.",
           "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "get_collector_log_file": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "Read one uploaded collector log file, named as get_collector_log_files lists it, and return the end of its text: at most max_bytes bytes, starting on a whole line. truncated says whether earlier lines were left out.",
+    "inputSchema": {
+      "properties": {
+        "collector_id": {
+          "description": "Collector ID",
+          "type": "integer"
+        },
+        "file_name": {
+          "description": "Log file name, such as 82.postcheck.log.zip",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*$",
+          "type": "string"
+        },
+        "max_bytes": {
+          "default": 20000,
+          "description": "Most bytes of the log's end to return",
+          "maximum": 200000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "collector_id",
+        "file_name"
+      ],
+      "type": "object"
+    }
+  },
+  "get_collector_log_files": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the log files a collector has uploaded to the portal, as zip files with their size and upload time. A collector uploads them through Send Logs to LogicMonitor in the portal or the !uploadlog debug command, so an empty list means nothing was uploaded. Read one with get_collector_log_file.",
+    "inputSchema": {
+      "properties": {
+        "collector_id": {
+          "description": "Collector ID",
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "collector_id"
+      ],
+      "type": "object"
+    }
+  },
+  "get_collector_upgrade_history": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List the portal's collector version upgrades, each row as the API returns it.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
         }
       },
       "type": "object"
