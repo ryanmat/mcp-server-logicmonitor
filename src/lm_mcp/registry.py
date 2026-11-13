@@ -6513,6 +6513,119 @@ TOOLS.extend(
             },
         ),
         Tool(
+            name="collector_debug",
+            description=(
+                "Run one collector debug command from a fixed list and return what the "
+                "collector said (requires write permission). Each listed command reads, but it "
+                "runs on the collector and opens a debug session the portal records in its Audit "
+                "Log, and http sends a GET a device can act on, so the tool is gated as a write. "
+                "Pick a command and pass that command's typed args; any other key is refused, "
+                "and a command that changes the collector, runs code on its host or carries a "
+                "credential is never sent. Device probes (ping, nslookup, macaddress, "
+                "snmpdiagnose, snmpget, snmpwalk, wmi, winrm, cim, http, sslcerts) need "
+                "device_id: the host is the device record's, and the command runs on the "
+                "collector that serves the device. checkserverconnectivity targets the "
+                "configured portal. Use it once get_collector_health or diagnose has named a "
+                "collector, to answer one narrow question: whether the debug channel answers "
+                "(uptime), what the stored health check says (health_check, parsed into each "
+                "method's all-NaN rate), whether the collector reaches a device (ping, "
+                "snmpdiagnose). answered and no_reply are results; a refusal by the portal or "
+                "the collector is an error with the call's record in its details. The call "
+                "stops at budget_seconds, and secrets in the output are masked, best effort."
+            ),
+            annotations=_DESTRUCTIVE_RUN,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "enum": [
+                            "adlist",
+                            "aplist",
+                            "avslist",
+                            "checkserverconnectivity",
+                            "cim",
+                            "dxlist",
+                            "firewallstatus",
+                            "getconfig",
+                            "health_check",
+                            "http",
+                            "ipaddress",
+                            "logsurf",
+                            "macaddress",
+                            "nslookup",
+                            "nsplist",
+                            "perf",
+                            "ping",
+                            "reportercache",
+                            "snmpdiagnose",
+                            "snmpget",
+                            "snmpwalk",
+                            "splist",
+                            "sslcerts",
+                            "tasklist",
+                            "tlist",
+                            "tplist",
+                            "uptime",
+                            "winrm",
+                            "wmi",
+                        ],
+                        "description": "The command to run",
+                    },
+                    "collector_id": {
+                        "type": "integer",
+                        "description": (
+                            "Collector to run it on; optional when device_id is given, and "
+                            "then it must be the collector that serves the device"
+                        ),
+                    },
+                    "device_id": {
+                        "type": "integer",
+                        "description": (
+                            "Device to probe; required for device probes. Its record names "
+                            "the host and the collector"
+                        ),
+                    },
+                    "args": {
+                        "type": "object",
+                        "description": (
+                            "The command's own arguments; no other key is accepted, and never "
+                            "host. perf: type (ds, queue or cpu), dsFilterColumn, ds, h. "
+                            "getconfig: key (collector.<method>.threadpool or .timeout). "
+                            "logsurf: level, n, files. aplist: h, status. splist: hostname. "
+                            "tplist: h, status. tlist: h or c, one required. ping: type, count. "
+                            "snmpdiagnose: oids. snmpget: oids. snmpwalk: oid, timeout (never "
+                            "the SNMP community or user tables). wmi: query (one WQL SELECT, "
+                            "comparisons written Name = 'x'; Win32_Product, the file, "
+                            "directory and environment classes, their parent classes and "
+                            "command-line columns are refused, and Win32_NTLogEvent, "
+                            "Win32_UserAccount and Win32_Group need a WHERE clause), authType. "
+                            "winrm: auth, useSSL, certCheck, timeout. "
+                            "cim: class. http: url (the device's own host and no credentials; "
+                            "a host written as a loopback, link-local or cloud metadata "
+                            "address, or a known name for one, is refused, but a DNS name that "
+                            "resolves to one is not caught), timeout. sslcerts: port. The "
+                            "other commands take no arguments"
+                        ),
+                    },
+                    "budget_seconds": {
+                        "type": "number",
+                        "default": 15,
+                        "description": "Wall-clock budget for the whole call, 2 to 60 seconds",
+                    },
+                    "max_output_chars": {
+                        "type": "integer",
+                        "default": 20000,
+                        "description": (
+                            "Most raw output returned, 500 to 100,000 characters; health_check "
+                            "returns its parsed summary and at most 4,000 raw characters"
+                        ),
+                    },
+                },
+                "required": ["command"],
+            },
+        ),
+        Tool(
             name="get_power_events",
             description=(
                 "Filter alerts for UPS/PDU power-event signatures across APC, Liebert, "
@@ -6934,6 +7047,7 @@ def get_tool_handler(tool_name: str) -> Any:
         api_tokens,
         audit,
         batchjobs,
+        collector_debug,
         collectors,
         configsources,
         correlation,
@@ -7045,6 +7159,7 @@ def get_tool_handler(tool_name: str) -> Any:
         "update_collector_group": collectors.update_collector_group,
         "delete_collector_group": collectors.delete_collector_group,
         "get_collector_health": collectors.get_collector_health,
+        "collector_debug": collector_debug.collector_debug,
         # Network Intelligence (v3.8.0)
         "get_interface_metrics": networking.get_interface_metrics,
         "get_device_flows": networking.get_device_flows,

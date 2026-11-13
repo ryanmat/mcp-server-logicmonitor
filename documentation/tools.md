@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 270 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 271 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -133,6 +133,7 @@ Collector status and management
 | `update_collector_group` | Update a collector group (requires write permission) | Yes |
 | `delete_collector_group` | Delete a collector group (requires write permission). Blocks if collectors are still assigned. | Yes |
 | `get_collector_health` | Enriched collector status: whether each collector is down, downstream device count, uptime, and optional alert history. Leading indicator for site-level events. Prefer this over `get_collectors` when investigating potential outages. The collector asked for by collector_id, and each collector not known to be up, carries evidence: its latest status check and its five latest events. | No |
+| `collector_debug` | Run one collector debug command from a fixed list and return what the collector said (requires write permission). Each listed command reads, but it runs on the collector and opens a debug session the portal records in its Audit Log, and http sends a GET a device can act on, so the tool is gated as a write. Pick a command and pass that command's typed args; any other key is refused, and a command that changes the collector, runs code on its host or carries a credential is never sent. Device probes (ping, nslookup, macaddress, snmpdiagnose, snmpget, snmpwalk, wmi, winrm, cim, http, sslcerts) need device_id: the host is the device record's, and the command runs on the collector that serves the device. checkserverconnectivity targets the configured portal. Use it once get_collector_health or diagnose has named a collector, to answer one narrow question: whether the debug channel answers (uptime), what the stored health check says (health_check, parsed into each method's all-NaN rate), whether the collector reaches a device (ping, snmpdiagnose). answered and no_reply are results; a refusal by the portal or the collector is an error with the call's record in its details. The call stops at budget_seconds, and secrets in the output are masked, best effort. | Yes |
 
 ## Networking
 
