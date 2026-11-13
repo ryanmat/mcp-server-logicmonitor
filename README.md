@@ -6,7 +6,7 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 271 tools, 3 workflow prompts, and 25 resources.
+Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 273 tools, 3 workflow prompts, and 25 resources.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The server runs as a local subprocess of your MCP client and calls your portal w
 
 Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
 
-The 271 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
+The 273 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
 
 ## What's new in v4.3.0
 
@@ -113,7 +113,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 ### Find a tool
 
 - `search_tools`: keyword search by name and description over the tools your settings list, so with writes off it names no write tool; an optional `category` narrows it to one group
-- the `lm://guide/tool-categories` resource: all 271 tools grouped by domain
+- the `lm://guide/tool-categories` resource: all 273 tools grouped by domain
 - [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
 
 ### What the tools cover
@@ -135,6 +135,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Services | Service Insights services, service groups and rules |
 | APM traces | Service discovery, per-operation RED metrics, service alerts, and OTel properties |
 | Network | Neighbors, interfaces, flows, connections, top talkers, link flaps, and outage detection. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |
+| Usage | The contract's entitlements per feature, including the features the usage page hides, and the portal's current resource counts, which are not billing figures |
 | Cost | Cost recommendations, recommendation categories, and idle resources (LM Envision) |
 | Ingestion | Push logs and metrics through LMv1 authentication |
 | Logs | LM Logs pipelines, tracked queries, saved query groups, partitions with their contracts, and the usage figure. Log search is not offered: the v3 search endpoint applied neither the query nor the time range when probed |
@@ -305,7 +306,7 @@ Clients read these through the standard MCP resource and prompt calls.
 | `lm://filters/devices` | Filter fields and operators for device queries |
 | `lm://filters/sdts` | Filter fields and operators for SDT queries |
 | `lm://syntax/operators` | Filter operators: `:`, `~`, `>`, `<`, `!:`, `!~`, `>:`, `<:` |
-| `lm://guide/tool-categories` | All 271 tools organized by domain category |
+| `lm://guide/tool-categories` | All 273 tools organized by domain category |
 | `lm://guide/examples` | Common filter patterns and query examples |
 | `lm://guide/mcp-orchestration` | Patterns for combining LogicMonitor with other MCP servers |
 | `lm://guide/best-practices` | Scenario-based best practices with recommendations and anti-patterns |

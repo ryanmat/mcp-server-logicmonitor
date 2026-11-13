@@ -2,7 +2,7 @@
 
 <!-- GENERATED FILE. Do not edit by hand. Regenerate: uv run python tests/test_tools_doc.py -->
 
-Reference for all 271 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
+Reference for all 273 tools the LogicMonitor MCP server can advertise. The **Write** column marks the tools that change the portal; the server lists them only when `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 This file is generated from the tool registry (`src/lm_mcp/registry.py`) and the domain index (`lm://guide/tool-categories`), and kept in sync by `tests/test_tools_doc.py`. At runtime, discover tools with the `search_tools` tool.
 
@@ -287,6 +287,15 @@ Audit logs and activity tracking
 | Tool | Description | Write |
 |------|-------------|-------|
 | `get_audit_logs` | Read the portal audit log: call this for who did what and when. kind='all' returns one page of entries, newest first; kind='change' returns the configuration changes (create, update, delete or import, read from each entry's description) found in a pool of the newest entries, with scanned and has_more; kind='login' returns portal sign-ins, sign-outs and failed logins, one query per login wording (up to six calls), with status and method per row, success_only or failed_only, and total as a lower bound while has_more is true; kind='api_token' returns the rows naming an API token, given by access_id or token_id (read to its access ID), keeping only that exact access ID, with event (change, rejected, throttled), path and method per row. username is an exact name or a comma-separated list; action and resource_type (kinds all and change) are whole words the description holds (the portal applies one, the second is matched on the fetched page); start_time and end_time bound the entry time in epoch seconds. System and automation actors (System:*, LogicMonitor Internal, cloud auto-delete) are dropped after the fetch for kinds all and change unless exclude_system is false or a username is given; dropped counts them and paging follows the rows the portal returned. An argument another kind reads is refused. offset plus the rows read must stay within 10,000, and the filter within about 900 characters. | No |
+
+## Usage
+
+Contracted entitlements and the portal's current resource counts
+
+| Tool | Description | Write |
+|------|-------------|-------|
+| `get_usage_contract` | Read the portal's contracted entitlements, for license and contract questions: every feature the contract names, entitled or not, each with its role (billable_line, metered_no_entitlement, metered_unpaid, repeats_parent, rollup_or_carveout), entitled quantity, unit and roll-up basis, plus the detected billing_mode. It does not count the portal's current resources. | No |
+| `get_usage_metrics` | Read how many devices, Kubernetes, AWS, Azure and GCP resources, websites and services the portal holds now, as point-in-time counts. The portal is billed on each feature's roll-up basis in the contract, so these are not billed figures. | No |
 
 ## Cost Optimization
 

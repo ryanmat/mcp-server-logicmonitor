@@ -820,3 +820,32 @@ class TestStep70Tools:
 
         assert set(schemas["get_service_insights_rules"]["properties"]) == {"limit", "offset"}
         assert schemas["get_tenants"]["properties"] == {}
+
+
+# R3.10, Step 75: the usage reads from #98, alone in the usage category.
+_USAGE_TOOLS = ("get_usage_contract", "get_usage_metrics")
+
+
+class TestUsageTools:
+    """R3.10: the two usage reads are registered read-only with their handlers and grouped."""
+
+    def test_each_is_read_only_with_its_handler_in_the_usage_category(self):
+        from lm_mcp.resources.guides import TOOL_CATEGORIES
+
+        tools = {tool.name: tool for tool in TOOLS}
+
+        assert [tools[name].annotations.readOnlyHint for name in _USAGE_TOOLS] == [True, True]
+        assert [get_tool_handler(name).__name__ for name in _USAGE_TOOLS] == list(_USAGE_TOOLS)
+        assert TOOL_CATEGORIES["categories"]["usage"]["tools"] == list(_USAGE_TOOLS)
+
+    def test_the_schemas(self):
+        schemas = {tool.name: tool.inputSchema for tool in TOOLS}
+
+        assert schemas["get_usage_contract"]["properties"] == {
+            "billable_only": {
+                "type": "boolean",
+                "default": False,
+                "description": "Return only the billable_line features",
+            }
+        }
+        assert schemas["get_usage_metrics"]["properties"] == {}

@@ -4059,6 +4059,43 @@ TOOLS.extend(
     ]
 )
 
+# Usage
+TOOLS.extend(
+    [
+        Tool(
+            name="get_usage_contract",
+            description=(
+                "Read the portal's contracted entitlements, for license and contract "
+                "questions: every feature the contract names, entitled or not, each with its "
+                "role (billable_line, metered_no_entitlement, metered_unpaid, repeats_parent, "
+                "rollup_or_carveout), entitled quantity, unit and roll-up basis, plus the "
+                "detected billing_mode. It does not count the portal's current resources."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "billable_only": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Return only the billable_line features",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_usage_metrics",
+            description=(
+                "Read how many devices, Kubernetes, AWS, Azure and GCP resources, websites and "
+                "services the portal holds now, as point-in-time counts. The portal is billed "
+                "on each feature's roll-up basis in the contract, so these are not billed figures."
+            ),
+            annotations=_READ_ONLY,
+            inputSchema={"type": "object", "properties": {}},
+        ),
+    ]
+)
+
 # Cost/Cloud
 TOOLS.extend(
     [
@@ -7094,6 +7131,7 @@ def get_tool_handler(tool_name: str) -> Any:
         topology_analysis,
         topologysources,
         traces,
+        usage,
         users,
         websites,
         workflows,
@@ -7365,6 +7403,9 @@ def get_tool_handler(tool_name: str) -> Any:
         "get_batchjob": batchjobs.get_batchjob,
         "get_device_batchjobs": batchjobs.get_device_batchjobs,
         "get_scheduled_downtime_jobs": batchjobs.get_scheduled_downtime_jobs,
+        # Usage
+        "get_usage_contract": usage.get_usage_contract,
+        "get_usage_metrics": usage.get_usage_metrics,
         # Cost
         "get_cost_recommendations": cost.get_cost_recommendations,
         "get_cost_recommendation_categories": cost.get_cost_recommendation_categories,
