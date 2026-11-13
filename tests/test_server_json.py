@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 import typing
 from pathlib import Path
@@ -154,3 +155,26 @@ def test_description_fits_the_registry_schema() -> None:
     """The 2025-12-11 server schema caps the description at 100 characters."""
     assert SERVER_JSON["$schema"].endswith("/2025-12-11/server.schema.json")
     assert 1 <= len(SERVER_JSON["description"]) <= 100
+
+
+def _readme_env_rows() -> dict[str, list[str]]:
+    """The README configuration table: each variable's row cells after the name."""
+    rows: dict[str, list[str]] = {}
+    for line in (ROOT / "README.md").read_text().splitlines():
+        match = re.match(r"^\| `([A-Z][A-Z0-9_]+)` \|(.*)\|$", line)
+        if match:
+            assert match[1] not in rows, f"two README rows for {match[1]}"
+            rows[match[1]] = [cell.strip() for cell in match[2].split("|")]
+    return rows
+
+
+def test_readme_env_table_lists_the_server_json_variables() -> None:
+    """R4.5: the README's configuration table is server.json's variable list."""
+    assert set(_readme_env_rows()) == set(ENTRIES)
+
+
+def test_readme_env_table_states_the_server_json_defaults() -> None:
+    rows = _readme_env_rows()
+    for name, entry in ENTRIES.items():
+        if "default" in entry:
+            assert rows[name][1] == f"`{entry['default']}`", name

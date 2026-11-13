@@ -376,4 +376,26 @@ def test_tests_name_no_removed_integration():
     ],
 )
 def test_public_file_names_no_removed_integration(name):
-    assert _REMOVED_WORDS.findall((_REPO / name).read_text()) == []
+    assert _REMOVED_WORDS.findall(_without_pointer_section(name)) == []
+
+
+# The README section that says where Terraform runs and Ansible launches belong (R4.5).
+_POINTER_HEADING = "### What the server does not do\n"
+
+
+def _without_pointer_section(name: str) -> str:
+    """A public file's text, less the README section that points to other servers."""
+    text = (_REPO / name).read_text()
+    if name != "README.md":
+        return text
+    start = text.index(_POINTER_HEADING)
+    end = text.index("\n#", start + len(_POINTER_HEADING))
+    return text[:start] + text[end:]
+
+
+def test_readme_pointer_section_names_no_tool_or_setting():
+    """The section names other servers and CLIs, not a tool or setting this server had."""
+    text = (_REPO / "README.md").read_text()
+    start = text.index(_POINTER_HEADING)
+    section = text[start : text.index("\n#", start + len(_POINTER_HEADING))]
+    assert re.findall(r"`(awx_[a-z_]+|[A-Z]+_[A-Z_]+|terraform_[a-z]+)`", section) == []

@@ -103,3 +103,9 @@ def test_job_and_action_tools_keep_their_verbs(name: str) -> None:
 
 def test_no_tool_carries_the_list_prefix() -> None:
     assert sorted(name for name in _registered() if name.startswith("list_")) == []
+
+
+def test_readme_names_no_tool_5_0_does_not_register() -> None:
+    """R4.5: no name the README quotes, alone or as a call, is a 4.3.0 tool 5.0 lacks."""
+    quoted = set(re.findall(r"`([a-z][a-z0-9_]*)[`(]", (ROOT / "README.md").read_text()))
+    assert sorted(quoted & (_names_430() - _registered())) == []
