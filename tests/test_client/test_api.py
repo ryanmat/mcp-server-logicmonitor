@@ -758,9 +758,9 @@ class TestRequestBodyAuthSignature:
         async with LogicMonitorClient(
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
-            ingest_url="https://test.logicmonitor.com",
+            ingest_url="https://test.logicmonitor.com/rest",
         ) as client:
-            await client.ingest_post("/rest/log/ingest", json_body={})
+            await client.ingest_post("/log/ingest", json_body={})
 
         assert auth.captured_body == "{}"
 
@@ -779,10 +779,10 @@ class TestRequestBodyAuthSignature:
         async with LogicMonitorClient(
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
-            ingest_url="https://test.logicmonitor.com",
+            ingest_url="https://test.logicmonitor.com/rest",
         ) as client:
             with pytest.raises(LMError, match="2 records rejected"):
-                await client.ingest_post("/rest/log/ingest", json_body={"foo": "bar"})
+                await client.ingest_post("/log/ingest", json_body={"foo": "bar"})
 
     @pytest.mark.asyncio
     @respx.mock
@@ -799,10 +799,10 @@ class TestRequestBodyAuthSignature:
         async with LogicMonitorClient(
             base_url="https://test.logicmonitor.com/santaba/rest",
             auth=auth,
-            ingest_url="https://test.logicmonitor.com",
+            ingest_url="https://test.logicmonitor.com/rest",
         ) as client:
             with pytest.raises(LMError):
-                await client.ingest_post("/rest/log/ingest", json_body={"foo": "bar"})
+                await client.ingest_post("/log/ingest", json_body={"foo": "bar"})
 
 
 def _guard_client(auth=None):
@@ -813,7 +813,7 @@ def _guard_client(auth=None):
     return LogicMonitorClient(
         base_url="https://test.logicmonitor.com/santaba/rest",
         auth=auth or BearerAuth("test_token"),
-        ingest_url="https://test.logicmonitor.com",
+        ingest_url="https://test.logicmonitor.com/rest",
     )
 
 
@@ -888,7 +888,7 @@ class TestPathSegmentGuard:
         route = respx.route().mock(return_value=Response(202, json={"success": True}))
         async with _guard_client() as client:
             with pytest.raises(ValidationError):
-                await client.ingest_post("/rest/../santaba/rest/setting/admins", json_body={})
+                await client.ingest_post("/../santaba/rest/setting/admins", json_body={})
 
         assert not route.called
 
@@ -954,12 +954,12 @@ class TestPathSegmentGuard:
         auth = _RecordingAuth()
         async with _guard_client(auth) as client:
             await client.ingest_post(
-                "/rest/metric/ingest", json_body={"a": 1}, params={"create": "true"}
+                "/metric/ingest", json_body={"a": 1}, params={"create": "true"}
             )
 
         assert route.called
         assert route.calls[0].request.url.params["create"] == "true"
-        assert auth.calls == [("POST", "/rest/metric/ingest", '{"a":1}')]
+        assert auth.calls == [("POST", "/metric/ingest", '{"a":1}')]
 
 
 class TestStringIdSchemaPattern:
@@ -1000,7 +1000,7 @@ def _retry_client(retry_after_cap: int = 120):
         base_url=_API,
         auth=BearerAuth("test_token"),
         max_retries=2,
-        ingest_url="https://test.logicmonitor.com",
+        ingest_url="https://test.logicmonitor.com/rest",
         retry_after_cap=retry_after_cap,
     )
 
@@ -1104,14 +1104,14 @@ class TestRetryPolicy:
             side_effect=[Response(429), Response(202, json={"success": True})]
         )
         async with _retry_client() as client:
-            assert await client.ingest_post("/rest/log/ingest", json_body=[{"msg": "x"}])
+            assert await client.ingest_post("/log/ingest", json_body=[{"msg": "x"}])
         assert limited.call_count == 2
 
         respx.clear()
         failing = respx.post(ingest).mock(return_value=Response(500, json={"errorMessage": "x"}))
         async with _retry_client() as client:
             with pytest.raises(ServerError):
-                await client.ingest_post("/rest/log/ingest", json_body=[{"msg": "x"}])
+                await client.ingest_post("/log/ingest", json_body=[{"msg": "x"}])
         assert failing.call_count == 1
 
     @pytest.mark.asyncio
@@ -1123,7 +1123,7 @@ class TestRetryPolicy:
             (f"{_API}/device/devices", lambda c: c.post_multipart("/device/devices", {"a": 1})),
             (
                 "https://test.logicmonitor.com/rest/log/ingest",
-                lambda c: c.ingest_post("/rest/log/ingest", json_body=[{"msg": "x"}]),
+                lambda c: c.ingest_post("/log/ingest", json_body=[{"msg": "x"}]),
             ),
         ],
         ids=["request", "post_multipart", "ingest_post"],
@@ -1207,7 +1207,7 @@ class TestTransportErrorTranslation:
         ("call", "args"),
         [
             ("post_multipart", ("/setting/datasources/importjson", {"name": "x"})),
-            ("ingest_post", ("/rest/log/ingest", [{"msg": "x"}])),
+            ("ingest_post", ("/log/ingest", [{"msg": "x"}])),
         ],
     )
     async def test_import_and_ingest_translate_timeouts(self, call, args, waits):
@@ -1264,7 +1264,7 @@ class TestOneClientFactory:
         )
 
         assert client.base_url == "https://acme.logicmonitor.com/santaba/rest"
-        assert client.ingest_url == "https://acme.logicmonitor.com"
+        assert client.ingest_url == "https://acme.logicmonitor.com/rest"
         assert isinstance(client.auth, BearerAuth)
         assert (client.max_retries, client.retry_after_cap) == (2, 60)
         assert client._client.timeout.read == 45

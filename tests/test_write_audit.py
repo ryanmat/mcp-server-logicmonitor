@@ -75,6 +75,50 @@ class TestWriteAuditLogging:
         assert "failed" in caplog.text.lower()
 
 
+class TestAuditAtTheDefaultLevel:
+    """R4.6: the audit trail reaches stderr at the default LM_LOG_LEVEL, warning."""
+
+    @pytest.fixture
+    def configure(self, monkeypatch):
+        """Configure logging from LM_LOG_LEVEL (unset means the default), then restore it."""
+        from lm_mcp.config import LMConfig
+        from lm_mcp.logging import configure_logging
+        from tests.logging_state import restored_logging
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test_token_value")
+
+        with restored_logging():
+            yield lambda: configure_logging(LMConfig())
+
+    def test_successful_write_is_on_stderr_at_the_default_level(
+        self, monkeypatch, capsys, configure
+    ):
+        from lm_mcp.config import LMConfig
+        from lm_mcp.logging import log_write_operation
+
+        monkeypatch.delenv("LM_LOG_LEVEL", raising=False)
+        assert LMConfig().log_level == "warning"
+        configure()
+        log_write_operation("create_device", {"name": "web-01"}, success=True)
+
+        assert "INFO lm_mcp.audit: Write operation: create_device" in capsys.readouterr().err
+
+    def test_other_info_records_stay_below_the_default_level(self, monkeypatch, capsys, configure):
+        monkeypatch.delenv("LM_LOG_LEVEL", raising=False)
+        configure()
+        logging.getLogger("lm_mcp.client").info("an info record outside the audit trail")
+        logging.getLogger("lm_mcp.server").info("another one")
+
+        assert capsys.readouterr().err == ""
+
+    def test_debug_level_keeps_the_audit_loggers_debug_records(self, monkeypatch, configure):
+        monkeypatch.setenv("LM_LOG_LEVEL", "debug")
+        configure()
+
+        assert logging.getLogger("lm_mcp.audit").isEnabledFor(logging.DEBUG)
+
+
 class TestPortalAuditVisibility:
     """Portal switches are auditable and audit lines carry portal identity."""
 

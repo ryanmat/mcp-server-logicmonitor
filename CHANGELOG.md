@@ -461,6 +461,12 @@ instead.
   `INVALID_REQUEST`, which is not retryable. It answered `UPSTREAM_ERROR` with `isRetryable` true
   and logged a traceback, so a client that follows `isRetryable` retried a call that could not
   succeed.
+- With an LMv1 token, `ingest_logs` and `push_metrics` sign the path after `/rest`
+  (`/log/ingest`, `/metric/ingest`), the one the portal checks. They signed `/rest/log/ingest`
+  and `/rest/metric/ingest`, which a live portal refused with 401 while the same token passed a
+  REST read, so LMv1 ingestion failed with 401 on every call. The same probe found a Bearer token accepted on
+  both, so the README, `server.json` and the two tools' descriptions no longer say ingestion
+  needs LMv1.
 
 ### Changed
 
@@ -630,6 +636,11 @@ instead.
   down.
 - The `lm-portal` skill finds down collectors by `is_down`, reads each one's evidence, and runs a
   collector operation only after asking the user.
+- A successful write's audit line reaches stderr at every `LM_LOG_LEVEL`, the default `warning`
+  and `error` included, where only `info` and `debug` showed it. Other INFO records still follow
+  `LM_LOG_LEVEL`.
+- Under the HTTP transport uvicorn logs at `LM_LOG_LEVEL`, where it logged at `info` whatever
+  the setting, so its startup and access lines are off at the default `warning`.
 - The server names itself `logicmonitor` at initialize, the server part of its MCP Registry name
   `io.github.ryanmat/logicmonitor`, where it said `logicmonitor-platform`.
 - `server.json` lists all 30 environment variables the server reads, with their defaults, choices

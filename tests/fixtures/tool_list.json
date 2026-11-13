@@ -8770,7 +8770,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Ingest log entries into LogicMonitor (requires LMv1 auth)",
+    "description": "Ingest log entries into LogicMonitor",
     "inputSchema": {
       "properties": {
         "logs": {
@@ -8936,7 +8936,7 @@
       "readOnlyHint": false,
       "title": null
     },
-    "description": "Push custom metrics into LogicMonitor (requires LMv1 auth)",
+    "description": "Push custom metrics into LogicMonitor",
     "inputSchema": {
       "properties": {
         "metrics": {

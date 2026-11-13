@@ -167,6 +167,34 @@ async def test_root_listing_names_the_health_routes_and_mcp(http_env, monkeypatc
     }
 
 
+@pytest.mark.parametrize("level", [None, "debug", "error"])
+async def test_uvicorn_log_level_follows_lm_log_level(http_env, monkeypatch, level):
+    """R4.6: uvicorn's loggers take LM_LOG_LEVEL (warning when unset), where info was fixed."""
+    import logging
+
+    from lm_mcp.transport.http import create_http_server
+
+    if level is None:
+        monkeypatch.delenv("LM_LOG_LEVEL", raising=False)
+    else:
+        monkeypatch.setenv("LM_LOG_LEVEL", level)
+    expected_name = level or "warning"
+    names = ("uvicorn.error", "uvicorn.access")
+    before = {name: logging.getLogger(name).level for name in names}
+
+    live = live_uvicorn(monkeypatch)
+    try:
+        async with live(create_http_server()):
+            levels = {name: logging.getLogger(name).level for name in names}
+    finally:
+        for name, previous in before.items():
+            logging.getLogger(name).setLevel(previous)
+
+    expected = logging.getLevelNamesMapping()[expected_name.upper()]
+    assert live.servers[0].config.log_level == expected_name
+    assert levels == dict.fromkeys(names, expected)
+
+
 def test_analysis_module_is_gone():
     with pytest.raises(ModuleNotFoundError):
         importlib.import_module("lm_mcp.analysis")

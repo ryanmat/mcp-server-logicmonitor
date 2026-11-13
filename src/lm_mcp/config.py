@@ -334,12 +334,13 @@ class LMConfig(BaseSettings):
     def ingest_url(self) -> str:
         """Return the base URL for LogicMonitor ingestion APIs.
 
-        Ingestion APIs (logs, metrics) use a different path structure
-        than the standard REST API.
+        Ingestion APIs (logs, metrics) live under /rest rather than /santaba/rest;
+        an ingest path such as /log/ingest follows this base, and an LMv1
+        signature covers that path, as it covers the path after /santaba/rest.
         """
         if not self.portal:
             raise ValueError("no portal set (multi-portal mode: select a portal via use_portal)")
-        return f"https://{self.portal}"
+        return f"https://{self.portal}/rest"
 
     @property
     def http_host_allowlist(self) -> frozenset[str]:

@@ -14,7 +14,7 @@ from lm_mcp.client import LogicMonitorClient
 from lm_mcp.config import LMConfig
 
 BASE_URL = "https://test.logicmonitor.com/santaba/rest"
-INGEST_URL = "https://test.logicmonitor.com"
+INGEST_URL = "https://test.logicmonitor.com/rest"
 ACCESS_ID = "test-access-id"
 ACCESS_KEY = "test-access-key"
 
@@ -49,6 +49,59 @@ def _assert_signed_over_wire_body(request: Request, resource_path: str) -> None:
     ).hexdigest()
     expected = base64.b64encode(hex_digest.encode("utf-8")).decode("utf-8")
     assert signature == expected, f"signature does not cover wire body {wire_body!r}"
+
+
+class TestIngestSignatureCoversThePathAfterRest:
+    """R4.6: an LMv1 ingest signature covers the path after /rest, as the portal requires.
+
+    A live probe of the sandbox portal on 2026-11-13, with one LMv1 token that a REST read
+    accepted, had /rest/log/ingest refuse a signature over /rest/log/ingest (401) and accept
+    one over /log/ingest (202), and /rest/metric/ingest accept one over /metric/ingest (202).
+    """
+
+    @pytest.fixture
+    def built_client(self, monkeypatch):
+        """A client from build_client, the one place the transports make a client."""
+        from lm_mcp.client import build_client
+
+        monkeypatch.delenv("LM_BEARER_TOKEN", raising=False)
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_ACCESS_ID", ACCESS_ID)
+        monkeypatch.setenv("LM_ACCESS_KEY", ACCESS_KEY)
+        monkeypatch.setenv("LM_MAX_RETRIES", "0")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        return build_client(
+            "test.logicmonitor.com", bearer_token=None, access_id=ACCESS_ID, access_key=ACCESS_KEY
+        )
+
+    @respx.mock
+    async def test_ingest_logs_signs_log_ingest(self, built_client):
+        from lm_mcp.tools.ingestion import ingest_logs
+
+        route = respx.post("https://test.logicmonitor.com/rest/log/ingest").mock(
+            return_value=Response(202, json={"success": True, "message": "Accepted"})
+        )
+        async with built_client as client:
+            await ingest_logs(client, logs=[{"message": "probe", "_lm.resourceId": {"a": "b"}}])
+
+        assert route.called
+        _assert_signed_over_wire_body(route.calls.last.request, "/log/ingest")
+
+    @respx.mock
+    async def test_push_metrics_signs_metric_ingest(self, built_client):
+        from lm_mcp.tools.ingestion import push_metrics
+
+        route = respx.post("https://test.logicmonitor.com/rest/metric/ingest").mock(
+            return_value=Response(202, json={"message": "accepted"})
+        )
+        metrics = {"resourceIds": {"system.hostname": "h"}, "dataSource": "D", "instances": []}
+        async with built_client as client:
+            await push_metrics(client, metrics=metrics)
+
+        assert route.called
+        request = route.calls.last.request
+        assert request.url.params["create"] == "true"
+        _assert_signed_over_wire_body(request, "/metric/ingest")
 
 
 class TestLMv1SignsWireBody:
@@ -112,13 +165,13 @@ class TestLMv1SignsWireBody:
     @respx.mock
     async def test_ingest_post_signs_wire_body(self, lmv1_client):
         """ingest_post signs exactly the bytes it sends to the ingestion host."""
-        route = respx.post(f"{INGEST_URL}/rest/log/ingest").mock(
+        route = respx.post(f"{INGEST_URL}/log/ingest").mock(
             return_value=Response(202, json={"success": True})
         )
 
         async with lmv1_client as client:
-            await client.ingest_post("/rest/log/ingest", json_body=[{"msg": "ü", "n": 2}])
+            await client.ingest_post("/log/ingest", json_body=[{"msg": "ü", "n": 2}])
 
         request = route.calls.last.request
         assert request.content == '[{"msg":"ü","n":2}]'.encode()
-        _assert_signed_over_wire_body(request, "/rest/log/ingest")
+        _assert_signed_over_wire_body(request, "/log/ingest")

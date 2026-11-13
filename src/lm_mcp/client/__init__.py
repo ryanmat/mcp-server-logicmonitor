@@ -42,5 +42,5 @@ def build_client(
         timeout=config.timeout,
         max_retries=config.max_retries,
         retry_after_cap=config.retry_after_cap_seconds,
-        ingest_url=f"https://{portal}",
+        ingest_url=f"https://{portal}/rest",
     )

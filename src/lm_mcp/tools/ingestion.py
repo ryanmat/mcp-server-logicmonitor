@@ -1,5 +1,5 @@
 # Description: Log and metric ingestion tools for LogicMonitor MCP server.
-# Description: Provides ingest_logs and push_metrics using LMv1 HMAC authentication.
+# Description: Provides ingest_logs and push_metrics, with a Bearer or an LMv1 token.
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ async def ingest_logs(
     should contain a message and resource mapping information.
 
     Args:
-        client: LogicMonitor API client with LMv1 authentication.
+        client: LogicMonitor API client.
         logs: List of log entries. Each entry should have:
             - message: The log message text
             - _lm.resourceId: Resource mapping (e.g., {"system.hostname": "server1"})
@@ -53,7 +53,7 @@ async def ingest_logs(
                 suggestion="Pass at least one log entry with message + _lm.resourceId.",
             )
 
-        result = await client.ingest_post("/rest/log/ingest", json_body=logs)
+        result = await client.ingest_post("/log/ingest", json_body=logs)
         return format_response(result)
     except Exception as e:
         return handle_error(e)
@@ -70,7 +70,7 @@ async def push_metrics(
     Metrics are associated with resources and organized by datasource.
 
     Args:
-        client: LogicMonitor API client with LMv1 authentication.
+        client: LogicMonitor API client.
         metrics: Metric payload containing:
             - resourceIds: Resource mapping (e.g., {"system.hostname": "server1"})
             - dataSource: Name of the datasource for these metrics
@@ -117,7 +117,7 @@ async def push_metrics(
             )
 
         result = await client.ingest_post(
-            "/rest/metric/ingest", json_body=metrics, params={"create": "true"}
+            "/metric/ingest", json_body=metrics, params={"create": "true"}
         )
         return format_response(result)
     except Exception as e:

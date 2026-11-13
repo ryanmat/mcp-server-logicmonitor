@@ -211,7 +211,7 @@ class TestOneRetryLoop:
             auth=auth,
             timeout=30,
             max_retries=3,
-            ingest_url="https://test.logicmonitor.com",
+            ingest_url="https://test.logicmonitor.com/rest",
         )
         throttled = httpx.Response(429, headers={"Retry-After": "1"})
         rest = respx.get("https://test.logicmonitor.com/santaba/rest/device/devices").mock(
@@ -226,7 +226,7 @@ class TestOneRetryLoop:
 
         await client.get("/device/devices")
         await client.post_multipart("/setting/datasources/importjson", {"name": "x"})
-        await client.ingest_post("/rest/log/ingest", [{"msg": "x"}])
+        await client.ingest_post("/log/ingest", [{"msg": "x"}])
 
         assert seen == [
             ("GET", "LogicMonitor API"),
