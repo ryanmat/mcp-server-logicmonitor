@@ -1,249 +1,308 @@
-# LogicMonitor MCP Server: Client Setup
+# Connect an MCP client to the LogicMonitor server
 
-Per-client configuration for connecting the LogicMonitor MCP server. Every client runs the
-same server (`uvx --from lm-mcp lm-mcp-server`); only the config format and file location
-differ. For the fastest path (Claude Code) see the [README Setup](../README.md#setup).
+Connect Claude Code, Claude Desktop, Cursor, VS Code, OpenAI Codex CLI or Gemini CLI to the LogicMonitor MCP server, read-only first.
 
-Back to the [README](../README.md).
+1. [Connect Claude Code](#connect-claude-code)
+2. [Connect Claude Desktop](#connect-claude-desktop)
+3. [Connect Cursor](#connect-cursor)
+4. [Connect VS Code](#connect-vs-code)
+5. [Connect OpenAI Codex CLI](#connect-openai-codex-cli)
+6. [Connect Gemini CLI](#connect-gemini-cli)
+7. [Optional: Connect over Streamable HTTP](#optional-connect-over-streamable-http)
+8. [Optional: Narrow the tool list](#optional-narrow-the-tool-list)
+9. [Optional: Turn on the write tools](#optional-turn-on-the-write-tools)
+10. [Verify the connection](#verify-the-connection)
 
-### Claude Code
+Every client starts the same command, `uvx --from lm-mcp lm-mcp-server`; the config file and its format are what differ. Back to the [README](../README.md).
 
-```bash
-claude mcp add logicmonitor \
-  -e LM_PORTAL=yourcompany.logicmonitor.com \
-  -e LM_BEARER_TOKEN=<your-bearer-token> \
-  -e LM_ENABLE_WRITE_OPERATIONS=true \
-  -- uvx --from lm-mcp lm-mcp-server
-```
+## Before you begin
 
-> **Note:** Remove `-e LM_ENABLE_WRITE_OPERATIONS=true` if you want read-only access.
+- Install [uv](https://docs.astral.sh/uv/), which provides `uvx`. The server needs Python 3.11 or later, and uv downloads one when none is installed.
+- Create a LogicMonitor API token under **Settings** > **Users and Roles** > **API Tokens**: a Bearer token, or an LMv1 access ID and key, for a user whose role grants what the tools you call need.
+- Note your portal hostname, such as `yourcompany.logicmonitor.com`.
+- For the Streamable HTTP task, run the server with `LM_TRANSPORT=http` and `LM_HTTP_AUTH_TOKEN` set. See [Deployment](../README.md#deployment) in the README.
 
-Verify the connection:
-```bash
-claude mcp list
-```
+The server lists only its read tools until `LM_ENABLE_WRITE_OPERATIONS=true` is set, so each client task below sets up read-only access. [Optional: Turn on the write tools](#optional-turn-on-the-write-tools) adds the rest.
 
-To update an existing configuration, remove and re-add:
-```bash
-claude mcp remove logicmonitor
-claude mcp add logicmonitor -e LM_PORTAL=... -e LM_BEARER_TOKEN=... -- uvx --from lm-mcp lm-mcp-server
-```
+## Connect Claude Code
 
-### Cursor
+To connect Claude Code:
 
-Add to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project):
+1. Add the server with your portal and token.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token"
-      }
-    }
-  }
-}
-```
+   ```bash
+   claude mcp add logicmonitor \
+     -e LM_PORTAL=yourcompany.logicmonitor.com \
+     -e LM_BEARER_TOKEN=<LM_BEARER_TOKEN> \
+     -- uvx --from lm-mcp lm-mcp-server
+   ```
 
-To enable write operations and ingestion APIs:
+2. Run `claude mcp list`. The list shows `logicmonitor` as connected.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token",
-        "LM_ACCESS_ID": "your-access-id",
-        "LM_ACCESS_KEY": "your-access-key",
-        "LM_ENABLE_WRITE_OPERATIONS": "true"
-      }
-    }
-  }
-}
-```
+## Connect Claude Desktop
 
-Then restart Cursor or enable the server in **Cursor Settings** → **MCP**.
+To connect Claude Desktop:
 
-**Cursor's 40-tool cap (recommended for v3.6.0+):** Cursor only loads the first 40 MCP tools — the rest are invisible to the agent. Use `LM_MCP_CATEGORIES` to fit a curated subset under the cap. The `workflow` category alone (`triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, scoring/correlation tools, plus `update_logicmodule`) is roughly 23 tools and covers the 80% case:
+1. Open `claude_desktop_config.json`, in `~/Library/Application Support/Claude/` on macOS or `%APPDATA%\Claude\` on Windows.
+2. Add the `logicmonitor` entry under `mcpServers`.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token",
-        "LM_MCP_CATEGORIES": "workflow"
-      }
-    }
-  }
-}
-```
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "your-bearer-token"
+         }
+       }
+     }
+   }
+   ```
 
-For surgical control, combine with `LM_ENABLED_TOOLS`:
+3. Restart Claude Desktop.
 
-```json
-"env": {
-  "LM_PORTAL": "yourcompany.logicmonitor.com",
-  "LM_BEARER_TOKEN": "your-bearer-token",
-  "LM_ENABLED_TOOLS": "triage,diagnose,health_check,portal_overview,get_alerts,get_devices,get_alert_details,acknowledge_alert,search_tools",
-  "LM_MCP_CATEGORIES": "read,workflow"
-}
-```
+## Connect Cursor
 
-The two filters compose by intersection: `LM_MCP_CATEGORIES` only narrows further, never expands. With the env var unset, no category filter applies, and the server lists every tool its configuration enables out of the server's 273 tools.
+Older Cursor releases sent only the first 40 MCP tools to the agent. Cursor's MCP documentation (cursor.com/docs/mcp, read 2026-11-13) states no limit. With writes off the server lists 150 of its 273 tools, so if your release still caps the list, narrow it as [Optional: Narrow the tool list](#optional-narrow-the-tool-list) shows.
 
-### Claude Desktop
+To connect Cursor:
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+1. Open `~/.cursor/mcp.json` to use the server in every project, or `.cursor/mcp.json` in one project.
+2. Add the `logicmonitor` entry. Cursor reads `${env:LM_BEARER_TOKEN}` from your environment, so the token stays out of the file.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token"
-      }
-    }
-  }
-}
-```
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "${env:LM_BEARER_TOKEN}"
+         }
+       }
+     }
+   }
+   ```
 
-To enable write operations and ingestion APIs:
+3. Restart Cursor.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token",
-        "LM_ACCESS_ID": "your-access-id",
-        "LM_ACCESS_KEY": "your-access-key",
-        "LM_ENABLE_WRITE_OPERATIONS": "true"
-      }
-    }
-  }
-}
-```
+## Connect VS Code
 
-### OpenAI Codex CLI
+VS Code's Copilot reads a workspace-root `.mcp.json`, or `~/.copilot/mcp-config.json` for every workspace (`$COPILOT_HOME/mcp-config.json` when that variable is set). Both take a top-level `mcpServers` object. The `servers` format in `.vscode/mcp.json` belongs to the deprecated Local harness, which Copilot reads only through forwarding. See [MCP configuration reference](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) (approved 2026-11-11).
 
-```bash
-codex mcp add logicmonitor \
-  --env LM_PORTAL=yourcompany.logicmonitor.com \
-  --env LM_BEARER_TOKEN=<your-bearer-token> \
-  -- uvx --from lm-mcp lm-mcp-server
-```
+To connect VS Code:
 
-Or add directly to `~/.codex/config.toml`:
+1. Open `.mcp.json` at the workspace root, or `~/.copilot/mcp-config.json`.
+2. Add the `logicmonitor` entry. VS Code reads `${LM_BEARER_TOKEN}` from your environment.
 
-```toml
-[mcp_servers.logicmonitor]
-command = "uvx"
-args = ["--from", "lm-mcp", "lm-mcp-server"]
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "type": "stdio",
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "${LM_BEARER_TOKEN}"
+         },
+         "tools": ["*"]
+       }
+     }
+   }
+   ```
 
-[mcp_servers.logicmonitor.env]
-LM_PORTAL = "yourcompany.logicmonitor.com"
-LM_BEARER_TOKEN = "<your-bearer-token>"
-```
+## Connect OpenAI Codex CLI
 
-### Cline (VS Code Extension)
+`codex mcp add logicmonitor --env LM_PORTAL=... --env LM_BEARER_TOKEN=... -- uvx --from lm-mcp lm-mcp-server` writes the same server with the token in the file. The steps below keep the token in your environment instead.
 
-Add to Cline's MCP settings file:
+To connect OpenAI Codex CLI:
 
-**macOS**: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+1. Open `~/.codex/config.toml`.
+2. Add the `logicmonitor` table. `env_vars` forwards `LM_BEARER_TOKEN` from your environment to the server.
 
-**Windows**: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+   ```toml
+   [mcp_servers.logicmonitor]
+   command = "uvx"
+   args = ["--from", "lm-mcp", "lm-mcp-server"]
+   env = { LM_PORTAL = "yourcompany.logicmonitor.com" }
+   env_vars = ["LM_BEARER_TOKEN"]
+   ```
 
-**Linux**: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+3. Run `codex mcp list`. The list shows `logicmonitor`.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token"
-      }
-    }
-  }
-}
-```
+## Connect Gemini CLI
 
-### GitHub Copilot (VS Code 1.99+)
+To connect Gemini CLI:
 
-Add to your VS Code settings (`settings.json`) or project-level `.vscode/mcp.json`:
+1. Open `~/.gemini/settings.json`, or `.gemini/settings.json` in a project.
+2. Add the `logicmonitor` entry under `mcpServers`. Gemini CLI reads `$LM_BEARER_TOKEN` from your environment.
 
-```json
-{
-  "mcp": {
-    "servers": {
-      "logicmonitor": {
-        "command": "uvx",
-        "args": ["--from", "lm-mcp", "lm-mcp-server"],
-        "env": {
-          "LM_PORTAL": "yourcompany.logicmonitor.com",
-          "LM_BEARER_TOKEN": "your-bearer-token"
-        }
-      }
-    }
-  }
-}
-```
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "$LM_BEARER_TOKEN"
+         }
+       }
+     }
+   }
+   ```
 
-Enable MCP in VS Code settings: `"chat.mcp.enabled": true`
+3. Start Gemini CLI and run `/mcp`. The list shows `logicmonitor` and its tools.
 
-### Gemini CLI
+## Optional: Connect over Streamable HTTP
 
-Gemini CLI supports MCP servers. Configure in `~/.gemini/settings.json`:
+Use this task when the server runs as an HTTP service, such as the container, instead of as a subprocess of the client. The client sends `LM_HTTP_AUTH_TOKEN` as a Bearer token on every request to `/mcp`, and no LogicMonitor credential leaves the server.
 
-```json
-{
-  "mcpServers": {
-    "logicmonitor": {
-      "command": "uvx",
-      "args": ["--from", "lm-mcp", "lm-mcp-server"],
-      "env": {
-        "LM_PORTAL": "yourcompany.logicmonitor.com",
-        "LM_BEARER_TOKEN": "your-bearer-token"
-      }
-    }
-  }
-}
-```
+To connect a client over Streamable HTTP:
 
-### Other Clients
+1. Note the server's URL, such as `http://127.0.0.1:8080/mcp`, and its `LM_HTTP_AUTH_TOKEN`.
+2. Add the server in your client's format.
 
-**Aider**: Does not currently have native MCP support. Track progress at [aider issue #3314](https://github.com/Aider-AI/aider/issues/3314).
+   Claude Code:
 
-**Continue**: Uses similar JSON configuration. See [Continue MCP docs](https://docs.continue.dev/customize/model-providers/mcp).
+   ```bash
+   claude mcp add --transport http logicmonitor http://127.0.0.1:8080/mcp \
+     --header "Authorization: Bearer <LM_HTTP_AUTH_TOKEN>"
+   ```
 
-### Enabling Write Operations
+   Cursor, in `mcp.json`:
 
-For any JSON-based configuration, add `LM_ENABLE_WRITE_OPERATIONS` to the `env` section:
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "url": "http://127.0.0.1:8080/mcp",
+         "headers": {
+           "Authorization": "Bearer ${env:LM_HTTP_AUTH_TOKEN}"
+         }
+       }
+     }
+   }
+   ```
 
-```json
-"env": {
-  "LM_PORTAL": "yourcompany.logicmonitor.com",
-  "LM_BEARER_TOKEN": "your-bearer-token",
-  "LM_ENABLE_WRITE_OPERATIONS": "true"
-}
-```
+   VS Code, in `.mcp.json` or `mcp-config.json`:
 
-This enables tools like `acknowledge_alert`, `create_sdt`, `create_device`, etc.
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "type": "http",
+         "url": "http://127.0.0.1:8080/mcp",
+         "headers": {
+           "Authorization": "Bearer ${LM_HTTP_AUTH_TOKEN}"
+         }
+       }
+     }
+   }
+   ```
+
+   OpenAI Codex CLI, in `config.toml`, reading the token from `LM_HTTP_AUTH_TOKEN`:
+
+   ```toml
+   [mcp_servers.logicmonitor]
+   url = "http://127.0.0.1:8080/mcp"
+   bearer_token_env_var = "LM_HTTP_AUTH_TOKEN"
+   ```
+
+   Gemini CLI, in `settings.json`:
+
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "httpUrl": "http://127.0.0.1:8080/mcp",
+         "headers": {
+           "Authorization": "Bearer your-http-auth-token"
+         }
+       }
+     }
+   }
+   ```
+
+3. Restart the client.
+
+## Optional: Narrow the tool list
+
+Use this task when a client handles a long tool list poorly, or to give an agent only the tools its job needs. `LM_MCP_CATEGORIES` takes `read`, `write`, `delete`, `export`, `import`, `session` and `workflow`, and narrows `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` without widening them. `LM_ENABLED_TOOLS` and `LM_DISABLED_TOOLS` cannot both be set.
+
+To narrow the tool list:
+
+1. Set `LM_MCP_CATEGORIES` in the entry's `env`, such as `workflow`. With writes off, `workflow` lists 13 tools: the analytics, the composites, `search_tools` and `audit_network_monitoring_coverage`.
+
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "${env:LM_BEARER_TOKEN}",
+           "LM_MCP_CATEGORIES": "workflow"
+         }
+       }
+     }
+   }
+   ```
+
+2. For named tools in place of a category, set `LM_ENABLED_TOOLS` to their names. The server lists those eight tools.
+
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "${env:LM_BEARER_TOKEN}",
+           "LM_ENABLED_TOOLS": "triage,diagnose,health_check,portal_overview,get_alerts,get_alert_details,get_devices,search_tools"
+         }
+       }
+     }
+   }
+   ```
+
+3. Restart the client.
+
+## Optional: Turn on the write tools
+
+Use this task only for a portal and a token you accept the assistant changing. The server then lists the tools that create, update, delete, acknowledge and run. Before a destructive tool runs, a client that supports MCP elicitation asks you to confirm.
+
+To turn on the write tools:
+
+1. Add `LM_ENABLE_WRITE_OPERATIONS` set to `true` to the entry's `env`. In Claude Code, pass `-e LM_ENABLE_WRITE_OPERATIONS=true` to `claude mcp add`.
+
+   ```json
+   {
+     "mcpServers": {
+       "logicmonitor": {
+         "command": "uvx",
+         "args": ["--from", "lm-mcp", "lm-mcp-server"],
+         "env": {
+           "LM_PORTAL": "yourcompany.logicmonitor.com",
+           "LM_BEARER_TOKEN": "${env:LM_BEARER_TOKEN}",
+           "LM_ENABLE_WRITE_OPERATIONS": "true"
+         }
+       }
+     }
+   }
+   ```
+
+2. Restart the client. The tool list grows from 150 to 261.
+
+## Verify the connection
+
+To verify the connection:
+
+1. Ask the assistant to list the first 5 devices in LogicMonitor. It calls `get_devices` and names five devices.
+2. Ask it to search the LogicMonitor tools for "acknowledge". With writes off, `search_tools` returns no write tool.

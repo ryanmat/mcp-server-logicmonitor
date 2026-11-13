@@ -45,14 +45,14 @@ Run the server locally over stdio with `uv run lm-mcp-server`, which needs
 
 ## Expectations for a pull request
 
-- **Tests ship with the change.** New behavior needs unit coverage; bug fixes
-  need a test that fails before the fix.
-- **One logical unit per PR.** Unrelated fixes belong in their own PR.
-- **Conventional commit titles**, for example `fix(http): ...`, `feat(alerts): ...`,
-  `docs(readme): ...`. The PR title becomes the squashed commit subject.
-- **Describe the why**, not just the what. Include how you verified the change.
-- **No credentials, ever.** Not in code, tests, fixtures, or examples. Push
-  protection and secret scanning are enabled and will block them.
+- Ship tests with the change: new behavior needs unit coverage, and a bug fix needs
+  a test that fails before the fix.
+- Keep one logical unit per PR; unrelated fixes go in their own PR.
+- Title the PR as a conventional commit, such as `fix(http): ...`, `feat(alerts): ...`
+  or `docs(readme): ...`. The PR title becomes the squashed commit subject.
+- Say why the change is needed and how you verified it.
+- Leave credentials out of code, tests, fixtures and examples. Push protection and
+  secret scanning are on and block them.
 
 ## Tool changes
 
@@ -72,6 +72,24 @@ will fail.
 Write tools must be decorated with `require_write_permission` and annotated with
 `readOnlyHint=False` and `openWorldHint=True`: the server leaves them out of `tools/list`
 and refuses calls to them unless the operator sets `LM_ENABLE_WRITE_OPERATIONS=true`.
+A tool that deletes or overwrites also carries `destructiveHint=True`, and the server asks
+the user before it runs when the client supports MCP elicitation.
+
+A change to a tool's name or description can move `search_tools` results. CI grades
+`search_tools` against `evals/search/queries.json` with writes off and on and fails below
+the pass rate; run `uv run python evals/grade.py` before you push.
+
+## Live shapes and probe records
+
+Every fixture for a new or changed tool is copied from a response a real portal
+returned, since the API documentation often differs from what the API sends. Trim only
+what identifies a portal or a person, and put a comment above the fixture naming the
+date of the read and the kind of portal it came from (a sandbox, a trial).
+
+The pull request carries the probe record: the date, each request with its status code,
+the keys the change reads, and anything the live API did that its documentation does not
+say. A response shape no portal has returned yet stays marked unverified in the tool's
+description until one does.
 
 ## Reporting bugs and vulnerabilities
 
@@ -81,8 +99,9 @@ issue: use private vulnerability reporting as described in
 
 ## Related documents
 
-- [README.md](README.md) — installation, configuration, client setup
-- [MULTIPORTAL.md](MULTIPORTAL.md) — multi-portal mode (stdio only)
-- [SECURITY.md](SECURITY.md) — security policy and deployment considerations
-- [CHANGELOG.md](CHANGELOG.md) — release history; add an entry under
+- [README.md](README.md): installation, configuration and the tool families
+- [documentation/client-setup.md](documentation/client-setup.md): each client's configuration
+- [MULTIPORTAL.md](MULTIPORTAL.md): multi-portal mode (stdio only)
+- [SECURITY.md](SECURITY.md): the security policy and the security model
+- [CHANGELOG.md](CHANGELOG.md): release history; add an entry under
   `## [Unreleased]` with your change
