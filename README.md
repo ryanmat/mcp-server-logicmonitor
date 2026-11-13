@@ -6,48 +6,24 @@
 
 <!-- mcp-name: io.github.ryanmat/logicmonitor -->
 
-Model Context Protocol (MCP) server that gives AI assistants structured access to the LogicMonitor REST API v3 through 273 tools, 3 workflow prompts, and 25 resources.
+A Model Context Protocol (MCP) server that gives AI assistants the LogicMonitor REST API v3 through 273 tools, 3 workflow prompts and 25 resources.
 
 ## Overview
 
-The server runs as a local subprocess of your MCP client and calls your portal with your API token. It works with any MCP client that launches a stdio server, including Claude Desktop, Claude Code, Cursor, Continue, and Cline.
+Your MCP client starts the server as a subprocess and talks to it over stdio; the server calls your portal with your API token. It can also run as an HTTP service that serves MCP at `/mcp`.
 
-Until you set `LM_ENABLE_WRITE_OPERATIONS=true`, the server does not list the tools that change your portal. Composite tools such as `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan`, and `detect_site_outage` answer common investigations in one call, and `search_tools` finds the right tool when your client cannot load them all.
+Of the 273 tools, 261 are there with one portal. Multi-portal mode adds four portal tools, and Edwin AI credentials add eight Edwin tools. The server lists a tool that changes the portal only when you set `LM_ENABLE_WRITE_OPERATIONS=true`, and refuses it by name until then, so by default a client sees 150 of them (154 in multi-portal mode, 7 more with Edwin credentials).
 
-The 273 counts every tool the server can advertise; four of them appear only in multi-portal mode and eight only with Edwin AI credentials; see [Integrations](#integrations).
-
-## What's new in v4.3.0
-
-A hardening release: mostly fixes to HTTP exposure, Terraform gating, and analytics that returned wrong or partial answers without saying so.
-
-Check these before you upgrade:
-
-- `LM_TRANSPORT=http` with no `LM_HTTP_AUTH_TOKEN` refuses to start on the default bind, and HTTP routes check `Host` and `Content-Type`.
-- `terraform_init` and `terraform_plan` need writes enabled, the `terraform` subprocess no longer inherits cloud credentials, and `backend_config` is an object.
-- `get_topology_map` no longer takes `device_group_id`.
-- `get_collector_health` reads each collector's `isDown` field and no longer returns `active_collector_down_alerts`, so `detect_site_outage` verdicts change where a collector is down.
-- `calculate_availability` and `score_alert_noise` read cleared alerts, so availability falls and flap counts rise where cleared incidents exist.
-
-The [CHANGELOG](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/CHANGELOG.md) has every change and what to do about it.
-
-<details>
-<summary>Earlier releases</summary>
-
-- v4.2.1: LMv1 portals authenticate again, tool errors reach the client with `isError: true`, every tool is callable per its own schema, and the container installs from `uv.lock`.
-- v4.2.0: Multi-portal mode serves many customer portals from one server, with credentials in an age-encrypted vault.
-- v4.1.0: Native OTLP metrics tools, for discovery and PromQL range queries.
-- v4.0.0: Tools that called nonexistent API paths are gone, the cost and Service Insight tools move to working APIs, and the Automated Diagnostics and Remediation surface arrives.
-
-</details>
+Before one of the 36 destructive tools runs, the server asks you to confirm when the client supports MCP elicitation. Where it cannot ask, as over the stateless HTTP transport, the write setting is the only check.
 
 ## Setup
 
-You need [uv](https://docs.astral.sh/uv/) for `uvx`, and a LogicMonitor API token.
+You need [uv](https://docs.astral.sh/uv/) for `uvx`, and a LogicMonitor API token: a Bearer token, or an LMv1 access ID and key.
 
-To connect Claude Code:
+### Claude Code
 
 1. In your portal, go to **Settings** > **Users and Roles** > **API Tokens**.
-2. Create an API-only user or add a token to an existing user, then copy the bearer token.
+2. Create an API-only user or add a token to an existing user, then copy the Bearer token.
 3. Add the server:
 
    ```bash
@@ -57,10 +33,12 @@ To connect Claude Code:
      -- uvx --from lm-mcp lm-mcp-server
    ```
 
-4. Run `claude mcp list`. The output lists `logicmonitor` as connected.
+4. Run `claude mcp list`. It lists `logicmonitor` as connected.
 5. Ask your assistant to "List the first 5 devices in LogicMonitor".
 
-Cursor, Claude Desktop, Cline, and Gemini CLI run the same server with the same block:
+### Other clients
+
+Claude Desktop, Cursor and Gemini CLI read the same block:
 
 ```json
 {
@@ -77,7 +55,21 @@ Cursor, Claude Desktop, Cline, and Gemini CLI run the same server with the same 
 }
 ```
 
-[documentation/client-setup.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/client-setup.md) has each client's config file location and exact steps, including OpenAI Codex and GitHub Copilot, whose formats differ. Cursor loads only the first 40 MCP tools, and that page shows how to fit a curated set under the cap with `LM_MCP_CATEGORIES`.
+[documentation/client-setup.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/client-setup.md) has each client's config file and steps, including VS Code and OpenAI Codex CLI, whose formats differ. Cursor loads only the first 40 MCP tools; that page shows how to fit a set under the cap with `LM_MCP_CATEGORIES`.
+
+### Container
+
+The image on GitHub Container Registry runs the HTTP transport on port 8080:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e LM_PORTAL=yourcompany.logicmonitor.com \
+  -e LM_BEARER_TOKEN=<your-bearer-token> \
+  -e LM_HTTP_AUTH_TOKEN=<a-secret-of-16-characters-or-more> \
+  ghcr.io/ryanmat/mcp-server-logicmonitor:latest
+```
+
+Point a Streamable HTTP client at `http://127.0.0.1:8080/mcp` with the header `Authorization: Bearer <LM_HTTP_AUTH_TOKEN>`. [Deployment](#deployment) covers compose, TLS and Kubernetes.
 
 ### Other install methods
 
@@ -85,99 +77,99 @@ Cursor, Claude Desktop, Cline, and Gemini CLI run the same server with the same 
 # pip
 pip install lm-mcp
 
-# From source
+# a persistent install; uv tool upgrade lm-mcp picks up a new release
+uv tool install lm-mcp
+
+# from source
 git clone https://github.com/ryanmat/mcp-server-logicmonitor.git
 cd mcp-server-logicmonitor
 uv sync
+uv run lm-mcp-server
 ```
 
-A `uv tool install` does not update itself: run `uv tool upgrade lm-mcp`, then restart your MCP client.
+Restart your MCP client after an upgrade.
 
 ## Usage
 
-Ask your assistant in natural language:
+Ask your assistant in plain language:
 
-- "Show me all critical alerts from the last hour"
-- "Acknowledge alert LMA12345 with note 'Investigating disk issue'"
-- "What datasources are applied to device 123, and get CPU metrics for the last hour"
-- "Create a dashboard called 'API Health' and add a graph widget"
-- "Create a 2-hour maintenance window (SDT) for device 123"
-- "Triage all critical alerts from the last 4 hours"
-- "Run a health check on device 123, then give me a portal overview for shift handoff"
-- "Forecast when memory on device 123 will hit 90%"
-- "What's the blast radius if device 789 goes down?"
-- "What diagnostics ran on device 123 today, and what did the scripts output?"
+- "Triage the critical alerts from the last 4 hours"
+- "Run a health check on device 123"
+- "Give me a portal overview for shift handoff"
+- "Forecast when memory on device 123 reaches 90 percent"
+- "What is the blast radius if device 789 goes down?"
+- "Acknowledge alert LMA12345 with the note 'Investigating disk issue'"
+- "Create a 2-hour SDT for device 123"
 
-The server also takes LogicMonitor filter syntax directly, for example "Get devices where filter is 'displayName~"prod",hostStatus:"normal"'". String values, `hostStatus` words included, are quoted.
+The tools also take LogicMonitor filter syntax, for example `displayName~"prod",hostStatus:"normal"`. String values, `hostStatus` words included, are quoted.
 
 ### Find a tool
 
-- `search_tools`: keyword search by name and description over the tools your settings list, so with writes off it names no write tool; an optional `category` narrows it to one group
-- the `lm://guide/tool-categories` resource: all 273 tools grouped by domain
-- [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md): every tool, its parameters, and its read/write classification, generated from the tool registry
+Start with `search_tools`. It searches the tools your settings list by keyword, so with writes off it names no write tool, and `category` narrows it to one group. The `lm://guide/tool-categories` resource groups all 273 tools by domain, and [documentation/tools.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/tools.md) lists every tool with its parameters and whether it writes, generated from the registry.
 
-### What the tools cover
+### Tool families
 
-| Area | Tools |
-|------|-------|
-| Alerts | Query, acknowledge, bulk acknowledge, escalate and add notes to alerts; full CRUD for alert rules; datapoint thresholds, read at instance, device or group level with the level each one comes from, and set or cleared at instance or group level |
-| Devices | Full CRUD for devices and groups, device and group properties, and manual datasource instances; scheduling Active Discovery on a device; the device delta, to follow what changed; unmonitored devices a NetScan found |
-| Metrics | Datasources and the devices each applies to, instances, metric data, graphs, and native OTLP metrics through PromQL range and instant queries; `analyze_metric(source="otlp")` analyzes a PromQL series |
-| Dashboards | Full CRUD for dashboards, widgets, and groups |
-| SDT | Create, list, bulk create, and bulk delete scheduled downtime |
-| Collectors | Collectors and collector groups, each collector's events and uploaded log files, and the upgrade history; with writes on, status checks, restarts, acknowledging a down collector, and running allowlisted debug commands one at a time (`collector_debug`). OpenTelemetry (lmotel) collectors are not among them, since the v3 API the server reads does not list them |
-| Websites | Full CRUD for synthetic checks and website groups; the checkpoint locations checks run from |
-| Reports | List, view, run, and schedule reports |
-| Escalations | Full CRUD for escalation chains and recipient groups |
-| Users and audit | Users, roles, access groups, API tokens, the portal's tenant names, audit logs, ops notes, login and change audits |
-| LogicModules | Query, create, update, delete, and import data, config, event, property, topology, log, diagnostic, and remediation sources, and read any of them as its full REST object with `raw=true` (remediation sources have no import), plus Config Archive retrieval, diffs, and on-demand collection |
-| Diagnostics and remediation | Assigned-source resolution, structured execution results with script output, manual execution, action chains and rules |
+| Family | What the tools cover |
+|--------|----------------------|
+| Alerts | Query, acknowledge, bulk acknowledge, escalate and annotate alerts; alert rules; datapoint thresholds, read at instance, device or group level with the level each comes from, and set or cleared at instance or group level |
+| Devices | Devices and groups, their properties and manual instances; Active Discovery scheduling; the device delta, to follow what changed; the unmonitored devices a NetScan found |
+| Metrics | Datasources and the devices each applies to, instances, metric data and graphs |
+| Dashboards | Dashboards, widgets and dashboard groups |
+| SDT | Scheduled downtime, one at a time or in bulk |
+| Collectors | Collectors and collector groups, with the operations below |
+| Websites | Synthetic checks, website groups and checkpoint locations |
+| Reports | List, view, run and schedule reports |
+| Escalations | Escalation chains and recipient groups |
+| Users and audit | Users, roles, access groups, API tokens, audit logs and ops notes |
+| LogicModules | Data, config, event, property, topology, log, diagnostic and remediation sources: query, create, update, delete and import, and read any as its full REST object with `raw=true`; Config Archive versions, diffs and on-demand collection |
+| Diagnostics and remediation | Assigned sources, execution results with script output, manual runs, action chains and action rules |
 | Services | Service Insights services, service groups and rules |
-| APM traces | Service discovery, per-operation RED metrics, service alerts, and OTel properties |
-| Network | Neighbors, interfaces, flows, connections, top talkers, link flaps, and outage detection. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |
-| Usage | The contract's entitlements per feature, including the features the usage page hides, and the portal's current resource counts, which are not billing figures |
-| Cost | Cost recommendations, recommendation categories, and idle resources (LM Envision) |
-| Ingestion | Push logs and metrics, with a Bearer token or an LMv1 token |
-| Logs | LM Logs pipelines, tracked queries, saved query groups, partitions with their contracts, and the usage figure. Log search is not offered: the v3 search endpoint applied neither the query nor the time range when probed |
-| Batch jobs | List batch jobs and the BatchJob datasources on a device; per-run output comes from `get_device_data` |
+| APM | Traced services and their alerts; a service's operations, metrics and properties through the device tools |
+| Network | Neighbors, interfaces, flows, connections, top talkers and link flaps. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |
+| Usage and cost | The contract's entitlements per feature, current resource counts (not billing figures), cost recommendations and idle resources |
+| Ingestion | `ingest_logs` and `push_metrics`, with a Bearer or an LMv1 token |
+| Batch jobs | Batch jobs and the BatchJob datasources on a device |
 
-`get_device_flows` and `get_device_top_talkers` read a device's NetFlow paths and answer `FEATURE_DISABLED` when the portal has NetFlow off, as the only portal tested does. They return rows as the API sends them, so treat the row shapes as unverified until you have tried them on a portal with NetFlow data.
+`update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it reads the definition, deep-merges `changes`, checks required fields, and returns a dry-run diff unless you ask it to apply.
 
-`update_logicmodule(type, id, changes, mode)` is the safe way to change a LogicModule: it reads the full definition, deep-merges your `changes`, validates required fields, and returns a dry-run diff by default, so a partial change cannot blank a script.
+`get_device_flows` and `get_device_top_talkers` answer `FEATURE_DISABLED` when the portal has NetFlow off, as the only portal tested does, so their row shapes are unverified against NetFlow data.
 
-### Analysis tools
+### Analytics and composites
 
-These run server-side in pure Python, so an assistant gets the result in one call.
+The analytics run in the server, so an assistant gets an answer in one call:
 
-- Alert correlation clusters, statistics by severity and device, noise scoring with flap detection, and burst detection
-- `analyze_metric` reads a series once for its summary, trend, seasonality, change points, anomalies (z-score, IQR, MAD) and linear and Holt-Winters forecast to a threshold, and with one more read compares it with an earlier window; metric correlation across series
-- Availability with MTTR from active and cleared alerts, and SLO error budgets
-- Topology-based blast radius, and change correlation against audit logs
+- `analyze_metric` reads one series once for its summary, trend, seasonality, change points, anomalies and a forecast to a threshold, and can compare it with an earlier window.
+- `analyze_alerts` clusters a window's alerts and reports statistics, noise, flapping and bursts.
+- `correlate_metrics`, `calculate_availability` (with MTTR and an SLO error budget) and `analyze_blast_radius` cover the rest.
 
-Composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) combine these. Each takes `detail_level` (`summary` or `full`) and returns partial results when a sub-tool fails.
+The composites combine several reads to answer a common investigation: `triage`, `diagnose`, `health_check`, `portal_overview`, `capacity_plan` and `detect_site_outage`. Each takes `detail_level` (`summary` or `full`) and returns what it could read when a sub-call fails. `triage`, `portal_overview`, `capacity_plan` and `detect_site_outage` send a progress notification per phase when the request carries a progress token. These eleven tools declare an output schema and return structured content beside the JSON text.
 
-### Claude Code skills
+### Edwin AI
 
-Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage` in Claude Code.
+Set `EDWIN_CLIENT_ID` and `EDWIN_CLIENT_TOKEN` to an Edwin AI API credential and the server lists eight more tools:
 
-| Skill | Command | Description |
-|-------|---------|-------------|
-| Alert Triage | `/lm-triage` | Investigate active alerts, score noise, correlate clusters, assess blast radius, take action |
-| Device Health | `/lm-health <device>` | Health check: metrics, anomalies, availability, topology |
-| Portal Overview | `/lm-portal` | Portal-wide snapshot for shift handoff: alerts, collectors, SDTs, down devices |
-| Capacity Planning | `/lm-capacity <device>` | Trend analysis, seasonality detection, breach forecasting, right-sizing |
-| APM Investigation | `/lm-apm [service]` | Service discovery, operation-level RED metrics, alert correlation |
-| Remediation | `/lm-remediate <alert_id or device>` | Diagnose an alert, then run an assigned RemediationSource or an Edwin AI agent tool after a pre-execution checklist and your confirmation |
-| Edwin Review | `/lm-edwin [insight]` | Check an Edwin AI insight's root cause against the causal CI's metric and the alert window |
-| Logs Review | `/lm-logs [partition]` | Review LM Logs partitions and their contracts, the pipelines that name them, usage, and saved and tracked queries |
+- `get_edwin_insights` and `get_edwin_insight` read the incidents Edwin built from correlated alerts, with its root cause and remediation analysis when it has one.
+- `get_edwin_records`, `get_edwin_alert_volume` and `get_edwin_metadata` read Edwin's copy of alerts and events and its data model.
+- `get_edwin_tools` lists Edwin's agent tools, and `edwin_run_tool` runs one. It needs writes on, every run is audited, and multi-portal mode leaves it out, since one Edwin tenant serves every portal there.
+- `ask_edwin` asks Edwin a question and waits up to two minutes for the answer.
 
-## Integrations
+The server calls `https://<portal name>.dexda.ai` unless `EDWIN_HOST` names another host; multi-portal mode has no portal name to derive it from, so set `EDWIN_HOST` there. A credential that lacks a scope a tool needs gets `SCOPE_MISSING` naming the scope.
 
-`get_terraform_imports` needs no settings. Multi-portal mode and Edwin AI are optional; add their variables to the `env` block or `claude mcp add` command from [Setup](#setup).
+### Logs
 
-### Terraform
+`get_log_pipelines`, `get_tracked_log_queries`, `get_log_query_groups`, `get_log_partitions` and `get_log_usage` read LM Logs configuration and usage, and `ingest_logs` sends log lines. There is no log search: the v3 search endpoint applied neither the query nor the time range when probed.
 
-`get_terraform_imports` lists one resource type's objects in your portal as Terraform import blocks for the `logicmonitor/logicmonitor` provider, one block per object:
+### OpenTelemetry metrics
+
+`get_otlp_metric_names`, `get_otlp_metric_labels` and `get_otlp_label_values` explore the OTLP metrics your portal holds, and `query_otlp_metrics` runs a PromQL instant or range query. `analyze_metric(source="otlp")` analyzes a PromQL series, and `add_widget` and `update_widget` take an OTLP query for an advanced metrics widget. Alert rules cannot hold one: the v3 alert rule has no query field.
+
+### Collector operations
+
+`get_collectors` marks each collector `is_down`, and `get_collector_health` adds the latest status check and five latest events for the collector you name and for each one not known to be up. The events, uploaded log files and upgrade history are readable too. With writes on, `run_collector_status_check`, `restart_collector`, `acknowledge_collector_down` and `collector_debug` act on a collector; `collector_debug` runs one debug command from a fixed list, and the portal records each session in its audit log. OpenTelemetry (lmotel) collectors are not listed: the v3 API does not return them.
+
+### Terraform imports
+
+`get_terraform_imports` lists one resource type's objects as import blocks for the `logicmonitor/logicmonitor` provider, one per object:
 
 ```hcl
 import {
@@ -186,9 +178,9 @@ import {
 }
 ```
 
-It covers 15 of the 16 resource types whose provider docs (2.1.7) import by ID: `alert_rule`, `collector`, `collector_group`, `dashboard`, `dashboard_group`, `datasource`, `device`, `device_group`, `escalation_chain`, `report_group`, `role`, `sdt`, `website`, `website_group`, and `widget`. It refuses `device_group_cluster_alert_conf`, since the provider's importer reads a cluster alert conf by ID without its device group and the API answers that read with 404. Each address ends with the object's ID, so objects that share a name get distinct addresses.
+It covers 15 of the 16 types whose provider docs (2.1.7) import by ID: `alert_rule`, `collector`, `collector_group`, `dashboard`, `dashboard_group`, `datasource`, `device`, `device_group`, `escalation_chain`, `report_group`, `role`, `sdt`, `website`, `website_group` and `widget`. It refuses `device_group_cluster_alert_conf`, whose importer reads a conf by ID without its device group, a read the API answers with 404. Each address ends with the object's ID, so objects that share a name get distinct addresses.
 
-Save the blocks in a `.tf` file beside the provider's configuration:
+Save the blocks in a `.tf` file beside the provider configuration:
 
 ```hcl
 terraform {
@@ -202,110 +194,36 @@ terraform {
 provider "logicmonitor" {}
 ```
 
-Run `terraform init`, then `terraform plan -generate-config-out=generated.tf` (Terraform 1.5 or later). Terraform writes the matching resource configuration to `generated.tf` for you to review before `terraform apply`.
+Then run `terraform init` and `terraform plan -generate-config-out=generated.tf` (Terraform 1.5 or later), and review `generated.tf` before `terraform apply`.
 
-The provider authenticates only with an LMv1 API token, `api_id` and `api_key` (`LM_API_ID`, `LM_API_KEY`), plus `company` (`LM_COMPANY`). It takes no bearer token, so a server set up with `LM_BEARER_TOKEN` alone needs an LMv1 token for Terraform.
+The provider authenticates only with an LMv1 token, `api_id` and `api_key` (`LM_API_ID`, `LM_API_KEY`), plus `company` (`LM_COMPANY`). It takes no Bearer token, so a server set up with `LM_BEARER_TOKEN` alone needs an LMv1 token for Terraform.
 
-This server does not run Terraform. Use the `terraform` CLI, or HashiCorp's [Terraform MCP server](https://github.com/hashicorp/terraform-mcp-server), which drives runs in HCP Terraform and Terraform Enterprise.
+### What the server does not do
+
+The server does not run Terraform or launch Ansible jobs. Run Terraform with the `terraform` CLI, or HashiCorp's [Terraform MCP server](https://github.com/hashicorp/terraform-mcp-server), which drives runs in HCP Terraform and Terraform Enterprise. Launch Ansible jobs with `ansible-playbook`, or Red Hat's [MCP server for Ansible Automation Platform](https://www.redhat.com/en/blog/it-automation-agentic-ai-introducing-mcp-server-red-hat-ansible-automation-platform), a Technology Preview in AAP 2.6.4.
+
+The portal refuses API tokens on API version 4 ("External calls are not supported for API Version 4"), so trace and span search, service maps, Resource Explorer, Cloud Operations billing and the lmotel collector list are out of the server's reach.
 
 ### Multi-portal mode
 
-Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`get_portals`, `use_portal`, `get_current_portal`, `run_portal_reload`) switch the active portal at runtime. Every LogicMonitor tool also takes an optional `portal` argument that runs one call against another portal and leaves the active one as it is. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
+One server entry can serve many portals. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault: an age-encrypted file, or a plaintext JSON file for testing. `get_portals`, `use_portal`, `get_current_portal` and `run_portal_reload` manage the active portal, and every LogicMonitor tool takes an optional `portal` argument that runs one call against another portal. Each portal is read-only unless its record marks it writable. The mode is stdio-only. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
 
-### Edwin AI
+### Claude Code skills
 
-Set `EDWIN_CLIENT_ID` and `EDWIN_CLIENT_TOKEN` to an Edwin AI API credential and the server lists eight more tools. `get_edwin_insights` and `get_edwin_insight` read the incidents Edwin built by correlating alerts, with its root cause and remediation analysis when it has written one. `get_edwin_records`, `get_edwin_alert_volume` and `get_edwin_metadata` read Edwin's copy of alerts and events and its data model. `get_edwin_tools` lists the tools of Edwin's agents and `edwin_run_tool` runs one; it needs `LM_ENABLE_WRITE_OPERATIONS=true`, every run is audited, and multi-portal mode does not offer it, since one Edwin tenant serves every portal there. `ask_edwin` asks Edwin a question and waits up to two minutes for the answer. The server calls `https://<portal name>.dexda.ai` unless `EDWIN_HOST` names another host; multi-portal mode has no portal name to derive it from, so set `EDWIN_HOST` there. A credential that lacks a scope a tool needs gets `SCOPE_MISSING` naming the scope.
+The repository ships slash-command runbooks. Clone it and run `/lm-triage` in Claude Code.
 
-## Deployment
+| Command | What it does |
+|---------|--------------|
+| `/lm-triage` | Triage alerts: one `triage` call, then bursts, the worst clusters, and acknowledgements or notes you confirm |
+| `/lm-health <device>` | A device health check: CPU, memory and disk, anomalies, open alerts, availability and topology neighbors |
+| `/lm-portal` | A portal-wide overview: alert volume, clusters, noise, collectors, active SDTs, open critical and error alerts, and dead devices |
+| `/lm-capacity <device>` | Capacity planning: level, trend, daily and weekly cycles, level shifts and threshold-breach forecasts |
+| `/lm-apm [service]` | APM: services, operation-level RED metrics and alert correlation |
+| `/lm-remediate <alert_id or device>` | Diagnose an alert, then run an assigned RemediationSource or an Edwin AI agent tool after a checklist and your confirmation |
+| `/lm-edwin [insight]` | Check an Edwin AI insight's root cause against the causal CI's metric and the alert window |
+| `/lm-logs [partition]` | Review LM Logs partitions and their contracts, the pipelines that name them, usage, and saved and tracked queries |
 
-Stdio is the default transport and the one MCP clients use. It needs no deployment: your client launches the server.
-
-### HTTP transport
-
-The HTTP transport serves MCP at `/mcp` through the SDK's Streamable HTTP, stateless and answering with JSON, beside the health, readiness and info routes. When `LM_HTTP_AUTH_TOKEN` is set, `/mcp` requires it like every route outside `/` and the health endpoints. `/mcp` refuses a body that is not `application/json` with `415`, and one over 4 MiB with `413`. `/api/v1/*` has no route (`404` once past the bearer check).
-
-```bash
-cd deploy
-cp .env.example .env
-# Edit .env with your credentials, including LM_HTTP_AUTH_TOKEN (required)
-
-# Run with docker-compose
-docker compose up -d
-
-# With TLS via Caddy
-docker compose --profile tls up -d
-```
-
-The server exposes health endpoints for container orchestration:
-- `GET /health` - Detailed health check with all component statuses (adds the LM API connectivity check when enabled, for callers presenting `LM_HTTP_AUTH_TOKEN` or when no token is set)
-- `GET /healthz` - Liveness probe (200 OK or 503)
-- `GET /readyz` - Readiness probe (local checks only; never calls the LM API)
-
-Every route except `/healthz` and `/readyz`, `/health` included, answers only the `Host` names the server expects (the loopback names, a non-wildcard `LM_HTTP_HOST`, and `LM_HTTP_ALLOWED_HOSTS`) and refuses others with `400`; those two probes accept any `Host` so probes by pod IP keep working. The compose file requires `LM_HTTP_AUTH_TOKEN` for every profile and passes `DOMAIN` through as an allowed host for the Caddy `tls` profile.
-
-See [SECURITY.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/SECURITY.md) for the exposure model.
-
-### Kubernetes
-
-`deploy/k8s/deployment.yaml` is a vendor-neutral Deployment and Service running
-the published `ghcr.io` image. It works on AKS, EKS, GKE, OpenShift, or vanilla
-Kubernetes, reads credentials from a Kubernetes secret you create, and wires the
-liveness and readiness probes to the endpoints above. Apply it with
-`kubectl apply -f deploy/k8s/deployment.yaml` after creating the secret
-documented at the top of the file.
-
-## Configuration
-
-Set these as environment variables, through your client's `env` block or `-e` flags. The server does not read a `.env` file itself; to use one when you run it from a clone, run `uv run --env-file .env lm-mcp-server`.
-
-### Authentication
-
-Set `LM_BEARER_TOKEN`, or `LM_ACCESS_ID` and `LM_ACCESS_KEY` for an LMv1 token. Either works for every tool, `ingest_logs` and `push_metrics` included; with both set, the server uses the Bearer token.
-
-To get LMv1 credentials:
-
-1. Go to **Settings** > **Users and Roles** > **Users**.
-2. Select a user, then open the **API Tokens** tab.
-3. Create or view the Access ID and Access Key.
-
-### Environment variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `LM_PORTAL` | Yes | - | LogicMonitor portal hostname (e.g., `company.logicmonitor.com`) |
-| `LM_BEARER_TOKEN` | Yes* | - | API Bearer token (min 10 characters) |
-| `LM_ACCESS_ID` | No | - | LMv1 API access ID; with `LM_ACCESS_KEY` it stands in for `LM_BEARER_TOKEN` |
-| `LM_ACCESS_KEY` | No | - | LMv1 API access key |
-| `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | Enable write operations (create, update, delete) |
-| `LM_TIMEOUT` | No | `30` | Request timeout in seconds (range: 5-300) |
-| `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited requests, and for server errors on idempotent requests (GET, PUT, DELETE); a POST or PATCH that gets a 5xx is not resent (range: 0-10) |
-| `LM_RETRY_AFTER_CAP_SECONDS` | No | `120` | Longest wait between retries. A server's `Retry-After` can lengthen the backoff up to this cap, never shorten it |
-| `LM_TRANSPORT` | No | `stdio` | Transport mode: `stdio` (MCP clients) or `http` (see [HTTP transport](#http-transport)) |
-| `LM_MULTI_PORTAL` | No | `false` | Serve many customer portals from one server, selected at runtime with `use_portal` or per call with a `portal` argument. Stdio-only. |
-| `LM_VAULT_FILE` | No | - | Path to the age-encrypted portal vault (multi-portal) |
-| `LM_AGE_KEY` | No | - | Path to the age identity that decrypts the vault (multi-portal) |
-| `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |
-| `EDWIN_CLIENT_ID` | No | - | Edwin AI API credential client id. With `EDWIN_CLIENT_TOKEN` it turns on the eight Edwin tools; one without the other leaves them off and logs a warning |
-| `EDWIN_CLIENT_TOKEN` | No | - | Secret of that Edwin AI credential |
-| `EDWIN_HOST` | No | `https://<portal name>.dexda.ai` | Edwin AI base URL, https only. Required in multi-portal mode, which has no `LM_PORTAL` to derive it from |
-| `LM_HTTP_HOST` | No | `0.0.0.0` | HTTP server bind address. With `LM_TRANSPORT=http`, an address other than `127.0.0.1`, `::1` or `localhost` needs `LM_HTTP_AUTH_TOKEN` or `LM_HTTP_ALLOW_UNAUTHENTICATED=true`, or the server refuses to start. |
-| `LM_HTTP_PORT` | No | `8080` | HTTP server port |
-| `LM_HTTP_AUTH_TOKEN` | No | - | Require this bearer token on every path outside `/` and the health endpoints (min 16 chars). Needed to start on a non-loopback `LM_HTTP_HOST`, the default `0.0.0.0` included, unless `LM_HTTP_ALLOW_UNAUTHENTICATED=true`. Health endpoints and `/` stay open for probes. HTTP transport only. |
-| `LM_HTTP_ALLOWED_HOSTS` | No | - | Comma-separated `Host` names the server accepts on every route except `/healthz` and `/readyz`, besides `127.0.0.1`, `::1`, `localhost` and a non-wildcard `LM_HTTP_HOST` (for example the public name a reverse proxy forwards). HTTP transport only. |
-| `LM_HTTP_ALLOW_UNAUTHENTICATED` | No | `false` | Start on a non-loopback `LM_HTTP_HOST` with no `LM_HTTP_AUTH_TOKEN`, for a listener protected another way (an authenticating proxy, a private network). HTTP transport only. |
-| `LM_HTTP_SSL_CERTFILE` | No | - | TLS certificate path. Set with `LM_HTTP_SSL_KEYFILE` to serve HTTPS. HTTP transport only. |
-| `LM_HTTP_SSL_KEYFILE` | No | - | TLS private key path. HTTP transport only. |
-| `LM_HTTP_SSL_KEYFILE_PASSWORD` | No | - | Password for an encrypted TLS private key. HTTP transport only. |
-| `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
-| `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error`, for the server and, under the HTTP transport, uvicorn. The server's records go to stderr; write audit lines (`info` for a success, `warning` for a failure, both written at every level) redact argument values under credential-shaped keys such as `password`, `token`, `api_key` and `extra_vars`, LogicMonitor credential properties such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one |
-| `LM_ENABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to enable (e.g., `get_*,triage`). Mutually exclusive with `LM_DISABLED_TOOLS`. |
-| `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable (e.g., `delete_*`). Mutually exclusive with `LM_ENABLED_TOOLS`. |
-| `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
-| `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Include an LM API ping in `/health` for authenticated callers (never in `/readyz`) |
-
-*Either `LM_BEARER_TOKEN` or both `LM_ACCESS_ID` and `LM_ACCESS_KEY` are required.
-
-## MCP resources and prompts
+### Resources and prompts
 
 Clients read these through the standard MCP resource and prompt calls.
 
@@ -353,19 +271,112 @@ Clients read these through the standard MCP resource and prompt calls.
 
 </details>
 
+## Layout
+
+| Path | Contents |
+|------|----------|
+| `src/lm_mcp/server.py` | Entry point (`lm-mcp-server`) and tool dispatch |
+| `src/lm_mcp/registry.py` | Tool definitions and the handler map |
+| `src/lm_mcp/tools/` | Tool handlers, one module per domain |
+| `src/lm_mcp/client/` | Async HTTP clients for the LogicMonitor and Edwin AI APIs |
+| `src/lm_mcp/auth/` | Bearer and LMv1 authentication |
+| `src/lm_mcp/transport/` | Stdio and HTTP transports |
+| `src/lm_mcp/prompts/`, `resources/` | MCP prompts and reference resources |
+| `.claude/skills/` | Claude Code skills |
+| `documentation/` | Tool reference (generated), client setup, networking intelligence |
+| `deploy/` | Dockerfile, compose file, Caddyfile, Kubernetes manifest |
+| `server.json` | MCP Registry manifest |
+| `tests/` | pytest suite and contract fixtures |
+
+## Configuration
+
+Set these as environment variables, through your client's `env` block or `-e` flags. The server does not read a `.env` file; to use one from a clone, run `uv run --env-file .env lm-mcp-server`. [server.json](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/server.json) lists the same variables for registry clients.
+
+### Authentication
+
+Set `LM_BEARER_TOKEN`, or `LM_ACCESS_ID` and `LM_ACCESS_KEY` for an LMv1 token. Either works for every tool, `ingest_logs` and `push_metrics` included; with both set, the server uses the Bearer token. To create an LMv1 token, go to **Settings** > **Users and Roles** > **Users**, select a user, open the **API Tokens** tab, and create the access ID and key.
+
+### Portal, tools and requests
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LM_PORTAL` | Yes, one portal | - | Portal hostname, such as `company.logicmonitor.com`. Multi-portal mode takes hosts from the vault instead |
+| `LM_BEARER_TOKEN` | Yes, or LMv1 | - | API Bearer token (10 characters or more) |
+| `LM_ACCESS_ID` | For LMv1 | - | LMv1 access ID; with `LM_ACCESS_KEY` it stands in for `LM_BEARER_TOKEN` |
+| `LM_ACCESS_KEY` | For LMv1 | - | LMv1 access key |
+| `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | List and allow the tools that change the portal |
+| `LM_ENABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to enable, such as `get_*,triage`. Not with `LM_DISABLED_TOOLS` |
+| `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable, such as `delete_*`. Not with `LM_ENABLED_TOOLS` |
+| `LM_MCP_CATEGORIES` | No | - | Comma-separated categories to list: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. It narrows the two settings above, never widens them; useful under a client's tool cap |
+| `LM_TIMEOUT` | No | `30` | Request timeout in seconds, 5 to 300 |
+| `LM_MAX_RETRIES` | No | `3` | Resends of a rate-limited request, and of a 5xx on an idempotent request (GET, PUT, DELETE); a POST or PATCH that gets a 5xx is not resent. 0 to 10 |
+| `LM_RETRY_AFTER_CAP_SECONDS` | No | `120` | Longest wait between retries. A `Retry-After` header can lengthen the backoff up to this cap, never shorten it |
+| `LM_SESSION_HISTORY_SIZE` | No | `50` | Tool calls kept in the session history, 0 to 1000 |
+| `LM_LOG_LEVEL` | No | `warning` | `debug`, `info`, `warning` or `error`, for the server and, under the HTTP transport, uvicorn. The server logs to stderr. Write audit lines (`info` for a success, `warning` for a failure) appear at every level, with argument values under credential-shaped keys such as `password`, `token`, `api_key` and `extra_vars`, LogicMonitor credential properties such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one, redacted |
+
+
+### Multi-portal and Edwin AI
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LM_MULTI_PORTAL` | No | `false` | Serve several portals from one server, chosen with `use_portal` or a call's `portal` argument. Stdio only |
+| `LM_VAULT_FILE` | No | - | Age-encrypted portal vault |
+| `LM_AGE_KEY` | No | - | Age identity file that decrypts the vault |
+| `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map, for testing; the vault wins when both are set |
+| `EDWIN_CLIENT_ID` | No | - | Edwin AI API credential client ID. With `EDWIN_CLIENT_TOKEN` it turns on the eight Edwin tools; one without the other leaves them off and logs a warning |
+| `EDWIN_CLIENT_TOKEN` | No | - | Secret of that Edwin AI credential |
+| `EDWIN_HOST` | No | `https://<portal name>.dexda.ai` | Edwin AI base URL, https only. Required in multi-portal mode |
+
+### HTTP transport
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `LM_TRANSPORT` | No | `stdio` | `stdio` for MCP clients, or `http` (see [Deployment](#deployment)) |
+| `LM_HTTP_HOST` | No | `0.0.0.0` | Bind address. Any address but `127.0.0.1`, `::1` or `localhost` needs `LM_HTTP_AUTH_TOKEN` or `LM_HTTP_ALLOW_UNAUTHENTICATED=true`, or the server refuses to start |
+| `LM_HTTP_PORT` | No | `8080` | Port |
+| `LM_HTTP_AUTH_TOKEN` | No | - | Bearer token required on every path except `/` and the health endpoints; 16 characters or more |
+| `LM_HTTP_ALLOW_UNAUTHENTICATED` | No | `false` | Start on a non-loopback bind with no `LM_HTTP_AUTH_TOKEN`, for a listener protected another way |
+| `LM_HTTP_ALLOWED_HOSTS` | No | - | Comma-separated `Host` names accepted on every route except `/healthz` and `/readyz`, besides the loopback names and a non-wildcard `LM_HTTP_HOST`, such as the name a reverse proxy forwards |
+| `LM_HTTP_SSL_CERTFILE` | No | - | TLS certificate; with `LM_HTTP_SSL_KEYFILE` the server speaks HTTPS |
+| `LM_HTTP_SSL_KEYFILE` | No | - | TLS private key |
+| `LM_HTTP_SSL_KEYFILE_PASSWORD` | No | - | Password of an encrypted TLS private key |
+| `LM_HEALTH_CHECK_CONNECTIVITY` | No | `false` | Add a LogicMonitor API call to `/health` for callers that pass the bearer check; `/readyz` never makes one |
+
+## Deployment
+
+Stdio needs no deployment: your client starts the server. The HTTP transport serves MCP at `/mcp` through the MCP SDK's Streamable HTTP, stateless and answering with JSON, beside the health and info routes. With `LM_HTTP_AUTH_TOKEN` set, `/mcp` requires it like every route outside `/` and the health endpoints. `/mcp` refuses a body that is not `application/json` with 415, and one over 4 MiB with 413.
+
+```bash
+cd deploy
+cp .env.example .env
+# Edit .env with your credentials, including LM_HTTP_AUTH_TOKEN (required)
+
+docker compose up -d                  # HTTP on port 8080
+docker compose --profile tls up -d    # behind Caddy with TLS
+```
+
+Health endpoints for orchestration:
+
+- `GET /health`: every component's status, plus the API connectivity check when `LM_HEALTH_CHECK_CONNECTIVITY` is on and the caller passes the bearer check
+- `GET /healthz`: liveness, 200 or 503
+- `GET /readyz`: readiness from local checks only; never calls the LogicMonitor API
+
+Every route except `/healthz` and `/readyz` answers only the `Host` names the server expects (the loopback names, a non-wildcard `LM_HTTP_HOST` and `LM_HTTP_ALLOWED_HOSTS`) and refuses others with 400; the two probes accept any `Host`, so probes by pod IP work. The compose file requires `LM_HTTP_AUTH_TOKEN` in every profile and passes `DOMAIN` through as an allowed host for the `tls` profile.
+
+`deploy/k8s/deployment.yaml` is a Deployment and Service for the published image that runs on AKS, EKS, GKE, OpenShift or plain Kubernetes. It reads credentials from a secret you create, documented at the top of the file, and wires the liveness and readiness probes to the endpoints above. Apply it with `kubectl apply -f deploy/k8s/deployment.yaml`.
+
+[SECURITY.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/SECURITY.md) describes the exposure model.
+
 ## Troubleshooting
 
-The server logs to stderr. Set `LM_LOG_LEVEL=debug` to add httpx and MCP SDK lines.
+The server logs to stderr. Set `LM_LOG_LEVEL=debug` to add the httpx and MCP SDK lines.
 
 ### "Failed to connect" in Claude Code
 
-`claude mcp list` shows this when the server is missing environment variables. Claude Code spawns the server as a subprocess with its own environment, so variables in your shell or a `.env` file do not reach it, and the `-e` flags are required:
+The server is missing environment variables. Claude Code starts it with its own environment, so variables in your shell or a `.env` file do not reach it; pass them with `-e`:
 
 ```bash
-# Remove the broken config
 claude mcp remove logicmonitor
-
-# Re-add with environment variables
 claude mcp add logicmonitor \
   -e LM_PORTAL=yourcompany.logicmonitor.com \
   -e LM_BEARER_TOKEN=<your-bearer-token> \
@@ -374,11 +385,11 @@ claude mcp add logicmonitor \
 
 ### "Write operations are disabled"
 
-Write operations (acknowledge, create SDT, etc.) are disabled by default: the server does not list those tools, and a call to one by name returns this error. Set `LM_ENABLE_WRITE_OPERATIONS=true` in your environment.
+The tools that change the portal are off by default: the server does not list them, and a call to one by name returns this error. Set `LM_ENABLE_WRITE_OPERATIONS=true`.
 
 ### "spawn uvx ENOENT" in Claude Desktop
 
-Claude Desktop cannot find `uvx`. Find its path with `which uvx`, then use the full path:
+Claude Desktop cannot find `uvx`. Find its path with `which uvx` and use the full path:
 
 ```json
 {
@@ -391,17 +402,13 @@ Claude Desktop cannot find `uvx`. Find its path with `which uvx`, then use the f
 
 The default bind is `0.0.0.0`, which needs `LM_HTTP_AUTH_TOKEN`. Set the token, bind to `127.0.0.1`, or set `LM_HTTP_ALLOW_UNAUTHENTICATED=true` for a listener protected another way.
 
-### Ingestion API errors
-
-`ingest_logs` and `push_metrics` take a Bearer token or an LMv1 token, as the other tools do.
-
-### Rate limit errors
-
-The server retries rate-limited requests with exponential backoff. If you consistently hit limits, reduce request frequency or contact LogicMonitor support.
-
 ### Authentication errors
 
-Verify your bearer token is correct and has appropriate permissions. Manage API tokens in LogicMonitor under **Settings** > **Users and Roles** > **API Tokens**.
+Check that the token is active and that its user's role grants the access the tool needs. Manage tokens under **Settings** > **Users and Roles** > **API Tokens**.
+
+### Rate limits
+
+The server retries a rate-limited request with exponential backoff, waiting at least what `Retry-After` asks up to `LM_RETRY_AFTER_CAP_SECONDS`. If you keep hitting limits, make fewer calls.
 
 ## Development
 
@@ -414,22 +421,6 @@ uv run ruff format src tests
 
 [CONTRIBUTING.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/CONTRIBUTING.md) has the workflow, the type-check ratchet, and what to regenerate after a tool change.
 
-### Layout
-
-| Path | Contents |
-|------|----------|
-| `src/lm_mcp/server.py` | MCP server entry point (`lm-mcp-server`) and tool dispatch |
-| `src/lm_mcp/registry.py` | Tool definitions and the handler map |
-| `src/lm_mcp/tools/` | Tool handlers, one module per domain |
-| `src/lm_mcp/client/` | Async HTTP client for the LogicMonitor API |
-| `src/lm_mcp/auth/` | Bearer and LMv1 authentication |
-| `src/lm_mcp/transport/` | Stdio and HTTP transports |
-| `src/lm_mcp/prompts/`, `resources/` | MCP prompts and reference resources |
-| `.claude/skills/` | Claude Code skills |
-| `documentation/` | Tool reference (generated), client setup, networking intelligence |
-| `deploy/` | Dockerfile, compose file, Caddyfile, Kubernetes manifest |
-| `tests/` | pytest suite and contract fixtures |
-
 ## License
 
-MIT License. See the [LICENSE](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/LICENSE) file.
+MIT License. See [LICENSE](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/LICENSE).
