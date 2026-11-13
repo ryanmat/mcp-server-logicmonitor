@@ -12,7 +12,7 @@ from tests.live_uvicorn import free_port, live_uvicorn
 TOKEN = "http-auth-tok-16"
 WRONG = "wrong-http-auth-token-999"
 
-# A Streamable HTTP client accepts both answers; the SDK refuses a POST that does not.
+# The Accept header a Streamable HTTP client sends; the SDK refuses a POST without application/json.
 MCP_ACCEPT = {"Accept": "application/json, text/event-stream"}
 
 

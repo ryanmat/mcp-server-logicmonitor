@@ -14,7 +14,7 @@ from tests.live_uvicorn import free_port, live_uvicorn
 # 16 characters: the configured minimum, and below the length a secret scanner flags.
 TOKEN = "route-test-tok16"
 
-# A Streamable HTTP client accepts both answers; the SDK refuses a POST that does not.
+# The Accept header a Streamable HTTP client sends; the SDK refuses a POST without application/json.
 _MCP_ACCEPT = {"Accept": "application/json, text/event-stream"}
 _INITIALIZE = {
     "jsonrpc": "2.0",
