@@ -1,7 +1,8 @@
-# Description: Collector debug command builder: the allowlist, typed arguments and request checks.
-# Description: Composes one checked debug command line from a named command and its arguments.
+# Description: Collector debug: the command allowlist, typed arguments, request checks, output
+# Description: masking and the stored health-check parse, each bounded against hostile text.
 
-"""Collector debug: the command builder and the checks made before anything is sent.
+"""Collector debug: the command builder, the checks made before anything is sent, and what is
+done with what comes back.
 
 Callers never send free text. They name a command from COMMANDS and pass that command's typed
 arguments; any other argument key is refused, and this module builds the command line.
@@ -19,24 +20,43 @@ arguments; any other argument key is refused, and this module builds the command
 - A WMI query is one WQL SELECT. The collector reads any key=value token on the line as a
   parameter of !wmi, so the WHERE clause allows ``!`` only as ``!=`` and ``=`` only after a
   space, ``<``, ``>`` or ``!``: no command head and no parameter can ride in it.
+- Output is the device's and so hostile input. redact() masks the secret values a collector or
+  device prints (key=value, key: value, JSON, XML, URL user information, PEM blocks) by the
+  credential rule the audit log uses, and every scan grows with the length of the text, never
+  with its square, so a hostile reply cannot hold the server.
+- The stored health check (!shealthcheck func=detail) is sectioned text: "=====name=====" blocks,
+  each with "is scheduled at ..., finished at ..., status N", optional detail, and a
+  ":checkpoints:" JSON array of {name, detail, status}. parse_health_check() leads with each
+  method's all-NaN rate, since a collector can show every checkpoint OK with a tenth of a
+  method's tasks returning nothing, and names any block whose array it cannot read.
+- A failure is logged before it becomes a status: describe_failure() logs an LMError at WARNING
+  with the portal's words and anything else with its stack trace, and parse_reply() logs a parse
+  fault with its stack trace and leaves the answer standing.
 """
 
 from __future__ import annotations
 
+import bisect
+import json
+import logging
 import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import SplitResult, parse_qsl, urlsplit
 
+from lm_mcp.exceptions import AuthenticationError, LMError, LMPermissionError, RateLimitError
 from lm_mcp.logging import is_sensitive_key
+
+logger = logging.getLogger(__name__)
 
 BUDGET_DEFAULT = 15.0
 BUDGET_MIN = 2.0
 BUDGET_MAX = 60.0
 OUTPUT_DEFAULT = 20_000
 OUTPUT_MIN = 500
+OUTPUT_MAX = 100_000  # the most of a reply a parse reads
 MAX_CMDLINE = 2048
 _ID_MAX = 10**12  # the largest id or count read as one
 
@@ -276,17 +296,23 @@ def _bare(host: str) -> str:
     return host.strip("[]").lower()
 
 
+def _parse_url(url: str) -> SplitResult:
+    """Split a URL, or refuse it: a port out of range or a broken IPv6 literal is not a URL."""
+    try:
+        parts = urlsplit(url)
+        _ = parts.port  # raises on a malformed port
+    except ValueError as e:
+        raise ToolRejectionError("'url' is not a valid URL") from e
+    return parts
+
+
 def _b_http(a: dict[str, Any], t: Target) -> str:
     """An HTTP(S) GET to the device itself: the URL's host must be the device record's host."""
     device = _device(t)
     url = _required(a, "url")
     if re.search(r"\s", url):
         raise ToolRejectionError("'url' cannot contain whitespace")
-    try:
-        parts = urlsplit(url)
-        _ = parts.port  # raises on a malformed port
-    except ValueError as e:
-        raise ToolRejectionError("'url' is not a valid URL") from e
+    parts = _parse_url(url)
     if parts.scheme not in ("http", "https"):
         raise ToolRejectionError("'url' must start with http:// or https://")
     if "#" in url:
@@ -606,10 +632,7 @@ def check_request(
         raise ToolRejectionError(f"unknown or disallowed command '{command}'")
     host = _PLACEHOLDER_HOST
     if command == "http":
-        try:
-            host = urlsplit(str(checked_args.get("url") or "")).hostname or _PLACEHOLDER_HOST
-        except ValueError as e:
-            raise ToolRejectionError("'url' is not a valid URL") from e
+        host = _parse_url(str(checked_args.get("url") or "")).hostname or _PLACEHOLDER_HOST
     build_cmdline(command, checked_args, Target(collector_id=0, host=host, portal_host=portal_host))
     if COMMANDS[command].needs_device and device_id is None:
         raise ToolRejectionError(
@@ -657,3 +680,618 @@ def target_from_record(
         host=host if needs_device else None,
         portal_host=portal_host,
     )
+
+
+# ---------------------------------------------------------------- output masking
+# Best effort, and a second line of defence. The guarantees are elsewhere: no credential is
+# ever sent, getconfig reads only thread-pool and timeout keys, and debughistory is never sent.
+# Masking catches the common shapes a collector or device prints a secret in; an unusual shape
+# can still slip through, and masking errs toward hiding too much rather than too little.
+#
+# Output is hostile input, so every scan either moves forward past what it read or is capped
+# at a fixed length: the work grows with the length of the text, never with its square.
+
+# A key names a secret when it ends in one of these words. The short words (pass, pwd, pw)
+# count only at the start of the key or after a separator (wmi.pass, x_sid) or a camelCase
+# step (wmiPass), so compass, bypass and superpass are not keys; the longer words count at the
+# end of any key (dbpassword, snmp.authtoken, CLIENTSECRET).
+_SECRET_KEY_WORDS = (
+    "password", "passwd", "pass", "passphrase", "secret", "token", "community", "credential",
+    "credentials", "signature", "authorization", "cookie", "bearer", "apikey", "api_key",
+    "api-key", "accesskey", "access_key", "access-key", "privatekey", "private_key",
+    "private-key", "secretkey", "secret_key", "secret-key", "sessionid", "session_id",
+    "session-id", "storepass", "keypass", "authcode", "auth_code", "auth-code", "jwt", "pw",
+    "pwd", "sig", "otp",
+)  # fmt: skip
+_SHORT_WORD = 4  # words this long or shorter need a boundary before them
+_ASCII_LOWER_OR_DIGIT = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
+_ASCII_UPPER = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+_JVM_FLAG_RE = re.compile(r"^-+D?")
+
+
+def _is_secret_key(key: str) -> bool:
+    """True when a key (wmi.pass, -Ddb.password, clientSecret, snmp.authtoken) names a secret.
+
+    A dotted key is also a secret wherever lm_mcp.logging.is_sensitive_key says so (ssh.key,
+    snmp.auth, snmp.priv, meraki.api.key), so one rule decides the audit line and the masked
+    output. An undotted word such as key or auth is left to the list above, so a log's
+    "key=value" or "auth: ok" is not masked.
+    """
+    key = _JVM_FLAG_RE.sub("", key)  # -Dwmi.pass, --password
+    if "." in key and is_sensitive_key(key):
+        return True
+    low = key.lower()
+    for word in _SECRET_KEY_WORDS:
+        if not low.endswith(word):
+            continue
+        start = len(key) - len(word)
+        if start == 0 or len(word) > _SHORT_WORD:
+            return True
+        before, first = key[start - 1], key[start]
+        if before in "._:-" or (before in _ASCII_LOWER_OR_DIGIT and first in _ASCII_UPPER):
+            return True
+    return False
+
+
+_CAP = 512  # sets how far a <name> element and a bracketed value are read
+# key=value, key: value, "key": "value", -Dkey=value. The key is one token: word characters,
+# dots and dashes, starting where the previous token ended.
+_KEYED_RE = re.compile(r"""(?<![\w.-])["']?([\w.-]+)["']?[ \t]*([=:])""")
+# --password value, -storepass value
+_FLAG_RE = re.compile(r"(?<![\w.-])--?([A-Za-z][\w.-]+)(?=[ \t])")
+_SPACES_RE = re.compile(r"[ \t]*")
+# A quoted value with backslash escapes, on one line.
+_QUOTED_RE = re.compile(r""""(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'""")
+# An unquoted value ends at the line end, at markup (<tag, />), at a quote that closes the
+# string the key sat in ("detail": "proxy pass: none", "status": ...), or where the next key
+# starts. After "key=", the next key is "k=v", "k: " or a -flag; after "key:", the display
+# form, only the next "k: ". A "=" that pads base64 (Basic dXNlcjpw==) never starts a key.
+_STOPS = r"""[\r\n]|<(?=[A-Za-z/!?])|/>|["'](?=[ \t]*(?:[,;}\]>/\r\n]|\Z))"""
+# After "key:", a JSON value also ends where its object or array closes: {"a":{"password":1}}.
+_JSON_STOPS = r"""|[}\]](?=[ \t]*(?:[,}\]\r\n]|\Z))"""
+_NEXT = r"""(?:[,;&][ \t]*|[ \t])"""
+_VALUE_END_RES = {
+    "=": re.compile(
+        rf"""{_STOPS}|{_NEXT}(?:["']?[\w.:-]+["']?[ \t]*=(?=[^=\s])"""
+        r"""|["']?[\w.-]+["']?[ \t]*:(?=[ \t\r\n]|\Z)|--?[A-Za-z])"""
+        r"""|[,;&][ \t]*["'][\w.-]+["'][ \t]*:"""
+    ),
+    ":": re.compile(
+        rf"""{_STOPS}{_JSON_STOPS}|{_NEXT}["']?[\w.-]+["']?[ \t]*:(?=[ \t\r\n]|\Z)"""
+        r"""|[,;&][ \t]*["'][\w.-]+["'][ \t]*:"""
+    ),
+}
+_KEY_AHEAD_RE = re.compile(r"[\w.-]+[ \t]*=")
+# "password:" with its value on the next, indented line (YAML, pretty-printed JSON)
+_NEXT_LINE_VALUE_RE = re.compile(r"\r?\n[ \t]+(?=[^\s])")
+_KEY_LINE_RE = re.compile(r"""["']?[\w.-]+["']?[ \t]*[=:]|[-#]""")
+# Authorization: Bearer xxx is a key; a bare "Bearer xxx" in a log line is caught here.
+_BEARER_RE = re.compile(r"(?<![\w-])(bearer[ \t]+)([A-Za-z0-9._~+/=-]+)", re.IGNORECASE)
+# A PEM private key block: a BEGIN line naming a PRIVATE KEY, the body, an END line.
+_PEM_RE = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z ]*-----")
+# name="wmi.pass" ... value="x", in either order, anywhere inside one XML tag or one JSON
+# object: the text between two of the characters { } < >.
+_SEGMENT_RE = re.compile(r"[^{}<>]+")
+_NAME_FIELD_RE = re.compile(
+    r"""(?<![\w.:-])["']?(?:name|key)["']?\s*[=:]\s*"""
+    r"""(?:"([^"]*)"|'([^']*)'|([\w.:-]+))""",
+    re.IGNORECASE,
+)
+_VALUE_FIELD_RE = re.compile(
+    r"""((?<![\w.:-])["']?value["']?\s*[=:]\s*)(?:"([^"]*)"|'([^']*)'|([^\s"',;&]+))""",
+    re.IGNORECASE,
+)
+_PAIR_SPAN = 512  # outside braces and tags, how far apart a name and its value field may be
+# <password>value</password>, <Password type="x">, <entry key="wmi.pass">value</entry>
+_TAG_RE = re.compile(r"<([A-Za-z_][\w.:-]*)((?:\s[^<>]*)?)>")
+_CLOSE_TAG_RE = re.compile(r"</([A-Za-z_][\w.:-]*)")
+_TAG_NAME_ATTR_RE = re.compile(
+    r"""(?<![\w.:-])(?:name|key)\s*=\s*(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE
+)
+_LOOSE_TEXT_RE = re.compile(r"[^<]*")  # without a closing tag, the text up to the next tag
+# <name>x.password</name><value>hunter2</value>, as Hadoop, Spring and .NET configs write it
+_NAMED_VALUE_RE = re.compile(r"\s*<value(?:\s[^<>]*)?>", re.IGNORECASE)
+_PATH_RE = re.compile(r"""["']?(?:[~/]|[A-Za-z]:[\\/])""")  # pwd: /usr/local, a directory
+# scheme://userinfo@host, and scheme:\/\/ as JSON escapes it
+_SCHEME_RE = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?://|\\/\\/)")
+# The authority ends at / ? # (RFC 3986), at whitespace and at characters an authority never
+# holds (quotes, < > \ { } |), and at a comma, where text lists one URL after another.
+_AUTHORITY_END_RE = re.compile(r"""[\s/?#"'<>\\{}|,]""")
+# curl -u user:password, --user user:password
+_USER_FLAG_RE = re.compile(r"(?<![\w.-])(--user|-u)([ \t=]+[^\s:]+:)(\S+)")
+
+
+def _mask_value(text: str, pos: int, out: list[str], sep: str = "=") -> int:
+    """Append the masked value that starts at pos and return where it ends. A quoted value
+    keeps its quotes, and an empty one is kept whole: an empty password is itself a finding."""
+    quoted = _QUOTED_RE.match(text, pos)
+    if quoted:
+        q = quoted.group(0)
+        out.append(q if len(q) == 2 else f"{q[0]}***{q[0]}")
+        return quoted.end()
+    if pos >= len(text) or text[pos] in "\r\n" or text.startswith("<", pos):
+        return pos
+    if text[pos] in "[{":
+        close = _bracket_end(text, pos)
+        if close is not None:
+            out.append("***")
+            return close
+    out.append("***")
+    stop = _VALUE_END_RES[sep].search(text, pos + 1)
+    return stop.start() if stop else len(text)
+
+
+def _bracket_end(text: str, pos: int) -> int | None:
+    """The end of the JSON array or object that opens at pos, read up to _CAP*8 characters;
+    when it does not close inside that, the rest of the text from pos, so nothing leaks."""
+    depth, in_str, esc = 0, False, False
+    limit = min(len(text), pos + _CAP * 8)
+    for i in range(pos, limit):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return len(text) if limit < len(text) or depth else None
+
+
+def _mask_keyed(text: str) -> str:
+    """key=value and key: value."""
+    out: list[str] = []
+    pos = 0
+    while True:
+        m = _KEYED_RE.search(text, pos)
+        if not m:
+            break
+        out.append(text[pos : m.end()])
+        pos = m.end()
+        if not _is_secret_key(m.group(1)):
+            continue
+        spaces = _SPACES_RE.match(text, pos)
+        start = spaces.end() if spaces else pos
+        out.append(text[pos:start])
+        if m.group(1).lower() == "pwd" and m.group(2) == ":" and _PATH_RE.match(text, start):
+            pos = start  # pwd: /usr/local/bin is a working directory
+            continue
+        if m.group(2) == "=" and start > pos and _KEY_AHEAD_RE.match(text, start):
+            pos = start  # "wmi.pass= wmi.user=x": the password is empty
+            continue
+        if m.group(2) == ":":
+            below = _NEXT_LINE_VALUE_RE.match(text, start)
+            if below and not _KEY_LINE_RE.match(text, below.end()):
+                out.append(text[start : below.end()])
+                start = below.end()
+        pos = _mask_value(text, start, out, m.group(2))
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _mask_flags(text: str) -> str:
+    """--password value, --password "two words" and -storepass value."""
+    out: list[str] = []
+    pos = 0
+    while True:
+        m = _FLAG_RE.search(text, pos)
+        if not m:
+            break
+        out.append(text[pos : m.end()])
+        pos = m.end()
+        if _is_secret_key(m.group(1)):
+            spaces = _SPACES_RE.match(text, pos)
+            start = spaces.end() if spaces else pos
+            out.append(text[pos:start])
+            pos = _mask_value(text, start, out)
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _mask_user_flags(text: str) -> str:
+    """curl -u user:password and --user user:password keep the user."""
+    return _USER_FLAG_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}***", text)
+
+
+def _mask_pem(text: str) -> str:
+    """The body of a PEM private key, to its END line or, without one, to the end."""
+    out: list[str] = []
+    pos = 0
+    while True:
+        m = _PEM_RE.search(text, pos)
+        if not m:
+            break
+        out.append(text[pos : m.end()])
+        end = text.find("-----END", m.end())
+        end = len(text) if end < 0 else end
+        out.append("***")
+        pos = end
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _mask_value_field(m: re.Match[str]) -> str:
+    if m.group(4) is not None:
+        return f"{m.group(1)}***"  # value=hunter2, unquoted
+    value = m.group(2) if m.group(2) is not None else m.group(3)
+    if not value:
+        return m.group(0)
+    quote = '"' if m.group(2) is not None else "'"
+    return f"{m.group(1)}{quote}***{quote}"
+
+
+def _mask_segment(m: re.Match[str]) -> str:
+    segment = m.group(0)
+    secret_at = [
+        f.start()
+        for f in _NAME_FIELD_RE.finditer(segment)
+        if _is_secret_key(f.group(1) or f.group(2) or f.group(3) or "")
+    ]
+    if not secret_at:
+        return segment
+
+    if m.start() > 0 and m.end() < len(m.string):
+        # Inside one tag or object: every value field goes with the secret name.
+        return _VALUE_FIELD_RE.sub(_mask_value_field, segment)
+
+    def near(v: re.Match[str]) -> str:
+        # Outside braces and tags, only a value field close to a secret name field: one
+        # "name: token" must not mask every "value:" in the text.
+        i = bisect.bisect_left(secret_at, v.start() - _PAIR_SPAN)
+        if i < len(secret_at) and secret_at[i] <= v.end() + _PAIR_SPAN:
+            return _mask_value_field(v)
+        return v.group(0)
+
+    return _VALUE_FIELD_RE.sub(near, segment)
+
+
+def _mask_pairs(text: str) -> str:
+    """Every value field in a tag or object whose name/key field names a secret."""
+    return _SEGMENT_RE.sub(_mask_segment, text)
+
+
+def _closing_tags(text: str) -> dict[str, list[int]]:
+    """Where each closing tag starts, by tag name, in ascending order, from one scan of the
+    text, so many unclosed tags cost that one scan and not one search each to the end."""
+    found: dict[str, list[int]] = {}
+    for m in _CLOSE_TAG_RE.finditer(text):
+        found.setdefault(m.group(1), []).append(m.start())
+    return found
+
+
+def _mask_content(
+    text: str, pos: int, tag: str, closes: dict[str, list[int]], out: list[str]
+) -> int:
+    """Mask an element's content from pos to the next closing tag of its own name, child
+    elements, CDATA and line breaks included; with no such tag after pos, to the next tag."""
+    starts = closes.get(tag, [])
+    i = bisect.bisect_left(starts, pos)
+    if i < len(starts):
+        close = starts[i]
+    else:
+        loose = _LOOSE_TEXT_RE.match(text, pos)
+        close = loose.end() if loose else pos
+    out.append("***" if text[pos:close].strip() else text[pos:close])
+    return close
+
+
+def _mask_elements(text: str) -> str:
+    """The content of an element whose tag, or whose name/key attribute, names a secret."""
+    out: list[str] = []
+    pos = 0
+    closes: dict[str, list[int]] | None = None  # read once, at the first secret element
+    while True:
+        m = _TAG_RE.search(text, pos)
+        if not m:
+            break
+        out.append(text[pos : m.end()])
+        pos = m.end()
+        tag, attrs = m.group(1), m.group(2)
+        if attrs.rstrip().endswith("/"):
+            continue  # <x/> has no content
+        if tag.lower() in ("name", "key"):
+            # <name>x.password</name><value>hunter2</value>: mask the value element.
+            close = text.find(f"</{tag}>", pos, pos + _CAP)
+            if close >= 0 and _is_secret_key(text[pos:close].strip()):
+                value = _NAMED_VALUE_RE.match(text, close + len(tag) + 3)
+                if value:
+                    if closes is None:
+                        closes = _closing_tags(text)
+                    out.append(text[pos : value.end()])
+                    pos = _mask_content(text, value.end(), "value", closes, out)
+            continue
+        named = (a or b for a, b in _TAG_NAME_ATTR_RE.findall(attrs))
+        if not (_is_secret_key(tag) or any(_is_secret_key(n) for n in named)):
+            continue
+        if closes is None:
+            closes = _closing_tags(text)
+        pos = _mask_content(text, pos, tag, closes, out)
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def _mask_userinfo(text: str) -> str:
+    """scheme://user:password@host keeps the user; scheme://token@host masks it all."""
+    out: list[str] = []
+    pos = 0
+    while True:
+        m = _SCHEME_RE.search(text, pos)
+        if not m:
+            break
+        stop = _AUTHORITY_END_RE.search(text, m.end())
+        span_end = stop.start() if stop else len(text)
+        at = text.rfind("@", m.end(), span_end)
+        out.append(text[pos : m.end()])
+        if at < 0:
+            pos = m.end()
+            continue
+        userinfo = text[m.end() : at]
+        out.append(f"{userinfo.split(':', 1)[0]}:***" if ":" in userinfo else "***")
+        pos = at
+    out.append(text[pos:])
+    return "".join(out)
+
+
+def redact(text: str) -> str:
+    """Mask the secret values the collector's output shows, keeping their keys. Best effort;
+    see the comment above the patterns."""
+    out = text or ""
+    out = _mask_pem(out)
+    out = _mask_keyed(out)
+    out = _mask_flags(out)
+    out = _mask_user_flags(out)
+    out = _BEARER_RE.sub(lambda m: f"{m.group(1)}***", out)
+    out = _mask_pairs(out)
+    out = _mask_elements(out)
+    out = _mask_userinfo(out)
+    return out
+
+
+def redact_values(data: Any) -> Any:
+    """Mask a parsed structure: every string, the value under a secret-named key, and the
+    value beside a name/key field that names a secret."""
+    if isinstance(data, str):
+        return redact(data)
+    if isinstance(data, list):
+        return [redact_values(v) for v in data]
+    if not isinstance(data, dict):
+        return data
+    named = any(
+        str(k).lower() in ("name", "key") and isinstance(v, str) and _is_secret_key(v)
+        for k, v in data.items()
+    )
+    masked = {}
+    for k, v in data.items():
+        secret = _is_secret_key(str(k)) or (named and str(k).lower() == "value")
+        masked[k] = "***" if secret and v not in (None, "") else redact_values(v)
+    return masked
+
+
+# ---------------------------------------------------------------- failures
+
+
+def _error_text(error: Exception) -> str:
+    return str(getattr(error, "details", "") or getattr(error, "message", "") or error)
+
+
+def _classify_error(error: Exception) -> tuple[str, str]:
+    """The status a failed debug call reads as, and what it means for the caller."""
+    text = f"{getattr(error, 'message', '')} {getattr(error, 'details', '') or ''} {error}".lower()
+    if isinstance(error, RateLimitError):
+        return "rate_limited", "the portal rate limit was hit; try again shortly"
+    if "debug" in text and "disable" in text:
+        return (
+            "disabled",
+            "remote debug is disabled on this collector (debug.disable in agent.conf)",
+        )
+    if isinstance(error, AuthenticationError):
+        return "error", "the portal rejected this server's API credentials"
+    if isinstance(error, LMPermissionError):
+        return "refused", "the calling identity lacks the collector Debug permission"
+    if "unknown debug command" in text or "invalid debug command" in text:
+        return "unsupported", "this collector build does not support the command"
+    return "error", type(error).__name__
+
+
+def describe_failure(error: Exception) -> dict[str, str]:
+    """The status, its meaning and the masked portal words for a debug call that raised,
+    logged first: an LMError at WARNING with the portal's words, as handle_error logs one, and
+    anything else with its stack trace. The words are masked in the log as in the result."""
+    if isinstance(error, LMError):
+        logger.warning(
+            "collector_debug %s: %s%s",
+            error.code,
+            redact(error.message),
+            f" (details: {redact(error.details)})" if error.details else "",
+        )
+    else:
+        logger.exception("collector_debug: unexpected error in the debug call", exc_info=error)
+    status, detail = _classify_error(error)
+    return {"status": status, "detail": detail, "error_body": redact(_error_text(error)[:4000])}
+
+
+# ---------------------------------------------------------------- health check parsing
+# The reply is the collector's, so the parse is held to the same rules as the masking: each
+# pattern is bounded or starts where a run starts, nothing is recursed into without a guard,
+# and every list and string in the result is capped.
+
+_BLOCK_RE = re.compile(r"^=+\$?([^=\n]+?)=+[ \t]*$", re.MULTILINE)
+_SCHED_RE = re.compile(
+    r"is scheduled at ([^,\n]{0,80}), finished at ([^,\n]{0,80}), status (-?[0-9]{1,6})"
+)
+# A rate is digits with at most one decimal point, so float() always reads it.
+_NAN_RE = re.compile(
+    r"(?<![0-9])([0-9]{1,9}) of ([0-9]{1,9}) tasks \(([0-9]{1,9}(?:\.[0-9]{1,6})?)%\)"
+)
+_CHECKPOINTS = ":checkpoints:"
+PARSE_LIST_MAX = 25  # entries kept in each list of the parsed result
+PARSE_TEXT_MAX = 500  # characters kept of each checkpoint detail
+_FACTS = (
+    "basic.Version",
+    "basic.Role",
+    "biz.InstanceCount",
+    "biz.ReportingData",
+    "module.Collector",
+    "module.Watchdog",
+)
+
+
+def _checkpoints(name: str, body: str) -> list[Any] | None:
+    """A block's :checkpoints: array: [] when the block has none, None when it has one that
+    does not close or does not decode, so an unreadable array never reads as a clean one."""
+    idx = body.find(_CHECKPOINTS)
+    if idx < 0:
+        return []
+    text = body[idx + len(_CHECKPOINTS) :].lstrip()
+    if not text.startswith("["):
+        return None
+    depth, end, in_str, esc = 0, -1, False, False
+    for i, ch in enumerate(text):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    if end < 0:
+        return None
+    try:
+        data = json.loads(text[:end])
+    except (ValueError, RecursionError):
+        logger.warning(
+            "collector_debug: the checkpoints of %r did not decode; reported as unreadable",
+            name,
+            exc_info=True,
+        )
+        return None
+    return data if isinstance(data, list) else [data]
+
+
+def _detail_text(detail: Any) -> str | None:
+    """A checkpoint detail as capped text; a structured detail is written out as JSON."""
+    if detail is None:
+        return None
+    text = detail if isinstance(detail, str) else json.dumps(detail, default=str)
+    return text[:PARSE_TEXT_MAX]
+
+
+def parse_health_check(output: str) -> dict[str, Any]:
+    """Summarise a !shealthcheck func=detail reply. Unparsed parts are left out, never guessed,
+    and a block whose checkpoint array cannot be read is named under checkpoints_unreadable."""
+    text = output or ""
+    marks = list(_BLOCK_RE.finditer(text))
+    blocks = []
+    for i, m in enumerate(marks):
+        body = text[m.end() : marks[i + 1].start() if i + 1 < len(marks) else len(text)]
+        blocks.append((m.group(1).strip()[:200], body))
+
+    methods: list[dict[str, Any]] = []
+    idle: list[str] = []
+    not_ok: list[dict[str, Any]] = []
+    unreadable: list[str] = []
+    nan_modules: list[dict[str, Any]] = []
+    facts: dict[str, str | None] = {}
+    scheduled = []
+    for name, body in blocks:
+        sched = _SCHED_RE.search(body)
+        if sched:
+            scheduled.append(sched.group(1).strip())
+            if sched.group(3) != "0":
+                not_ok.append({"check": name, "detail": f"script status {sched.group(3)}"})
+        checkpoints = _checkpoints(name, body)
+        if checkpoints is None:
+            unreadable.append(name)
+            continue
+        for cp in checkpoints:
+            if not isinstance(cp, dict):
+                continue
+            cp_name = str(cp.get("name", ""))[:200]
+            detail = cp.get("detail")
+            status = str(cp.get("status", ""))[:40]
+            if status and status.upper() != "OK":
+                not_ok.append({"check": cp_name, "status": status, "detail": _detail_text(detail)})
+            if cp_name.startswith("biz.DataSource."):
+                method = cp_name.split(".", 2)[2]
+                match = _NAN_RE.search(detail) if isinstance(detail, str) else None
+                if match:
+                    methods.append(
+                        {
+                            "method": method,
+                            "all_nan": int(match.group(1)),
+                            "attempts": int(match.group(2)),
+                            "all_nan_pct": float(match.group(3)),
+                            "checkpoint_status": status,
+                        }
+                    )
+                elif isinstance(detail, str) and "no tasks" in detail.lower():
+                    idle.append(method)
+            elif cp_name == "cogs.DSTableByNan" and isinstance(detail, list):
+                # One row per module per device, so each row names its device.
+                rows = [
+                    r for r in detail if isinstance(r, dict) and (_count(r.get("nanDsi")) or 0) > 0
+                ]
+                rows.sort(key=lambda r: -(_count(r.get("nanDsi")) or 0))
+                nan_modules = [
+                    {
+                        "module": _detail_text(r.get("dsName")),
+                        "method": _detail_text(r.get("collectorName")),
+                        "device_id": _count(r.get("deviceId")),
+                        "nan_instances": _count(r.get("nanDsi")),
+                        "timeout_instances": _count(r.get("timeoutDsi")),
+                        "dropped_instances": _count(r.get("droppedDsi")),
+                    }
+                    for r in rows[:10]
+                ]
+            elif cp_name in _FACTS:
+                facts[cp_name] = _detail_text(detail)
+
+    methods.sort(key=lambda m: -m["all_nan_pct"])
+    return {
+        "checks_parsed": len(blocks),
+        "last_run_started": scheduled[0] if scheduled else None,
+        "methods_by_all_nan_rate": methods[:PARSE_LIST_MAX],
+        "idle_methods": idle[:PARSE_LIST_MAX],
+        "not_ok": not_ok[:PARSE_LIST_MAX],
+        "not_ok_total": len(not_ok),
+        "checkpoints_unreadable": unreadable[:PARSE_LIST_MAX],
+        "nan_by_module": nan_modules,
+        "facts": facts,
+        "reading_note": (
+            "Rates lead, checkpoint status does not: a method can show OK with a double-digit "
+            "share of its tasks returning NaN for every datapoint."
+        ),
+    }
+
+
+def parse_reply(parse: Callable[[str], Any], output: str) -> dict[str, Any]:
+    """Run a reply parse on the raw output, cut at OUTPUT_MAX, and mask its result value by
+    value; the parse reads the raw reply, which masking could break. A parse that raises is
+    logged with its stack trace and leaves the answer standing, with parse_error naming it."""
+    result: dict[str, Any] = {}
+    try:
+        result["parsed"] = redact_values(parse(output[:OUTPUT_MAX]))
+    except Exception as e:
+        logger.exception("collector_debug: the reply parse failed; the answer stands unparsed")
+        result["parse_error"] = type(e).__name__
+    if len(output) > OUTPUT_MAX:
+        result["parse_partial"] = True
+    return result
