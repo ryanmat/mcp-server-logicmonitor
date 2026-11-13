@@ -106,3 +106,6 @@ secrets*.json
 age-key.txt
 *.age
 *.agekey
+
+# Skill eval transcripts and judge verdicts hold raw portal data; they stay local.
+evals/skills/*/runs/

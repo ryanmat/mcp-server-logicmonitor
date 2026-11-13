@@ -120,9 +120,12 @@ def _read_transcript(path: Path) -> tuple[set[str], str, list[str]]:
 
     Reads `claude -p --output-format stream-json` output and session files alike: both
     carry the conversation as assistant and user rows of content blocks. The answer is the
-    result row's text, or without one the assistant text after the last tool call.
+    result row's text, or without one the assistant text after the last tool call. The
+    results are those of every tool, since a run reads a result over the client's size cap
+    back from a saved file with Read or Bash.
     """
-    called: dict[str, str] = {}
+    called: set[str] = set()
+    names: dict[str, str] = {}
     evidence: list[str] = []
     texts: list[str] = []
     final: str | None = None
@@ -137,18 +140,19 @@ def _read_transcript(path: Path) -> tuple[set[str], str, list[str]]:
             for block in content if isinstance(content, list) else []:
                 if row["type"] == "assistant" and block["type"] == "tool_use":
                     texts = []
+                    names[block["id"]] = block["name"].removeprefix(TOOL_PREFIX)
                     if block["name"].startswith(TOOL_PREFIX):
-                        called[block["id"]] = block["name"].removeprefix(TOOL_PREFIX)
+                        called.add(names[block["id"]])
                 elif row["type"] == "assistant" and block["type"] == "text":
                     texts.append(block["text"])
-                elif block["type"] == "tool_result" and block["tool_use_id"] in called:
+                elif block["type"] == "tool_result" and block["tool_use_id"] in names:
                     body = block["content"]
                     if not isinstance(body, str):
                         body = "\n".join(part.get("text", "") for part in body)
-                    evidence.append(f"{called[block['tool_use_id']]} returned:\n{body}")
+                    evidence.append(f"{names[block['tool_use_id']]} returned:\n{body}")
     except (json.JSONDecodeError, KeyError, TypeError, AttributeError) as error:
         raise FixtureError(f"{path}: not a Claude Code transcript ({error!r})") from error
-    return set(called.values()), "\n".join(texts) if final is None else final, evidence
+    return called, "\n".join(texts) if final is None else final, evidence
 
 
 def _judge(scenario: dict, answer: str, evidence: list[str]) -> dict[str, dict]:
