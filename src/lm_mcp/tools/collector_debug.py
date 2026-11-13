@@ -593,7 +593,8 @@ _PLACEHOLDER_HOST = "device.invalid"
 
 
 def _finite(value: Any) -> float:
-    """A finite float from an int or float, else nan; bools and strings are not numbers."""
+    """The value as a float, or nan for a bool, a string or an int too large for a float; an
+    infinity passes through, and check_request refuses both."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return math.nan
     try:
@@ -614,8 +615,8 @@ def check_request(
 ) -> Request:
     """Check everything the caller passed before any call: finite budgets, positive ids, an
     argument object, a known command, and every argument value, by building the command once
-    against a placeholder device. The http URL's own host stands in for the device here; the
-    build after the device read compares it with the record."""
+    against a placeholder device. The http URL's own host stands in for the device here, since the
+    http builder refuses a URL whose host is not the target's."""
     budget, cap = _finite(budget_seconds), _finite(max_output_chars)
     if not (math.isfinite(budget) and math.isfinite(cap)):
         raise ToolRejectionError("budget_seconds and max_output_chars must be finite numbers")
@@ -653,7 +654,8 @@ def target_from_record(
     command: str, record: Any, collector_id: int | None, portal_host: str | None
 ) -> Target:
     """The target a command runs against, from the device record: the record's host for a
-    device probe, and the collector that serves the device for every command.
+    device probe, and the collector that serves the device. A command that needs no device runs
+    on collector_id when the device has no collector.
 
     A collectorless device answers a negative currentCollectorId (-2 for a cloud resource, -4
     for a service), which reads as no collector.
