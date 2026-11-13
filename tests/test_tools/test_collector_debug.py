@@ -2328,8 +2328,9 @@ class TestWmiAllowlist:
             assert written.name in message, written.name
         message = _refusal("cim", {"class": cls})
         assert f"the class {cls} is not queried" in message
-        for written in cd.WMI_CLASSES.values():
-            assert (written.name in message) is (written.columns is None), written.name
+        for key, written in cd.WMI_CLASSES.items():
+            whole = written.columns is None and key not in cd._WHERE_CLASSES
+            assert (written.name in message) is whole, written.name
 
     @pytest.mark.parametrize(
         "query,bad",
@@ -2366,6 +2367,43 @@ class TestWmiAllowlist:
         assert "Win32_Process is not queried with cim" in message
 
     @pytest.mark.parametrize(
+        "cls,written",
+        [
+            ("Win32_NTLogEvent", "Win32_NTLogEvent"),
+            ("win32_useraccount", "Win32_UserAccount"),
+            ("WIN32_GROUP", "Win32_Group"),
+        ],
+    )
+    def test_cim_refuses_a_class_read_only_with_a_where_clause(self, cls, written):
+        message = _refusal("cim", {"class": cls})
+        assert f"{written} is read only with a WHERE clause, which cim cannot carry" in message
+        assert f"select * from {written} where " in message
+
+    # A quote after an odd run of backslashes is escaped in WQL and closes the string read
+    # literally, so the two readings would split the clause differently.
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "select Name from Win32_Process where Name = 'a\\' AND Name = ' OR CommandLine LIKE '%1%'",
+            "select Name from Win32_Service where Name = 'O\\'Brien'",
+            "select Name from Win32_Service where PathName = 'C:\\\\\\' OR Name = 'x'",
+        ],
+    )
+    def test_a_quote_escaped_with_a_backslash_is_refused(self, query):
+        assert "a quote after an odd number of backslashes" in _refusal("wmi", {"query": query})
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "select Name from Win32_Service where PathName = 'C:\\\\'",
+            "select Name from Win32_Service where PathName LIKE 'C:\\\\Windows\\\\%'",
+            "select Name from Win32_Process where ExecutablePath = 'C:\\\\x.exe' AND Name = 'x.exe'",
+        ],
+    )
+    def test_an_escaped_backslash_before_a_quote_still_builds(self, query):
+        assert build_cmdline("wmi", {"query": query}, T) == f"!wmi h=10.0.0.5 {query}"
+
+    @pytest.mark.parametrize(
         "query",
         [
             "select * from Win32_NTLogEvent",
@@ -2391,4 +2429,5 @@ class TestWmiAllowlist:
             "any other class is refused",
         ):
             assert words in wmi, words
-        assert "Win32_Process" in text.split("cim: ", 1)[1].split(". ", 1)[0]
+        cim = text.split("cim: ", 1)[1].split(". ", 1)[0]
+        assert "Win32_Process" in cim and "WHERE clause" in cim

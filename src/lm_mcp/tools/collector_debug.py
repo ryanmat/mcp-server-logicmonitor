@@ -354,9 +354,9 @@ _PROCESS_COLUMNS = (
     "ThreadCount", "UserModeTime", "VirtualSize", "WindowsVersion", "WorkingSetSize",
     "WriteOperationCount", "WriteTransferCount",
 )  # fmt: skip
-# Every class wmi reads, by lower-case name; cim reads those with no column list. Beside the
-# datasource classes: PR #97's Win32_Process (by its columns) and CIM_ComputerSystem, and the
-# three classes read only with a WHERE clause.
+# Every class wmi reads, by lower-case name; cim reads those with no column list and no WHERE
+# requirement. Beside the datasource classes: PR #97's Win32_Process (by its columns) and
+# CIM_ComputerSystem, and the three classes read only with a WHERE clause.
 WMI_CLASSES = {
     entry.name.lower(): entry
     for entry in (
@@ -390,11 +390,18 @@ def _check_where(where: str) -> None:
 
     ``!`` stands only directly before ``=`` (``!=``), so no ``!restart`` rides after a
     comparison. Each operator that holds ``=`` (``=``, ``<=``, ``>=``, ``!=``) stands alone, with
-    a space on each side (``Name = 'x'``), so no token reads as key=value, quoted or not.
+    a space on each side (``Name = 'x'``), so no token reads as key=value, quoted or not. No quote
+    follows an odd run of backslashes: WQL reads that quote as escaped, so a reading that takes
+    every quote as a delimiter would split the clause into other strings and other column names.
     """
     if not _WHERE_CHARS_RE.match(where):
         raise ToolRejectionError("the WHERE clause holds a character the tool does not allow")
     for i, ch in enumerate(where):
+        if ch == "'" and (i - len(where[:i].rstrip("\\"))) % 2:
+            raise ToolRejectionError(
+                "in the WHERE clause a quote after an odd number of backslashes is not allowed; "
+                "write a literal backslash as two"
+            )
         if ch == "!" and where[i + 1 : i + 2] != "=":
             raise ToolRejectionError("in the WHERE clause '!' is allowed only as '!='")
         if ch == "=":
@@ -413,7 +420,11 @@ def _wmi_class(name: str, command: str) -> WmiClass:
     that command reads."""
     entry = WMI_CLASSES.get(name.lower())
     if entry is None:
-        readable = [e.name for e in WMI_CLASSES.values() if command == "wmi" or e.columns is None]
+        readable = [
+            e.name
+            for key, e in WMI_CLASSES.items()
+            if command == "wmi" or (e.columns is None and key not in _WHERE_CLASSES)
+        ]
         raise ToolRejectionError(
             f"the class {name} is not queried: {command} reads only these classes: "
             + ", ".join(sorted(readable, key=str.lower))
@@ -727,6 +738,12 @@ def _b_snmpget(a: dict[str, Any], t: Target) -> str:
 def _b_cim(a: dict[str, Any], t: Target) -> str:
     cls = _opt(a, "class", pattern=_CLASS_RE) or _required(a, "class")
     entry = _wmi_class(cls, "cim")
+    if entry.name.lower() in _WHERE_CLASSES:
+        written, example = _WHERE_CLASSES[entry.name.lower()]
+        raise ToolRejectionError(
+            f"{written} is read only with a WHERE clause, which cim cannot carry; read it with "
+            f"wmi, e.g. select * from {written} where {example}"
+        )
     if entry.columns is not None:
         raise ToolRejectionError(
             f"the class {entry.name} is not queried with cim, which returns every column; read "
