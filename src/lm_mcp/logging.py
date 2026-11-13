@@ -240,6 +240,7 @@ def log_write_operation(
     tool_name: str,
     arguments: dict,
     success: bool,
+    elicitation: str | None = None,
 ) -> None:
     """Log a write operation for audit trail purposes.
 
@@ -247,26 +248,20 @@ def log_write_operation(
     Failed operations are logged at WARNING level.
     In multi-portal mode each line carries the portal bound to the call, and
     none outside a call or before use_portal.
-    Argument values under credential-shaped keys are redacted first
+    A destructive call's line also carries the user's answer to its confirmation
+    (spec R4.3). Argument values under credential-shaped keys are redacted first
     (see :func:`redact_arguments`).
 
     Args:
         tool_name: Name of the MCP tool.
         arguments: Arguments passed to the tool.
         success: Whether the operation succeeded.
+        elicitation: accepted, declined, cancelled or unavailable for a destructive call
+            that reached its confirmation; None otherwise.
     """
     shown = redact_arguments(arguments)
+    marker = _portal_marker() + (f" elicitation={elicitation}" if elicitation else "")
     if success:
-        _audit_logger.info(
-            "Write operation: %s args=%s%s",
-            tool_name,
-            shown,
-            _portal_marker(),
-        )
+        _audit_logger.info("Write operation: %s args=%s%s", tool_name, shown, marker)
     else:
-        _audit_logger.warning(
-            "Write operation failed: %s args=%s%s",
-            tool_name,
-            shown,
-            _portal_marker(),
-        )
+        _audit_logger.warning("Write operation failed: %s args=%s%s", tool_name, shown, marker)

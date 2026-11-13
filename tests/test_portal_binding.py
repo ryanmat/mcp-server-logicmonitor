@@ -341,7 +341,10 @@ class TestAuditMarker:
             await execute_tool("delete_device", {"device_id": 7})
 
         audit = [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"]
-        assert audit == ["Write operation: delete_device args={'device_id': 7} portal=acme"]
+        assert audit == [
+            "Write operation: delete_device args={'device_id': 7} portal=acme"
+            " elicitation=unavailable"
+        ]
         assert portals.active()["active"] == "globex"
 
 
@@ -474,6 +477,7 @@ class TestPortalArgumentCall:
         assert error["details"]["portal"] == "globex"
         assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
             "Write operation failed: delete_device args={'device_id': 7} portal=globex"
+            " elicitation=unavailable"
         ]
 
     @pytest.mark.asyncio
@@ -496,6 +500,7 @@ class TestPortalArgumentCall:
         assert route.call_count == 1
         assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
             "Write operation: delete_device args={'device_id': 7} portal=acme"
+            " elicitation=unavailable"
         ]
         assert portals.active()["active"] == "globex"
 

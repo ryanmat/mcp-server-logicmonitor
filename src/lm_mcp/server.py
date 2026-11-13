@@ -8,7 +8,14 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp.server import Server
-from mcp.types import CallToolResult, GetPromptResult, TextContent, Tool
+from mcp.types import (
+    CallToolResult,
+    ClientCapabilities,
+    ElicitationCapability,
+    GetPromptResult,
+    TextContent,
+    Tool,
+)
 
 from lm_mcp import __version__, portals
 from lm_mcp.categories import passes_name_filter, writes_to_portal
@@ -304,6 +311,8 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
 async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[TextContent]:
     """Run one tool call inside its binding: the filters, the gate, the handler, the audit."""
+    # The answer to a destructive call's confirmation, for its audit line
+    elicitation: str | None = None
     try:
         handler = get_tool_handler(name)
 
@@ -356,7 +365,30 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
                     log_write_operation(name, arguments, success=False)
                 return write_disabled_response()
 
-        # Session and portal tools don't need an LM client
+        # Session, portal, discovery and Edwin tools don't need an LM client
+        needs_client = not (
+            name in SESSION_TOOLS
+            or name in PORTAL_TOOLS
+            or name in CLIENT_OPTIONAL_TOOLS
+            or name in EDWIN_TOOLS
+        )
+        if needs_client and current_binding().client is None:
+            # No portal selected yet, or no startup client: the caller fixes that
+            # first, so this is a refusal, not an upstream failure worth retrying.
+            if is_write_tool(name):
+                log_write_operation(name, arguments, success=False)
+            return error_content("INVALID_REQUEST", missing_client_message(config.multi_portal))
+
+        # A destructive call that passed every gate waits for the user's yes when the
+        # client can ask (spec R4.3); without that, the write gate is the only check.
+        if name in _DESTRUCTIVE_TOOLS:
+            elicitation = await _ask_before_destroying(name, arguments)
+            if elicitation in ("declined", "cancelled"):
+                log_write_operation(name, arguments, success=False, elicitation=elicitation)
+                return error_content(
+                    "REJECTED_BY_TOOL", f"The user {elicitation} {name}; nothing was changed."
+                )
+
         if name in SESSION_TOOLS or name in PORTAL_TOOLS:
             result = await handler(**arguments)
         elif name in CLIENT_OPTIONAL_TOOLS:
@@ -368,21 +400,14 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
             # work before a portal is selected.
             result = await handler(current_binding().edwin, **arguments)
         else:
-            client = current_binding().client
-            if client is None:
-                # No portal selected yet, or no startup client: the caller fixes that
-                # first, so this is a refusal, not an upstream failure worth retrying.
-                if is_write_tool(name):
-                    log_write_operation(name, arguments, success=False)
-                return error_content("INVALID_REQUEST", missing_client_message(config.multi_portal))
-            result = await handler(client, **arguments)
+            result = await handler(current_binding().client, **arguments)
 
         # Handlers return errors rather than raise, so the outcome comes from the result
         failed = is_error_result(result)
 
         # Audit trail for write operations
         if is_write_tool(name):
-            log_write_operation(name, arguments, success=not failed)
+            log_write_operation(name, arguments, success=not failed, elicitation=elicitation)
 
         # Record the result in the history of the call's portal. Portal tools are
         # recorded too, in the history of the portal the call started on, so a
@@ -405,14 +430,43 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
     except ValueError as e:
         logger.exception("Tool %s rejected its arguments", name)
         if is_write_tool(name):
-            log_write_operation(name, arguments, success=False)
+            log_write_operation(name, arguments, success=False, elicitation=elicitation)
         return error_content("INVALID_REQUEST", str(e))
     except Exception as e:
         logger.exception("Tool %s raised", name)
         if is_write_tool(name):
-            log_write_operation(name, arguments, success=False)
+            log_write_operation(name, arguments, success=False, elicitation=elicitation)
         return error_from_exception(e)
 
+
+async def _ask_before_destroying(name: str, arguments: dict) -> str:
+    """Ask the user to allow a destructive call, when the client can be asked (spec R4.3).
+
+    Returns the answer for the audit line: accepted, declined or cancelled; or
+    unavailable when the client advertises no elicitation, the session is stateless HTTP
+    (it keeps no client capabilities), or the call came from outside an MCP request.
+    """
+    try:
+        context = server.request_context
+    except LookupError:
+        return "unavailable"
+    asks = ClientCapabilities(elicitation=ElicitationCapability())
+    if not context.session.check_client_capability(asks):
+        return "unavailable"
+    portal = current_binding().portal
+    where = f" on portal {portal}" if portal else ""
+    answer = await context.session.elicit_form(
+        f"Allow {name} {redact_arguments(arguments)}{where}?",
+        {"type": "object", "properties": {}},
+        related_request_id=context.request_id,
+    )
+    return {"accept": "accepted", "decline": "declined"}.get(answer.action, "cancelled")
+
+
+# The tools annotated destructiveHint=true, which ask the user first when the client can
+_DESTRUCTIVE_TOOLS = frozenset(
+    tool.name for tool in TOOLS if tool.annotations is not None and tool.annotations.destructiveHint
+)
 
 # The tools whose results the SDK validates against an outputSchema (spec R4.3)
 _OUTPUT_SCHEMA_TOOLS = frozenset(tool.name for tool in TOOLS if tool.outputSchema is not None)
