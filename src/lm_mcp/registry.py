@@ -6529,9 +6529,10 @@ TOOLS.extend(
                 "collector, to answer one narrow question: whether the debug channel answers "
                 "(uptime), what the stored health check says (health_check, parsed into each "
                 "method's all-NaN rate), whether the collector reaches a device (ping, "
-                "snmpdiagnose). answered and no_reply are results; a refusal by the portal or "
-                "the collector is an error with the call's record in its details. The call "
-                "stops at budget_seconds, and secrets in the output are masked, best effort."
+                "snmpdiagnose). A status of answered or no_reply is a result, not an error; a "
+                "refusal by the portal or the collector is an error with the call's record in "
+                "its details. The call stops at budget_seconds, and secrets in the output are "
+                "masked, best effort."
             ),
             annotations=_DESTRUCTIVE_RUN,
             inputSchema={
@@ -6589,8 +6590,8 @@ TOOLS.extend(
                     "args": {
                         "type": "object",
                         "description": (
-                            "The command's own arguments; no other key is accepted, and never "
-                            "host. perf: type (ds, queue or cpu), dsFilterColumn, ds, h. "
+                            "The command's own arguments and no other key; host is never "
+                            "accepted. perf: type (ds, queue or cpu), dsFilterColumn, ds, h. "
                             "getconfig: key (collector.<method>.threadpool or .timeout). "
                             "logsurf: level, n, files. aplist: h, status. splist: hostname. "
                             "tplist: h, status. tlist: h or c, one required. ping: type, count. "
