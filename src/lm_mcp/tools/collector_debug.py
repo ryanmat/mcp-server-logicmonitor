@@ -23,6 +23,8 @@ arguments; any other argument key is refused, and this module builds the command
 - A WMI query is one WQL SELECT. The collector reads any key=value token on the line as a
   parameter of !wmi, so the WHERE clause allows ``!`` only as ``!=``, and each operator that
   holds ``=`` stands alone between spaces: no command head and no parameter can ride in it.
+- wmi and cim read only the classes in WMI_CLASSES, and a class with a column list, such as
+  Win32_Process, only by those columns, in the SELECT list and the WHERE clause.
 - Output is the device's and so hostile input. redact() masks the secret values a collector or
   device prints (key=value, key: value, JSON, XML, URL user information, PEM blocks) by the
   credential rule the audit log uses, and every scan grows with the length of the text, never
@@ -271,52 +273,113 @@ _WQL_RE = re.compile(
     r"(\s+WHERE\s+(?P<where>.+))?$",
     re.IGNORECASE,
 )
-# WMI and CIM classes never queried, by lower-case name: the name as written, and why.
-_REFUSED_CLASSES = {
-    "win32_product": (
-        "Win32_Product",
-        "reading it starts a Windows Installer consistency check that can repair every "
-        "installed package",
-    ),
-    "cim_datafile": ("CIM_DataFile", "it walks every file on every disk"),
-    "cim_directory": ("CIM_Directory", "it walks every directory on every disk"),
-    "win32_directory": ("Win32_Directory", "it walks every directory on every disk"),
-    "win32_environment": (
-        "Win32_Environment",
-        "it holds environment variables, secrets among them",
-    ),
-    # A query on a class also returns its subclasses' rows, so their parents are refused too.
-    "cim_product": ("CIM_Product", "it returns Win32_Product's rows"),
-    "cim_logicalfile": ("CIM_LogicalFile", "it returns every file and directory on every disk"),
-    "cim_systemresource": ("CIM_SystemResource", "it returns Win32_Environment's rows"),
-    "cim_setting": ("CIM_Setting", "it returns Win32_StartupCommand's rows, Command among them"),
-    "cim_job": ("CIM_Job", "it returns Win32_ScheduledJob's rows, Command among them"),
-    "cim_logicalelement": (
-        "CIM_LogicalElement",
-        "it returns the file, process and resource classes' rows",
-    ),
-    "cim_managedsystemelement": (
-        "CIM_ManagedSystemElement",
-        "it returns the rows of every class beneath it",
-    ),
-    "win32_shortcutfile": ("Win32_ShortcutFile", "it walks every disk to find its rows"),
-    "win32_codecfile": ("Win32_CodecFile", "it walks every disk to find its rows"),
+
+
+@dataclass(frozen=True)
+class WmiClass:
+    """A WMI or CIM class wmi and cim read: its name as written, and, for a class read by its
+    columns alone, those columns (None: every column, and *) and why the others are not read."""
+
+    name: str
+    columns: tuple[str, ...] | None = None
+    why: str = ""
+
+
+# The classes LogicMonitor's WMI datasources collect from, as the sandbox portal's 59 name them
+# in collectorAttribute.queryClass (docs/validation/probes-2026-11.md, Step 74). A query on a
+# class also returns its subclasses' rows, so no parent class (CIM_LogicalElement and the like)
+# is on the list.
+_DATASOURCE_CLASSES = (
+    "Win32_Service",
+    "Win32_OperatingSystem",
+    "Win32_Volume",
+    "Win32_LogicalDisk",
+    "Win32_PrintJob",
+    "Win32_PerfRawData_PerfProc_Process",
+    "Win32_PerfRawData_PerfOS_Memory",
+    "Win32_PerfRawData_PerfOS_System",
+    "Win32_PerfRawData_PerfDisk_LogicalDisk",
+    "Win32_PerfRawData_PerfDisk_PhysicalDisk",
+    "Win32_PerfRawData_PerfNet_Server",
+    "Win32_PerfRawData_Tcpip_NetworkInterface",
+    "Win32_PerfRawData_Tcpip_TCP",
+    "Win32_PerfRawData_Tcpip_TCPv4",
+    "Win32_PerfRawData_Tcpip_UDP",
+    "Win32_PerfRawData_Tcpip_UDPv4",
+    "Win32_PerfRawData_W3SVC_WebService",
+    "Win32_PerfRawData_apppoolcountersprovider_apppoolwas",
+    "Win32_PerfRawData_DNS_DNS",
+    "Win32_PerfRawData_DirectoryServices_DirectoryServices",
+    "Win32_PerfRawData_LocalSessionManager_TerminalServices",
+    "Win32_PerfRawData_MSMQ_MSMQQueue",
+    "Win32_PerfRawData_MSMQ_MSMQService",
+    "Win32_PerfRawData_SQLSERVERAGENT_SQLAgentJobs",
+    "Win32_PerfRawData_MSSQLLYNCLOCAL_MSSQLLYNCLOCALDatabases",
+    "Win32_PerfRawData_Counters_VMwareBlast",
+    "Win32_PerfFormattedData_NETFramework_NETCLRLoading",
+    "Win32_PerfFormattedData_NETFramework_NETCLRMemory",
+    "Win32_PerfRawData_NETFramework_NETCLRExceptions",
+    "Win32_PerfRawData_NETFramework_NETCLRLocksAndThreads",
+    "Win32_PerfRawData_ClussvcPerfProvider_ClusterMulticastRequestResponseMessages",
+    "Win32_PerfRawData_ClussvcPerfProvider_ClusterResourceControlManager",
+    "Win32_PerfRawData_GmoPerfProvider_HyperVVMSaveSnapshotandRestore",
+    "Win32_PerfRawData_HvStats_HyperVHypervisorVirtualProcessor",
+    "Win32_PerfRawData_NvspNicStats_HyperVVirtualNetworkAdapter",
+    "Win32_PerfRawData_NvspPortStats_HyperVVirtualSwitchPort",
+    "Win32_PerfRawData_NvspSwitchStats_HyperVVirtualSwitch",
+    "Win32_PerfRawData_MSExchangeCalendarAttendant_MSExchangeCalendarAttendant",
+    "Win32_PerfRawData_MSExchangeRpcClientAccess_MSExchangeRpcClientAccess",
+    "Win32_PerfRawData_MediaPerf_LSMEDIAInformational",
+    "Win32_PerfRawData_MediaPerf_LSMEDIAOperations",
+    "Win32_PerfRawData_MediaPerf_LSMEDIAPlanning",
+    "Win32_PerfRawData_MediationPerf_LSMediationServerinboundCalls",
+    "Win32_PerfRawData_MediationPerf_LSMediationServeroutboundCalls",
+    "Win32_PerfRawData_S4Perf_LSSipEpsSipDialogs",
+    "Win32_PerfRawData_S4Perf_LSSipEpsSipEpsConnections",
+    "Win32_PerfRawData_S4Perf_LSSipEpsSipEpsTransactions",
+    "Win32_PerfRawData_UcwaPerf_LSWEBUCWA",
+    "Win32_PerfRawData_WSIPPerf_LSSIPPeers",
+)
+# Every column Microsoft's Win32_Process class reference declares but CommandLine, whose
+# arguments can carry passwords.
+_PROCESS_COLUMNS = (
+    "Caption", "CreationClassName", "CreationDate", "CSCreationClassName", "CSName",
+    "Description", "ExecutablePath", "ExecutionState", "Handle", "HandleCount", "InstallDate",
+    "KernelModeTime", "MaximumWorkingSetSize", "MinimumWorkingSetSize", "Name",
+    "OSCreationClassName", "OSName", "OtherOperationCount", "OtherTransferCount", "PageFaults",
+    "PageFileUsage", "ParentProcessId", "PeakPageFileUsage", "PeakVirtualSize",
+    "PeakWorkingSetSize", "Priority", "PrivatePageCount", "ProcessId", "QuotaNonPagedPoolUsage",
+    "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage", "QuotaPeakPagedPoolUsage",
+    "ReadOperationCount", "ReadTransferCount", "SessionId", "Status", "TerminationDate",
+    "ThreadCount", "UserModeTime", "VirtualSize", "WindowsVersion", "WorkingSetSize",
+    "WriteOperationCount", "WriteTransferCount",
+)  # fmt: skip
+# Every class wmi reads, by lower-case name; cim reads those with no column list. Beside the
+# datasource classes: PR #97's Win32_Process (by its columns) and CIM_ComputerSystem, and the
+# three classes read only with a WHERE clause.
+WMI_CLASSES = {
+    entry.name.lower(): entry
+    for entry in (
+        *(WmiClass(name) for name in _DATASOURCE_CLASSES),
+        WmiClass(
+            "Win32_Process",
+            _PROCESS_COLUMNS,
+            "its others hold a command line (CommandLine), whose arguments can carry passwords",
+        ),
+        WmiClass("CIM_ComputerSystem"),
+        WmiClass("Win32_NTLogEvent"),
+        WmiClass("Win32_UserAccount"),
+        WmiClass("Win32_Group"),
+    )
 }
+# WQL words a WHERE clause holds beside column names.
+_WQL_WORDS = frozenset({"and", "or", "not", "like", "is", "isa", "null", "true", "false"})
 # Classes read only with a WHERE clause, as their rows run to a whole event log or domain:
 # the name as written, and an example clause.
 _WHERE_CLASSES = {
     "win32_ntlogevent": ("Win32_NTLogEvent", "Logfile = 'System'"),
     "win32_useraccount": ("Win32_UserAccount", "LocalAccount = True"),
     "win32_group": ("Win32_Group", "LocalAccount = True"),
-}
-# Columns never read, by class, in the SELECT list or the WHERE clause: each holds a command
-# line, whose arguments can carry passwords, and * includes it. A process's rows also answer
-# a query on CIM_Process.
-_REFUSED_COLUMNS = {
-    "win32_process": ("Win32_Process", {"commandline": "CommandLine"}),
-    "cim_process": ("CIM_Process", {"commandline": "CommandLine"}),
-    "win32_startupcommand": ("Win32_StartupCommand", {"command": "Command"}),
-    "win32_scheduledjob": ("Win32_ScheduledJob", {"command": "Command"}),
 }
 _QUOTED_VALUE_RE = re.compile(r"'[^']*'?")
 _WHERE_CHARS_RE = re.compile(r"^[A-Za-z0-9_ '%.,:\\/\-<>=!()]+$")
@@ -345,11 +408,17 @@ def _check_where(where: str) -> None:
                 )
 
 
-def _check_class(name: str) -> None:
-    """Refuse a WMI or CIM class that changes the device, walks its disks or holds secrets."""
-    refused = _REFUSED_CLASSES.get(name.lower())
-    if refused:
-        raise ToolRejectionError(f"the class {refused[0]} is not queried: {refused[1]}")
+def _wmi_class(name: str, command: str) -> WmiClass:
+    """The allowlisted class a wmi or cim call names; any other is refused, naming the classes
+    that command reads."""
+    entry = WMI_CLASSES.get(name.lower())
+    if entry is None:
+        readable = [e.name for e in WMI_CLASSES.values() if command == "wmi" or e.columns is None]
+        raise ToolRejectionError(
+            f"the class {name} is not queried: {command} reads only these classes: "
+            + ", ".join(sorted(readable, key=str.lower))
+        )
+    return entry
 
 
 def _b_wmi(a: dict[str, Any], t: Target) -> str:
@@ -360,27 +429,27 @@ def _b_wmi(a: dict[str, Any], t: Target) -> str:
         raise ToolRejectionError(
             "'query' must be one WQL SELECT: SELECT * | col[, col] FROM Class [WHERE ...]"
         )
-    cls = match.group("cls").lower()
-    _check_class(cls)
+    entry = _wmi_class(match.group("cls"), "wmi")
     where = match.group("where")
-    if cls in _WHERE_CLASSES and not where:
-        written, example = _WHERE_CLASSES[cls]
+    if entry.name.lower() in _WHERE_CLASSES and not where:
+        written, example = _WHERE_CLASSES[entry.name.lower()]
         raise ToolRejectionError(f"{written} is read only with a WHERE clause, e.g. {example}")
-    if cls in _REFUSED_COLUMNS:
-        written, refused = _REFUSED_COLUMNS[cls]
-        cols = {c.strip().lower() for c in match.group("cols").split(",")}
-        # Outside its quoted values, a name in the WHERE clause is a column it tests.
-        tested = {
-            w.lower()
+    if entry.columns is not None:
+        allowed = {c.lower() for c in entry.columns}
+        # Outside its quoted values, a name in the WHERE clause that is not a WQL word is a
+        # column it tests.
+        tested = [
+            w
             for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", _QUOTED_VALUE_RE.sub(" ", where or ""))
-        }
-        hit = sorted(set(refused) & (cols | tested))
-        if "*" in cols or hit:
-            column = refused[hit[0]] if hit else next(iter(refused.values()))
+            if w.lower() not in _WQL_WORDS
+        ]
+        names = [c.strip() for c in match.group("cols").split(",")] + tested
+        bad = next((n for n in names if n.lower() not in allowed), None)
+        if bad is not None:
             raise ToolRejectionError(
-                f"{written}'s {column} is not read or tested: it holds a command line, whose "
-                f"arguments can carry passwords; name the columns, e.g. select Name from "
-                f"{written}"
+                f"{entry.name} is read only by these columns, in the SELECT list and the WHERE "
+                f"clause, as {entry.why}: {', '.join(entry.columns)}; {bad} is not one "
+                "of them"
             )
     if where:
         _check_where(where)
@@ -657,11 +726,11 @@ def _b_snmpget(a: dict[str, Any], t: Target) -> str:
 
 def _b_cim(a: dict[str, Any], t: Target) -> str:
     cls = _opt(a, "class", pattern=_CLASS_RE) or _required(a, "class")
-    _check_class(cls)
-    if cls.lower() in _REFUSED_COLUMNS:
+    entry = _wmi_class(cls, "cim")
+    if entry.columns is not None:
         raise ToolRejectionError(
-            f"the class {_REFUSED_COLUMNS[cls.lower()][0]} is not queried with cim, which "
-            "returns every column, a command line among them"
+            f"the class {entry.name} is not queried with cim, which returns every column; read "
+            f"it with wmi by its columns, e.g. select Name from {entry.name}"
         )
     return _join("!cim", f"h={_device(t)}", f"c={cls}")
 

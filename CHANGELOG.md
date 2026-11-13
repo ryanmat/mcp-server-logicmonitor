@@ -109,9 +109,13 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   address or named by a known name for one. A DNS name that resolves to such an address is not
   caught, and with writes on `create_device` can name a device for any host; set
   `LM_DISABLED_TOOLS` to leave either tool out. A WMI WHERE clause allows `!` only as `!=`, and
-  each comparison operator stands alone between spaces; `wmi` and `cim` refuse Win32_Product,
-  the file, directory and environment classes and their parent classes, and never read or test
-  a command-line column; `snmpwalk` never reads the SNMP community or user tables. Output is
+  each comparison operator stands alone between spaces. `wmi` and `cim` read only the classes
+  LogicMonitor's WMI datasources collect from (Win32_Service, Win32_OperatingSystem,
+  Win32_Volume, Win32_LogicalDisk, Win32_PrintJob and the performance counter classes), plus
+  CIM_ComputerSystem and Win32_NTLogEvent, Win32_UserAccount and Win32_Group, which need a WHERE
+  clause; `wmi` also reads Win32_Process by its listed columns, never CommandLine, and any other
+  class is refused with the allowed ones named. `snmpwalk` never reads the SNMP community or user
+  tables. Output is
   masked by the credential rule the audit log uses. `health_check` leads with each collection
   method's share of tasks returning NaN for every datapoint and names any checkpoint array it
   cannot read under `checkpoints_unreadable`. The masking and the `health_check` parse take

@@ -160,8 +160,8 @@ class TestBuilder:
             ("firewallstatus", {}, "!firewallstatus"), ("ipaddress", {}, "!ipaddress"),
             ("tasklist", {}, "!tasklist"), ("adlist", {}, "!adlist"), ("nsplist", {}, "!nsplist"),
             ("dxlist", {}, "!dxlist"), ("tplist", {}, "!tplist"), ("macaddress", {}, "!macaddress 10.0.0.5"),
-            ("wmi", {"query": "select Name, ProcessId from Win32_Process where User = 'svc'"},
-             "!wmi h=10.0.0.5 select Name, ProcessId from Win32_Process where User = 'svc'"),
+            ("wmi", {"query": "select Name, ProcessId from Win32_Process where Name = 'svchost.exe'"},
+             "!wmi h=10.0.0.5 select Name, ProcessId from Win32_Process where Name = 'svchost.exe'"),
             ("snmpwalk", {"oid": ".1.3.6.1.2.1.2"}, "!snmpwalk 10.0.0.5 .1.3.6.1.2.1.2"),
             ("logsurf", {"n": ""}, "!logsurf level=error n=50 wrapper.log"),
             ("logsurf", {"files": ["wrapper.log", "wrapper.log"]}, "!logsurf level=error n=50 wrapper.log"),
@@ -496,7 +496,7 @@ class TestRequest:
         "command,args",
         [("ping", {"count": 999}), ("ping", {"count": float("inf")}), ("ping", {"bogus": 1}),
          ("wmi", {"query": "select * from X h=evil"}),
-         ("wmi", {"query": "select * from X where Name = 'a' !restart"}),
+         ("wmi", {"query": "select * from Win32_Service where Name = 'a' !restart"}),
          ("http", {"url": "https://admin:x@10.0.0.42/"}), ("http", {"url": "https://10.0.0.42/?password=x"}),
          ("http", {"url": "ftp://10.0.0.42/"})],
     )  # fmt: skip
@@ -1309,7 +1309,7 @@ class TestTool:
         "command,args",
         [("ping", {"count": 999}), ("ping", {"count": float("inf")}), ("ping", {"bogus": 1}),
          ("wmi", {"query": "select * from X h=evil"}),
-         ("wmi", {"query": "select * from X where Name = 'a' !restart"}),
+         ("wmi", {"query": "select * from Win32_Service where Name = 'a' !restart"}),
          ("http", {"url": "https://admin:x@127.0.0.1/"}), ("http", {"url": "https://127.0.0.1/?password=x"}),
          ("http", {"url": "ftp://127.0.0.1/"})],
     )  # fmt: skip
@@ -1940,12 +1940,12 @@ class TestSecurityReview:
     # M3: a WQL or CIM class that changes the device, walks its disks or holds secrets by design.
     @pytest.mark.parametrize(
         "query,why",
-        [("select * from Win32_Product", "Win32_Product"),
-         ("SELECT Name FROM win32_product WHERE Name = 'x'", "Win32_Product"),
-         ("select * from CIM_DataFile where Drive = 'c:'", "CIM_DataFile"),
-         ("select * from CIM_Directory", "CIM_Directory"),
-         ("select * from Win32_Directory", "Win32_Directory"),
-         ("select * from Win32_Environment", "Win32_Environment"),
+        [("select * from Win32_Product", "Win32_Product is not queried"),
+         ("SELECT Name FROM win32_product WHERE Name = 'x'", "win32_product is not queried"),
+         ("select * from CIM_DataFile where Drive = 'c:'", "CIM_DataFile is not queried"),
+         ("select * from CIM_Directory", "CIM_Directory is not queried"),
+         ("select * from Win32_Directory", "Win32_Directory is not queried"),
+         ("select * from Win32_Environment", "Win32_Environment is not queried"),
          ("select * from Win32_Process", "CommandLine"),
          ("select Name, CommandLine from Win32_Process", "CommandLine"),
          ("select * from Win32_NTLogEvent", "WHERE")],
@@ -2129,7 +2129,7 @@ class TestSecurityReviewRecheck:
          "select Name, CommandLine from CIM_Process"],
     )  # fmt: skip
     def test_a_parent_or_subclass_of_a_refused_class_is_refused(self, query):
-        with pytest.raises(ToolRejectionError, match=r"not queried|is not read"):
+        with pytest.raises(ToolRejectionError, match="is not queried"):
             build_cmdline("wmi", {"query": query}, T)
 
     @pytest.mark.parametrize(
@@ -2169,8 +2169,8 @@ class TestSecurityReviewRecheck:
     # Notes: command lines in other classes, and classes that enumerate a domain.
     @pytest.mark.parametrize(
         "query,why",
-        [("select Command from Win32_StartupCommand", "Command"),
-         ("select * from Win32_ScheduledJob", "Command"),
+        [("select Command from Win32_StartupCommand", "Win32_StartupCommand is not queried"),
+         ("select * from Win32_ScheduledJob", "Win32_ScheduledJob is not queried"),
          ("select * from Win32_UserAccount", "WHERE"),
          ("select * from Win32_Group", "WHERE")],
     )  # fmt: skip
@@ -2230,3 +2230,165 @@ class TestSecurityReviewRecheck:
     def test_the_final_guard_refuses_a_second_head_of_any_name(self):
         with pytest.raises(ToolRejectionError):
             check_cmdline("!uptime !_x")
+
+
+# The classes the sandbox's own WMI datasources collect from (probes-2026-11.md, Step 74), as
+# their collectorAttribute.queryClass spells them.
+PROBED_CLASSES = [
+    "Win32_OperatingSystem",
+    "Win32_PerfFormattedData_NETFramework_NETCLRLoading",
+    "Win32_PerfFormattedData_NETFramework_NETCLRMemory",
+    "Win32_PerfRawData_ClussvcPerfProvider_ClusterMulticastRequestResponseMessages",
+    "Win32_PerfRawData_ClussvcPerfProvider_ClusterResourceControlManager",
+    "Win32_PerfRawData_Counters_VMwareBlast",
+    "Win32_PerfRawData_DirectoryServices_DirectoryServices",
+    "Win32_PerfRawData_GmoPerfProvider_HyperVVMSaveSnapshotandRestore",
+    "Win32_PerfRawData_HvStats_HyperVHypervisorVirtualProcessor",
+    "Win32_PerfRawData_LocalSessionManager_TerminalServices",
+    "Win32_PerfRawData_MSExchangeCalendarAttendant_MSExchangeCalendarAttendant",
+    "Win32_PerfRawData_MSExchangeRpcClientAccess_MSExchangeRpcClientAccess",
+    "Win32_PerfRawData_MSMQ_MSMQQueue",
+    "Win32_PerfRawData_MSMQ_MSMQService",
+    "Win32_PerfRawData_MSSQLLYNCLOCAL_MSSQLLYNCLOCALDatabases",
+    "Win32_PerfRawData_MediaPerf_LSMEDIAInformational",
+    "Win32_PerfRawData_MediaPerf_LSMEDIAOperations",
+    "Win32_PerfRawData_MediaPerf_LSMEDIAPlanning",
+    "Win32_PerfRawData_MediationPerf_LSMediationServerinboundCalls",
+    "Win32_PerfRawData_MediationPerf_LSMediationServeroutboundCalls",
+    "Win32_PerfRawData_NETFramework_NETCLRExceptions",
+    "Win32_PerfRawData_NETFramework_NETCLRLocksAndThreads",
+    "Win32_PerfRawData_NvspNicStats_HyperVVirtualNetworkAdapter",
+    "Win32_PerfRawData_NvspPortStats_HyperVVirtualSwitchPort",
+    "Win32_PerfRawData_NvspSwitchStats_HyperVVirtualSwitch",
+    "Win32_PerfRawData_PerfDisk_LogicalDisk",
+    "Win32_PerfRawData_PerfDisk_PhysicalDisk",
+    "Win32_PerfRawData_PerfNet_Server",
+    "Win32_PerfRawData_PerfOS_Memory",
+    "Win32_PerfRawData_PerfOS_System",
+    "Win32_PerfRawData_PerfProc_Process",
+    "Win32_PerfRawData_S4Perf_LSSipEpsSipDialogs",
+    "Win32_PerfRawData_S4Perf_LSSipEpsSipEpsConnections",
+    "Win32_PerfRawData_S4Perf_LSSipEpsSipEpsTransactions",
+    "Win32_PerfRawData_SQLSERVERAGENT_SQLAgentJobs",
+    "Win32_PerfRawData_Tcpip_NetworkInterface",
+    "Win32_PerfRawData_Tcpip_TCP",
+    "Win32_PerfRawData_Tcpip_TCPv4",
+    "Win32_PerfRawData_Tcpip_UDP",
+    "Win32_PerfRawData_Tcpip_UDPv4",
+    "Win32_PerfRawData_UcwaPerf_LSWEBUCWA",
+    "Win32_PerfRawData_W3SVC_WebService",
+    "Win32_PerfRawData_WSIPPerf_LSSIPPeers",
+    "Win32_PrintJob",
+    "Win32_Service",
+    "Win32_Volume",
+    "win32_PerfRawData_apppoolcountersprovider_apppoolwas",
+    "win32_logicaldisk",
+    "win32_perfrawdata_dns_dns",
+]
+
+
+def _refusal(command, args):
+    with pytest.raises(ToolRejectionError) as caught:
+        build_cmdline(command, args, T)
+    return str(caught.value)
+
+
+class TestWmiAllowlist:
+    """R3.9: wmi and cim read only allowlisted classes, and Win32_Process only by listed columns."""
+
+    def test_the_allowlist_is_the_probed_classes_and_97s_cases(self):
+        allowed = {name.lower() for name in cd.WMI_CLASSES}
+        assert len(PROBED_CLASSES) == 49
+        assert allowed == {c.lower() for c in PROBED_CLASSES} | {
+            "win32_process",
+            "cim_computersystem",
+            "win32_ntlogevent",
+            "win32_useraccount",
+            "win32_group",
+        }
+
+    @pytest.mark.parametrize("cls", [*PROBED_CLASSES, "CIM_ComputerSystem", "WIN32_SERVICE"])
+    def test_an_allowlisted_class_builds_with_wmi_and_cim(self, cls):
+        query = f"select * from {cls}"
+        assert build_cmdline("wmi", {"query": query}, T) == f"!wmi h=10.0.0.5 {query}"
+        assert build_cmdline("cim", {"class": cls}, T) == f"!cim h=10.0.0.5 c={cls}"
+
+    def test_the_default_query_still_builds(self):
+        assert build_cmdline("wmi", {}, T) == "!wmi h=10.0.0.5 select * from Win32_Service"
+
+    @pytest.mark.parametrize(
+        "cls",
+        ["CIM_LogicalElement", "CIM_ManagedSystemElement", "CIM_Setting", "CIM_Job", "CIM_Process",
+         "Win32_BIOS", "Win32_StartupCommand", "Win32_ScheduledJob", "Win32_Product", "X"],
+    )  # fmt: skip
+    def test_any_other_class_is_refused_naming_the_allowed_classes(self, cls):
+        message = _refusal("wmi", {"query": f"select Name from {cls}"})
+        assert f"the class {cls} is not queried" in message
+        for written in cd.WMI_CLASSES.values():
+            assert written.name in message, written.name
+        message = _refusal("cim", {"class": cls})
+        assert f"the class {cls} is not queried" in message
+        for written in cd.WMI_CLASSES.values():
+            assert (written.name in message) is (written.columns is None), written.name
+
+    @pytest.mark.parametrize(
+        "query,bad",
+        [("select * from Win32_Process", "*"),
+         ("select Name, CommandLine from Win32_Process", "CommandLine"),
+         ("select Name, Owner from Win32_Process", "Owner"),
+         ("select Name from Win32_Process where commandline LIKE '%-p%'", "commandline"),
+         ("select Name from Win32_Process where User = 'svc'", "User"),
+         ("select Name from win32_process where Name = 'a' AND (UserName = 'b')", "UserName")],
+    )  # fmt: skip
+    def test_win32_process_reads_only_its_listed_columns(self, query, bad):
+        message = _refusal("wmi", {"query": query})
+        assert f"{bad} is not one of them" in message
+        assert "Win32_Process is read only by these columns" in message
+        for column in cd.WMI_CLASSES["win32_process"].columns:
+            assert column in message
+        assert len(cd.WMI_CLASSES["win32_process"].columns) == 44
+        assert "CommandLine" not in cd.WMI_CLASSES["win32_process"].columns
+
+    @pytest.mark.parametrize(
+        "query",
+        ["select Name, ProcessId, WorkingSetSize from Win32_Process where Name = 'svchost.exe' AND ThreadCount > 10",
+         "select name from win32_process where processid = 4",
+         "select Name from Win32_Process where Name LIKE 'sql%' OR NOT Priority = 8",
+         "select ExecutablePath from Win32_Process where ExecutablePath IS NOT NULL",
+         "select Name from Win32_Process where Name = 'CommandLine' AND SessionId = 0"],
+    )  # fmt: skip
+    def test_listed_columns_and_wql_words_build(self, query):
+        assert build_cmdline("wmi", {"query": query}, T) == f"!wmi h=10.0.0.5 {query}"
+
+    @pytest.mark.parametrize("cls", ["Win32_Process", "win32_process"])
+    def test_cim_refuses_a_class_read_by_its_columns(self, cls):
+        message = _refusal("cim", {"class": cls})
+        assert "Win32_Process is not queried with cim" in message
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "select * from Win32_NTLogEvent",
+            "select Name from Win32_UserAccount",
+            "select * from win32_group",
+        ],
+    )
+    def test_the_where_classes_keep_their_where_requirement(self, query):
+        assert "is read only with a WHERE clause" in _refusal("wmi", {"query": query})
+
+    def test_the_registry_says_which_classes_wmi_and_cim_read(self):
+        from lm_mcp.registry import TOOLS
+
+        tool = next(t for t in TOOLS if t.name == "collector_debug")
+        text = tool.inputSchema["properties"]["args"]["description"]
+        wmi = text.split("wmi: ", 1)[1].split(". ", 1)[0]
+        for words in (
+            "Win32_Service",
+            "Win32_PerfRawData",
+            "CIM_ComputerSystem",
+            "Win32_Process",
+            "CommandLine",
+            "any other class is refused",
+        ):
+            assert words in wmi, words
+        assert "Win32_Process" in text.split("cim: ", 1)[1].split(". ", 1)[0]
