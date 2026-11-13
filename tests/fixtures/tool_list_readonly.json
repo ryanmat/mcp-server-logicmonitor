@@ -128,6 +128,7 @@
   "get_session_history",
   "get_session_variable",
   "get_tenants",
+  "get_terraform_imports",
   "get_topology_map",
   "get_topologysource",
   "get_topologysources",
@@ -150,7 +151,6 @@
   "run_portal_reload",
   "search_tools",
   "set_session_variable",
-  "terraform_generate",
   "triage",
   "use_portal"
 ]

@@ -497,11 +497,11 @@ Edwin AI: its insights, its copy of alerts and events, its data model, its agent
 
 ## Terraform
 
-Export LogicMonitor resources as Terraform HCL
+Terraform import blocks for existing LogicMonitor objects
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `terraform_generate` | Export an existing LogicMonitor resource as Terraform HCL configuration using the logicmonitor/logicmonitor provider. Supports device, device_group, collector, alert_rule, escalation_chain, dashboard, datasource, sdt, website, role, and report_group resource types. | No |
+| `get_terraform_imports` | List a resource type's portal objects as Terraform import blocks for the logicmonitor/logicmonitor provider, one `import { to, id }` block per object, for 15 of the provider resource types that import by ID; cluster alert confs are left out, since the API refuses the read the provider's importer makes. Run `terraform init`, then `terraform plan -generate-config-out=generated.tf` on the blocks to have Terraform write the resource configuration. The provider authenticates with LMv1 api_id and api_key only. | No |
 
 ## Remediation
 

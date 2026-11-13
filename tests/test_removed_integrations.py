@@ -29,7 +29,7 @@ _REPO = Path(__file__).resolve().parent.parent
 
 # Word-bounded where a plain substring overmatches: "TestOrchestrationGuide" holds "torch".
 # The Terraform runner is named by its settings and internals, not by the word terraform,
-# which terraform_generate keeps.
+# which get_terraform_imports keeps.
 _REMOVED_WORDS = re.compile(
     r"watsonx|huggingface|granite|\btorch\b|\bhf_|\bttm\b|nl_summary"
     r"|awx|ansible|\baap\b|remediate_workflow"
@@ -91,10 +91,10 @@ def test_removed_tool_is_not_registered(name):
     assert name not in {tool.name for tool in registry.TOOLS}
 
 
-def test_terraform_generate_is_the_only_terraform_tool():
+def test_no_tool_carries_the_terraform_prefix():
     terraform = {tool.name for tool in registry.TOOLS if tool.name.startswith("terraform_")}
 
-    assert terraform == {"terraform_generate"}
+    assert terraform == set()
 
 
 @pytest.mark.parametrize("name", _REMOVED_TOOLS)

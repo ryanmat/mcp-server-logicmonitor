@@ -34,7 +34,11 @@ def test_two_found_queries_pass_with_exit_0(tmp_path):
     result = _grade(
         tmp_path,
         [
-            {"query": "terraform_generate", "expected": "terraform_generate", "forbidden": []},
+            {
+                "query": "get_terraform_imports",
+                "expected": "get_terraform_imports",
+                "forbidden": [],
+            },
             {"query": "get_reference", "expected": "get_reference", "forbidden": []},
         ],
     )
@@ -50,7 +54,11 @@ def test_a_missed_query_fails_with_a_nonzero_exit(tmp_path):
     result = _grade(
         tmp_path,
         [
-            {"query": "terraform_generate", "expected": "terraform_generate", "forbidden": []},
+            {
+                "query": "get_terraform_imports",
+                "expected": "get_terraform_imports",
+                "forbidden": [],
+            },
             {"query": "zzzz qqqq", "expected": "get_devices", "forbidden": []},
         ],
     )
@@ -106,12 +114,26 @@ def test_an_unregistered_tool_that_is_not_pending_is_a_fixture_error(tmp_path):
 
 
 @pytest.mark.parametrize("field", ["query", "expected", "forbidden"])
-def test_the_search_fixture_has_forty_complete_entries(field):
-    """R7.1: forty queries, each naming its query, expected tool and forbidden tools."""
+def test_the_search_fixture_has_53_complete_entries(field):
+    """R7.1: the forty queries, less search_logs (dropped by ruling), and one query for each
+    Phase C family; each names its query, expected tool and forbidden tools."""
     entries = json.loads(QUERIES.read_text())
 
-    assert len(entries) == 40
+    assert len(entries) == 53
     assert all(field in entry for entry in entries)
+
+
+def test_the_search_fixture_names_registered_tools_and_holds_no_pending_entry():
+    """Phase C exit: every expected and forbidden tool is registered, and no entry waits on a
+    tool to be built."""
+    from lm_mcp.registry import TOOLS
+
+    registered = {tool.name for tool in TOOLS}
+    entries = json.loads(QUERIES.read_text())
+
+    assert [e["expected"] for e in entries if e["expected"] not in registered] == []
+    assert [name for e in entries for name in e["forbidden"] if name not in registered] == []
+    assert [e["query"] for e in entries if "pending" in e] == []
 
 
 def test_ci_grades_the_search_eval():

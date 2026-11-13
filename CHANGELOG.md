@@ -179,6 +179,14 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `/metrics/usage`, the portal's current resource counts, which are not billing figures. A 404 from
   either names the path, and a 403 names the path and the role permission it needs. The two tools
   come from #98 by GitHub user barunagarwal.
+- `get_terraform_imports`, which replaces `terraform_generate` (see Removed), lists one resource
+  type's portal objects as Terraform import blocks, `import { to = logicmonitor_<type>.<name>_<id>
+  id = "<id>" }`, one per object. It serves 15 of the 16 resource types of the
+  `logicmonitor/logicmonitor` provider (2.1.7) whose docs import by ID; `terraform init` and then
+  `terraform plan -generate-config-out=generated.tf` write their configuration. Each address ends
+  with the object's ID, so objects that share a name get distinct addresses. It refuses
+  `device_group_cluster_alert_conf`, since the provider's importer reads a cluster alert conf by ID
+  without its device group and the API answers that read with 404.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
@@ -233,6 +241,7 @@ instead.
 | `terraform_state_list` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_state_show` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_write_config` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
+| `terraform_generate` | removed | `get_terraform_imports`, which lists a resource type's objects as import blocks; `terraform init` and then `terraform plan -generate-config-out=generated.tf` write their configuration. The HCL renderers leave with it. |
 | `get_workflow` | removed | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
 | `update_datasource` | removed | `update_logicmodule` with `type="datasource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 | `update_configsource` | removed | `update_logicmodule` with `type="configsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
@@ -307,8 +316,9 @@ instead.
 - The Terraform runner: the ten `terraform_*` tools above, which ran the `terraform` CLI in
   workspaces under `TF_WORKSPACE_DIR`, and the settings `TF_WORKSPACE_DIR`, `TF_TERRAFORM_BINARY`,
   `TF_TIMEOUT` and `TF_AUTO_APPROVE_ENABLED`, which the server ignores if set. The only process the
-  server still starts is `age`, to decrypt a multi-portal vault. `terraform_generate` stays, and the
-  `terraform` category in `lm://guide/tool-categories` now lists only it.
+  server still starts is `age`, to decrypt a multi-portal vault. The `terraform` category in
+  `lm://guide/tool-categories` now lists only `get_terraform_imports`, which replaces
+  `terraform_generate` (see the table).
 - The HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}` and the alert webhook
   `POST /api/v1/webhooks/alert`, and the `LM_ANALYSIS_MAX_CONCURRENCY` setting, which the server
   ignores if set. Run the composite tools, such as `triage`, `diagnose` and `health_check`, from an
