@@ -135,7 +135,7 @@ Parameters:
 
 Pre-execution checklist (complete every item before calling execute_remediation):
 1. Find the source. Call `get_diagnostic_remediation_assignments` with the host ID as
-   resource_id (or the alert ID) and module_type "remediationsource" for the sources
+   resource_id (or the alert ID) and module_type "remediation" for the sources
    assigned to the device. `get_remediationsources` lists every source by name.
 2. Confirm it applies. The source must be among the device's assignments; one outside
    them runs a script written for other devices.

@@ -6069,8 +6069,8 @@
         "module_type": {
           "description": "Restrict to one module type (both if omitted)",
           "enum": [
-            "diagnosticsource",
-            "remediationsource"
+            "diagnostic",
+            "remediation"
           ],
           "type": "string"
         },
