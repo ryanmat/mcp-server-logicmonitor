@@ -165,6 +165,8 @@ findings of Steps 4 and 5.
 1. **Immediate**: [actions to mitigate]
 2. **Investigation**: [analysis to confirm the cause]
 3. **Prevention**: [longer-term improvements]
+### Not checked
+- [What this run left unread]
 ```
 
 ## Discovery mode
@@ -175,4 +177,17 @@ When invoked without arguments (`/lm-apm`):
 2. Read each service's open alerts with `get_apm_service_alerts` and rank the services
    by critical and error alerts.
 3. Present the inventory with those counts.
-4. Ask the user which service to drill into.
+4. Say which services' alerts you did not read, and that no service's metrics were
+   analyzed yet.
+5. Ask the user which service to drill into.
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", name each operation you did not analyze and each analysis you ran
+on only some operations, say that no percentiles were read unless the datasource
+carries them, and name each datasource with no instances.

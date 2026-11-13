@@ -232,4 +232,18 @@ For a workload, each row is one series, named by its selector.
 
 ### Right-sizing opportunities
 - [Resources with decreasing trends that could be downsized]
+### Not checked
+- [What this run left unread]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", name the resources, instances and datapoints you left out (for a
+workload, each of CPU, memory and filesystem you did not query), a window that came
+back truncated, a threshold that was not set, the weekly cycle when the window cannot
+show it, and the series past the 20 analyzed, by count and not by name.

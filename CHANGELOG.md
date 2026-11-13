@@ -641,6 +641,10 @@ instead.
 - The `lm-capacity`, `lm-health` and `lm-remediate` skills call `analyze_metric` in place of the
   tools it replaces. `lm-health` grades the mean of |`z_score`| across a device's datapoints at
   1.33 and 3.33, the points where the removed health score crossed 80 and 50.
+- Every skill carries the same reporting rules and ends its report with a "Not checked" entry:
+  it reports only what the run's tool results carry and says what the run left unread. `lm-triage`,
+  `lm-portal` and `lm-edwin` read the bounded cluster, burst and change lists against their
+  totals, and `lm-edwin` lists at most 25 insights in one call.
 - `get_collector_health` returns `evidence` for the collector asked for by id and for each
   collector in a list not known to be up: its latest status check (script counts and the checks
   that are not OK) and its five latest events. A failed read leaves its part null with

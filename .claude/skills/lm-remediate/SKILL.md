@@ -131,4 +131,16 @@ Use a header per step. End with:
 - Ran: [source or Edwin tool], confirmed by the operator / nothing ran
 - Result: [status and output in one line]
 - Alert after the run: [cleared / still open]
+- Not checked: [what this run left unread]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", name each sub-read the diagnosis listed in its warnings, each source
+of options you did not read (Edwin's tools when they are not listed), and, when nothing
+ran, that the alert's state after a fix is untested.

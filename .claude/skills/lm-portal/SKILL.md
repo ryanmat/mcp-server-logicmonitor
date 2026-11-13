@@ -86,7 +86,8 @@ nothing to show.
 
 A down collector leaves its devices unmonitored, so this is a high-priority finding.
 Those devices read `dead-collector`, not `dead`, so `dead_devices` leaves them out:
-call `get_devices` with `status="dead-collector"` to count them.
+call `get_devices` with `status="dead-collector"` and `limit=1` and read `total`, the
+count. A page of a thousand devices is more than a client returns.
 
 Collector operations change the portal and need writes on. Offer them where they fit,
 and run one only after you ask the user and they say yes:
@@ -165,4 +166,17 @@ Criteria:
 1. [Highest priority action]
 2. [Second priority action]
 3. [Third priority action]
+### Not checked
+- [What this run left unread]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", name each block that came back null or capped at 20 rows, the
+clusters past the five of each type listed, the down collectors whose health you did
+not read, an audit log that could not be read, and that no collector operation ran.

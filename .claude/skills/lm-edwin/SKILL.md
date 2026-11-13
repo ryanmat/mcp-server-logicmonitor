@@ -36,8 +36,10 @@ Execute these steps in order. After each step, present findings before moving on
 
 ### Step 1: Insights
 
-Call `get_edwin_insights` with `hours` set to `hours_back`, and `limit` up to 50 when
-looking for a display id. Each row carries:
+Call `get_edwin_insights` with `hours` set to `hours_back`, and `limit` up to 25 when
+looking for a display id: a row Edwin has analyzed runs to about 1,600 characters, and
+a client can refuse a result of 50 such rows. When the id is not among them, narrow the
+read with `state`, `causal_ci` or a shorter `hours`. Each row carries:
 
 - `meta.displayId`, `meta.state` (`active` or `cleared`) and
   `insightDetails.workflowState`
@@ -139,4 +141,17 @@ Use a header per step. End with:
 - LogicMonitor's window: [clusters, changes and blast radius in one line]
 - Verdict: [supported / contradicted / untested], with the evidence
 - Link: [meta.link]
+- Not checked: [each comparison the data could not make]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", name each comparison the data could not make and why: a causal CI
+that is no monitored device or has no metric series, an impacted CI in no listed
+cluster, a blast-radius row that does not cover the causal CI, an audit log that could
+not be read. When you only list insights, say that none was reviewed yet.

@@ -154,7 +154,20 @@ matters to the findings, run this skill on it.
 
 ### Warnings
 - [Every warning health_check returned]
+### Not checked
+- [What this run left unread]
 
 ### Recommendations
 - [Prioritized actions based on the findings]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", say that the health check reads CPU, memory and disk only, and name
+each section that came back null or with a warning, each metric the device has no data
+for, and a neighbor read that failed.
