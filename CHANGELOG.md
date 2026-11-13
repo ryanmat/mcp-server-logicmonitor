@@ -464,7 +464,7 @@ instead.
 - With an LMv1 token, `ingest_logs` and `push_metrics` sign the path after `/rest`
   (`/log/ingest`, `/metric/ingest`), the one the portal checks. They signed `/rest/log/ingest`
   and `/rest/metric/ingest`, which a live portal refused with 401 while the same token passed a
-  REST read, so LMv1 ingestion never worked. The same probe found a Bearer token accepted on
+  REST read, so LMv1 ingestion failed with 401 on every call. The same probe found a Bearer token accepted on
   both, so the README, `server.json` and the two tools' descriptions no longer say ingestion
   needs LMv1.
 
