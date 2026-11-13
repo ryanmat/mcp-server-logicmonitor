@@ -537,8 +537,10 @@ instead.
   any portal was selected.
 - A write refused because its portal is read-only says `Portal '<name>' is read-only`, naming the
   portal the call ran against, where it said `The active portal is read-only`.
-- The audit line of a destructive call ends with `elicitation=accepted`, `declined`, `cancelled`
-  or `unavailable`, the user's answer to the confirmation or the reason none was asked for.
+- The audit line of a destructive call that reaches the confirmation ends with
+  `elicitation=accepted`, `declined` or `cancelled`, the user's answer, or `unavailable` when the
+  client could not be asked. A call refused before it, by the write gate, a read-only portal or a
+  missing portal, carries no marker.
 - Tool results are compact JSON, with no indentation and no space after `,` or `:`, where they
   were indented by two spaces. Error envelopes keep their format.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
