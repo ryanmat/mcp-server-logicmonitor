@@ -567,8 +567,8 @@ _PLACEHOLDER_HOST = "device.invalid"
 
 
 def _finite(value: Any) -> float:
-    """The value as a float, or nan for a bool, a string or an int too large for a float; an
-    infinity passes through, and check_request refuses both."""
+    """The value as a float: nan for anything but an int or a float, a bool included, and for an
+    int too large for a float. An infinity passes through, and check_request refuses both."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return math.nan
     try:
