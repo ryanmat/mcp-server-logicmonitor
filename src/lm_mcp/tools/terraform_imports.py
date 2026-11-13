@@ -13,9 +13,9 @@ from lm_mcp.tools import list_tool, validation_error
 if TYPE_CHECKING:
     from lm_mcp.client import LogicMonitorClient
 
-# The 16 resources of logicmonitor/logicmonitor v2.1.7 whose docs carry an Import section by
-# object ID: the path that lists a type's objects, and the row fields that name one, the
-# first present field winning. Cluster alert confs are listed per device group.
+# The resources of logicmonitor/logicmonitor v2.1.7 whose docs carry an Import section by
+# object ID, less the one in _UNIMPORTABLE: the path that lists a type's objects, and the row
+# fields that name one, the first present field winning.
 IMPORTABLE_TYPES: dict[str, tuple[str, tuple[str, ...]]] = {
     "alert_rule": ("/setting/alert/rules", ("name",)),
     "collector": ("/setting/collector/collectors", ("description", "hostname")),
@@ -25,10 +25,6 @@ IMPORTABLE_TYPES: dict[str, tuple[str, tuple[str, ...]]] = {
     "datasource": ("/setting/datasources", ("name",)),
     "device": ("/device/devices", ("displayName", "name")),
     "device_group": ("/device/groups", ("name",)),
-    "device_group_cluster_alert_conf": (
-        "/device/groups/{device_group_id}/clusterAlertConf",
-        ("dataSourceDisplayName", "dataPointName"),
-    ),
     "escalation_chain": ("/setting/alert/chains", ("name",)),
     "report_group": ("/report/groups", ("name",)),
     "role": ("/setting/roles", ("name",)),
@@ -38,13 +34,23 @@ IMPORTABLE_TYPES: dict[str, tuple[str, tuple[str, ...]]] = {
     "widget": ("/dashboard/widgets", ("name",)),
 }
 
-_CLUSTER_ALERT_CONF = "device_group_cluster_alert_conf"
+# A documented import this tool leaves out, and why. The API answered
+# GET /device/groups/0/clusterAlertConf/{id} with 404 on 2026-11-13, and the provider's v2.1.7
+# importer reads a cluster alert conf by ID through that path, setting no device group.
+_UNIMPORTABLE = {
+    "device_group_cluster_alert_conf": (
+        "the provider's importer (2.1.7) reads a cluster alert conf by ID without its device "
+        "group, and the API answers that read with 404"
+    ),
+}
 
 NEXT_STEP = (
-    "Write the import blocks to a .tf file and run `terraform plan "
-    "-generate-config-out=generated.tf` (Terraform 1.5 or later) to have Terraform write the "
-    "matching resource blocks. The provider authenticates with an LMv1 api_id and api_key "
-    "(LM_API_ID, LM_API_KEY) and company (LM_COMPANY), not a bearer token."
+    "Write the import blocks to a .tf file beside a required_providers entry with "
+    'source = "logicmonitor/logicmonitor" and a provider "logicmonitor" block, run '
+    "`terraform init`, then `terraform plan -generate-config-out=generated.tf` (Terraform 1.5 or "
+    "later) to have Terraform write the matching resource blocks. The provider authenticates with "
+    "an LMv1 api_id and api_key (LM_API_ID, LM_API_KEY) and company (LM_COMPANY), not a bearer "
+    "token."
 )
 
 
@@ -82,37 +88,29 @@ async def get_terraform_imports(
     filter: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    device_group_id: int | None = None,
 ) -> list[TextContent]:
     """List a resource type's portal objects as Terraform import blocks.
 
     Args:
         client: LogicMonitor API client.
-        resource_type: One of the 16 provider resource types that import by ID.
+        resource_type: One of the 15 provider resource types this tool serves.
         filter: LogicMonitor filter expression, sent as written.
         limit: Page size.
         offset: Rows to skip.
-        device_group_id: The device group whose cluster alert confs to list; required for
-            device_group_cluster_alert_conf and refused for every other type.
 
     Returns:
         List of TextContent with one import block per object, or error.
     """
     if resource_type not in IMPORTABLE_TYPES:
+        reason = _UNIMPORTABLE.get(resource_type, "it has no Terraform import")
         return validation_error(
             "INVALID_REQUEST",
-            f"'{resource_type}' has no Terraform import. Types: {', '.join(IMPORTABLE_TYPES)}.",
-        )
-    if (resource_type == _CLUSTER_ALERT_CONF) != (device_group_id is not None):
-        return validation_error(
-            "INVALID_REQUEST",
-            f"device_group_id is required for {_CLUSTER_ALERT_CONF} and refused for any other "
-            "type, since only cluster alert confs are listed per device group.",
+            f"'{resource_type}' is not served: {reason}. Types: {', '.join(IMPORTABLE_TYPES)}.",
         )
     path, fields = IMPORTABLE_TYPES[resource_type]
     return await list_tool(
         client,
-        path.format(device_group_id=device_group_id),
+        path,
         key="imports",
         project=lambda row: _import_entry(resource_type, fields, row),
         limit=limit,

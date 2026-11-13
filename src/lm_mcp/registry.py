@@ -4070,8 +4070,7 @@ TOOLS.extend(
                 "questions: every feature the contract names, entitled or not, each with its "
                 "role (billable_line, metered_no_entitlement, metered_unpaid, repeats_parent, "
                 "rollup_or_carveout), entitled quantity, unit and roll-up basis, plus the "
-                "detected billing_mode. It reports what the contract allows, not what the "
-                "portal holds now."
+                "detected billing_mode. It does not count the portal's current resources."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4089,8 +4088,8 @@ TOOLS.extend(
             name="get_usage_metrics",
             description=(
                 "Read how many devices, Kubernetes, AWS, Azure and GCP resources, websites and "
-                "services the portal holds now. Point-in-time counts, not the figures the "
-                "portal is billed on, which follow each feature's roll-up basis in the contract."
+                "services the portal holds now, as point-in-time counts. The portal is billed "
+                "on each feature's roll-up basis in the contract, so these are not billed figures."
             ),
             annotations=_READ_ONLY,
             inputSchema={"type": "object", "properties": {}},
@@ -6338,11 +6337,12 @@ TOOLS.extend(
             description=(
                 "List a resource type's portal objects as Terraform import blocks for the "
                 "logicmonitor/logicmonitor provider, one `import { to, id }` block per object, "
-                "for the 16 provider resource types that import by ID. Run `terraform plan "
-                "-generate-config-out=generated.tf` on the blocks to have Terraform write the "
-                "resource configuration. The provider authenticates with LMv1 api_id and "
-                "api_key only. device_group_id is required for "
-                "device_group_cluster_alert_conf and refused for every other type."
+                "for 15 of the provider resource types that import by ID; cluster alert confs "
+                "are left out, since the API refuses the read the provider's importer makes. "
+                "Run `terraform init`, then "
+                "`terraform plan -generate-config-out=generated.tf` on the blocks to have "
+                "Terraform write the resource configuration. The provider authenticates with "
+                "LMv1 api_id and api_key only."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6359,10 +6359,6 @@ TOOLS.extend(
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},
                     "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
-                    "device_group_id": {
-                        "type": "integer",
-                        "description": "Device group whose cluster alert confs to list",
-                    },
                 },
                 "required": ["resource_type"],
             },

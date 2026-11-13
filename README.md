@@ -186,9 +186,23 @@ import {
 }
 ```
 
-It covers the 16 resource types whose provider docs (2.1.7) import by ID: `alert_rule`, `collector`, `collector_group`, `dashboard`, `dashboard_group`, `datasource`, `device`, `device_group`, `device_group_cluster_alert_conf`, `escalation_chain`, `report_group`, `role`, `sdt`, `website`, `website_group`, and `widget`. Cluster alert confs are listed per device group, so that type needs `device_group_id`. Each address ends with the object's ID, so objects that share a name get distinct addresses.
+It covers 15 of the 16 resource types whose provider docs (2.1.7) import by ID: `alert_rule`, `collector`, `collector_group`, `dashboard`, `dashboard_group`, `datasource`, `device`, `device_group`, `escalation_chain`, `report_group`, `role`, `sdt`, `website`, `website_group`, and `widget`. It refuses `device_group_cluster_alert_conf`, since the provider's importer reads a cluster alert conf by ID without its device group and the API answers that read with 404. Each address ends with the object's ID, so objects that share a name get distinct addresses.
 
-Save the blocks in a `.tf` file beside a `provider "logicmonitor"` block and run `terraform plan -generate-config-out=generated.tf` (Terraform 1.5 or later); Terraform writes the matching resource configuration to `generated.tf` for you to review before `terraform apply`.
+Save the blocks in a `.tf` file beside the provider's configuration:
+
+```hcl
+terraform {
+  required_providers {
+    logicmonitor = {
+      source = "logicmonitor/logicmonitor"
+    }
+  }
+}
+
+provider "logicmonitor" {}
+```
+
+Run `terraform init`, then `terraform plan -generate-config-out=generated.tf` (Terraform 1.5 or later). Terraform writes the matching resource configuration to `generated.tf` for you to review before `terraform apply`.
 
 The provider authenticates only with an LMv1 API token, `api_id` and `api_key` (`LM_API_ID`, `LM_API_KEY`), plus `company` (`LM_COMPANY`). It takes no bearer token, so a server set up with `LM_BEARER_TOKEN` alone needs an LMv1 token for Terraform.
 

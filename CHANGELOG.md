@@ -165,26 +165,28 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   its tenant names; both read endpoints of LogicMonitor v247 that the public API reference does
   not list, so the rules come back as the API returns them.
 - Usage reads, in a new `usage` category. `get_usage_contract` reads `/usage/contractInfo`: every
-  feature the contract names, including those with no entitlement that the usage page hides,
-  each with its role, entitled quantity, unit and roll-up basis, and the detected
-  `billing_mode`; `billable_only` keeps the billable lines. A zero entitlement is
-  `metered_no_entitlement` whether or not the contract marks it unpaid. A line with more than
-  one unit pairs each unit with its quantity in `entitled_by_unit`; its `unit` names the one
-  unit that carries a quantity, the largest with `entitled_ambiguous` when more than one does,
-  and is null when none does. A child that restates its metered parent's non-zero quantity is
-  `repeats_parent`, not a billable line. A node the tool cannot read is logged and listed under
-  `unreadable_nodes`, and a response with no feature the tool can read carries a warning rather
-  than reading as an empty contract. `get_usage_metrics` reads `/metrics/usage`, the portal's current
-  resource counts, which are not billing figures. A 404 from either names the path, and a 403
-  names the path and the role permission it needs. The two tools come from #98 by GitHub user
-  barunagarwal.
-- `get_terraform_imports` lists one resource type's portal objects as Terraform import blocks,
-  `import { to = logicmonitor_<type>.<name>_<id> id = "<id>" }`, one per object, for the 16
-  resource types of the `logicmonitor/logicmonitor` provider (2.1.7) whose docs import by ID;
-  `terraform plan -generate-config-out=generated.tf` then writes their configuration. Each
-  address ends with the object's ID, so objects that share a name get distinct addresses.
-  `device_group_cluster_alert_conf` lists one device group's confs and needs
-  `device_group_id`. It replaces `terraform_generate` (see Removed).
+  feature the contract names, including those with no entitlement that the usage page hides, each
+  with its role, entitled quantity, unit and roll-up basis, and the detected `billing_mode`;
+  `billable_only` keeps the billable lines. `metered_no_entitlement` covers a metered line with a
+  zero entitlement, whether or not the contract marks it unpaid. A line whose quantities pair one
+  to one with more than one unit gets `entitled_by_unit`, each unit with its quantity; its `unit`
+  names the one unit that carries a quantity, the largest with `entitled_ambiguous` when more than
+  one does, and is null when none does. When the unit list does not pair with the quantities,
+  `unit` is the whole list. `repeats_parent` marks a child that restates its metered parent's
+  non-zero quantity, and such a child is never a billable line. A node the tool cannot read is
+  logged and listed under `unreadable_nodes`, and a response with no feature the tool can read
+  carries a warning that no entitlement can be concluded from it. `get_usage_metrics` reads
+  `/metrics/usage`, the portal's current resource counts, which are not billing figures. A 404 from
+  either names the path, and a 403 names the path and the role permission it needs. The two tools
+  come from #98 by GitHub user barunagarwal.
+- `get_terraform_imports`, which replaces `terraform_generate` (see Removed), lists one resource
+  type's portal objects as Terraform import blocks, `import { to = logicmonitor_<type>.<name>_<id>
+  id = "<id>" }`, one per object. It serves 15 of the 16 resource types of the
+  `logicmonitor/logicmonitor` provider (2.1.7) whose docs import by ID; `terraform init` and then
+  `terraform plan -generate-config-out=generated.tf` write their configuration. Each address ends
+  with the object's ID, so objects that share a name get distinct addresses. It refuses
+  `device_group_cluster_alert_conf`, since the provider's importer reads a cluster alert conf by ID
+  without its device group and the API answers that read with 404.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.
@@ -239,7 +241,7 @@ instead.
 | `terraform_state_list` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_state_show` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
 | `terraform_write_config` | removed | None. Run the `terraform` CLI or HashiCorp's Terraform MCP server. |
-| `terraform_generate` | removed | `get_terraform_imports`, which lists a resource type's objects as import blocks; `terraform plan -generate-config-out=generated.tf` then writes their configuration. The HCL renderers leave with it. |
+| `terraform_generate` | removed | `get_terraform_imports`, which lists a resource type's objects as import blocks; `terraform init` and then `terraform plan -generate-config-out=generated.tf` write their configuration. The HCL renderers leave with it. |
 | `get_workflow` | removed | None. The composite tools (`triage`, `diagnose`, `health_check`, `capacity_plan`, `portal_overview`) run the procedures; MCP clients read the three remaining prompts through `prompts/get`. |
 | `update_datasource` | removed | `update_logicmodule` with `type="datasource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |
 | `update_configsource` | removed | `update_logicmodule` with `type="configsource"`, which reads the current definition, merges your changes, and returns a diff unless `mode="apply"`. |

@@ -1,5 +1,5 @@
-# Description: Tests for get_terraform_imports: one Terraform import block per portal object for the
-# Description: 16 provider resource types that import by ID, refusals, names and the registry entry.
+# Description: Tests for get_terraform_imports (R3.12): one Terraform import block per portal object
+# Description: for the 15 provider resource types it serves, refusals, names and the registry entry.
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from tests.envelope import envelope
 
 BASE = "https://test.logicmonitor.com/santaba/rest"
 
-# The 16 resources of logicmonitor/logicmonitor v2.1.7 whose docs carry an Import section by ID,
-# with the path that lists them and one synthetic row in the keys the 2026-11-13 probe read
-# (the sdt and cluster alert conf rows follow the swagger: the sandbox held none).
+# The 15 resources of logicmonitor/logicmonitor v2.1.7 whose docs carry an Import section by ID,
+# less device_group_cluster_alert_conf, with the path that lists them and one synthetic row in
+# the keys the 2026-11-13 probe read (the sdt row follows the swagger: the sandbox held none).
 TYPES = {
     "alert_rule": ("/setting/alert/rules", {"id": 11, "name": "Critical to NOC"}),
     "collector": ("/setting/collector/collectors", {"id": 12, "description": "dc1 collector"}),
@@ -30,10 +30,6 @@ TYPES = {
     "datasource": ("/setting/datasources", {"id": 16, "name": "HostStatus"}),
     "device": ("/device/devices", {"id": 17, "displayName": "web-01", "name": "10.0.0.17"}),
     "device_group": ("/device/groups", {"id": 18, "name": "Linux Servers"}),
-    "device_group_cluster_alert_conf": (
-        "/device/groups/42/clusterAlertConf",
-        {"id": 19, "dataSourceDisplayName": "Ping", "dataPointName": "PingLossPercent"},
-    ),
     "escalation_chain": ("/setting/alert/chains", {"id": 20, "name": "NOC Team"}),
     "report_group": ("/report/groups", {"id": 21, "name": "Firewall Reports"}),
     "role": ("/setting/roles", {"id": 22, "name": "readonly"}),
@@ -54,17 +50,12 @@ def client():
     return LogicMonitorClient(base_url=BASE, auth=BearerAuth("test-token"), timeout=30)
 
 
-def _kwargs(resource_type: str) -> dict:
-    extra = {"device_group_id": 42} if resource_type == "device_group_cluster_alert_conf" else {}
-    return {"resource_type": resource_type, **extra}
-
-
 async def _imports(client, resource_type: str, rows: list[dict], **kwargs) -> tuple[dict, object]:
     path = TYPES[resource_type][0]
     route = respx.get(f"{BASE}{path}").mock(
         return_value=httpx.Response(200, json={"total": len(rows), "items": rows})
     )
-    result = await get_terraform_imports(client, **{**_kwargs(resource_type), **kwargs})
+    result = await get_terraform_imports(client, resource_type=resource_type, **kwargs)
     return json.loads(result[0].text), route
 
 
@@ -137,11 +128,16 @@ class TestImportBlocks:
         }
 
     @respx.mock
-    async def test_the_answer_names_the_next_step_and_the_provider_auth(self, client):
+    async def test_the_answer_names_the_next_steps_and_the_provider_auth(self, client):
         body, _ = await _imports(client, "role", [TYPES["role"][1]])
+        steps = body["next_step"]
 
-        assert "terraform plan -generate-config-out=generated.tf" in body["next_step"]
-        assert "LM_API_ID" in body["next_step"] and "LM_API_KEY" in body["next_step"]
+        # Without the source, terraform init looks for hashicorp/logicmonitor.
+        assert 'source = "logicmonitor/logicmonitor"' in steps
+        assert steps.index("terraform init") < steps.index(
+            "terraform plan -generate-config-out=generated.tf"
+        )
+        assert "LM_API_ID" in steps and "LM_API_KEY" in steps
 
 
 class TestRefusals:
@@ -157,7 +153,9 @@ class TestRefusals:
         assert route.call_count == 0
 
     @respx.mock
-    async def test_the_cluster_alert_conf_type_needs_a_device_group(self, client):
+    async def test_cluster_alert_confs_are_refused_with_the_reason(self, client):
+        # GET /device/groups/0/clusterAlertConf/2 answered 404 on 2026-11-13, the read the
+        # provider's v2.1.7 importer makes with no device group.
         route = respx.get(url__startswith=BASE).mock(return_value=httpx.Response(200, json={}))
 
         error = envelope(
@@ -165,19 +163,7 @@ class TestRefusals:
         )
 
         assert error["code"] == "INVALID_REQUEST"
-        assert "device_group_id" in error["message"]
-        assert route.call_count == 0
-
-    @respx.mock
-    async def test_any_other_type_refuses_a_device_group(self, client):
-        route = respx.get(url__startswith=BASE).mock(return_value=httpx.Response(200, json={}))
-
-        error = envelope(
-            await get_terraform_imports(client, resource_type="device", device_group_id=42)
-        )
-
-        assert error["code"] == "INVALID_REQUEST"
-        assert "device_group_id" in error["message"]
+        assert "404" in error["message"] and "device group" in error["message"]
         assert route.call_count == 0
 
     @respx.mock
@@ -217,7 +203,7 @@ class TestRegistry:
         assert get_tool_handler("get_terraform_imports") is get_terraform_imports
         assert TOOL_CATEGORIES["categories"]["terraform"]["tools"] == ["get_terraform_imports"]
 
-    def test_the_schema_lists_the_16_types(self):
+    def test_the_schema_lists_the_15_types(self):
         schema = {tool.name: tool.inputSchema for tool in TOOLS}["get_terraform_imports"]
 
         assert schema["required"] == ["resource_type"]
@@ -227,5 +213,4 @@ class TestRegistry:
             "filter",
             "limit",
             "offset",
-            "device_group_id",
         }
