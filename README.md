@@ -55,7 +55,7 @@ Claude Desktop, Cursor and Gemini CLI read the same block:
 }
 ```
 
-[documentation/client-setup.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/client-setup.md) has each client's config file and steps, including VS Code and OpenAI Codex CLI, whose formats differ. Cursor loads only the first 40 MCP tools; that page shows how to fit a set under the cap with `LM_MCP_CATEGORIES`.
+[documentation/client-setup.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/client-setup.md) has each client's config file and steps, including VS Code and OpenAI Codex CLI, whose formats differ. If your Cursor release still sends only the first 40 MCP tools to the agent, that page shows how to narrow the list with `LM_MCP_CATEGORIES`.
 
 ### Container
 

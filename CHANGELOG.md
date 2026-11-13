@@ -2132,6 +2132,30 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
+[Unreleased]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.2.1...v4.3.0
+[4.2.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.2.0...v4.2.1
+[4.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.1.0...v4.2.0
+[4.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.0.0...v4.1.0
+[4.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.9.0...v4.0.0
+[3.9.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.8.3...v3.9.0
+[3.8.3]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.8.2...v3.8.3
+[3.8.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.8.1...v3.8.2
+[3.8.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.8.0...v3.8.1
+[3.8.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.7.3...v3.8.0
+[3.7.3]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.7.2...v3.7.3
+[3.7.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/036d2942450e...v3.7.2
+[3.7.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/59bbe20f2489...036d2942450e
+[3.7.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.6.1...59bbe20f2489
+[3.6.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.6.0...v3.6.1
+[3.6.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.5.0...v3.6.0
+[3.5.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.1.0...v3.4.0
+[3.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v3.0.0...v3.1.0
+[3.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/8ad2f309de64...v3.0.0
+[2.5.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/146c0670ab6f...8ad2f309de64
+[2.4.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/6e61c9432ce3...146c0670ab6f
+[2.3.2]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.3.0...6e61c9432ce3
 [2.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.1...v2.2.0
 [2.1.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v2.1.0...v2.1.1
