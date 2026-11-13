@@ -414,21 +414,35 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
         return error_from_exception(e)
 
 
+# The tools whose results the SDK validates against an outputSchema (spec R4.3)
+_OUTPUT_SCHEMA_TOOLS = frozenset(tool.name for tool in TOOLS if tool.outputSchema is not None)
+
+
 @server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent] | CallToolResult:
+async def call_tool(
+    name: str, arguments: dict
+) -> list[TextContent] | tuple[list[TextContent], dict] | CallToolResult:
     """MCP call_tool handler that delegates to execute_tool.
+
+    A tool with an outputSchema returns its report twice, as the JSON text and as the
+    parsed object, which the SDK validates against the schema and sends as
+    structuredContent; a report that breaks its schema reaches the client as an error.
+    The object is read from the final text, so it carries the portal stamp too.
 
     Args:
         name: Tool name to execute.
         arguments: Tool arguments.
 
     Returns:
-        List of TextContent with the tool result, or a CallToolResult with
-        isError=True when the result is an error, which the SDK passes through.
+        List of TextContent with the tool result; with it the parsed report for a tool
+        with an outputSchema; or a CallToolResult with isError=True when the result is
+        an error, which the SDK passes through unvalidated.
     """
     result = await execute_tool(name, arguments)
     if is_error_result(result):
         return CallToolResult(content=list(result), isError=True)
+    if name in _OUTPUT_SCHEMA_TOOLS and len(result) == 1:
+        return result, json.loads(result[0].text)
     return result
 
 

@@ -10,6 +10,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
+from tests.sdk_call import replay_through_sdk, structured
 
 
 @pytest.fixture
@@ -117,7 +118,7 @@ class TestAnalyzeBlastRadius:
         assert data["unreadable"] == []
 
     @respx.mock
-    async def test_alert_lookup_failure_marks_degraded(self, client):
+    async def test_alert_lookup_failure_marks_degraded(self, client, monkeypatch):
         """A failed per-device alert lookup is surfaced, not silently treated as healthy."""
         from lm_mcp.tools.topology_analysis import analyze_blast_radius
 
@@ -137,6 +138,11 @@ class TestAnalyzeBlastRadius:
         assert dev["alert_status_unavailable"] is True
         # Not a confident "healthy" -- the critical status is unknown.
         assert dev["has_critical"] is None
+        structured(
+            await replay_through_sdk(
+                monkeypatch, "analyze_blast_radius", {"device_id": 1, "depth": 1}, result
+            )
+        )
 
     @respx.mock
     async def test_depth_capped_at_three(self, client):

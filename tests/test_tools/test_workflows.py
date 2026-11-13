@@ -38,6 +38,7 @@ from lm_mcp.tools.workflows import (
     triage,
 )
 from tests.alert_pages import alert_lists
+from tests.sdk_call import replay_through_sdk, structured
 from tests.test_tools.test_diagnostic_remediation import _assigned_source, _execution
 
 
@@ -659,6 +660,7 @@ class TestTriage:
         assert data["blast_radius"] == []
         assert data["warnings"] == ["analyze_alerts failed: API timeout"]
         jsonschema.validate(data, TRIAGE_OUTPUT_SCHEMA)
+        structured(await replay_through_sdk(monkeypatch, "triage", {"detail_level": "full"}, data))
         reset_config()
 
     @respx.mock
@@ -997,7 +999,9 @@ class TestHealthCheck:
         jsonschema.validate(data, HEALTH_CHECK_OUTPUT_SCHEMA)
 
     @respx.mock
-    async def test_a_device_without_cpu_memory_or_disk_datasources_is_a_warning(self, auth, lm_env):
+    async def test_a_device_without_cpu_memory_or_disk_datasources_is_a_warning(
+        self, auth, lm_env, monkeypatch
+    ):
         """No positional stand-in: the device's other datasources are not analyzed."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         respx.get(_DS_URL).mock(
@@ -1022,6 +1026,11 @@ class TestHealthCheck:
             "instance; metrics is empty."
         ]
         jsonschema.validate(data, HEALTH_CHECK_OUTPUT_SCHEMA)
+        structured(
+            await replay_through_sdk(
+                monkeypatch, "health_check", {"device_id": 1, "detail_level": "full"}, data
+            )
+        )
 
     @respx.mock
     async def test_summary_lifts_the_metric_warnings(self, auth, lm_env):
@@ -1186,7 +1195,7 @@ class TestCapacityPlan:
         assert "portal unavailable" in failed
 
     @respx.mock
-    async def test_threshold_sets_each_instance_breach_eta(self, auth, lm_env):
+    async def test_threshold_sets_each_instance_breach_eta(self, auth, lm_env, monkeypatch):
         """R2.3: threshold reaches analyze_metric's forecast, and each summary row carries
         the breach ETA in epoch seconds beside the hours.
 
@@ -1212,6 +1221,19 @@ class TestCapacityPlan:
         assert forecast["forecast"]["threshold"] == 60
         jsonschema.validate(summary, CAPACITY_PLAN_OUTPUT_SCHEMA)
         jsonschema.validate(full, CAPACITY_PLAN_OUTPUT_SCHEMA)
+        structured(
+            await replay_through_sdk(
+                monkeypatch, "capacity_plan", {"device_id": 1, "threshold": 60}, summary
+            )
+        )
+        structured(
+            await replay_through_sdk(
+                monkeypatch,
+                "capacity_plan",
+                {"device_id": 1, "threshold": 60, "detail_level": "full"},
+                full,
+            )
+        )
 
     @respx.mock
     async def test_summary_carries_truncation_warnings_once_per_datapoint(self, auth, lm_env):
@@ -1458,7 +1480,7 @@ class TestPortalOverview:
         }
 
     @respx.mock
-    async def test_summary_reads_alerts_collectors_and_sdts_once(self, auth, lm_env):
+    async def test_summary_reads_alerts_collectors_and_sdts_once(self, auth, lm_env, monkeypatch):
         """R2.3: summary reads the alert window once (one active and one
         cleared request), collectors once and SDTs once, and skips the open-alert and
         dead-device reads whose lists it does not report."""
@@ -1486,6 +1508,9 @@ class TestPortalOverview:
             "active_sdts",
         }
         jsonschema.validate(data, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
+        structured(
+            await replay_through_sdk(monkeypatch, "portal_overview", {"hours_back": 8}, data)
+        )
 
     @respx.mock
     async def test_full_adds_the_open_alert_and_dead_device_reads(self, auth, lm_env):
@@ -1707,7 +1732,9 @@ class TestDiagnose:
         return stack
 
     @respx.mock
-    async def test_reads_the_assigned_diagnostics_and_their_latest_results(self, auth, lm_env):
+    async def test_reads_the_assigned_diagnostics_and_their_latest_results(
+        self, auth, lm_env, monkeypatch
+    ):
         """rul-43402c07ec: the device's assigned DiagnosticSources and the latest results of
         the alert's diagnostic runs, read and never run; the summary lifts the trimmed blast
         radius' warning."""
@@ -1740,6 +1767,9 @@ class TestDiagnose:
         assert "blast_radius" not in data
         assert data["warnings"] == ["blast_radius: w"]
         jsonschema.validate(data, DIAGNOSE_OUTPUT_SCHEMA)
+        structured(
+            await replay_through_sdk(monkeypatch, "diagnose", {"alert_id": "DS362333940"}, data)
+        )
 
     @respx.mock
     async def test_a_failed_diagnostics_read_is_a_warning(self, auth, lm_env, caplog):
@@ -2028,7 +2058,9 @@ class TestDetectSiteOutage:
         yield
         reset_config()
 
-    async def test_the_collector_down_signal_cites_each_down_collectors_evidence(self, client):
+    async def test_the_collector_down_signal_cites_each_down_collectors_evidence(
+        self, client, monkeypatch
+    ):
         """R3.4: the evidence get_collector_health read for each down collector, once per
         collector, rides on the collector_down signal; an up collector adds none."""
         from lm_mcp.tools.workflows import detect_site_outage
@@ -2066,6 +2098,9 @@ class TestDetectSiteOutage:
 
         data = json.loads(result[0].text)
         jsonschema.validate(data, DETECT_SITE_OUTAGE_OUTPUT_SCHEMA)
+        structured(
+            await replay_through_sdk(monkeypatch, "detect_site_outage", {"group_id": 42}, data)
+        )
         assert sorted(call.kwargs["collector_id"] for call in health.await_args_list) == [1, 2]
         assert data["signals"]["collector_down"] == {
             "triggered": True,

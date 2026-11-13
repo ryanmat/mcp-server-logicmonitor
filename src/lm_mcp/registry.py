@@ -8,6 +8,14 @@ from typing import Any
 from mcp.types import Tool, ToolAnnotations
 
 from lm_mcp.resources.guides import TOOL_CATEGORIES
+from lm_mcp.tools import (
+    analyze_alerts,
+    analyze_metric,
+    correlation,
+    scoring,
+    topology_analysis,
+    workflows,
+)
 from lm_mcp.tools.terraform_imports import IMPORTABLE_TYPES
 
 # Annotation presets for tool categorization
@@ -7069,6 +7077,41 @@ TOOLS.extend(
         ),
     ]
 )
+
+
+# The analytics and composite tools declare the report they return (spec R4.3). In
+# multi-portal mode execute_tool stamps each result with its portal (stamp_portal), so
+# every one of these schemas also takes that key.
+_OUTPUT_SCHEMAS: dict[str, dict] = {
+    "analyze_metric": analyze_metric.ANALYZE_METRIC_OUTPUT_SCHEMA,
+    "analyze_alerts": analyze_alerts.ANALYZE_ALERTS_OUTPUT_SCHEMA,
+    "calculate_availability": scoring.CALCULATE_AVAILABILITY_OUTPUT_SCHEMA,
+    "correlate_metrics": correlation.CORRELATE_METRICS_OUTPUT_SCHEMA,
+    "analyze_blast_radius": topology_analysis.ANALYZE_BLAST_RADIUS_OUTPUT_SCHEMA,
+    "triage": workflows.TRIAGE_OUTPUT_SCHEMA,
+    "portal_overview": workflows.PORTAL_OVERVIEW_OUTPUT_SCHEMA,
+    "health_check": workflows.HEALTH_CHECK_OUTPUT_SCHEMA,
+    "capacity_plan": workflows.CAPACITY_PLAN_OUTPUT_SCHEMA,
+    "diagnose": workflows.DIAGNOSE_OUTPUT_SCHEMA,
+    "detect_site_outage": workflows.DETECT_SITE_OUTAGE_OUTPUT_SCHEMA,
+}
+_PORTAL_STAMP = {
+    "type": ["string", "null"],
+    "description": "The portal the call ran against, in multi-portal mode.",
+}
+
+
+def _output_schema(schema: dict) -> dict:
+    """``schema`` with the portal key a multi-portal result carries."""
+    return {**schema, "properties": {**schema["properties"], "portal": _PORTAL_STAMP}}
+
+
+TOOLS[:] = [
+    tool.model_copy(update={"outputSchema": _output_schema(_OUTPUT_SCHEMAS[tool.name])})
+    if tool.name in _OUTPUT_SCHEMAS
+    else tool
+    for tool in TOOLS
+]
 
 
 def get_tool_handler(tool_name: str) -> Any:

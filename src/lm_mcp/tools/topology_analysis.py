@@ -16,6 +16,37 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The report analyze_blast_radius returns, as a JSON Schema.
+ANALYZE_BLAST_RADIUS_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "device_id": {"type": "integer"},
+        "depth": {"type": "integer"},
+        "total_affected_devices": {"type": "integer"},
+        "neighbor_count": {"type": "integer"},
+        "dependent_count": {"type": "integer"},
+        "affected_devices": {"type": "array", "items": {"type": "object"}},
+        "critical_path_devices": {"type": "array", "items": {"type": "object"}},
+        "critical_alert_count": {"type": "integer"},
+        "unreadable": {"type": "array"},
+        "warning": {"type": "string"},
+        "degraded": {"type": "boolean"},
+        "degraded_detail": {"type": "string"},
+    },
+    "required": [
+        "device_id",
+        "depth",
+        "total_affected_devices",
+        "neighbor_count",
+        "dependent_count",
+        "affected_devices",
+        "critical_path_devices",
+        "critical_alert_count",
+        "unreadable",
+    ],
+    "additionalProperties": False,
+}
+
 
 async def analyze_blast_radius(
     client: LogicMonitorClient,

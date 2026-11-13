@@ -34,6 +34,22 @@ logger = logging.getLogger(__name__)
 # The sections analyze_alerts offers, in the order it reports them.
 SECTIONS = ("statistics", "clusters", "noise", "bursts", "changes")
 
+# The report analyze_alerts returns, as a JSON Schema; each section is present when
+# `analyses` names it.
+ANALYZE_ALERTS_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "hours": {"type": "integer", "description": "Hours the alert window reaches back."},
+        "analyses": {"type": "array", "items": {"type": "string", "enum": list(SECTIONS)}},
+        "total_alerts": {"type": "integer"},
+        "truncated": {"type": "boolean"},
+        "api_total": {"type": ["integer", "null"]},
+        **{section: {"type": "object"} for section in SECTIONS},
+    },
+    "required": ["hours", "analyses", "total_alerts", "truncated", "api_total"],
+    "additionalProperties": False,
+}
+
 DEFAULT_HOURS = 24
 
 # A cleared alert that re-fires on the same device and datapoint within this many

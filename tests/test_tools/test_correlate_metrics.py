@@ -10,6 +10,7 @@ import respx
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
+from tests.sdk_call import replay_through_sdk, structured
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ class TestCorrelateMetrics:
     """Tests for correlate_metrics tool."""
 
     @respx.mock
-    async def test_perfect_positive_correlation(self, client):
+    async def test_perfect_positive_correlation(self, client, monkeypatch):
         """Perfectly correlated metrics return r=1."""
         from lm_mcp.tools.correlation import correlate_metrics
 
@@ -66,6 +67,9 @@ class TestCorrelateMetrics:
         data = json.loads(result[0].text)
         assert data["correlation_matrix"][0][1] == 1.0
         assert len(data["strong_correlations"]) > 0
+        structured(
+            await replay_through_sdk(monkeypatch, "correlate_metrics", {"sources": sources}, result)
+        )
 
     @respx.mock
     async def test_negative_correlation(self, client):

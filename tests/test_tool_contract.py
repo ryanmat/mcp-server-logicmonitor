@@ -4,6 +4,7 @@
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import respx
@@ -49,6 +50,8 @@ def canonical_tool_surface() -> dict:
             "inputSchema": tool.inputSchema,
             "annotations": _annotations(tool.annotations),
         }
+        if tool.outputSchema is not None:
+            surface[tool.name]["outputSchema"] = tool.outputSchema
     return surface
 
 
@@ -333,3 +336,141 @@ def test_no_tool_text_carries_an_em_or_en_dash():
         if "\N{EM DASH}" in text or "\N{EN DASH}" in text
     ]
     assert hits == []
+
+
+# The analytics and composite tools that declare their result shape (spec R4.3), with the
+# module constant each one's outputSchema is built from.
+_OUTPUT_SCHEMA_TOOLS = {
+    "analyze_metric": ("analyze_metric", "ANALYZE_METRIC_OUTPUT_SCHEMA"),
+    "analyze_alerts": ("analyze_alerts", "ANALYZE_ALERTS_OUTPUT_SCHEMA"),
+    "calculate_availability": ("scoring", "CALCULATE_AVAILABILITY_OUTPUT_SCHEMA"),
+    "correlate_metrics": ("correlation", "CORRELATE_METRICS_OUTPUT_SCHEMA"),
+    "analyze_blast_radius": ("topology_analysis", "ANALYZE_BLAST_RADIUS_OUTPUT_SCHEMA"),
+    "triage": ("workflows", "TRIAGE_OUTPUT_SCHEMA"),
+    "portal_overview": ("workflows", "PORTAL_OVERVIEW_OUTPUT_SCHEMA"),
+    "health_check": ("workflows", "HEALTH_CHECK_OUTPUT_SCHEMA"),
+    "capacity_plan": ("workflows", "CAPACITY_PLAN_OUTPUT_SCHEMA"),
+    "diagnose": ("workflows", "DIAGNOSE_OUTPUT_SCHEMA"),
+    "detect_site_outage": ("workflows", "DETECT_SITE_OUTAGE_OUTPUT_SCHEMA"),
+}
+
+_BLAST_RADIUS = {
+    "device_id": 1,
+    "depth": 2,
+    "total_affected_devices": 0,
+    "neighbor_count": 0,
+    "dependent_count": 0,
+    "affected_devices": [],
+    "critical_path_devices": [],
+    "critical_alert_count": 0,
+    "unreadable": [],
+}
+
+
+async def test_the_analytics_and_composites_declare_their_output_schema(single_portal):
+    """R4.3: exactly these eleven tools list an outputSchema, their module's schema plus the
+    portal a multi-portal result is stamped with."""
+    import importlib
+
+    import jsonschema
+
+    from lm_mcp.server import list_tools
+
+    declared = {tool.name: tool.outputSchema for tool in await list_tools() if tool.outputSchema}
+
+    assert set(declared) == set(_OUTPUT_SCHEMA_TOOLS)
+    for name, (module, constant) in _OUTPUT_SCHEMA_TOOLS.items():
+        schema = getattr(importlib.import_module(f"lm_mcp.tools.{module}"), constant)
+        properties = dict(declared[name]["properties"])
+        assert properties.pop("portal")["type"] == ["string", "null"], name
+        assert {**declared[name], "properties": properties} == schema, name
+        assert schema["additionalProperties"] is False, name
+        jsonschema.Draft202012Validator.check_schema(schema)
+
+
+async def test_a_result_that_breaks_its_schema_is_an_error(single_portal, monkeypatch):
+    """R4.3: the SDK validates an analytics result on call_tool and refuses one that breaks it."""
+    from lm_mcp.tools import format_response
+    from tests.sdk_call import replay_through_sdk
+
+    broken = format_response({**_BLAST_RADIUS, "health_score": 80})
+
+    result = await replay_through_sdk(monkeypatch, "analyze_blast_radius", {"device_id": 1}, broken)
+
+    assert result.isError is True
+    assert result.structuredContent is None
+    assert result.content[0].text.startswith("Output validation error:")
+    assert "health_score" in result.content[0].text
+
+
+async def test_a_result_carries_structured_content_beside_its_text(single_portal, monkeypatch):
+    """R4.3: a valid result reaches the client as structuredContent and as the same JSON text."""
+    from lm_mcp.tools import format_response
+    from tests.sdk_call import replay_through_sdk, structured
+
+    result = await replay_through_sdk(
+        monkeypatch, "analyze_blast_radius", {"device_id": 1}, format_response(_BLAST_RADIUS)
+    )
+
+    assert structured(result) == _BLAST_RADIUS
+
+
+async def test_a_tool_without_an_output_schema_sends_text_alone(single_portal, monkeypatch):
+    """Only the eleven send structuredContent; any other result stays one JSON text."""
+    from lm_mcp.tools import format_response
+    from tests.sdk_call import replay_through_sdk
+
+    device = {"id": 1, "displayName": "web-01"}
+
+    result = await replay_through_sdk(
+        monkeypatch, "get_device", {"device_id": 1}, format_response(device)
+    )
+
+    assert result.isError is False
+    assert result.structuredContent is None
+    assert json.loads(result.content[0].text) == device
+
+
+async def test_an_error_result_passes_through_unvalidated(single_portal, monkeypatch):
+    """An error envelope from a tool with an outputSchema stays the tool's error."""
+    from lm_mcp.tools import error_content
+    from tests.envelope import envelope
+    from tests.sdk_call import replay_through_sdk
+
+    refusal = error_content("NOT_FOUND", "Device 1 not found")
+
+    result = await replay_through_sdk(
+        monkeypatch, "analyze_blast_radius", {"device_id": 1}, refusal
+    )
+
+    assert result.isError is True
+    assert result.structuredContent is None
+    assert envelope(result.content)["code"] == "NOT_FOUND"
+
+
+async def test_a_multi_portal_result_validates_with_its_portal(
+    monkeypatch, tmp_path, reset_portals
+):
+    """In multi-portal mode a result names its portal and still meets its outputSchema."""
+    from mcp import types
+
+    from lm_mcp.server import server
+    from lm_mcp.tools import format_response
+    from tests.portal_env import two_portal_vault
+
+    two_portal_vault(tmp_path, monkeypatch)
+
+    async def handler(client, **kwargs):
+        return format_response(_BLAST_RADIUS)
+
+    request = types.CallToolRequest(
+        params=types.CallToolRequestParams(
+            name="analyze_blast_radius", arguments={"device_id": 1, "portal": "globex"}
+        )
+    )
+    with respx.mock, patch("lm_mcp.server.get_tool_handler", return_value=handler):
+        await server.request_handlers[types.ListToolsRequest](None)
+        result = (await server.request_handlers[types.CallToolRequest](request)).root
+
+    assert result.isError is False, result.content[0].text
+    assert result.structuredContent == {**_BLAST_RADIUS, "portal": "globex"}

@@ -42,6 +42,33 @@ SECTIONS = ("summary", "trend", "seasonality", "change_points", "anomalies", "fo
 # Where analyze_metric reads its series: a device instance's datapoints or a PromQL range query.
 SOURCES = ("device", "otlp")
 
+# The report analyze_metric returns, as a JSON Schema: a device instance's report keys its
+# sections by datapoint under `datapoints`, a PromQL report by series under `series`.
+ANALYZE_METRIC_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "source": {"type": "string", "enum": ["otlp"]},
+        "query": {"type": "string"},
+        "step": {"type": ["string", "null"]},
+        "device_id": {"type": "integer"},
+        "device_datasource_id": {"type": "integer"},
+        "instance_id": {"type": "integer"},
+        "hours": {"type": "integer", "description": "Hours the window reaches back."},
+        "analyses": {"type": "array", "items": {"type": "string", "enum": list(SECTIONS)}},
+        "series_count_total": {"type": "integer"},
+        "datapoints": {"type": "object", "description": "Sections per datapoint name."},
+        "series": {"type": "object", "description": "Sections per series label set."},
+        "baseline_hours_ago": {"type": "integer"},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["hours", "analyses"],
+    "oneOf": [
+        {"required": ["device_id", "device_datasource_id", "instance_id", "datapoints"]},
+        {"required": ["source", "query", "step", "series_count_total", "series"]},
+    ],
+    "additionalProperties": False,
+}
+
 DEFAULT_HOURS = 168
 
 # Seasonality tests these periods where the lag fits inside half the series.
