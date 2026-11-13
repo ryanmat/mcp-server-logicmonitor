@@ -303,6 +303,70 @@
         }
       },
       "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "analyses": {
+          "items": {
+            "enum": [
+              "statistics",
+              "clusters",
+              "noise",
+              "bursts",
+              "changes"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "api_total": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "bursts": {
+          "type": "object"
+        },
+        "changes": {
+          "type": "object"
+        },
+        "clusters": {
+          "type": "object"
+        },
+        "hours": {
+          "description": "Hours the alert window reaches back.",
+          "type": "integer"
+        },
+        "noise": {
+          "type": "object"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "statistics": {
+          "type": "object"
+        },
+        "total_alerts": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hours",
+        "analyses",
+        "total_alerts",
+        "truncated",
+        "api_total"
+      ],
+      "type": "object"
     }
   },
   "analyze_blast_radius": {
@@ -328,6 +392,72 @@
       },
       "required": [
         "device_id"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_devices": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "critical_alert_count": {
+          "type": "integer"
+        },
+        "critical_path_devices": {
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "degraded": {
+          "type": "boolean"
+        },
+        "degraded_detail": {
+          "type": "string"
+        },
+        "dependent_count": {
+          "type": "integer"
+        },
+        "depth": {
+          "type": "integer"
+        },
+        "device_id": {
+          "type": "integer"
+        },
+        "neighbor_count": {
+          "type": "integer"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "total_affected_devices": {
+          "type": "integer"
+        },
+        "unreadable": {
+          "type": "array"
+        },
+        "warning": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id",
+        "depth",
+        "total_affected_devices",
+        "neighbor_count",
+        "dependent_count",
+        "affected_devices",
+        "critical_path_devices",
+        "critical_alert_count",
+        "unreadable"
       ],
       "type": "object"
     }
@@ -408,6 +538,105 @@
           "type": "number"
         }
       },
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": [
+            "device_id",
+            "device_datasource_id",
+            "instance_id",
+            "datapoints"
+          ]
+        },
+        {
+          "required": [
+            "source",
+            "query",
+            "step",
+            "series_count_total",
+            "series"
+          ]
+        }
+      ],
+      "properties": {
+        "analyses": {
+          "items": {
+            "enum": [
+              "summary",
+              "trend",
+              "seasonality",
+              "change_points",
+              "anomalies",
+              "forecast",
+              "baseline"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "baseline_hours_ago": {
+          "type": "integer"
+        },
+        "datapoints": {
+          "description": "Sections per datapoint name.",
+          "type": "object"
+        },
+        "device_datasource_id": {
+          "type": "integer"
+        },
+        "device_id": {
+          "type": "integer"
+        },
+        "hours": {
+          "description": "Hours the window reaches back.",
+          "type": "integer"
+        },
+        "instance_id": {
+          "type": "integer"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query": {
+          "type": "string"
+        },
+        "series": {
+          "description": "Sections per series label set.",
+          "type": "object"
+        },
+        "series_count_total": {
+          "type": "integer"
+        },
+        "source": {
+          "enum": [
+            "otlp"
+          ],
+          "type": "string"
+        },
+        "step": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hours",
+        "analyses"
+      ],
       "type": "object"
     }
   },
@@ -615,6 +844,81 @@
         }
       },
       "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "api_total": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "availability_percent": {
+          "type": "number"
+        },
+        "by_device": {
+          "description": "Availability per device name.",
+          "type": "object"
+        },
+        "device_id": {
+          "type": "integer"
+        },
+        "device_resolved": {
+          "type": "boolean"
+        },
+        "error_budget": {
+          "type": "object"
+        },
+        "hours_back": {
+          "type": "integer"
+        },
+        "incident_count": {
+          "type": "integer"
+        },
+        "longest_incident_minutes": {
+          "type": "number"
+        },
+        "measurement_window_context": {
+          "type": "object"
+        },
+        "mttr_minutes": {
+          "type": "number"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity_threshold": {
+          "type": "string"
+        },
+        "total_downtime_minutes": {
+          "type": "number"
+        },
+        "total_uptime_minutes": {
+          "type": "number"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "availability_percent",
+        "total_downtime_minutes",
+        "total_uptime_minutes",
+        "mttr_minutes",
+        "incident_count",
+        "longest_incident_minutes",
+        "by_device",
+        "hours_back",
+        "severity_threshold",
+        "truncated",
+        "api_total"
+      ],
+      "type": "object"
     }
   },
   "capacity_plan": {
@@ -660,6 +964,173 @@
           "type": "number"
         }
       },
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "datasources": {
+          "description": "Full: up to five datasources and three instances each.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "datasource": {
+                "type": "string"
+              },
+              "instances": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "analysis": {
+                      "description": "analyze_metric's trend, seasonality, change points and forecast; null when the read failed.",
+                      "type": [
+                        "object",
+                        "null"
+                      ]
+                    },
+                    "analysis_error": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "instance",
+                    "analysis"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "datasource",
+              "instances"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "detail_level": {
+          "enum": [
+            "summary",
+            "full"
+          ],
+          "type": "string"
+        },
+        "device_id": {
+          "type": "integer"
+        },
+        "device_name": {
+          "type": "string"
+        },
+        "forecast_summary": {
+          "description": "Summary: one headline row per datapoint read.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "breach_eta": {
+                "additionalProperties": false,
+                "description": "Epoch seconds each method reaches the threshold.",
+                "properties": {
+                  "holt_winters": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "linear": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "linear",
+                  "holt_winters"
+                ],
+                "type": "object"
+              },
+              "datapoint": {
+                "type": "string"
+              },
+              "datasource": {
+                "type": "string"
+              },
+              "hours_until_breach": {
+                "additionalProperties": false,
+                "properties": {
+                  "holt_winters": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "linear": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "linear",
+                  "holt_winters"
+                ],
+                "type": "object"
+              },
+              "instance": {
+                "type": "string"
+              },
+              "status": {
+                "description": "Why no forecast was made.",
+                "type": "string"
+              },
+              "trend": {
+                "description": "The trend section's label.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "datasource",
+              "instance",
+              "datapoint"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "hours_back": {
+          "description": "Hours of history each read covers.",
+          "type": "integer"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "threshold": {
+          "description": "The level each forecast must reach.",
+          "type": "number"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "device_id",
+        "device_name",
+        "hours_back",
+        "threshold",
+        "detail_level"
+      ],
       "type": "object"
     }
   },
@@ -830,6 +1301,91 @@
       },
       "required": [
         "sources"
+      ],
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "bucket_seconds": {
+          "type": "integer"
+        },
+        "correlation_matrix": {
+          "description": "Pearson r for each pair of labels, in label order.",
+          "items": {
+            "items": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "hours_back": {
+          "type": "integer"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shared_samples": {
+          "type": "integer"
+        },
+        "strong_correlations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "correlation": {
+                "type": "number"
+              },
+              "source_a": {
+                "type": "string"
+              },
+              "source_b": {
+                "type": "string"
+              },
+              "strength": {
+                "enum": [
+                  "strong_positive",
+                  "strong_negative"
+                ]
+              }
+            },
+            "required": [
+              "source_a",
+              "source_b",
+              "correlation",
+              "strength"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "labels",
+        "correlation_matrix",
+        "strong_correlations",
+        "shared_samples",
+        "bucket_seconds",
+        "hours_back"
       ],
       "type": "object"
     }
@@ -2775,6 +3331,354 @@
         "group_id"
       ],
       "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "collectors_inspected": {
+          "description": "Full: get_collector_health's record of each collector read.",
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "confidence": {
+          "description": "The weights of the triggered signals, capped at 100.",
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "confidence_level": {
+          "enum": [
+            "reduced"
+          ]
+        },
+        "group_id": {
+          "type": "integer"
+        },
+        "hours_back": {
+          "type": "integer"
+        },
+        "interface_burst_detail": {
+          "description": "Full: analyze_alerts 'bursts'; null when the read failed.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "power_events_preview": {
+          "description": "Full: up to ten get_power_events events.",
+          "items": {
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "recommendations": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "properties": {
+            "collectors_serving_group": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "dead_devices": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "devices_in_group": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "devices_in_group",
+            "dead_devices",
+            "collectors_serving_group"
+          ],
+          "type": "object"
+        },
+        "signals": {
+          "additionalProperties": false,
+          "properties": {
+            "collector_down": {
+              "additionalProperties": false,
+              "properties": {
+                "burst_count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "dead_devices": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "error": {
+                  "description": "Why the signal's read failed.",
+                  "type": "string"
+                },
+                "evidence": {
+                  "description": "collector_down: each down collector's status check and recent events, as get_collector_health read them.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "unavailable"
+                  ]
+                },
+                "threshold": {
+                  "description": "Dead devices that trigger device_silence.",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "triggered": {
+                  "description": "null when the signal's read failed: unknown, not untriggered.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "weight": {
+                  "description": "Confidence a triggered signal adds.",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "triggered"
+              ],
+              "type": "object"
+            },
+            "device_silence": {
+              "additionalProperties": false,
+              "properties": {
+                "burst_count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "dead_devices": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "error": {
+                  "description": "Why the signal's read failed.",
+                  "type": "string"
+                },
+                "evidence": {
+                  "description": "collector_down: each down collector's status check and recent events, as get_collector_health read them.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "unavailable"
+                  ]
+                },
+                "threshold": {
+                  "description": "Dead devices that trigger device_silence.",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "triggered": {
+                  "description": "null when the signal's read failed: unknown, not untriggered.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "weight": {
+                  "description": "Confidence a triggered signal adds.",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "triggered"
+              ],
+              "type": "object"
+            },
+            "interface_burst": {
+              "additionalProperties": false,
+              "properties": {
+                "burst_count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "dead_devices": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "error": {
+                  "description": "Why the signal's read failed.",
+                  "type": "string"
+                },
+                "evidence": {
+                  "description": "collector_down: each down collector's status check and recent events, as get_collector_health read them.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "unavailable"
+                  ]
+                },
+                "threshold": {
+                  "description": "Dead devices that trigger device_silence.",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "triggered": {
+                  "description": "null when the signal's read failed: unknown, not untriggered.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "weight": {
+                  "description": "Confidence a triggered signal adds.",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "triggered"
+              ],
+              "type": "object"
+            },
+            "power_events": {
+              "additionalProperties": false,
+              "properties": {
+                "burst_count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "count": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "dead_devices": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "error": {
+                  "description": "Why the signal's read failed.",
+                  "type": "string"
+                },
+                "evidence": {
+                  "description": "collector_down: each down collector's status check and recent events, as get_collector_health read them.",
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": {
+                  "enum": [
+                    "unavailable"
+                  ]
+                },
+                "threshold": {
+                  "description": "Dead devices that trigger device_silence.",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "triggered": {
+                  "description": "null when the signal's read failed: unknown, not untriggered.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "weight": {
+                  "description": "Confidence a triggered signal adds.",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "triggered"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "collector_down",
+            "interface_burst",
+            "power_events",
+            "device_silence"
+          ],
+          "type": "object"
+        },
+        "unavailable_signals": {
+          "description": "Signals left out of the score because their read failed.",
+          "items": {
+            "enum": [
+              "collector_down",
+              "interface_burst",
+              "power_events"
+            ]
+          },
+          "type": "array"
+        },
+        "verdict": {
+          "description": "indeterminate when the unread signals could change the verdict.",
+          "enum": [
+            "site_outage_detected",
+            "possible_site_outage",
+            "no_outage_signature",
+            "indeterminate"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "window_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "verdict",
+        "confidence",
+        "group_id",
+        "window_seconds",
+        "hours_back",
+        "scope",
+        "signals",
+        "recommendations",
+        "warnings"
+      ],
+      "type": "object"
     }
   },
   "diagnose": {
@@ -2806,6 +3710,99 @@
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "alert": {
+          "description": "get_alert_details; null when the device has no open critical alert.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "blast_radius": {
+          "description": "Full: analyze_blast_radius.",
+          "type": "object"
+        },
+        "changes": {
+          "description": "analyze_alerts 'changes' over the last four hours.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "correlated_alerts": {
+          "description": "analyze_alerts 'clusters' over the last four hours.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "detail_level": {
+          "enum": [
+            "summary",
+            "full"
+          ],
+          "type": "string"
+        },
+        "device": {
+          "description": "get_device for the alert's device.",
+          "type": "object"
+        },
+        "device_properties": {
+          "description": "Full: get_device_properties.",
+          "type": "object"
+        },
+        "diagnostics": {
+          "additionalProperties": false,
+          "description": "Read only: diagnose never runs a DiagnosticSource.",
+          "properties": {
+            "assigned": {
+              "description": "DiagnosticSources assigned to the device.",
+              "items": {
+                "type": "object"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "latest_results": {
+              "description": "The alert's latest diagnostic runs, with their output.",
+              "items": {
+                "type": "object"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "assigned",
+            "latest_results"
+          ],
+          "type": "object"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "detail_level"
+      ],
       "type": "object"
     }
   },
@@ -7382,6 +8379,90 @@
         }
       },
       "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "active_alerts": {
+          "description": "get_alerts, open, for the device.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "availability": {
+          "description": "calculate_availability, 30 days.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "datasource_count": {
+          "description": "Datasources the device carries.",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "detail_level": {
+          "enum": [
+            "summary",
+            "full"
+          ],
+          "type": "string"
+        },
+        "device_id": {
+          "type": "integer"
+        },
+        "device_name": {
+          "type": "string"
+        },
+        "metrics": {
+          "description": "Full: the first instance of each CPU, memory or disk datasource read.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "analysis": {
+                "description": "analyze_metric's summary and anomalies over 24 hours.",
+                "type": "object"
+              },
+              "datasource": {
+                "type": "string"
+              },
+              "instance": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "datasource",
+              "instance",
+              "analysis"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "device_id",
+        "device_name",
+        "detail_level",
+        "datasource_count",
+        "active_alerts",
+        "availability"
+      ],
+      "type": "object"
     }
   },
   "import_appliesto_function": {
@@ -7749,6 +8830,101 @@
           "type": "integer"
         }
       },
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "active_sdts": {
+          "description": "get_active_sdts' first page.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "alert_clusters": {
+          "description": "analyze_alerts 'clusters'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "alert_statistics": {
+          "description": "analyze_alerts 'statistics'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "collectors": {
+          "description": "get_collectors' first page.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "critical_alerts": {
+          "description": "Full: up to 20 open critical alerts, portal-wide (get_alerts).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "dead_devices": {
+          "description": "Full: up to 20 dead devices (get_devices status=dead).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "detail_level": {
+          "enum": [
+            "summary",
+            "full"
+          ],
+          "type": "string"
+        },
+        "error_alerts": {
+          "description": "Full: up to 20 open error alerts, portal-wide (get_alerts).",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "hours_back": {
+          "description": "Hours the alert window reaches back.",
+          "type": "integer"
+        },
+        "noise": {
+          "description": "analyze_alerts 'noise'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hours_back",
+        "detail_level",
+        "alert_statistics",
+        "alert_clusters",
+        "noise",
+        "collectors",
+        "active_sdts"
+      ],
       "type": "object"
     }
   },
@@ -8152,6 +9328,147 @@
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "blast_radius": {
+          "description": "One row per device cluster read, up to three.",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "affected_devices": {
+                "description": "Full: each device reached, with its depth and open alerts.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "critical_alert_count": {
+                "description": "Devices reached with a critical alert open.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "critical_path_devices": {
+                "description": "Full: devices reached from two or more others.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "degraded_detail": {
+                "description": "Present when an alert check failed; critical counts may be low.",
+                "type": "string"
+              },
+              "dependent_count": {
+                "description": "Devices reached at depth 2 and beyond.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "device": {
+                "description": "The device's name, the cluster's key.",
+                "type": "string"
+              },
+              "device_id": {
+                "description": "The device the cluster's alerts share.",
+                "type": "integer"
+              },
+              "neighbor_count": {
+                "description": "Devices reached at depth 1.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "total_affected_devices": {
+                "description": "Devices reached at any depth.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "unreadable_count": {
+                "description": "Devices whose neighbors neither topology path answered.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "warning": {
+                "description": "Present when unreadable_count is not 0.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "device",
+              "device_id",
+              "total_affected_devices",
+              "neighbor_count",
+              "dependent_count",
+              "critical_alert_count",
+              "unreadable_count"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "changes": {
+          "description": "analyze_alerts 'changes'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "clusters": {
+          "description": "analyze_alerts 'clusters'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "detail_level": {
+          "enum": [
+            "summary",
+            "full"
+          ],
+          "type": "string"
+        },
+        "hours_back": {
+          "description": "Hours the alert window reaches back.",
+          "type": "integer"
+        },
+        "noise": {
+          "description": "analyze_alerts 'noise'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "portal": {
+          "description": "The portal the call ran against, in multi-portal mode.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "statistics": {
+          "description": "analyze_alerts 'statistics'.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "hours_back",
+        "detail_level",
+        "statistics",
+        "clusters",
+        "noise",
+        "changes",
+        "blast_radius"
+      ],
       "type": "object"
     }
   },

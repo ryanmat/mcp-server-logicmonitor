@@ -15,6 +15,7 @@ from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools.stats_helpers import MAX_SERIES_PAGES, coefficient_of_variation
 from tests.envelope import envelope
+from tests.sdk_call import replay_through_sdk, structured
 
 # Base epoch for test data (2024-01-15 00:00:00 UTC)
 BASE_EPOCH = 1705276800
@@ -116,7 +117,7 @@ class TestOneFetch:
         assert cpu["trend"]["slope_per_hour"] == 2.0
 
     @respx.mock
-    async def test_default_runs_every_section(self, client):
+    async def test_default_runs_every_section(self, client, monkeypatch):
         """With analyses omitted the response carries every section that needs no argument.
 
         The baseline needs baseline_hours_ago; the rest run on the window alone.
@@ -132,6 +133,7 @@ class TestOneFetch:
         unprompted = [s for s in SECTIONS if s != "baseline"]
         assert body["analyses"] == unprompted
         assert set(unprompted) <= set(body["datapoints"]["cpu"])
+        structured(await replay_through_sdk(monkeypatch, "analyze_metric", SERIES_ARGS, body))
 
     @respx.mock
     async def test_analyses_selects_sections(self, client):
@@ -1171,7 +1173,7 @@ class TestOtlpSource:
     """R3.2: analyze_metric(source="otlp") reads one PromQL range query and runs every section."""
 
     @respx.mock
-    async def test_one_range_read_feeds_every_section_per_series(self, client):
+    async def test_one_range_read_feeds_every_section_per_series(self, client, monkeypatch):
         from lm_mcp.tools.analyze_metric import SECTIONS, analyze_metric
 
         rising = _texts(_every(300, [100.0 + i for i in range(60)]))
@@ -1200,6 +1202,14 @@ class TestOtlpSource:
         assert entry["summary"]["latest"] == 159.0
         assert entry["trend"]["label"] == "increasing"
         assert body["series"]['{code="0"}']["summary"]["stddev"] == 0.0
+        structured(
+            await replay_through_sdk(
+                monkeypatch,
+                "analyze_metric",
+                {"source": "otlp", "query": OTLP_QUERY, "hours": 6, "step": "5m"},
+                result,
+            )
+        )
 
     @respx.mock
     async def test_series_keys_name_labels_and_an_unlabeled_aggregate(self, client):

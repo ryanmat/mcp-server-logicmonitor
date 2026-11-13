@@ -27,6 +27,43 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The report calculate_availability returns, as a JSON Schema. A window with no alerts
+# has no measurement_window_context; a resolved device adds device_resolved and device_id.
+CALCULATE_AVAILABILITY_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "availability_percent": {"type": "number"},
+        "total_downtime_minutes": {"type": "number"},
+        "total_uptime_minutes": {"type": "number"},
+        "mttr_minutes": {"type": "number"},
+        "incident_count": {"type": "integer"},
+        "longest_incident_minutes": {"type": "number"},
+        "by_device": {"type": "object", "description": "Availability per device name."},
+        "hours_back": {"type": "integer"},
+        "severity_threshold": {"type": "string"},
+        "measurement_window_context": {"type": "object"},
+        "truncated": {"type": "boolean"},
+        "api_total": {"type": ["integer", "null"]},
+        "device_resolved": {"type": "boolean"},
+        "device_id": {"type": "integer"},
+        "error_budget": {"type": "object"},
+    },
+    "required": [
+        "availability_percent",
+        "total_downtime_minutes",
+        "total_uptime_minutes",
+        "mttr_minutes",
+        "incident_count",
+        "longest_incident_minutes",
+        "by_device",
+        "hours_back",
+        "severity_threshold",
+        "truncated",
+        "api_total",
+    ],
+    "additionalProperties": False,
+}
+
 
 async def calculate_availability(
     client: LogicMonitorClient,

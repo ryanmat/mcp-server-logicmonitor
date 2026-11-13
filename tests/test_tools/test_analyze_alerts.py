@@ -14,6 +14,7 @@ from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from tests.alert_pages import alert_lists
 from tests.envelope import envelope
+from tests.sdk_call import replay_through_sdk, structured
 
 # Base epoch for test data (2024-01-15 00:00:00 UTC)
 BASE_EPOCH = 1705276800
@@ -109,7 +110,7 @@ class TestOneRead:
         assert body["noise"]["total_alerts"] == 3700
 
     @respx.mock
-    async def test_default_runs_every_section(self, client):
+    async def test_default_runs_every_section(self, client, monkeypatch):
         from lm_mcp.tools.analyze_alerts import SECTIONS
 
         respx.get(ALERT_URL).mock(side_effect=alert_lists([_make_alert(1, "s1", "CPU")]))
@@ -120,6 +121,7 @@ class TestOneRead:
         assert body["hours"] == 24
         assert body["analyses"] == list(SECTIONS)
         assert set(SECTIONS) <= set(body)
+        structured(await replay_through_sdk(monkeypatch, "analyze_alerts", {}, body))
 
     @respx.mock
     async def test_analyses_selects_sections(self, client):

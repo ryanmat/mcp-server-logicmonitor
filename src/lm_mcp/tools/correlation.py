@@ -26,6 +26,46 @@ if TYPE_CHECKING:
 # Bucket width when no series holds two samples to measure an interval from.
 DEFAULT_BUCKET_SECONDS = 300
 
+# The report correlate_metrics returns, as a JSON Schema.
+CORRELATE_METRICS_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "labels": {"type": "array", "items": {"type": "string"}},
+        "correlation_matrix": {
+            "type": "array",
+            "items": {"type": "array", "items": {"type": ["number", "null"]}},
+            "description": "Pearson r for each pair of labels, in label order.",
+        },
+        "strong_correlations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source_a": {"type": "string"},
+                    "source_b": {"type": "string"},
+                    "correlation": {"type": "number"},
+                    "strength": {"enum": ["strong_positive", "strong_negative"]},
+                },
+                "required": ["source_a", "source_b", "correlation", "strength"],
+                "additionalProperties": False,
+            },
+        },
+        "shared_samples": {"type": "integer"},
+        "bucket_seconds": {"type": "integer"},
+        "hours_back": {"type": "integer"},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "labels",
+        "correlation_matrix",
+        "strong_correlations",
+        "shared_samples",
+        "bucket_seconds",
+        "hours_back",
+    ],
+    "additionalProperties": False,
+}
+
 
 def bucket_width(timestamps: list[list[int]]) -> int:
     """The coarsest median sample interval among the series, in seconds.

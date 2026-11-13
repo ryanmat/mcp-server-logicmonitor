@@ -13,6 +13,7 @@ from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
 from tests.alert_pages import alert_lists
+from tests.sdk_call import replay_through_sdk, structured
 
 
 @pytest.fixture
@@ -65,7 +66,7 @@ class TestCalculateAvailability:
     """Tests for calculate_availability tool."""
 
     @respx.mock
-    async def test_no_alerts_full_availability(self, client):
+    async def test_no_alerts_full_availability(self, client, monkeypatch):
         """No alerts means 100% availability."""
         from lm_mcp.tools.scoring import calculate_availability
 
@@ -77,9 +78,10 @@ class TestCalculateAvailability:
         assert data["availability_percent"] == 100.0
         assert data["total_downtime_minutes"] == 0
         assert data["incident_count"] == 0
+        structured(await replay_through_sdk(monkeypatch, "calculate_availability", {}, result))
 
     @respx.mock
-    async def test_single_incident_reduces_availability(self, client):
+    async def test_single_incident_reduces_availability(self, client, monkeypatch):
         """A single incident reduces availability below 100%."""
         from lm_mcp.tools.scoring import calculate_availability
 
@@ -104,6 +106,11 @@ class TestCalculateAvailability:
         assert data["availability_percent"] < 100.0
         assert data["total_downtime_minutes"] > 0
         assert data["incident_count"] == 1
+        structured(
+            await replay_through_sdk(
+                monkeypatch, "calculate_availability", {"hours_back": 24}, result
+            )
+        )
 
     @respx.mock
     async def test_overlapping_incidents_merged(self, client):
