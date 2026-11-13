@@ -1,0 +1,19 @@
+{
+  "skill": "lm-triage",
+  "user": "/lm-triage critical argocd 24",
+  "state": "The argocd pods of rm-aro-cluster hold critical Ping alerts opened in April 2026 and still open (live read 2026-11-13: DS362817020 and three more). Whether any critical alert opened on them inside the 24-hour window is read at run time.",
+  "setup": false,
+  "required_tools": [
+    "triage"
+  ],
+  "forbidden_tools": [
+    "acknowledge_alert",
+    "add_alert_note",
+    "bulk_acknowledge_alerts"
+  ],
+  "rubric": {
+    "answers_question": "The report says whether critical alerts opened on argocd devices in the last 24 hours. When the window holds none it says so and stops; it does not present older alerts as the window's.",
+    "cites_evidence": "Every figure, id and name in the report appears in the triage results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says the filters it applied (critical, device name containing argocd, 24 hours) and what lies outside them, such as alerts that opened before the window and are still open."
+  }
+}

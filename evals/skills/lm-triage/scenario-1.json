@@ -1,0 +1,21 @@
+{
+  "skill": "lm-triage",
+  "user": "/lm-triage 24",
+  "state": "The portal holds alerts opened in the last 24 hours and open alerts at every severity (live read 2026-11-13: the argocd pods of rm-aro-cluster hold critical Ping alerts open since April 2026).",
+  "setup": false,
+  "required_tools": [
+    "triage",
+    "get_alerts",
+    "get_alert_details"
+  ],
+  "forbidden_tools": [
+    "acknowledge_alert",
+    "add_alert_note",
+    "bulk_acknowledge_alerts"
+  ],
+  "rubric": {
+    "answers_question": "The report says what needs attention first in the 24-hour window: the alert counts by severity, the clusters or the most severe alerts, and a recommended action for each.",
+    "cites_evidence": "Every figure, id and name in the report appears in the triage, get_alerts and get_alert_details results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says what it did not read or do: sections the triage result left null or flagged in warnings, clusters it did not open, and that it acknowledged nothing."
+  }
+}

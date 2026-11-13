@@ -1,0 +1,21 @@
+{
+  "skill": "lm-portal",
+  "user": "/lm-portal 24",
+  "state": "Six of the portal's fourteen collectors are down (26, 99, 100, 101, 163 and 164), with devices behind them (live read 2026-11-13).",
+  "setup": false,
+  "required_tools": [
+    "portal_overview",
+    "get_collector_health",
+    "analyze_alerts"
+  ],
+  "forbidden_tools": [
+    "acknowledge_collector_down",
+    "run_collector_status_check",
+    "restart_collector"
+  ],
+  "rubric": {
+    "answers_question": "The report gives a GREEN, YELLOW or RED status for the last 24 hours, with the alert landscape, the collectors, the clusters, the noise level and the changes and bursts of that window.",
+    "cites_evidence": "Every figure, id and name in the report appears in the portal_overview, get_collector_health and analyze_alerts results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says what it did not read: an alert window cut short at its cap, blocks returned null, collectors past the first page, and that it ran no collector operation."
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "skill": "lm-logs",
+  "user": "/lm-logs k8JobLogs",
+  "state": "The portal has two log partitions: default, active, and k8JobLogs, paused (live read 2026-11-13).",
+  "setup": false,
+  "required_tools": [
+    "get_log_partitions",
+    "get_log_pipelines",
+    "get_log_usage",
+    "get_log_query_groups",
+    "get_tracked_log_queries"
+  ],
+  "forbidden_tools": [],
+  "rubric": {
+    "answers_question": "The report gives the k8JobLogs partition in full, flags that it is paused with its stop_ingestion_on_limit setting, and lists only the pipelines that name it.",
+    "cites_evidence": "Every figure, id and name in the report appears in the five log tools' results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says it carried only k8JobLogs into the pipeline step, that the tools return no log lines, and that the usage figure has no stated unit or period."
+  }
+}

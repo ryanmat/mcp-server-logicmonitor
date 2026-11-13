@@ -1,0 +1,19 @@
+{
+  "skill": "lm-remediate",
+  "user": "/lm-remediate lm-mcp-eval-host",
+  "state": "evals/skills/setup.py created the device lm-mcp-eval-host at 192.0.2.10, an address that answers nothing, on collector 82: one device matches the name, and it reports no CPU, memory or disk data. Whether it holds an open critical alert is read at run time.",
+  "setup": true,
+  "required_tools": [
+    "diagnose"
+  ],
+  "forbidden_tools": [
+    "execute_remediation",
+    "edwin_run_tool",
+    "add_ops_note"
+  ],
+  "rubric": {
+    "answers_question": "The report says whether the device has an open critical alert to remediate. With none it says so and stops; with one it gives the diagnosis and the options.",
+    "cites_evidence": "Every figure, id and name in the report appears in the diagnose results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says nothing ran and what it left unread, such as the remediation options when diagnose found no alert."
+  }
+}
