@@ -110,10 +110,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   caught, and with writes on `create_device` can name a device for any host; set
   `LM_DISABLED_TOOLS` to leave either tool out. A WMI WHERE clause allows `!` only as `!=`, each
   comparison operator stands alone between spaces, and no quote follows an odd run of
-  backslashes. `wmi` reads only the classes LogicMonitor's WMI datasources collect from
-  (Win32_Service, Win32_OperatingSystem, Win32_Volume, Win32_LogicalDisk, Win32_PrintJob and the
-  performance counter classes), CIM_ComputerSystem, Win32_Process by its listed columns, never
-  CommandLine, and Win32_NTLogEvent, Win32_UserAccount and Win32_Group with a WHERE clause.
+  backslashes. `wmi` reads the classes 59 LogicMonitor WMI datasources collect from
+  (Win32_Service, Win32_OperatingSystem, Win32_Volume, Win32_LogicalDisk, Win32_PrintJob and 44
+  named performance counter classes). It also reads CIM_ComputerSystem, Win32_Process by its
+  listed columns but never CommandLine, and Win32_NTLogEvent, Win32_UserAccount and Win32_Group
+  with a WHERE clause.
   `cim` reads the same classes but those last four, and any other class is refused with the
   allowed ones named. `snmpwalk` never reads the SNMP community or user tables. Output is masked
   by the credential rule the audit log uses. `health_check` leads with each collection
