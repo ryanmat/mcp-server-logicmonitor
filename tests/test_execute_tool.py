@@ -122,7 +122,9 @@ class TestExecuteToolMiddleware:
 
             await execute_tool("create_device", {"name": "test"})
 
-        mock_log.assert_called_once_with("create_device", {"name": "test"}, success=True)
+        mock_log.assert_called_once_with(
+            "create_device", {"name": "test"}, success=True, elicitation=None
+        )
 
     @pytest.mark.asyncio
     async def test_records_result_in_session(self, monkeypatch, mock_handler, mock_client):
@@ -465,7 +467,11 @@ class TestWriteOutcomeFromResult:
         assert isinstance(result[0], ErrorContent)
         assert envelope(result)["message"].startswith("Permission denied")
         assert _audit_lines(caplog) == [
-            (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
+            (
+                logging.WARNING,
+                "Write operation failed: delete_device args={'device_id': 7}"
+                " elicitation=unavailable",
+            )
         ]
 
     @respx.mock
@@ -571,7 +577,10 @@ class TestWriteOutcomeFromResult:
         assert not is_error_result(result)
         assert json.loads(result[0].text)["success"] is True
         assert _audit_lines(caplog) == [
-            (logging.INFO, "Write operation: delete_device args={'device_id': 7}")
+            (
+                logging.INFO,
+                "Write operation: delete_device args={'device_id': 7} elicitation=unavailable",
+            )
         ]
 
     async def test_write_raising_before_handler_audits_failure(self, write_portal, caplog):
@@ -600,7 +609,11 @@ class TestWriteOutcomeFromResult:
 
         assert envelope(result)["code"] == "INVALID_REQUEST"
         assert _audit_lines(caplog) == [
-            (logging.WARNING, "Write operation failed: delete_device args={'device_id': 7}")
+            (
+                logging.WARNING,
+                "Write operation failed: delete_device args={'device_id': 7}"
+                " elicitation=unavailable",
+            )
         ]
 
     async def test_unregistered_name_leaves_no_audit_line(self, write_portal, caplog):
@@ -1021,3 +1034,145 @@ class TestEdwinBackend:
 
         names = {match["name"] for match in json.loads(result[0].text)["matches"]}
         assert not names & EDWIN_TOOL_NAMES
+
+
+DEVICE_7_URL = "https://test.logicmonitor.com/santaba/rest/device/devices/7"
+
+
+def _device_7_routes(router) -> tuple:
+    """The two requests delete_device makes: the device read, then the delete."""
+    read = router.get(DEVICE_7_URL).mock(
+        return_value=httpx.Response(200, json={"id": 7, "displayName": "web-07"})
+    )
+    delete = router.delete(DEVICE_7_URL).mock(return_value=httpx.Response(200, json={}))
+    return read, delete
+
+
+def _answering(action: str, asked: list):
+    """An elicitation callback that records each request and answers with ``action``."""
+    from mcp.types import ElicitResult
+
+    async def callback(context, params):
+        asked.append(params)
+        return ElicitResult(action=action, content={} if action == "accept" else None)
+
+    return callback
+
+
+async def _call(name: str, arguments: dict, callback=None) -> CallToolResult:
+    """Call ``name`` from an in-memory SDK client, which advertises elicitation only when
+    it has a callback."""
+    from mcp.shared.memory import create_connected_server_and_client_session
+
+    from lm_mcp.server import server
+
+    async with create_connected_server_and_client_session(
+        server, elicitation_callback=callback
+    ) as session:
+        return await session.call_tool(name, arguments)
+
+
+def _sdk_error(result: CallToolResult) -> dict:
+    """The error envelope of a result as a client receives it, its content deserialized."""
+    assert result.isError is True
+    return json.loads(result.content[0].text)["error"]
+
+
+class TestElicitation:
+    """R4.3: a destructive call waits for the user when the client can ask (rul-c876cb01c1)."""
+
+    @respx.mock
+    async def test_accept_runs_the_call_and_the_audit_line_says_so(self, write_portal, caplog):
+        read, delete = _device_7_routes(respx)
+        asked: list = []
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await _call("delete_device", {"device_id": 7}, _answering("accept", asked))
+
+        assert result.isError is False
+        assert (read.call_count, delete.call_count) == (1, 1)
+        assert [params.message for params in asked] == ["Allow delete_device {'device_id': 7}?"]
+        assert _audit_lines(caplog) == [
+            (
+                logging.INFO,
+                "Write operation: delete_device args={'device_id': 7} elicitation=accepted",
+            )
+        ]
+
+    @pytest.mark.parametrize(("action", "word"), [("decline", "declined"), ("cancel", "cancelled")])
+    @respx.mock
+    async def test_decline_or_cancel_is_rejected_and_changes_nothing(
+        self, write_portal, caplog, action, word
+    ):
+        read, delete = _device_7_routes(respx)
+        asked: list = []
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await _call("delete_device", {"device_id": 7}, _answering(action, asked))
+
+        assert result.isError is True
+        error = _sdk_error(result)
+        assert (error["code"], error["isRetryable"]) == ("REJECTED_BY_TOOL", False)
+        assert error["message"] == f"The user {word} delete_device; nothing was changed."
+        assert (read.call_count, delete.call_count) == (0, 0)
+        assert len(asked) == 1
+        assert _audit_lines(caplog) == [
+            (
+                logging.WARNING,
+                f"Write operation failed: delete_device args={{'device_id': 7}} elicitation={word}",
+            )
+        ]
+
+    @respx.mock
+    async def test_without_the_capability_the_write_gate_alone_applies(self, write_portal, caplog):
+        read, delete = _device_7_routes(respx)
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await _call("delete_device", {"device_id": 7})
+
+        assert result.isError is False
+        assert (read.call_count, delete.call_count) == (1, 1)
+        assert _audit_lines(caplog) == [
+            (
+                logging.INFO,
+                "Write operation: delete_device args={'device_id': 7} elicitation=unavailable",
+            )
+        ]
+
+    @respx.mock
+    async def test_with_writes_off_the_gate_refuses_before_asking(self, write_portal, monkeypatch):
+        from lm_mcp.config import reset_config
+
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "false")
+        reset_config()
+        asked: list = []
+
+        result = await _call("delete_device", {"device_id": 7}, _answering("accept", asked))
+
+        assert result.isError is True
+        assert _sdk_error(result)["code"] == "WRITE_DISABLED"
+        assert asked == []
+
+    @pytest.mark.parametrize(
+        ("name", "arguments"),
+        [("get_device", {"device_id": 7}), ("update_device", {"device_id": 7, "description": "x"})],
+        ids=["read_only", "write_not_destructive"],
+    )
+    async def test_a_tool_that_is_not_destructive_never_asks(
+        self, write_portal, caplog, name, arguments
+    ):
+        from lm_mcp.tools import format_response
+
+        asked: list = []
+        handler = AsyncMock(return_value=format_response({"id": 7}))
+
+        with (
+            patch("lm_mcp.server.get_tool_handler", return_value=handler),
+            caplog.at_level(logging.INFO, logger="lm_mcp.audit"),
+        ):
+            result = await _call(name, arguments, _answering("decline", asked))
+
+        assert result.isError is False
+        assert asked == []
+        assert handler.await_count == 1
+        assert all("elicitation" not in line for _, line in _audit_lines(caplog))
