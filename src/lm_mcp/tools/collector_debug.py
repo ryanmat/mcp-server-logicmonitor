@@ -396,12 +396,14 @@ def _check_where(where: str) -> None:
     """
     if not _WHERE_CHARS_RE.match(where):
         raise ToolRejectionError("the WHERE clause holds a character the tool does not allow")
+    backslashes = 0  # the run of backslashes just before ch
     for i, ch in enumerate(where):
-        if ch == "'" and (i - len(where[:i].rstrip("\\"))) % 2:
+        if ch == "'" and backslashes % 2:
             raise ToolRejectionError(
                 "in the WHERE clause a quote after an odd number of backslashes is not allowed; "
                 "write a literal backslash as two"
             )
+        backslashes = backslashes + 1 if ch == "\\" else 0
         if ch == "!" and where[i + 1 : i + 2] != "=":
             raise ToolRejectionError("in the WHERE clause '!' is allowed only as '!='")
         if ch == "=":

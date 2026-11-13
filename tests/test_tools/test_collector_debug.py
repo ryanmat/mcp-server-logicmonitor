@@ -2393,6 +2393,14 @@ class TestWmiAllowlist:
         assert "a quote after an odd number of backslashes" in _refusal("wmi", {"query": query})
 
     @pytest.mark.parametrize(
+        "unit", ["'", "\\\\''", "x\\\\'"], ids=["quotes", "pairs-and-quotes", "even-runs"]
+    )
+    def test_the_backslash_check_is_linear_in_the_clause(self, unit):
+        assert_linear(
+            cd._check_where, lambda n: "Name = " + unit * (n // len(unit)), 100_000, 400_000
+        )
+
+    @pytest.mark.parametrize(
         "query",
         [
             "select Name from Win32_Service where PathName = 'C:\\\\'",
