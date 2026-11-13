@@ -2,7 +2,7 @@
 # Description: Supports both stdio and HTTP transport modes.
 
 # python:3.11.17-slim-bookworm, digest read from Docker Hub 2026-10-21
-FROM python:3.11.17-slim-bookworm@sha256:f06d01d4ba3f8ad5af45a3ec87df19c1d317d8e8961edc0fabda61811af6f7cf AS builder
+FROM python:3.11.18-slim-bookworm@sha256:a83ba18aef0f865b1a4a611c2cf460fe446f2795673bbb9fe43be570439e3b39 AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN uv export --no-dev --extra http --frozen --no-emit-project --format requirem
     && uv build --wheel
 
 # python:3.11.17-slim-bookworm, digest read from Docker Hub 2026-10-21
-FROM python:3.11.17-slim-bookworm@sha256:f06d01d4ba3f8ad5af45a3ec87df19c1d317d8e8961edc0fabda61811af6f7cf
+FROM python:3.11.18-slim-bookworm@sha256:a83ba18aef0f865b1a4a611c2cf460fe446f2795673bbb9fe43be570439e3b39
 
 WORKDIR /app
 
