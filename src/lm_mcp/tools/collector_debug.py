@@ -287,8 +287,9 @@ class WmiClass:
 
 # The classes LogicMonitor's WMI datasources collect from, as the sandbox portal's 59 name them
 # in collectorAttribute.queryClass (docs/validation/probes-2026-11.md). A query on a class also
-# returns its subclasses' rows, which is why the CIM parent classes (CIM_LogicalElement,
-# CIM_ManagedSystemElement and the like) are left out.
+# returns its subclasses' rows, which is why the parents of the file, product, setting, job and
+# process classes (CIM_LogicalElement, CIM_ManagedSystemElement and the like) are left out;
+# CIM_ComputerSystem, kept below, answers with Win32_ComputerSystem's rows.
 _DATASOURCE_CLASSES = (
     "Win32_Service",
     "Win32_OperatingSystem",
