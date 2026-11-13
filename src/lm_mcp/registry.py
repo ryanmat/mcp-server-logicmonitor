@@ -4737,12 +4737,12 @@ TOOLS.extend(
     ]
 )
 
-# Ingestion APIs (require LMv1 authentication)
+# Ingestion APIs
 TOOLS.extend(
     [
         Tool(
             name="ingest_logs",
-            description="Ingest log entries into LogicMonitor (requires LMv1 auth)",
+            description="Ingest log entries into LogicMonitor",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",
@@ -4772,7 +4772,7 @@ TOOLS.extend(
         ),
         Tool(
             name="push_metrics",
-            description="Push custom metrics into LogicMonitor (requires LMv1 auth)",
+            description="Push custom metrics into LogicMonitor",
             annotations=_WRITE,
             inputSchema={
                 "type": "object",

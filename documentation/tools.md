@@ -402,8 +402,8 @@ Push custom logs and metrics
 
 | Tool | Description | Write |
 |------|-------------|-------|
-| `ingest_logs` | Ingest log entries into LogicMonitor (requires LMv1 auth) | Yes |
-| `push_metrics` | Push custom metrics into LogicMonitor (requires LMv1 auth) | Yes |
+| `ingest_logs` | Ingest log entries into LogicMonitor | Yes |
+| `push_metrics` | Push custom metrics into LogicMonitor | Yes |
 
 ## Logs
 

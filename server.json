@@ -29,11 +29,11 @@
         },
         {
           "name": "LM_ACCESS_ID",
-          "description": "LMv1 API access ID (required for log/metric ingestion)"
+          "description": "LMv1 API access ID; with LM_ACCESS_KEY it stands in for LM_BEARER_TOKEN"
         },
         {
           "name": "LM_ACCESS_KEY",
-          "description": "LMv1 API access key (required for log/metric ingestion)",
+          "description": "LMv1 API access key, the secret of the LM_ACCESS_ID token",
           "isSecret": true
         },
         {

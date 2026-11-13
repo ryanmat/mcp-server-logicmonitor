@@ -54,6 +54,9 @@ def configure_logging(config: LMConfig) -> logging.Handler:
     can be re-applied without duplicating output. stdout is never used: under
     the stdio transport it carries the JSON-RPC stream.
 
+    The audit logger runs at INFO, or at DEBUG when LM_LOG_LEVEL is debug, so a
+    successful write's INFO line reaches stderr at every LM_LOG_LEVEL.
+
     Args:
         config: Server configuration; ``log_level`` is one of debug, info,
             warning, error.
@@ -62,7 +65,9 @@ def configure_logging(config: LMConfig) -> logging.Handler:
         The stderr handler in place after the call.
     """
     root = logging.getLogger()
-    root.setLevel(logging.getLevelNamesMapping()[config.log_level.upper()])
+    level = logging.getLevelNamesMapping()[config.log_level.upper()]
+    root.setLevel(level)
+    _audit_logger.setLevel(min(level, logging.INFO))
     for existing in root.handlers:
         if existing.get_name() == STDERR_HANDLER_NAME:
             return existing

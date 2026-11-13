@@ -13,8 +13,9 @@ from lm_mcp.exceptions import ConfigurationError
 class LMv1Auth(AuthProvider):
     """LMv1 HMAC-SHA256 authentication provider.
 
-    Uses HMAC-SHA256 signatures for request authentication. Required for
-    LogicMonitor ingestion APIs (logs, metrics) that don't support Bearer tokens.
+    Uses HMAC-SHA256 signatures for request authentication, on the REST and
+    ingestion APIs alike. The resource path is the part of the URL after the API
+    root: /santaba/rest for REST, /rest for ingestion.
 
     The signature is computed as:
         HMAC-SHA256(access_key, method + timestamp + body + resource_path)
@@ -51,7 +52,7 @@ class LMv1Auth(AuthProvider):
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, etc.)
-            resource_path: API path (e.g., /santaba/rest/log/ingest)
+            resource_path: API path after the API root (e.g., /device/devices, /log/ingest)
             body: Request body as string
 
         Returns:

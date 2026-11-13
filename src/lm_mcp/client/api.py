@@ -177,7 +177,7 @@ class LogicMonitorClient:
             auth: Authentication provider for generating auth headers.
             timeout: Request timeout in seconds.
             max_retries: Maximum retry attempts for rate-limited requests.
-            ingest_url: Base URL for ingestion APIs (e.g., https://company.logicmonitor.com).
+            ingest_url: Base URL for ingestion APIs (e.g., https://company.logicmonitor.com/rest).
             retry_after_cap: Longest wait in seconds between retries, whatever a
                 server's Retry-After asks for.
         """
@@ -548,11 +548,12 @@ class LogicMonitorClient:
     ) -> dict:
         """Make a POST request to ingestion API.
 
-        Uses the ingest_url base instead of the standard base_url.
-        Ingestion APIs use paths like /rest/log/ingest.
+        Uses the ingest_url base instead of the standard base_url. The path
+        follows that base, as /log/ingest does, and is the path an LMv1
+        signature covers.
 
         Args:
-            path: Ingestion API path (e.g., /rest/log/ingest).
+            path: Ingestion API path (e.g., /log/ingest).
             json_body: JSON body (list of log entries or metric payload).
             params: Query parameters (e.g., {"create": "true"}); not part of the
                 signed resource path.

@@ -80,16 +80,11 @@ class TestConfigureLogging:
 
     @pytest.fixture
     def restore_root(self):
-        """Put the root logger back as it was: level, and no server stderr handler."""
-        from lm_mcp.logging import STDERR_HANDLER_NAME
+        """Put the logger levels back as they were, with no server stderr handler."""
+        from tests.logging_state import restored_logging
 
-        root = logging.getLogger()
-        level = root.level
-        yield
-        for handler in list(root.handlers):
-            if handler.get_name() == STDERR_HANDLER_NAME:
-                root.removeHandler(handler)
-        root.setLevel(level)
+        with restored_logging():
+            yield
 
     def _config(self, monkeypatch, level):
         monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
@@ -112,13 +107,18 @@ class TestConfigureLogging:
         assert "INFO" in err
         assert "lm_mcp.audit" in err
 
-    def test_warning_level_drops_the_info_audit_line(self, monkeypatch, capsys, restore_root):
-        """At warning the INFO audit record is not emitted, while a failed write still is."""
+    def test_warning_level_drops_info_records_outside_the_audit_trail(
+        self, monkeypatch, capsys, restore_root
+    ):
+        """At warning an INFO record of another logger is not emitted; a failed write is.
+
+        The audit trail's successful writes stay on at warning (R4.6, tests/test_write_audit.py).
+        """
         from lm_mcp.logging import configure_logging, log_write_operation
 
         configure_logging(self._config(monkeypatch, "warning"))
-        log_write_operation("create_device", {"name": "web-01"}, success=True)
-        assert "Write operation" not in capsys.readouterr().err
+        logging.getLogger("lm_mcp.client").info("GET /device/devices")
+        assert capsys.readouterr().err == ""
 
         log_write_operation("delete_device", {"device_id": 7}, success=False)
         err = capsys.readouterr().err

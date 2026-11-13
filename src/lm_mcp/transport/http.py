@@ -365,7 +365,7 @@ async def create_http_server() -> None:
         app,
         host=config.http_host,
         port=config.http_port,
-        log_level="info",
+        log_level=config.log_level,
         **ssl_kwargs,
     )
 

@@ -137,7 +137,7 @@ The server also takes LogicMonitor filter syntax directly, for example "Get devi
 | Network | Neighbors, interfaces, flows, connections, top talkers, link flaps, and outage detection. See [networking intelligence](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/documentation/networking-intelligence.md) |
 | Usage | The contract's entitlements per feature, including the features the usage page hides, and the portal's current resource counts, which are not billing figures |
 | Cost | Cost recommendations, recommendation categories, and idle resources (LM Envision) |
-| Ingestion | Push logs and metrics through LMv1 authentication |
+| Ingestion | Push logs and metrics, with a Bearer token or an LMv1 token |
 | Logs | LM Logs pipelines, tracked queries, saved query groups, partitions with their contracts, and the usage figure. Log search is not offered: the v3 search endpoint applied neither the query nor the time range when probed |
 | Batch jobs | List batch jobs and the BatchJob datasources on a device; per-run output comes from `get_device_data` |
 
@@ -260,7 +260,7 @@ Set these as environment variables, through your client's `env` block or `-e` fl
 
 ### Authentication
 
-Set `LM_BEARER_TOKEN` for most operations. Set `LM_ACCESS_ID` and `LM_ACCESS_KEY` as well for `ingest_logs` and `push_metrics`, which require LMv1 authentication.
+Set `LM_BEARER_TOKEN`, or `LM_ACCESS_ID` and `LM_ACCESS_KEY` for an LMv1 token. Either works for every tool, `ingest_logs` and `push_metrics` included; with both set, the server uses the Bearer token.
 
 To get LMv1 credentials:
 
@@ -274,8 +274,8 @@ To get LMv1 credentials:
 |----------|----------|---------|-------------|
 | `LM_PORTAL` | Yes | - | LogicMonitor portal hostname (e.g., `company.logicmonitor.com`) |
 | `LM_BEARER_TOKEN` | Yes* | - | API Bearer token (min 10 characters) |
-| `LM_ACCESS_ID` | No | - | LMv1 API access ID (for ingestion APIs) |
-| `LM_ACCESS_KEY` | No | - | LMv1 API access key (for ingestion APIs) |
+| `LM_ACCESS_ID` | No | - | LMv1 API access ID; with `LM_ACCESS_KEY` it stands in for `LM_BEARER_TOKEN` |
+| `LM_ACCESS_KEY` | No | - | LMv1 API access key |
 | `LM_ENABLE_WRITE_OPERATIONS` | No | `false` | Enable write operations (create, update, delete) |
 | `LM_TIMEOUT` | No | `30` | Request timeout in seconds (range: 5-300) |
 | `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited requests, and for server errors on idempotent requests (GET, PUT, DELETE); a POST or PATCH that gets a 5xx is not resent (range: 0-10) |
@@ -297,7 +297,7 @@ To get LMv1 credentials:
 | `LM_HTTP_SSL_KEYFILE` | No | - | TLS private key path. HTTP transport only. |
 | `LM_HTTP_SSL_KEYFILE_PASSWORD` | No | - | Password for an encrypted TLS private key. HTTP transport only. |
 | `LM_SESSION_HISTORY_SIZE` | No | `50` | Number of tool calls to keep in history |
-| `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error`. Records go to stderr; write audit lines (`info` for a success, `warning` for a failure) redact argument values under credential-shaped keys such as `password`, `token`, `api_key` and `extra_vars`, LogicMonitor credential properties such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one |
+| `LM_LOG_LEVEL` | No | `warning` | Logging level: `debug`, `info`, `warning`, or `error`, for the server and, under the HTTP transport, uvicorn. The server's records go to stderr; write audit lines (`info` for a success, `warning` for a failure, both written at every level) redact argument values under credential-shaped keys such as `password`, `token`, `api_key` and `extra_vars`, LogicMonitor credential properties such as `ssh.pass` and `snmp.community`, and a `property_value` whose `property_name` is one |
 | `LM_ENABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to enable (e.g., `get_*,triage`). Mutually exclusive with `LM_DISABLED_TOOLS`. |
 | `LM_DISABLED_TOOLS` | No | - | Comma-separated tool names or glob patterns to disable (e.g., `delete_*`). Mutually exclusive with `LM_ENABLED_TOOLS`. |
 | `LM_MCP_CATEGORIES` | No | - | Comma-separated category names to include: `read`, `write`, `delete`, `export`, `import`, `session`, `workflow`. Composes by intersection with `LM_ENABLED_TOOLS`/`LM_DISABLED_TOOLS` -- only narrows, never expands. Useful for clients with tool-count limits (e.g., Cursor's 40-tool cap). |
@@ -393,7 +393,7 @@ The default bind is `0.0.0.0`, which needs `LM_HTTP_AUTH_TOKEN`. Set the token, 
 
 ### Ingestion API errors
 
-The `ingest_logs` and `push_metrics` tools require LMv1 authentication, and bearer tokens do not work with ingestion APIs. Add `LM_ACCESS_ID` and `LM_ACCESS_KEY` to your configuration.
+`ingest_logs` and `push_metrics` take a Bearer token or an LMv1 token, as the other tools do.
 
 ### Rate limit errors
 
