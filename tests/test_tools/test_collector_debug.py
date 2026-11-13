@@ -2232,7 +2232,7 @@ class TestSecurityReviewRecheck:
             check_cmdline("!uptime !_x")
 
 
-# The classes the sandbox's own WMI datasources collect from (probes-2026-11.md, Step 74), as
+# The classes the sandbox's own WMI datasources collect from (probes-2026-11.md), as
 # their collectorAttribute.queryClass spells them.
 PROBED_CLASSES = [
     "Win32_OperatingSystem",
