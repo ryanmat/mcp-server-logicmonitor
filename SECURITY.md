@@ -69,6 +69,9 @@ You can expect:
 ### Write operations
 - Write operations are disabled by default
 - Enable only when needed: `LM_ENABLE_WRITE_OPERATIONS=true`
+- A destructive tool asks the user before it runs when the MCP client supports elicitation, and
+  its audit line records the answer; clients without elicitation, and the HTTP transport, rely on
+  the write gate alone
 - A POST or PATCH that gets a 5xx is not resent, so a retry cannot apply a change
   twice
 - Review permissions granted to your LogicMonitor API token

@@ -210,7 +210,7 @@ This server does not run Terraform. Use the `terraform` CLI, or HashiCorp's [Ter
 
 ### Multi-portal mode
 
-Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`get_portals`, `use_portal`, `get_current_portal`, `run_portal_reload`) switch the active portal at runtime. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
+Serves many customer portals from a single server entry. Set `LM_MULTI_PORTAL=true` and point the server at a credential vault; the full tool set loads once, and four tools (`get_portals`, `use_portal`, `get_current_portal`, `run_portal_reload`) switch the active portal at runtime. Every LogicMonitor tool also takes an optional `portal` argument that runs one call against another portal and leaves the active one as it is. Credentials come from an age-encrypted vault (or a plaintext JSON file for testing), and each portal is read-only unless its record marks it writable. The mode is stdio-only. See [MULTIPORTAL.md](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/MULTIPORTAL.md).
 
 ### Edwin AI
 
@@ -281,7 +281,7 @@ To get LMv1 credentials:
 | `LM_MAX_RETRIES` | No | `3` | Max retries for rate-limited requests, and for server errors on idempotent requests (GET, PUT, DELETE); a POST or PATCH that gets a 5xx is not resent (range: 0-10) |
 | `LM_RETRY_AFTER_CAP_SECONDS` | No | `120` | Longest wait between retries. A server's `Retry-After` can lengthen the backoff up to this cap, never shorten it |
 | `LM_TRANSPORT` | No | `stdio` | Transport mode: `stdio` (MCP clients) or `http` (see [HTTP transport](#http-transport)) |
-| `LM_MULTI_PORTAL` | No | `false` | Serve many customer portals from one server, selected at runtime via `use_portal`. Stdio-only. |
+| `LM_MULTI_PORTAL` | No | `false` | Serve many customer portals from one server, selected at runtime with `use_portal` or per call with a `portal` argument. Stdio-only. |
 | `LM_VAULT_FILE` | No | - | Path to the age-encrypted portal vault (multi-portal) |
 | `LM_AGE_KEY` | No | - | Path to the age identity that decrypts the vault (multi-portal) |
 | `LM_PORTALS_FILE` | No | - | Plaintext JSON portal map (multi-portal, testing only; the encrypted vault wins when both are set) |

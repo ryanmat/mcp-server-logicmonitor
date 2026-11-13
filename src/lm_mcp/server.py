@@ -8,6 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp.server import Server
+from mcp.server.lowlevel.server import request_ctx
 from mcp.types import (
     CallToolResult,
     ClientCapabilities,
@@ -277,8 +278,8 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
     audit logging and session recording. In multi-portal mode a tool outside
     _NO_PORTAL_ARGUMENT takes its portal from a ``portal`` argument when the call
     has one (spec R4.2), which the handler never sees, and every result except a
-    portal tool's carries the bound portal name. The MCP call_tool handler delegates
-    to it.
+    portal tool's or an Edwin tool's carries the bound portal name (Edwin AI is one
+    tenant for every portal). The MCP call_tool handler delegates to it.
 
     Args:
         name: Tool name to execute.
@@ -304,7 +305,7 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         return stamp_portal(error_from_exception(e), None)
     with bind(binding):
         result = await _execute_bound(name, arguments, config)
-    if config.multi_portal and name not in PORTAL_TOOLS:
+    if config.multi_portal and name not in PORTAL_TOOLS and name not in EDWIN_TOOLS:
         return stamp_portal(result, binding.portal)
     return result
 
@@ -380,8 +381,9 @@ async def _execute_bound(name: str, arguments: dict, config: LMConfig) -> list[T
             return error_content("INVALID_REQUEST", missing_client_message(config.multi_portal))
 
         # A destructive call that passed every gate waits for the user's yes when the
-        # client can ask (spec R4.3); without that, the write gate is the only check.
-        if name in _DESTRUCTIVE_TOOLS:
+        # client can ask (spec R4.3); without that, the write gate is the only check. A
+        # read-only portal is not asked: its handler's write gate refuses the call.
+        if name in _DESTRUCTIVE_TOOLS and current_binding().writable:
             elicitation = await _ask_before_destroying(name, arguments)
             if elicitation in ("declined", "cancelled"):
                 log_write_operation(name, arguments, success=False, elicitation=elicitation)
@@ -446,9 +448,8 @@ async def _ask_before_destroying(name: str, arguments: dict) -> str:
     unavailable when the client advertises no elicitation, the session is stateless HTTP
     (it keeps no client capabilities), or the call came from outside an MCP request.
     """
-    try:
-        context = server.request_context
-    except LookupError:
+    context = request_ctx.get(None)
+    if context is None:
         return "unavailable"
     asks = ClientCapabilities(elicitation=ElicitationCapability())
     if not context.session.check_client_capability(asks):

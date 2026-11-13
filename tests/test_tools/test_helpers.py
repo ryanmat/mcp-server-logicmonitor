@@ -23,6 +23,13 @@ class TestFormatResponse:
         assert parsed["count"] == 5
         assert parsed["items"] == [1, 2, 3]
 
+    def test_dicts_and_lists_are_compact_json(self):
+        """R4.3: no indentation and no spaces after separators."""
+        from lm_mcp.tools import format_response
+
+        assert format_response({"count": 5, "items": [1, 2]})[0].text == '{"count":5,"items":[1,2]}'
+        assert format_response([{"id": 1}, {"id": 2}])[0].text == '[{"id":1},{"id":2}]'
+
     def test_format_list_response(self):
         """List data is formatted as JSON text content."""
         from lm_mcp.tools import format_response

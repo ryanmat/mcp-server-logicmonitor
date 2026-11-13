@@ -208,6 +208,23 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `LM_HTTP_AUTH_TOKEN` is set. `/mcp` refuses a body that is not `application/json` with `415` and
   one over 4 MiB with `413`. The `mcp` requirement rises from `>=1.19.0` to `>=1.29.0`, the release
   that added that body limit.
+- In multi-portal mode every LogicMonitor tool takes an optional `portal` argument, the vault name
+  `get_portals` lists. A call that names a portal runs against it, with that portal's own write
+  flag, and leaves the `use_portal` default as it is; an unknown name is `INVALID_REQUEST`. The
+  session tools, the four portal tools, `search_tools`, `get_reference` and the Edwin AI tools do
+  not take it. The argument adds about 30 tokens per tool to `tools/list`. `MULTIPORTAL.md` is
+  rewritten.
+- `analyze_metric`, `analyze_alerts`, `calculate_availability`, `correlate_metrics`,
+  `analyze_blast_radius`, `triage`, `portal_overview`, `health_check`, `capacity_plan`, `diagnose`
+  and `detect_site_outage` declare an `outputSchema`. Their results carry `structuredContent`
+  beside the same JSON text, and a result that does not match its schema reaches the client as an
+  error.
+- A tool annotated `destructiveHint` asks the user before it runs when the client supports
+  elicitation: accepting runs it, and declining or cancelling returns `REJECTED_BY_TOOL` and
+  changes nothing. A client without elicitation, the stateless Streamable HTTP transport, and a
+  read-only portal in multi-portal mode are not asked; the write gate decides alone, as before.
+- `triage`, `portal_overview`, `capacity_plan` and `detect_site_outage` send a progress
+  notification after each phase when the request carries a `progressToken`.
 
 ### Removed
 
@@ -508,7 +525,8 @@ instead.
   its audit line on that portal. Every result object carries that portal's name as `portal`, and
   an error envelope carries it as `details.portal`, `null` before a portal is selected. The four
   portal tools' results are unchanged, since `use_portal` and `get_current_portal` already carry the
-  vault host as `portal`. The audit line for a `use_portal` names the portal the call started on;
+  vault host as `portal`, and Edwin AI results carry none, since one Edwin tenant serves every
+  portal. The audit line for a `use_portal` names the portal the call started on;
   its arguments name the one it switched to. Code that calls a write-gated handler or
   `portal_url` outside `execute_tool` in multi-portal mode gets a `RuntimeError`; an audit line
   written outside a call carries no portal. `lm_mcp.portals.is_active_writable` is removed.
@@ -517,6 +535,14 @@ instead.
   `use_portal` share one session, as single-portal mode keeps one. A `use_portal` is recorded in
   the history it was called from: the portal it switched away from, or the shared session before
   any portal was selected.
+- A write refused because its portal is read-only says `Portal '<name>' is read-only`, naming the
+  portal the call ran against, where it said `The active portal is read-only`.
+- The audit line of a destructive call that reaches the confirmation ends with
+  `elicitation=accepted`, `declined` or `cancelled`, the user's answer, or `unavailable` when the
+  client could not be asked. A call refused before it, by the write gate, a read-only portal or a
+  missing portal, carries no marker.
+- Tool results are compact JSON, with no indentation and no space after `,` or `:`, where they
+  were indented by two spaces. Error envelopes keep their format.
 - The source distribution holds `src/`, `README.md`, `LICENSE`, `CHANGELOG.md`, `pyproject.toml`,
   `PKG-INFO` and the `.gitignore` hatchling adds to every sdist. The 4.3.0 sdist on PyPI also
   carried the tests, `deploy/`, `documentation/`, `scripts/`, `.github/`, `.claude/` and the other

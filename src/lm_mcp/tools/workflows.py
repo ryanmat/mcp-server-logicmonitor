@@ -11,7 +11,13 @@ from typing import TYPE_CHECKING
 
 from mcp.types import TextContent
 
-from lm_mcp.tools import call_sub_tool, format_response, handle_error, validation_error
+from lm_mcp.tools import (
+    call_sub_tool,
+    format_response,
+    handle_error,
+    report_progress,
+    validation_error,
+)
 from lm_mcp.tools.alerts import ALERT_WINDOW_TRUNCATED_WARNING
 from lm_mcp.tools.logicmodules import MODULES, update_module
 
@@ -313,6 +319,7 @@ async def triage(
             warnings.append(ALERT_WINDOW_TRUNCATED_WARNING)
         for section in ("statistics", "clusters", "noise", "changes"):
             report[section] = window.get(section)
+        await report_progress(1, 2, "alert window read")
 
         # 2. Blast-radius counts for the largest device clusters that name their device
         clusters = (window.get("clusters") or {}).get("clusters", [])
@@ -332,6 +339,7 @@ async def triage(
                 )
                 warnings.append(f"blast_radius for {cluster['key']} failed: {exc}")
         report["blast_radius"] = blast_rows
+        await report_progress(2, 2, "blast radius read")
 
         if warnings:
             report["warnings"] = warnings
@@ -736,6 +744,7 @@ async def capacity_plan(
             "threshold": threshold,
             "detail_level": detail_level,
         }
+        await report_progress(1, 3, "device resolved")
 
         # 2. Get datasources (filtered if datasource param given)
         try:
@@ -749,6 +758,7 @@ async def capacity_plan(
         except Exception as exc:
             warnings.append(f"get_device_datasources failed: {exc}")
             ds_list = []
+        await report_progress(2, 3, "datasources read")
 
         # 3. Per datasource (up to 5), per instance (up to 3): one analysis
         ds_reports: list[dict] = []
@@ -809,6 +819,7 @@ async def capacity_plan(
             ds_reports.append(ds_report)
 
         report["datasources"] = ds_reports
+        await report_progress(3, 3, "instances analyzed")
 
         # The summary level trims the raw datasources block, so it keeps each
         # forecast's headline and every per-instance error in its place; _trim_detail
@@ -974,6 +985,8 @@ async def portal_overview(
         report["alert_statistics"] = window.get("statistics")
         report["alert_clusters"] = window.get("clusters")
         report["noise"] = window.get("noise")
+        phases = 5 if detail_level == "full" else 3
+        await report_progress(1, phases, "alert window read")
 
         # 2. Collector health
         try:
@@ -981,6 +994,7 @@ async def portal_overview(
         except Exception as exc:
             warnings.append(f"get_collectors failed: {exc}")
             report["collectors"] = None
+        await report_progress(2, phases, "collectors read")
 
         # 3. Active SDTs
         try:
@@ -988,6 +1002,7 @@ async def portal_overview(
         except Exception as exc:
             warnings.append(f"get_active_sdts failed: {exc}")
             report["active_sdts"] = None
+        await report_progress(3, phases, "active SDTs read")
 
         if detail_level == "full":
             # 4. Open critical and error alerts across the portal, not only the window
@@ -1002,6 +1017,7 @@ async def portal_overview(
                 warnings.append(f"get_alerts failed: {exc}")
                 report["critical_alerts"] = None
                 report["error_alerts"] = None
+            await report_progress(4, phases, "open alerts read")
 
             # 5. Dead devices
             try:
@@ -1011,6 +1027,7 @@ async def portal_overview(
             except Exception as exc:
                 warnings.append(f"get_devices (dead) failed: {exc}")
                 report["dead_devices"] = None
+            await report_progress(5, phases, "dead devices read")
 
         if warnings:
             report["warnings"] = warnings
@@ -1908,6 +1925,7 @@ async def detect_site_outage(
         device_count = len(devices)
         dead_devices = _count_dead_devices(devices)
         collector_ids = _collector_ids_from_devices(devices)
+        await report_progress(1, 4, "devices read")
 
         # Signals whose read failed, by signal name, with the error. They are left
         # out of the score instead of being scored as not triggered.
@@ -1954,6 +1972,7 @@ async def detect_site_outage(
                 f"{collectors_unchecked}/{len(collector_ids)} collector(s) could not be "
                 "checked for CollectorDown"
             )
+        await report_progress(2, 4, "collectors checked")
 
         # Signal B: mass interface-down burst in the window.
         burst_signal: dict | None = None
@@ -1975,6 +1994,7 @@ async def detect_site_outage(
         except Exception as exc:
             warnings.append(f"Burst detection failed: {exc}")
             unavailable["interface_burst"] = f"Burst detection failed: {exc}"
+        await report_progress(3, 4, "alert window read")
 
         # Signal C: power events (UPS/PDU on-battery, battery-runtime, etc.).
         power_events_count = 0
@@ -1991,6 +2011,7 @@ async def detect_site_outage(
         except Exception as exc:
             warnings.append(f"Power event query failed: {exc}")
             unavailable["power_events"] = f"Power event query failed: {exc}"
+        await report_progress(4, 4, "power events read")
 
         # Score and verdict.
         silence_threshold = max(3, device_count // 5)  # 20% of group or 3 whichever higher

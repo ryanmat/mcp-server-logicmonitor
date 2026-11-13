@@ -291,6 +291,24 @@ class TestPortalStamp:
         assert json.loads(result[0].text)["portal"] == "globex"
 
     @pytest.mark.asyncio
+    async def test_edwin_results_name_no_portal(self, two_portals):
+        """Edwin AI is one tenant for every portal, so its results carry no LM portal name."""
+        from lm_mcp.server import execute_tool
+
+        portals.activate("acme")
+
+        async def handler(edwin, **kwargs):
+            return format_response({"insights": []})
+
+        with (
+            patch("lm_mcp.server._edwin_client", object()),
+            patch("lm_mcp.server.get_tool_handler", return_value=handler),
+        ):
+            result = await execute_tool("get_edwin_insights", {})
+
+        assert json.loads(result[0].text) == {"insights": []}
+
+    @pytest.mark.asyncio
     async def test_portal_tool_results_keep_their_own_portal_field(self, two_portals):
         """use_portal's `portal` is the host it switched to, not the name it was bound to."""
         from lm_mcp.server import execute_tool
@@ -477,7 +495,6 @@ class TestPortalArgumentCall:
         assert error["details"]["portal"] == "globex"
         assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
             "Write operation failed: delete_device args={'device_id': 7} portal=globex"
-            " elicitation=unavailable"
         ]
 
     @pytest.mark.asyncio
