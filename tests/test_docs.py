@@ -201,3 +201,50 @@ class TestChangelogLinks:
             else:
                 assert match[2] == f"v{version}" or re.fullmatch(r"[0-9a-f]{12}", match[2]), version
             previous_ref = match[2]
+
+
+def _counts(monkeypatch) -> dict[str, int]:
+    """The per-configuration tool counts the docs state, computed from the registry and filter."""
+    from lm_mcp import server
+    from lm_mcp.registry import TOOLS
+
+    default = len(_listed(monkeypatch, {}))
+    multi = len(_listed(monkeypatch, {"LM_MULTI_PORTAL": "true", "LM_PORTALS_FILE": "/p.json"}))
+    monkeypatch.setattr(server, "_edwin_client", object())
+    with_edwin = len(_listed(monkeypatch, {}))
+    monkeypatch.setattr(server, "_edwin_client", None)
+    annotations = [tool.annotations for tool in TOOLS if tool.annotations is not None]
+    return {
+        "default": default,
+        "multi_portal": multi,
+        "edwin_extra": with_edwin - default,
+        "write_gated": sum(
+            a.readOnlyHint is False and a.openWorldHint is True for a in annotations
+        ),
+        "destructive": sum(bool(a.destructiveHint) for a in annotations),
+        "workflow": len(_listed(monkeypatch, {"LM_MCP_CATEGORIES": "workflow"})),
+        "writes_on": len(_listed(monkeypatch, {"LM_ENABLE_WRITE_OPERATIONS": "true"})),
+    }
+
+
+# Each documented count: the file, a pattern whose group is the number, and what it counts.
+_DOCUMENTED_COUNTS = [
+    ("README.md", r"a client sees (\d+) of them", "default"),
+    ("README.md", r"\((\d+) in multi-portal mode", "multi_portal"),
+    ("README.md", r"(\d+) more with Edwin credentials", "edwin_extra"),
+    ("README.md", r"Before one of the (\d+) destructive tools", "destructive"),
+    ("SECURITY.md", r"leaves the (\d+) tools whose annotations", "write_gated"),
+    ("SECURITY.md", r"The (\d+) tools annotated `destructiveHint`", "destructive"),
+    ("documentation/client-setup.md", r"lists (\d+) of its 273 tools", "default"),
+    ("documentation/client-setup.md", r"`workflow` lists (\d+) tools", "workflow"),
+    ("documentation/client-setup.md", r"grows from (\d+) to \d+", "default"),
+    ("documentation/client-setup.md", r"grows from \d+ to (\d+)", "writes_on"),
+]
+
+
+@pytest.mark.parametrize(("doc", "pattern", "key"), _DOCUMENTED_COUNTS)
+def test_documented_count_matches_the_server(doc: str, pattern: str, key: str, monkeypatch) -> None:
+    """Chunk W review: each per-configuration count a doc states is the one the server lists."""
+    stated = re.findall(pattern, (ROOT / doc).read_text())
+    assert len(stated) == 1, f"{doc}: {pattern!r} matched {len(stated)} times"
+    assert int(stated[0]) == _counts(monkeypatch)[key]
