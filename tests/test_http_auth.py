@@ -1,6 +1,7 @@
 # Description: Tests for opt-in inbound bearer authentication on the HTTP transport.
 # Description: Covers gated paths, open probe paths, preflights, and config validation.
 
+import contextlib
 import logging
 
 import pytest
@@ -10,6 +11,9 @@ from tests.live_uvicorn import free_port, live_uvicorn
 # 16 characters: the configured minimum, and below the length a secret scanner flags.
 TOKEN = "http-auth-tok-16"
 WRONG = "wrong-http-auth-token-999"
+
+# The Accept header a Streamable HTTP client sends; the SDK refuses a POST without application/json.
+MCP_ACCEPT = {"Accept": "application/json, text/event-stream"}
 
 
 @pytest.fixture
@@ -26,13 +30,23 @@ def _set_env_with_auth(_set_env, monkeypatch):
     monkeypatch.setenv("LM_HTTP_AUTH_TOKEN", TOKEN)
 
 
-def _client():
-    """Build an httpx client bound to a freshly constructed ASGI app."""
+@contextlib.asynccontextmanager
+async def _client():
+    """Yield an httpx client bound to a freshly constructed ASGI app, its lifespan running.
+
+    ASGITransport sends no lifespan events, and the /mcp session manager serves
+    requests only inside the app's lifespan, so the helper enters it itself.
+    """
     from httpx import ASGITransport, AsyncClient
 
     from lm_mcp.transport.http import create_asgi_app
 
-    return AsyncClient(transport=ASGITransport(app=create_asgi_app()), base_url="http://localhost")
+    app = create_asgi_app()
+    async with (
+        app.router.lifespan_context(app),
+        AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost") as client,
+    ):
+        yield client
 
 
 class TestHttpAuthRejection:
@@ -72,14 +86,15 @@ class TestHttpAuthAccepted:
 
     @pytest.mark.asyncio
     async def test_mcp_correct_token_accepted(self, _set_env_with_auth):
-        """POST /mcp with the token passes auth; the router has no /mcp route, so 404."""
+        """POST /mcp with the token passes auth, and the SDK answers tools/list."""
         async with _client() as client:
             resp = await client.post(
                 "/mcp",
                 json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
-                headers={"Authorization": f"Bearer {TOKEN}"},
+                headers={**MCP_ACCEPT, "Authorization": f"Bearer {TOKEN}"},
             )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        assert resp.json()["result"]["tools"]
 
 
 class TestHttpAuthOpenPaths:
@@ -146,12 +161,14 @@ class TestHttpAuthDisabled:
 
     @pytest.mark.asyncio
     async def test_no_token_configured_allows_requests(self, _set_env):
-        """POST /mcp with no header passes auth when no token is set; the router answers 404."""
+        """POST /mcp with no header passes auth when no token is set, and the SDK answers."""
         async with _client() as client:
             resp = await client.post(
-                "/mcp", json={"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+                "/mcp",
+                json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
+                headers=MCP_ACCEPT,
             )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
 
     def test_no_token_logs_warning(self, _set_env, caplog):
         """Building the app without a token warns that the surface is open."""
@@ -214,15 +231,15 @@ class TestHttpAuthHardening:
 
     @pytest.mark.asyncio
     async def test_scheme_is_case_insensitive(self, _set_env_with_auth):
-        """RFC 7235 defines auth-scheme as case-insensitive; each form passes auth to a 404."""
+        """RFC 7235 defines auth-scheme as case-insensitive; each form passes auth to the SDK."""
         async with _client() as client:
             for scheme in ("Bearer", "bearer", "BEARER", "BeArEr"):
                 resp = await client.post(
                     "/mcp",
                     json={"jsonrpc": "2.0", "method": "tools/list", "id": 1},
-                    headers={"Authorization": f"{scheme} {TOKEN}"},
+                    headers={**MCP_ACCEPT, "Authorization": f"{scheme} {TOKEN}"},
                 )
-                assert resp.status_code == 404, scheme
+                assert resp.status_code == 200, scheme
 
     @pytest.mark.asyncio
     async def test_wrong_scheme_still_rejected(self, _set_env_with_auth):

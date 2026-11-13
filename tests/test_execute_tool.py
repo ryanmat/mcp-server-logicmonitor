@@ -705,12 +705,14 @@ class TestWriteOutcomeFromResult:
         assert error["code"] == "AUTH_FAILED"
         assert error["message"].startswith("Permission denied")
 
-    def test_mcp_floor_admits_only_call_tool_result_passthrough(self):
-        """The mcp requirement excludes every release that cannot pass a CallToolResult.
+    def test_mcp_floor_admits_only_passthrough_and_the_body_limit(self):
+        """The mcp requirement excludes every release that lacks what the server relies on.
 
         call_tool returns CallToolResult(isError=True) for an error. mcp 1.19.0 is the first
         lowlevel server that passes one through; 1.18.0 and earlier list() it, fail
-        validation, and send a pydantic message in place of the tool's error text.
+        validation, and send a pydantic message in place of the tool's error text. mcp 1.29.0
+        added max_request_body_size to StreamableHTTPSessionManager (SDK PR #3101), the limit
+        /mcp keeps on a request body; 1.28.1 and earlier have no such limit.
         """
         from packaging.requirements import Requirement
         from packaging.version import Version
@@ -720,7 +722,8 @@ class TestWriteOutcomeFromResult:
         mcp = next(r for r in map(Requirement, dependencies) if r.name == "mcp")
 
         assert Version("1.18.0") not in mcp.specifier
-        assert Version("1.19.0") in mcp.specifier
+        assert Version("1.28.1") not in mcp.specifier
+        assert Version("1.29.0") in mcp.specifier
 
 
 EDWIN_TOOL_NAMES = {

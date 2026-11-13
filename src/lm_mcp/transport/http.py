@@ -1,5 +1,5 @@
 # Description: HTTP transport implementation for MCP server.
-# Description: Serves health, readiness and info routes over Starlette behind the HTTP middleware.
+# Description: Serves the SDK's Streamable HTTP at /mcp and the health routes behind the middleware.
 
 from __future__ import annotations
 
@@ -108,8 +108,8 @@ _BODYLESS_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _requires_json_body(path: str) -> bool:
-    """Match the routes whose request bodies must be JSON; no route takes a body."""
-    return False
+    """Match the routes whose request bodies must be JSON: /mcp."""
+    return path.rstrip("/") == "/mcp"
 
 
 def _media_type(headers: Iterable[tuple[bytes, bytes]]) -> str:
@@ -144,6 +144,12 @@ class JsonContentTypeMiddleware:
             return
 
         await _send_json_error(send, 415, "Content-Type must be application/json")
+
+
+# The largest request body /mcp reads; a larger one gets 413 before parsing. README and
+# the CHANGELOG state this figure, so the server sets it rather than taking the SDK's
+# default.
+_MCP_MAX_BODY_BYTES = 4 * 1024 * 1024
 
 
 # Orchestrators probe by pod or container IP, which no Host allowlist names.
@@ -193,11 +199,19 @@ class HostAllowlistMiddleware:
 
 
 def create_asgi_app() -> Starlette:
-    """Create the ASGI application with the health and info endpoints.
+    """Create the ASGI application with the MCP, health and info endpoints.
+
+    /mcp is the SDK's Streamable HTTP session manager over the same ``Server`` the
+    stdio transport runs, so both dispatch through one set of handlers. It runs
+    stateless, a fresh transport per request with no session id, and answers with
+    JSON rather than an SSE stream, since no handler sends a message before its
+    result. The manager serves requests only inside the app's lifespan.
 
     Returns:
         Starlette application configured with routes and middleware.
     """
+    from mcp.server.fastmcp.server import StreamableHTTPASGIApp
+    from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
     from starlette.applications import Starlette
     from starlette.middleware import Middleware
     from starlette.requests import Request
@@ -205,8 +219,15 @@ def create_asgi_app() -> Starlette:
     from starlette.routing import Route
 
     from lm_mcp.config import get_config
+    from lm_mcp.server import server
 
     config = get_config()
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        stateless=True,
+        json_response=True,
+        max_request_body_size=_MCP_MAX_BODY_BYTES,
+    )
 
     async def health(request: Request) -> Response:
         """Detailed health check endpoint.
@@ -262,6 +283,7 @@ def create_asgi_app() -> Starlette:
                     "health": "/health",
                     "healthz": "/healthz",
                     "readyz": "/readyz",
+                    "mcp": "/mcp",
                 },
                 "timestamp": datetime.now(UTC).isoformat(),
             }
@@ -272,6 +294,7 @@ def create_asgi_app() -> Starlette:
         Route("/health", health, methods=["GET"]),
         Route("/healthz", healthz, methods=["GET"]),
         Route("/readyz", readyz, methods=["GET"]),
+        Route("/mcp", StreamableHTTPASGIApp(session_manager)),
     ]
 
     # Order matters: the first entry is outermost. The Host check runs first, so
@@ -289,7 +312,11 @@ def create_asgi_app() -> Starlette:
         )
     middleware.append(Middleware(JsonContentTypeMiddleware))
 
-    return Starlette(routes=routes, middleware=middleware)
+    return Starlette(
+        routes=routes,
+        middleware=middleware,
+        lifespan=lambda app: session_manager.run(),
+    )
 
 
 async def create_http_server() -> None:
