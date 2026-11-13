@@ -2182,8 +2182,8 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 [1.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.0.1...v1.1.0
-[1.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.0.0...v1.0.1
+[1.1.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/179f031fa8eb...v1.1.0
+[1.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v1.0.0...179f031fa8eb
 [1.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.5.1...v1.0.0
 [0.5.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v0.4.0...v0.5.0
