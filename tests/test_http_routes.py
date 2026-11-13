@@ -7,7 +7,6 @@ import importlib
 
 import httpx
 import pytest
-from mcp.server.streamable_http_manager import DEFAULT_MAX_REQUEST_BODY_SIZE
 from mcp.types import LATEST_PROTOCOL_VERSION
 
 from tests.live_uvicorn import free_port, live_uvicorn
@@ -91,13 +90,28 @@ async def test_mcp_initialize_answers_through_the_sdk_stateless(http_env, monkey
     assert result["protocolVersion"] == LATEST_PROTOCOL_VERSION
 
 
-async def test_mcp_body_over_the_sdk_limit_is_413(http_env, monkeypatch):
-    """The mcp floor carries max_request_body_size; the mount keeps its 4 MiB limit."""
-    oversized = b"[" + b" " * DEFAULT_MAX_REQUEST_BODY_SIZE + b"]"
+async def test_mcp_body_over_4_mib_is_413(http_env, monkeypatch):
+    """README, SECURITY.md and the CHANGELOG say 4 MiB; the server sets that limit itself."""
+    from lm_mcp.transport.http import _MCP_MAX_BODY_BYTES
+
+    oversized = b"[" + b" " * _MCP_MAX_BODY_BYTES + b"]"
     headers = {**_MCP_ACCEPT, "Content-Type": "application/json"}
 
     (response,) = await _send(
         monkeypatch, [("POST", "/mcp", {"content": oversized, "headers": headers})]
+    )
+
+    assert _MCP_MAX_BODY_BYTES == 4 * 1024 * 1024
+    assert response.status_code == 413
+
+
+async def test_mcp_body_limit_is_the_servers_not_the_sdk_default(http_env, monkeypatch):
+    """With the server's limit cut to 1 KiB, a 2 KiB initialize gets 413 from the mount."""
+    monkeypatch.setattr("lm_mcp.transport.http._MCP_MAX_BODY_BYTES", 1024)
+    padded = {**_INITIALIZE, "params": {**_INITIALIZE["params"], "pad": "x" * 2048}}
+
+    (response,) = await _send(
+        monkeypatch, [("POST", "/mcp", {"json": padded, "headers": _MCP_ACCEPT})]
     )
 
     assert response.status_code == 413

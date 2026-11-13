@@ -146,6 +146,12 @@ class JsonContentTypeMiddleware:
         await _send_json_error(send, 415, "Content-Type must be application/json")
 
 
+# The largest request body /mcp reads; a larger one gets 413 before parsing. README,
+# SECURITY.md and the CHANGELOG state this figure, so the server sets it rather than
+# taking the SDK's default.
+_MCP_MAX_BODY_BYTES = 4 * 1024 * 1024
+
+
 # Orchestrators probe by pod or container IP, which no Host allowlist names.
 _HOST_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
 
@@ -216,7 +222,12 @@ def create_asgi_app() -> Starlette:
     from lm_mcp.server import server
 
     config = get_config()
-    session_manager = StreamableHTTPSessionManager(app=server, stateless=True, json_response=True)
+    session_manager = StreamableHTTPSessionManager(
+        app=server,
+        stateless=True,
+        json_response=True,
+        max_request_body_size=_MCP_MAX_BODY_BYTES,
+    )
 
     async def health(request: Request) -> Response:
         """Detailed health check endpoint.
