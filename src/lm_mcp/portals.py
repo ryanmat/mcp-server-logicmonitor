@@ -163,19 +163,28 @@ def _build_client(rec: dict):
         raise ValueError("portal record needs bearer_token or access_id + access_key") from e
 
 
-def activate(customer: str) -> dict:
-    """Make `customer` the active portal for subsequent tool calls."""
+def _portal(name: str) -> tuple[Any, dict]:
+    """Return the client and vault record of portal ``name``, building the client once.
+
+    Raises:
+        ValueError: The vault has no portal ``name``, or its record cannot build a client.
+    """
     load()
-    if customer not in _state["portals"]:
+    if name not in _state["portals"]:
         raise ValueError(
-            f"portal '{customer}' not found. Available: {', '.join(sorted(_state['portals']))}"
+            f"portal '{name}' not found. Available: {', '.join(sorted(_state['portals']))}"
         )
-    rec = _state["portals"][customer] or {}
-    client = _state["clients"].get(customer)
+    rec = _state["portals"][name] or {}
+    client = _state["clients"].get(name)
     if client is None:
         client = _build_client(rec)
-        _state["clients"][customer] = client
+        _state["clients"][name] = client
+    return client, rec
 
+
+def activate(customer: str) -> dict:
+    """Make `customer` the active portal for subsequent tool calls."""
+    rec = _portal(customer)[1]
     _state["active"] = customer
     _state["active_writable"] = bool(rec.get("writable", False))
     return {
@@ -242,17 +251,30 @@ def host(name: str | None) -> str | None:
     return (_state["portals"].get(name) or {}).get("portal") if name else None
 
 
-def call_binding(writes_enabled: bool) -> CallBinding:
-    """Return the selected portal as a call binding: its client, write flag and name.
+def call_binding(writes_enabled: bool, name: str | None = None) -> CallBinding:
+    """Return a call binding: the portal's client, write flag and name.
 
-    use_portal sets this default; execute_tool reads it once when a call starts, so
-    a switch while a call runs leaves that call on the portal it started with.
+    With no ``name`` it is the portal use_portal selected, the default; execute_tool
+    reads it once when a call starts, so a switch while a call runs leaves that call on
+    the portal it started with. A ``name``, a call's portal argument (spec R4.2), binds
+    that portal for the one call and leaves the default as it is.
 
     Args:
         writes_enabled: The operator's LM_ENABLE_WRITE_OPERATIONS gate.
+        name: The portal a call names, or None for the default.
+
+    Raises:
+        ValueError: ``name`` is not in the vault, or its record cannot build a client.
     """
     from lm_mcp.context import CallBinding
 
+    if name is not None:
+        client, rec = _portal(name)
+        return CallBinding(
+            client=client,
+            writable=writes_enabled and bool(rec.get("writable", False)),
+            portal=name,
+        )
     name = _state["active"]
     return CallBinding(
         client=_state["clients"].get(name) if name is not None else None,

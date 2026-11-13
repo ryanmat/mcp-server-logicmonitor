@@ -1,16 +1,22 @@
-# Description: Tests for the per-call portal binding (spec R2.12): execute_tool binds the
-# Description: client, write flag and portal name in a ContextVar, and stamps results with it.
+# Description: Tests for the per-call portal binding (spec R2.12, R4.2): execute_tool binds the
+# Description: client, write flag and portal name per call, from the default or a portal argument.
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
+import re
+from pathlib import Path
 from unittest.mock import patch
 
+import anyio
 import httpx
 import pytest
 import respx
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.types import TextContent
 
 from lm_mcp import portals
@@ -19,6 +25,20 @@ from tests.portal_env import two_portal_vault
 
 ACME = "https://acme.example.com/santaba/rest"
 GLOBEX = "https://globex.example.com/santaba/rest"
+REPO = Path(__file__).resolve().parents[1]
+
+# The tools whose schemas never carry the portal argument: the session tools, the four
+# portal tools, the two discovery tools that read no client, and the Edwin tools.
+SESSION_TOOLS = {
+    "get_session_context",
+    "set_session_variable",
+    "get_session_variable",
+    "delete_session_variable",
+    "clear_session_context",
+    "get_session_history",
+}
+PORTAL_TOOLS = {"get_portals", "use_portal", "get_current_portal", "run_portal_reload"}
+DISCOVERY_TOOLS = {"search_tools", "get_reference"}
 
 
 @pytest.fixture
@@ -323,3 +343,261 @@ class TestAuditMarker:
         audit = [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"]
         assert audit == ["Write operation: delete_device args={'device_id': 7} portal=acme"]
         assert portals.active()["active"] == "globex"
+
+
+def _properties(tool) -> dict:
+    return tool.inputSchema.get("properties") or {}
+
+
+@pytest.fixture
+def unfiltered(monkeypatch):
+    """No operator name or category filter, so the listing is every tool the mode serves."""
+    for name in ("LM_ENABLED_TOOLS", "LM_DISABLED_TOOLS", "LM_MCP_CATEGORIES"):
+        monkeypatch.delenv(name, raising=False)
+
+
+class TestPortalArgumentSchema:
+    """With LM_MULTI_PORTAL on, every LM tool lists an optional portal string (spec R4.2)."""
+
+    @pytest.mark.asyncio
+    async def test_lm_tool_schemas_carry_an_optional_portal_string(self, two_portals, unfiltered):
+        from lm_mcp.registry import TOOLS
+        from lm_mcp.server import list_tools
+
+        with patch("lm_mcp.server._edwin_client", object()):
+            listed = await list_tools()
+
+        names = {tool.name for tool in listed}
+        edwin = {name for name in names if "edwin" in name}
+        without = {tool.name for tool in listed if "portal" not in _properties(tool)}
+        assert edwin and names >= SESSION_TOOLS | PORTAL_TOOLS
+        assert without == SESSION_TOOLS | PORTAL_TOOLS | DISCOVERY_TOOLS | edwin
+        carrying = [tool for tool in listed if tool.name not in without]
+        assert len(carrying) > 240
+        for tool in carrying:
+            assert _properties(tool)["portal"]["type"] == "string", tool.name
+            assert "portal" not in tool.inputSchema.get("required", []), tool.name
+        assert [t.name for t in TOOLS if "portal" in _properties(t)] == []
+
+    @pytest.mark.asyncio
+    async def test_single_portal_schemas_carry_no_portal(self, monkeypatch, unfiltered):
+        from lm_mcp.server import list_tools
+
+        monkeypatch.setenv("LM_PORTAL", "test.logicmonitor.com")
+        monkeypatch.setenv("LM_BEARER_TOKEN", "test-token")
+        monkeypatch.setenv("LM_ENABLE_WRITE_OPERATIONS", "true")
+        monkeypatch.delenv("LM_MULTI_PORTAL", raising=False)
+
+        listed = await list_tools()
+
+        assert len(listed) > 240
+        assert [tool.name for tool in listed if "portal" in _properties(tool)] == []
+
+
+class TestPortalArgumentCall:
+    """A call's portal argument binds that portal for the call and leaves the default alone."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_call_with_portal_binds_it_and_keeps_the_default(self, two_portals):
+        from lm_mcp.server import execute_tool
+
+        acme_route = respx.get(f"{ACME}/device/devices/1").mock(return_value=_device(1, "acme-web"))
+        globex_route = respx.get(f"{GLOBEX}/device/devices/1").mock(
+            return_value=_device(1, "globex-web")
+        )
+        portals.activate("acme")
+
+        named = json.loads(
+            (await execute_tool("get_device", {"device_id": 1, "portal": "globex"}))[0].text
+        )
+        default = json.loads((await execute_tool("get_device", {"device_id": 1}))[0].text)
+
+        assert (named["name"], named["portal"]) == ("globex-web", "globex")
+        assert named["portal_url"].startswith("https://globex.example.com/")
+        assert (default["name"], default["portal"]) == ("acme-web", "acme")
+        assert (globex_route.call_count, acme_route.call_count) == (1, 1)
+        assert portals.active()["active"] == "acme"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_portal_argument_needs_no_use_portal(self, two_portals):
+        from lm_mcp.server import execute_tool
+
+        respx.get(f"{GLOBEX}/device/devices/1").mock(return_value=_device(1, "globex-web"))
+
+        result = await execute_tool("get_device", {"device_id": 1, "portal": "globex"})
+
+        assert json.loads(result[0].text)["portal"] == "globex"
+        assert portals.active()["active"] is None
+
+    @pytest.mark.asyncio
+    async def test_handler_gets_the_named_portal_and_not_the_argument(self, two_portals):
+        from lm_mcp.context import current_binding
+        from lm_mcp.server import execute_tool
+
+        portals.activate("acme")
+        seen = {}
+
+        async def handler(client, **kwargs):
+            seen.update(client=client, kwargs=kwargs, portal=current_binding().portal)
+            return format_response({"ok": True})
+
+        with patch("lm_mcp.server.get_tool_handler", return_value=handler):
+            await execute_tool("get_device", {"device_id": 1, "portal": "globex"})
+
+        assert seen == {
+            "client": portals._state["clients"]["globex"],
+            "kwargs": {"device_id": 1},
+            "portal": "globex",
+        }
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_named_read_only_portal_refuses_a_write_while_the_default_is_writable(
+        self, two_portals, caplog
+    ):
+        from lm_mcp.server import execute_tool
+        from tests.envelope import envelope
+
+        portals.activate("acme")
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            error = envelope(
+                await execute_tool("delete_device", {"device_id": 7, "portal": "globex"})
+            )
+
+        assert (error["code"], error["message"]) == (
+            "WRITE_DISABLED",
+            "Portal 'globex' is read-only. Set \"writable\": true on this portal's vault record "
+            "to allow writes",
+        )
+        assert error["details"]["portal"] == "globex"
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
+            "Write operation failed: delete_device args={'device_id': 7} portal=globex"
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_named_writable_portal_writes_while_the_default_is_read_only(
+        self, two_portals, caplog
+    ):
+        from lm_mcp.server import execute_tool
+
+        respx.get(f"{ACME}/device/devices/7").mock(return_value=_device(7, "acme-db"))
+        route = respx.delete(f"{ACME}/device/devices/7").mock(
+            return_value=httpx.Response(200, json={})
+        )
+        portals.activate("globex")
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await execute_tool("delete_device", {"device_id": 7, "portal": "acme"})
+
+        assert not isinstance(result[0], ErrorContent)
+        assert json.loads(result[0].text)["portal"] == "acme"
+        assert route.call_count == 1
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
+            "Write operation: delete_device args={'device_id': 7} portal=acme"
+        ]
+        assert portals.active()["active"] == "globex"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unknown_portal_is_invalid_request(self, two_portals):
+        from lm_mcp.server import execute_tool
+        from tests.envelope import envelope
+
+        portals.activate("acme")
+
+        error = envelope(await execute_tool("get_device", {"device_id": 1, "portal": "initech"}))
+
+        assert (error["code"], error["isRetryable"]) == ("INVALID_REQUEST", False)
+        assert error["message"] == "portal 'initech' not found. Available: acme, globex"
+        assert error["details"]["portal"] is None
+        assert portals.active()["active"] == "acme"
+        assert "initech" not in portals._state["clients"]
+
+    @pytest.mark.asyncio
+    async def test_write_to_an_unknown_portal_is_refused_and_audited(self, two_portals, caplog):
+        from lm_mcp.server import execute_tool
+        from tests.envelope import envelope
+
+        with caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            error = envelope(
+                await execute_tool("delete_device", {"device_id": 7, "portal": "initech"})
+            )
+
+        assert error["code"] == "INVALID_REQUEST"
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.audit"] == [
+            "Write operation failed: delete_device args={'device_id': 7, 'portal': 'initech'}"
+        ]
+
+    @pytest.mark.asyncio
+    async def test_vault_read_failure_is_logged_and_returned(self, two_portals, tmp_path, caplog):
+        from lm_mcp.server import execute_tool
+        from tests.envelope import envelope
+
+        (tmp_path / "portals.json").unlink()
+        with caplog.at_level(logging.ERROR, logger="lm_mcp.server"):
+            error = envelope(await execute_tool("get_device", {"device_id": 1, "portal": "acme"}))
+
+        assert (error["code"], error["details"]["exception"]) == (
+            "UPSTREAM_ERROR",
+            "FileNotFoundError",
+        )
+        assert error["details"]["portal"] is None
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.server"] == [
+            "Binding portal 'acme' for get_device failed"
+        ]
+
+
+def _guide_block(heading: str) -> str:
+    """The first fenced bash block under ``heading`` in MULTIPORTAL.md."""
+    text = (REPO / "MULTIPORTAL.md").read_text()
+    section = text.split(f"\n{heading}\n", 1)[1]
+    return re.search(r"```bash\n(.*?)```", section, re.S).group(1)
+
+
+class TestMultiportalGuide:
+    """MULTIPORTAL.md's commands run as written where they are commands."""
+
+    @pytest.mark.asyncio
+    async def test_clone_command_serves_the_portal_argument_over_stdio(self, tmp_path):
+        vault = tmp_path / "portals.json"
+        vault.write_text(
+            json.dumps(
+                {
+                    "acme": {"portal": "acme.example.com", "bearer_token": "t1"},
+                    "globex": {"portal": "globex.example.com", "bearer_token": "t2"},
+                }
+            )
+        )
+        # The launcher runs `uv run --project`. The stdio client hands the child only
+        # HOME, PATH and the like, so the UV_ settings (CI's UV_PYTHON per matrix leg)
+        # are passed on; without them uv would rebuild this run's .venv for another Python.
+        uv_settings = {key: value for key, value in os.environ.items() if key.startswith("UV_")}
+        params = StdioServerParameters(
+            command="bash",
+            args=["-c", _guide_block("## Try it from a clone")],
+            cwd=str(REPO),
+            env={**uv_settings, "LM_PORTALS_FILE": str(vault)},
+        )
+
+        with (tmp_path / "server.log").open("w") as errlog, anyio.fail_after(120):
+            async with (
+                stdio_client(params, errlog=errlog) as (read, write),
+                ClientSession(read, write) as session,
+            ):
+                await session.initialize()
+                listed = {tool.name: tool for tool in (await session.list_tools()).tools}
+                listing = await session.call_tool("get_portals", {})
+                refused = await session.call_tool(
+                    "get_device", {"device_id": 1, "portal": "initech"}
+                )
+
+        assert _properties(listed["get_device"])["portal"]["type"] == "string"
+        assert "portal" not in _properties(listed["get_session_context"])
+        assert [p["name"] for p in json.loads(listing.content[0].text)["portals"]] == [
+            "acme",
+            "globex",
+        ]
+        assert refused.isError
+        assert json.loads(refused.content[0].text)["error"]["code"] == "INVALID_REQUEST"

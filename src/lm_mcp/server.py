@@ -161,8 +161,22 @@ def _filter_tools(tools: list, config) -> list:
 
 @server.list_tools()
 async def list_tools():
-    """Return available tools, filtered by config."""
-    return _filter_tools(collect_tools(), get_config())
+    """Return available tools, filtered by config.
+
+    In multi-portal mode every tool outside _NO_PORTAL_ARGUMENT lists the optional
+    portal argument (spec R4.2); the registry's own schemas stay as they are.
+    """
+    config = get_config()
+    tools = _filter_tools(collect_tools(), config)
+    if config.multi_portal:
+        tools = [t if t.name in _NO_PORTAL_ARGUMENT else _with_portal_argument(t) for t in tools]
+    return tools
+
+
+def _with_portal_argument(tool: Tool) -> Tool:
+    """A copy of ``tool`` whose input schema adds the optional portal string."""
+    properties = {**(tool.inputSchema.get("properties") or {}), "portal": PORTAL_ARGUMENT}
+    return tool.model_copy(update={"inputSchema": {**tool.inputSchema, "properties": properties}})
 
 
 def collect_tools() -> list[Tool]:
@@ -211,16 +225,37 @@ CLIENT_OPTIONAL_TOOLS = {
 }
 
 
+# The tools that never take the portal argument (spec R4.2): the session tools keep the
+# default portal's session, the portal tools set and read that default, the discovery
+# tools read no client, and Edwin AI is one tenant for every portal.
+_NO_PORTAL_ARGUMENT = SESSION_TOOLS | PORTAL_TOOLS | CLIENT_OPTIONAL_TOOLS | EDWIN_TOOLS
+
+PORTAL_ARGUMENT = {
+    "type": "string",
+    "description": (
+        "Portal for this call only, by its get_portals name; omit for the use_portal default"
+    ),
+}
+
+
 def _edwin_write(name: str) -> bool:
     """Whether a tool is an Edwin tool that changes state. Edwin AI is one tenant for every
     portal in multi-portal mode, so no portal's vault write flag vouches for such a call."""
     return name in EDWIN_TOOLS and is_write_tool(name)
 
 
-def _call_binding(config: LMConfig) -> CallBinding:
-    """The clients, write flag and portal name a call runs against, read once at its start."""
+def _call_binding(config: LMConfig, portal: str | None = None) -> CallBinding:
+    """The clients, write flag and portal name a call runs against, read once at its start.
+
+    Args:
+        config: The server configuration.
+        portal: The portal a multi-portal call names, or None for the use_portal default.
+
+    Raises:
+        ValueError: ``portal`` is not in the vault, or its record cannot build a client.
+    """
     if config.multi_portal:
-        binding = portals.call_binding(writes_enabled=config.enable_write_operations)
+        binding = portals.call_binding(writes_enabled=config.enable_write_operations, name=portal)
         return dataclasses.replace(binding, edwin=_edwin_client)
     return CallBinding(
         client=_client, writable=config.enable_write_operations, portal=None, edwin=_edwin_client
@@ -232,7 +267,9 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
 
     Binds the call's LogicMonitor and Edwin clients, write flag and portal name for
     its duration (spec R2.12), then applies tool filtering, the write gate, write
-    audit logging and session recording. In multi-portal mode every result except a
+    audit logging and session recording. In multi-portal mode a tool outside
+    _NO_PORTAL_ARGUMENT takes its portal from a ``portal`` argument when the call
+    has one (spec R4.2), which the handler never sees, and every result except a
     portal tool's carries the bound portal name. The MCP call_tool handler delegates
     to it.
 
@@ -244,7 +281,20 @@ async def execute_tool(name: str, arguments: dict) -> list[TextContent]:
         List of TextContent with the tool result.
     """
     config = get_config()
-    binding = _call_binding(config)
+    named = None
+    if config.multi_portal and name not in _NO_PORTAL_ARGUMENT and "portal" in arguments:
+        named = arguments["portal"]
+        arguments = {key: value for key, value in arguments.items() if key != "portal"}
+    try:
+        binding = _call_binding(config, named)
+    except Exception as e:
+        # No portal is bound, so the refusal carries none, as before use_portal.
+        if is_write_tool(name):
+            log_write_operation(name, {**arguments, "portal": named}, success=False)
+        if isinstance(e, ValueError):
+            return stamp_portal(error_content("INVALID_REQUEST", str(e)), None)
+        logger.exception("Binding portal %r for %s failed", named, name)
+        return stamp_portal(error_from_exception(e), None)
     with bind(binding):
         result = await _execute_bound(name, arguments, config)
     if config.multi_portal and name not in PORTAL_TOOLS:

@@ -741,7 +741,7 @@ def require_write_permission(func: F) -> F:
                     {
                         "error": True,
                         "code": "WRITE_DISABLED",
-                        "message": "The active portal is read-only",
+                        "message": f"Portal '{binding.portal}' is read-only",
                         "suggestion": (
                             'Set "writable": true on this portal\'s vault record to allow writes'
                         ),
