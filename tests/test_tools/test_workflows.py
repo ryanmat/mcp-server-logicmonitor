@@ -454,8 +454,8 @@ class TestCheckRequiredTools:
     ids=["health_check", "capacity_plan", "diagnose", "detect_site_outage"],
 )
 def test_the_part_two_output_schemas_refuse_an_undocumented_key(schema):
-    """Each composite report schema is a valid JSON Schema and closed to keys it does not
-    document, a health_score among them."""
+    """Each of these four composite report schemas is a valid JSON Schema and closed to keys
+    it does not document, a health_score among them."""
     jsonschema.Draft202012Validator.check_schema(schema)
     assert schema["additionalProperties"] is False
     with pytest.raises(jsonschema.ValidationError, match="health_score"):
