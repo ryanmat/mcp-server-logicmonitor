@@ -165,19 +165,20 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   its tenant names; both read endpoints of LogicMonitor v247 that the public API reference does
   not list, so the rules come back as the API returns them.
 - Usage reads, in a new `usage` category. `get_usage_contract` reads `/usage/contractInfo`: every
-  feature the contract names, including those with no entitlement that the usage page hides,
-  each with its role, entitled quantity, unit and roll-up basis, and the detected
-  `billing_mode`; `billable_only` keeps the billable lines. A zero entitlement is
-  `metered_no_entitlement` whether or not the contract marks it unpaid. A line with more than
-  one unit pairs each unit with its quantity in `entitled_by_unit`; its `unit` names the one
-  unit that carries a quantity, the largest with `entitled_ambiguous` when more than one does,
-  and is null when none does. A child that restates its metered parent's non-zero quantity is
-  `repeats_parent`, not a billable line. A node the tool cannot read is logged and listed under
-  `unreadable_nodes`, and a response with no feature the tool can read carries a warning rather
-  than reading as an empty contract. `get_usage_metrics` reads `/metrics/usage`, the portal's current
-  resource counts, which are not billing figures. A 404 from either names the path, and a 403
-  names the path and the role permission it needs. The two tools come from #98 by GitHub user
-  barunagarwal.
+  feature the contract names, including those with no entitlement that the usage page hides, each
+  with its role, entitled quantity, unit and roll-up basis, and the detected `billing_mode`;
+  `billable_only` keeps the billable lines. `metered_no_entitlement` covers a metered line with a
+  zero entitlement, whether or not the contract marks it unpaid. A line whose quantities pair one
+  to one with more than one unit gets `entitled_by_unit`, each unit with its quantity; its `unit`
+  names the one unit that carries a quantity, the largest with `entitled_ambiguous` when more than
+  one does, and is null when none does. When the unit list does not pair with the quantities,
+  `unit` is the whole list. `repeats_parent` marks a child that restates its metered parent's
+  non-zero quantity, and such a child is never a billable line. A node the tool cannot read is
+  logged and listed under `unreadable_nodes`, and a response with no feature the tool can read
+  carries a warning that no entitlement can be concluded from it. `get_usage_metrics` reads
+  `/metrics/usage`, the portal's current resource counts, which are not billing figures. A 404 from
+  either names the path, and a 403 names the path and the role permission it needs. The two tools
+  come from #98 by GitHub user barunagarwal.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.

@@ -4069,8 +4069,7 @@ TOOLS.extend(
                 "questions: every feature the contract names, entitled or not, each with its "
                 "role (billable_line, metered_no_entitlement, metered_unpaid, repeats_parent, "
                 "rollup_or_carveout), entitled quantity, unit and roll-up basis, plus the "
-                "detected billing_mode. It reports what the contract allows, not what the "
-                "portal holds now."
+                "detected billing_mode. It does not count the portal's current resources."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -4088,8 +4087,8 @@ TOOLS.extend(
             name="get_usage_metrics",
             description=(
                 "Read how many devices, Kubernetes, AWS, Azure and GCP resources, websites and "
-                "services the portal holds now. Point-in-time counts, not the figures the "
-                "portal is billed on, which follow each feature's roll-up basis in the contract."
+                "services the portal holds now, as point-in-time counts. The portal is billed "
+                "on each feature's roll-up basis in the contract, so these are not billed figures."
             ),
             annotations=_READ_ONLY,
             inputSchema={"type": "object", "properties": {}},

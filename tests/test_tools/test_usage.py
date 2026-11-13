@@ -1,4 +1,4 @@
-# Description: Tests for the usage contract and usage counts tools, from #98: the contract walk,
+# Description: Tests for the usage contract and counts tools (R3.10, from #98): the contract walk,
 # Description: roles, units and errors, on synthetic contracts in the live shape and a live read.
 
 from __future__ import annotations
@@ -201,6 +201,15 @@ class TestQuantityCoercion:
         assert _as_quantity(" 600 ") == (600.0, None)
         assert _as_quantity("n/a") == (0.0, "n/a")
 
+    def test_a_string_that_is_not_a_number_is_logged(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="lm_mcp.tools.usage"):
+            assert _as_quantity("n/a") == (0.0, "n/a")
+
+        [record] = [r for r in caplog.records if r.name == "lm_mcp.tools.usage"]
+        assert record.levelno == logging.WARNING
+        assert "'n/a'" in record.getMessage()
+        assert isinstance(record.exc_info[1], ValueError)
+
     def test_multi_element_list_collapses_to_max_and_keeps_raw(self):
         assert _as_quantity([100, 1200, 50]) == (1200.0, [100, 1200, 50])
 
@@ -275,6 +284,14 @@ class TestUnits:
         assert (zero["entitled"], zero["unit"]) == (0.0, None)
         assert zero["entitled_by_unit"] == {"Services": 0.0, "User": 0.0}
         assert "entitled_raw" not in zero
+
+    def test_a_unit_list_that_does_not_pair_comes_back_whole(self):
+        # One quantity against two units: no unit can be named, so the list is the unit.
+        projected = _project_feature(
+            {"feature": "S", "node": node("S", [1500], ["User", "Services"]), "parent": None}
+        )
+        assert (projected["entitled"], projected["unit"]) == (1500.0, ["User", "Services"])
+        assert "entitled_by_unit" not in projected
 
     def test_a_paired_list_holding_junk_still_shows_the_raw_value(self):
         projected = _project_feature(

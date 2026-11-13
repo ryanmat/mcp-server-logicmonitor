@@ -129,6 +129,8 @@ def _as_quantity(value: Any) -> tuple[float, Any]:
         try:
             return float(value.strip()), None
         except ValueError:
+            # The caller surfaces the string as entitled_raw; the log keeps the parse failure.
+            logger.warning("usage contract: quantity %r is not a number", value, exc_info=True)
             return 0.0, value
     if isinstance(value, list):
         nums = []
@@ -290,10 +292,11 @@ async def get_usage_contract(
                              per product; never an additional commitment
       rollup_or_carveout     repeats or subdivides its parent; never a commitment
 
-    unit names the unit of entitled. A line with one unit keeps it. On a line with
-    more than one, it is the one unit that carries a quantity, the largest one with
-    entitled_ambiguous when more than one does, and null when none does;
-    entitled_by_unit pairs each of that line's units with its quantity.
+    unit names the unit of entitled. A line with one unit keeps it. On a line whose
+    quantities pair one to one with more than one unit, it is the one unit that
+    carries a quantity, the largest one with entitled_ambiguous when more than one
+    does, and null when none does; entitled_by_unit pairs each unit with its
+    quantity. A unit list that does not pair with the quantities comes back whole.
 
     Args:
         client: LogicMonitor API client.

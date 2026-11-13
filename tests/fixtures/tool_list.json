@@ -7039,7 +7039,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Read the portal's contracted entitlements, for license and contract questions: every feature the contract names, entitled or not, each with its role (billable_line, metered_no_entitlement, metered_unpaid, repeats_parent, rollup_or_carveout), entitled quantity, unit and roll-up basis, plus the detected billing_mode. It reports what the contract allows, not what the portal holds now.",
+    "description": "Read the portal's contracted entitlements, for license and contract questions: every feature the contract names, entitled or not, each with its role (billable_line, metered_no_entitlement, metered_unpaid, repeats_parent, rollup_or_carveout), entitled quantity, unit and roll-up basis, plus the detected billing_mode. It does not count the portal's current resources.",
     "inputSchema": {
       "properties": {
         "billable_only": {
@@ -7059,7 +7059,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Read how many devices, Kubernetes, AWS, Azure and GCP resources, websites and services the portal holds now. Point-in-time counts, not the figures the portal is billed on, which follow each feature's roll-up basis in the contract.",
+    "description": "Read how many devices, Kubernetes, AWS, Azure and GCP resources, websites and services the portal holds now, as point-in-time counts. The portal is billed on each feature's roll-up basis in the contract, so these are not billed figures.",
     "inputSchema": {
       "properties": {},
       "type": "object"
