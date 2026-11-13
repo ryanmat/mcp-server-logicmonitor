@@ -855,6 +855,26 @@ class TestChanges:
 class TestRegistration:
     """analyze_alerts is a registered, read-only tool dispatched through execute_tool."""
 
+    @pytest.mark.parametrize(
+        ("name", "counted"),
+        [
+            ("analyze_alerts", ("cluster_count", "total_correlated", "bursts_detected")),
+            ("triage", ("cluster_count", "total_correlated")),
+            ("portal_overview", ("cluster_count",)),
+            ("diagnose", ("cluster_count", "total_correlated")),
+        ],
+    )
+    def test_each_window_tool_states_what_its_lists_are_bounded_to(self, name, counted):
+        """rul-c5874c19c1: a caller learns from the description that the cluster and change
+        lists are the largest few, and which fields still count everything."""
+        from lm_mcp.registry import TOOLS
+
+        description = next(t for t in TOOLS if t.name == name).description
+
+        assert "five largest" in description
+        for field in counted:
+            assert field in description
+
     def test_schema_offers_exactly_the_sections_and_severities(self):
         from lm_mcp.registry import TOOLS
         from lm_mcp.tools import SEVERITY_MAP

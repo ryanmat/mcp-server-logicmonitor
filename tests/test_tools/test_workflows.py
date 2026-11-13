@@ -1919,6 +1919,39 @@ class TestDiagnose:
         return stack
 
     @respx.mock
+    async def test_a_busy_window_fits_the_clients_result_limit(self, auth, lm_env):
+        """rul-c5874c19c1: at full detail, as the lm-remediate skill calls it, diagnose over a
+        window at the sandbox's scale counts every cluster and pair and returns under 50,000
+        characters; its clusters and changes come through analyze_alerts unpatched."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        alerts, entries = busy_window(int(time.time()))
+        respx.get(_ALERTS_URL).mock(side_effect=alert_lists(alerts))
+        respx.get(_AUDIT_URL).mock(return_value=_ok({"items": entries}))
+        blast = {"neighbor_count": 0, "dependent_count": 0, "unreadable": [], "warning": "w"}
+        reads = (
+            (
+                "lm_mcp.tools.alerts.get_alert_details",
+                {"id": "DS362333940", "severity": 4, "monitorObjectId": 1786},
+            ),
+            ("lm_mcp.tools.devices.get_device", {"id": 1786, "displayName": "web-01"}),
+            ("lm_mcp.tools.resources.get_device_properties", {"properties": []}),
+            ("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast),
+        )
+
+        with ExitStack() as stack:
+            for path, data in reads:
+                stack.enter_context(_patch_sub(path, data))
+            stack.enter_context(_patch_no_diagnostics())
+            result = await diagnose(client, alert_id="DS362333940", detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert data["correlated_alerts"]["cluster_count"] > 30
+        assert len(data["correlated_alerts"]["clusters"]) == 15
+        assert data["changes"]["total_correlated"] == 300
+        assert len(data["changes"]["correlated_events"]) == 10
+        assert len(result[0].text) < 50_000
+
+    @respx.mock
     async def test_reads_the_assigned_diagnostics_and_their_latest_results(
         self, auth, lm_env, monkeypatch
     ):

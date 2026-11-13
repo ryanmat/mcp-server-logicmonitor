@@ -3689,7 +3689,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Composite diagnosis: given an alert, or a device's latest open critical alert, gathers the alert details, device context, alerts clustered and audit changes in the last four hours, blast radius, and the device's assigned DiagnosticSources with the latest results of the alert's diagnostic runs. It reads those results and never runs a DiagnosticSource. It computes no health score or root cause; health_check reports each metric's z-score.",
+    "description": "Composite diagnosis: given an alert, or a device's latest open critical alert, gathers the alert details, device context, alerts clustered and audit changes in the last four hours, blast radius, and the device's assigned DiagnosticSources with the latest results of the alert's diagnostic runs. correlated_alerts lists the five largest clusters of each type with ten alert ids each, and changes the ten change and spike pairs of highest confidence; cluster_count, by_type and total_correlated count them all. It reads those results and never runs a DiagnosticSource. It computes no health score or root cause; health_check reports each metric's z-score.",
     "inputSchema": {
       "properties": {
         "alert_id": {
@@ -8812,7 +8812,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Shift-handoff overview of the portal: reads the alert window of the last hours_back hours once for statistics, clusters and noise, and lists the collectors and the active SDTs. detail_level=full adds up to 20 open critical and 20 open error alerts from across the portal, not only the window, and up to 20 dead devices; summary does not read them.",
+    "description": "Shift-handoff overview of the portal: reads the alert window of the last hours_back hours once for statistics, clusters and noise, and lists the collectors and the active SDTs. alert_clusters lists the five largest clusters of each type with ten alert ids each, and its cluster_count and by_type count them all. detail_level=full adds up to 20 open critical and 20 open error alerts from across the portal, not only the window, and up to 20 dead devices; summary does not read them.",
     "inputSchema": {
       "properties": {
         "detail_level": {
@@ -9292,7 +9292,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Triage the alerts of the last hours_back hours in one call. Reads the alert window once through analyze_alerts for its statistics, clusters (by device, datasource and signature), noise and changes, then counts the blast radius of up to three device clusters, largest first. Each count row gives the devices reached as neighbors and as dependents, how many of them have a critical alert open, and how many devices' neighbors could not be read; a website cluster gets none. detail_level=full adds the devices each blast radius reached. Use analyze_alerts for bursts or a single section, and analyze_blast_radius for one device.",
+    "description": "Triage the alerts of the last hours_back hours in one call. Reads the alert window once through analyze_alerts for its statistics, clusters (by device, datasource and signature), noise and changes, then counts the blast radius of up to three device clusters, largest first. Each count row gives the devices reached as neighbors and as dependents, how many of them have a critical alert open, and how many devices' neighbors could not be read; a website cluster gets none. The clusters section lists the five largest clusters of each type with ten alert ids each, and changes the ten change and spike pairs of highest confidence; cluster_count, by_type and total_correlated count them all, and a narrower severity, device or window shows the rest. detail_level=full adds the devices each blast radius reached. Use analyze_alerts for bursts or a single section, and analyze_blast_radius for one device.",
     "inputSchema": {
       "properties": {
         "detail_level": {

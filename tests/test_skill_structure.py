@@ -313,9 +313,11 @@ operation is not applied to another. End the report with what you did not check.
 def test_every_skill_reports_only_what_it_read_and_says_what_it_did_not_check(name):
     """R7.2: the first scenario run (2026-11-13) failed the rubric on reports that named
     things no result carried and that never said what they left unread. Each skill states
-    the rule in the same words and gives its report a "Not checked" entry."""
+    the rule in the same words, gives its report template a "Not checked" entry, and says
+    after the rule what that entry names."""
     text = (SKILLS_DIR / name / "SKILL.md").read_text()
 
     assert REPORTING_RULES in text
-    report = text.split("## Reporting rules")[1]
-    assert "Not checked" in report
+    template, specifics = text.split("## Reporting rules")
+    assert "Not checked" in template
+    assert 'Under "Not checked"' in specifics
