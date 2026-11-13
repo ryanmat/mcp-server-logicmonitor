@@ -258,6 +258,13 @@ TOOL_CATEGORIES = {
                 "get_audit_logs",
             ],
         },
+        "usage": {
+            "description": "Contracted entitlements and the portal's current resource counts",
+            "tools": [
+                "get_usage_contract",
+                "get_usage_metrics",
+            ],
+        },
         "cost": {
             "description": "Cloud cost analysis and optimization",
             "tools": [

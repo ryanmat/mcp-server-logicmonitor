@@ -8,10 +8,10 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
-Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 271:
-259 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
+Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 273:
+261 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
-With writes off, the default, `tools/list` shows 148 of them, or 152 in multi-portal mode, and
+With writes off, the default, `tools/list` shows 150 of them, or 154 in multi-portal mode, and
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
@@ -164,6 +164,20 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - `get_service_insights_rules` pages the portal's Service Insights rules, and `get_tenants` lists
   its tenant names; both read endpoints of LogicMonitor v247 that the public API reference does
   not list, so the rules come back as the API returns them.
+- Usage reads, in a new `usage` category. `get_usage_contract` reads `/usage/contractInfo`: every
+  feature the contract names, including those with no entitlement that the usage page hides,
+  each with its role, entitled quantity, unit and roll-up basis, and the detected
+  `billing_mode`; `billable_only` keeps the billable lines. A zero entitlement is
+  `metered_no_entitlement` whether or not the contract marks it unpaid. A line with more than
+  one unit pairs each unit with its quantity in `entitled_by_unit`; its `unit` names the one
+  unit that carries a quantity, the largest with `entitled_ambiguous` when more than one does,
+  and is null when none does. A child that restates its metered parent's non-zero quantity is
+  `repeats_parent`, not a billable line. A node the tool cannot read is logged and listed under
+  `unreadable_nodes`, and a response with no feature the tool can read carries a warning rather
+  than reading as an empty contract. `get_usage_metrics` reads `/metrics/usage`, the portal's current
+  resource counts, which are not billing figures. A 404 from either names the path, and a 403
+  names the path and the role permission it needs. The two tools come from #98 by GitHub user
+  barunagarwal.
 - The `lm-edwin` skill checks an Edwin insight's root cause against the causal CI's metric and
   the alert window. The `lm-remediate` skill is rewritten onto `diagnose`, the device's
   assigned RemediationSources, action chains, `execute_remediation` and `edwin_run_tool`.

@@ -134,6 +134,8 @@
   "get_tracked_log_queries",
   "get_unmonitored_devices",
   "get_upcoming_sdts",
+  "get_usage_contract",
+  "get_usage_metrics",
   "get_user",
   "get_users",
   "get_website",
