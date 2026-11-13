@@ -202,6 +202,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   widget: it sets `queryType` `otlp` and the query in the widget's `advancedMetricsGraphInfo`,
   and the portal fills in the line chart. Other widget types refuse it. `create_alert_rule` and
   `update_alert_rule` refuse `otlp_query`, since the v3 alert rule body has no query field.
+- MCP over HTTP: with `LM_TRANSPORT=http`, `/mcp` serves the SDK's Streamable HTTP, stateless and
+  answering with JSON, over the same server and handlers as stdio, so an MCP client initializes
+  there and lists the same tools. It sits behind the `Host` allowlist and the bearer check, and
+  refuses a body that is not `application/json` with `415` and one over 4 MiB with `413`. The
+  `mcp` requirement rises from `>=1.19.0` to `>=1.29.0`, the release that added that body limit.
 
 ### Removed
 
@@ -324,10 +329,9 @@ instead.
   ignores if set. Run the composite tools, such as `triage`, `diagnose` and `health_check`, from an
   MCP client over stdio instead.
 - The JSON-RPC route at `/mcp` on the HTTP transport, which answered `tools/list`, `tools/call`,
-  `resources/list` and `prompts/list` without the MCP handshake. The HTTP transport serves `/`,
-  `/health`, `/healthz` and `/readyz` only, so `/mcp` and `/api/v1/*` answer `404` once past the
-  bearer check, and no route takes a request body, so no request gets `415`. Use stdio for MCP
-  clients.
+  `resources/list` and `prompts/list` without the MCP handshake. The SDK's Streamable HTTP
+  answers at `/mcp` in its place (see Added), and `/api/v1/*` answers `404` once past the bearer
+  check.
 - `jsonschema` as a direct dependency; `mcp` still installs it.
 - `python-dotenv` as a direct dependency. Nothing under `src/` imported it, and `pydantic-settings`
   still installs it.

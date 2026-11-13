@@ -35,10 +35,13 @@ You can expect:
   stay visible in a logged URL.
 
 ### Inbound HTTP exposure
-- The HTTP transport serves health, readiness and info routes only. It exposes
-  no tool and no MCP endpoint; its one use of the server's LogicMonitor
-  credentials is the optional `/health` connectivity check described below. Use
-  stdio when an MCP client is the caller.
+- The HTTP transport serves MCP at `/mcp` (the SDK's Streamable HTTP,
+  stateless) beside the health, readiness and info routes. A caller that passes
+  the bearer check at `/mcp` calls the tools stdio lists with the server's
+  LogicMonitor credentials, write tools only when
+  `LM_ENABLE_WRITE_OPERATIONS=true`, and every caller shares the server's one
+  session, its variables and history included. Give the token only to callers
+  who may share that portal access.
 - Set `LM_HTTP_AUTH_TOKEN` whenever the port is reachable beyond localhost:
   every path outside `/` and the health endpoints then requires
   `Authorization: Bearer <token>` and returns 401 otherwise. A bind outside `127.0.0.1`, `::1` and `localhost`

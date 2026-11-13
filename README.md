@@ -222,7 +222,7 @@ Stdio is the default transport and the one MCP clients use. It needs no deployme
 
 ### HTTP transport
 
-The HTTP transport serves health, readiness and info routes only; it exposes no tool and no MCP endpoint, so `/mcp` and `/api/v1/*` have no route (`404` once past the bearer check). Use stdio for MCP clients.
+The HTTP transport serves MCP at `/mcp` through the SDK's Streamable HTTP, stateless and answering with JSON, beside the health, readiness and info routes. `/mcp` takes the bearer token like every route outside `/` and the health endpoints, refuses a body that is not `application/json` with `415`, and refuses one over 4 MiB with `413`. `/api/v1/*` has no route (`404` once past the bearer check).
 
 ```bash
 cd deploy

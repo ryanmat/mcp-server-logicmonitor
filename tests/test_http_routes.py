@@ -1,5 +1,5 @@
-# Description: R1.5, R1.6: the HTTP transport serves health and info routes only, on a live socket.
-# Description: The analysis API, its webhook and /mcp answer 404; no preflight gets a CORS answer.
+# Description: R1.5, R1.6, R4.1: the HTTP transport's routes on a live socket, /mcp from the SDK.
+# Description: /mcp answers stateless JSON; the analysis API answers 404; no preflight gets CORS.
 
 from __future__ import annotations
 
@@ -7,14 +7,28 @@ import importlib
 
 import httpx
 import pytest
+from mcp.server.streamable_http_manager import DEFAULT_MAX_REQUEST_BODY_SIZE
+from mcp.types import LATEST_PROTOCOL_VERSION
 
 from tests.live_uvicorn import free_port, live_uvicorn
 
 # 16 characters: the configured minimum, and below the length a secret scanner flags.
 TOKEN = "route-test-tok16"
 
+# A Streamable HTTP client accepts both answers; the SDK refuses a POST that does not.
+_MCP_ACCEPT = {"Accept": "application/json, text/event-stream"}
+_INITIALIZE = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": LATEST_PROTOCOL_VERSION,
+        "capabilities": {},
+        "clientInfo": {"name": "route-test", "version": "0"},
+    },
+}
+
 _REMOVED_ROUTES = [
-    ("POST", "/mcp", {"json": {"jsonrpc": "2.0", "method": "tools/list", "id": 1}}),
     ("POST", "/api/v1/analyze", {"json": {"workflow": "health_check", "arguments": {}}}),
     ("GET", "/api/v1/analysis/x", {}),
     ("POST", "/api/v1/webhooks/alert", {"json": {"deviceId": 1, "alertId": 2}}),
@@ -60,7 +74,33 @@ async def test_health_and_readyz_answer(http_env, monkeypatch):
 async def test_removed_routes_are_404(http_env, monkeypatch):
     responses = await _send(monkeypatch, _REMOVED_ROUTES)
 
-    assert [r.status_code for r in responses] == [404, 404, 404, 404]
+    assert [r.status_code for r in responses] == [404, 404, 404]
+
+
+async def test_mcp_initialize_answers_through_the_sdk_stateless(http_env, monkeypatch):
+    """R4.1: the SDK's session manager answers initialize as JSON, with no session id."""
+    (response,) = await _send(
+        monkeypatch, [("POST", "/mcp", {"json": _INITIALIZE, "headers": _MCP_ACCEPT})]
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    assert "mcp-session-id" not in response.headers
+    result = response.json()["result"]
+    assert result["serverInfo"]["name"] == "logicmonitor-platform"
+    assert result["protocolVersion"] == LATEST_PROTOCOL_VERSION
+
+
+async def test_mcp_body_over_the_sdk_limit_is_413(http_env, monkeypatch):
+    """The mcp floor carries max_request_body_size; the mount keeps its 4 MiB limit."""
+    oversized = b"[" + b" " * DEFAULT_MAX_REQUEST_BODY_SIZE + b"]"
+    headers = {**_MCP_ACCEPT, "Content-Type": "application/json"}
+
+    (response,) = await _send(
+        monkeypatch, [("POST", "/mcp", {"content": oversized, "headers": headers})]
+    )
+
+    assert response.status_code == 413
 
 
 async def test_preflight_gets_no_cors_answer_with_origins_set(http_env, monkeypatch):
@@ -73,37 +113,43 @@ async def test_preflight_gets_no_cors_answer_with_origins_set(http_env, monkeypa
     assert "access-control-allow-origin" not in response.headers
 
 
-async def test_post_to_mcp_is_404_whatever_its_body_type(http_env, monkeypatch):
-    """No route takes a request body, so the Content-Type check refuses nothing."""
-    plain = {"content": "{}", "headers": {"Content-Type": "text/plain"}}
+async def test_mcp_refuses_a_non_json_body_with_415(http_env, monkeypatch):
+    """The Content-Type middleware answers before the SDK, whose own check would say 400."""
+    plain = {"content": "{}", "headers": {**_MCP_ACCEPT, "Content-Type": "text/plain"}}
 
     (response,) = await _send(monkeypatch, [("POST", "/mcp", plain)])
 
-    assert response.status_code == 404
+    assert response.status_code == 415
+    assert response.json() == {"error": "Content-Type must be application/json"}
 
 
-async def test_bearer_middleware_still_refuses_an_unauthenticated_gated_path(http_env, monkeypatch):
-    """With a token set, a path outside the open set is 401 before routing, and 404 after."""
+async def test_bearer_middleware_refuses_mcp_without_the_token(http_env, monkeypatch):
+    """With a token set, /mcp is 401 before the SDK sees the request, and answered after."""
     monkeypatch.setenv("LM_HTTP_AUTH_TOKEN", TOKEN)
-    method, path, kwargs = _REMOVED_ROUTES[0]
-    authorized = {**kwargs, "headers": {"Authorization": f"Bearer {TOKEN}"}}
+    anonymous = {"json": _INITIALIZE, "headers": _MCP_ACCEPT}
+    authorized = {
+        "json": _INITIALIZE,
+        "headers": {**_MCP_ACCEPT, "Authorization": f"Bearer {TOKEN}"},
+    }
 
-    anonymous, with_token = await _send(
-        monkeypatch, [(method, path, kwargs), (method, path, authorized)]
+    refused, answered = await _send(
+        monkeypatch, [("POST", "/mcp", anonymous), ("POST", "/mcp", authorized)]
     )
 
-    assert anonymous.status_code == 401
-    assert anonymous.headers["www-authenticate"] == "Bearer"
-    assert with_token.status_code == 404
+    assert refused.status_code == 401
+    assert refused.headers["www-authenticate"] == "Bearer"
+    assert answered.status_code == 200
+    assert answered.json()["result"]["serverInfo"]["name"] == "logicmonitor-platform"
 
 
-async def test_root_listing_names_only_the_health_routes(http_env, monkeypatch):
+async def test_root_listing_names_the_health_routes_and_mcp(http_env, monkeypatch):
     (root,) = await _send(monkeypatch, [("GET", "/", {})])
 
     assert root.json()["endpoints"] == {
         "health": "/health",
         "healthz": "/healthz",
         "readyz": "/readyz",
+        "mcp": "/mcp",
     }
 
 
