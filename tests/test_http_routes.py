@@ -86,7 +86,7 @@ async def test_mcp_initialize_answers_through_the_sdk_stateless(http_env, monkey
     assert response.headers["content-type"].startswith("application/json")
     assert "mcp-session-id" not in response.headers
     result = response.json()["result"]
-    assert result["serverInfo"]["name"] == "logicmonitor-platform"
+    assert result["serverInfo"]["name"] == "logicmonitor"
     assert result["protocolVersion"] == LATEST_PROTOCOL_VERSION
 
 
@@ -153,7 +153,7 @@ async def test_bearer_middleware_refuses_mcp_without_the_token(http_env, monkeyp
     assert refused.status_code == 401
     assert refused.headers["www-authenticate"] == "Bearer"
     assert answered.status_code == 200
-    assert answered.json()["result"]["serverInfo"]["name"] == "logicmonitor-platform"
+    assert answered.json()["result"]["serverInfo"]["name"] == "logicmonitor"
 
 
 async def test_root_listing_names_the_health_routes_and_mcp(http_env, monkeypatch):

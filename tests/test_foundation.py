@@ -106,7 +106,7 @@ class TestReleaseMetadata:
         assert sorted(settings - rows) == []
         assert sorted(settings - set(listed)) == []
         assert listed["EDWIN_CLIENT_TOKEN"]["isSecret"] is True
-        assert not any(listed[name]["isRequired"] for name in settings)
+        assert not any(listed[name].get("isRequired", False) for name in settings)
 
 
 class TestFoundationIntegration:

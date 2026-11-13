@@ -630,6 +630,12 @@ instead.
   down.
 - The `lm-portal` skill finds down collectors by `is_down`, reads each one's evidence, and runs a
   collector operation only after asking the user.
+- The server names itself `logicmonitor` at initialize, the server part of its MCP Registry name
+  `io.github.ryanmat/logicmonitor`, where it said `logicmonitor-platform`.
+- `server.json` lists all 30 environment variables the server reads, with their defaults, choices
+  and formats, where it listed 11, and its description fits the registry's 100-character limit.
+  A release tag publishes it to the MCP Registry after PyPI, through `mcp-publisher` v1.8.9
+  with its Sigstore signature checked and GitHub OIDC as the login.
 - Container image dependency updates, from `uv.lock`: pydantic 2.14.3, pydantic-settings 2.16.2,
   starlette 1.10.0, sse-starlette 3.6.0, uvicorn 0.54.0, cryptography 50.0.2, certifi 2026.10.23,
   pyjwt 2.15.1 and websockets 17.4.
