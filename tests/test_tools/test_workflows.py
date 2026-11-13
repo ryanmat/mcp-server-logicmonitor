@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import anyio
 import httpx
 import jsonschema
 import pytest
@@ -98,6 +100,45 @@ def _patch_window(**sections: dict) -> patch:
 # ---------------------------------------------------------------------------
 # Helpers for driving detect_site_outage through respx
 # ---------------------------------------------------------------------------
+
+
+async def _progress_of(client, name: str, arguments: dict, *, ask: bool) -> tuple:
+    """Call a composite from an in-memory SDK client with ``client`` as the startup client.
+
+    With ``ask`` the request carries a progressToken and the progress callback records each
+    notification; without it the request still carries a _meta, with no token in it. The
+    message handler records every progress notification either way. Returns the result,
+    the callback's (progress, total, message) rows and the handler's.
+    """
+    from mcp.shared.memory import create_connected_server_and_client_session
+    from mcp.types import ProgressNotification, ServerNotification
+
+    from lm_mcp.server import server
+
+    called: list = []
+    received: list = []
+
+    async def on_progress(progress, total, message):
+        called.append((progress, total, message))
+
+    async def on_message(message):
+        if isinstance(message, ServerNotification) and isinstance(
+            message.root, ProgressNotification
+        ):
+            params = message.root.params
+            received.append((params.progress, params.total, params.message))
+
+    with patch("lm_mcp.server._client", client):
+        async with create_connected_server_and_client_session(
+            server, message_handler=on_message
+        ) as session:
+            if ask:
+                result = await session.call_tool(name, arguments, progress_callback=on_progress)
+            else:
+                result = await session.call_tool(name, arguments, meta={"origin": "test"})
+    assert result.isError is False, result.content[0].text
+    return result, called, received
+
 
 _BASE = "https://test.logicmonitor.com/santaba/rest"
 _ALERTS_URL = f"{_BASE}/alert/alerts"
@@ -813,10 +854,56 @@ class TestTriage:
             row = {**_CORE_SW_COUNTS, "score": 40}
             jsonschema.validate({**report, "blast_radius": [row]}, TRIAGE_OUTPUT_SCHEMA)
 
+    # ---------------------------------------------------------------------------
+    # TestHealthCheck
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# TestHealthCheck
-# ---------------------------------------------------------------------------
+    @pytest.mark.parametrize("ask", [True, False], ids=["token", "no_token"])
+    async def test_progress_per_phase_only_when_asked(self, client, lm_env, ask, caplog):
+        """R4.3: one notification per phase when the request carries a progressToken, and
+        no attempt to send one when it does not."""
+        with (
+            patch(
+                "lm_mcp.tools.analyze_alerts.analyze_alerts",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("API timeout"),
+            ),
+            caplog.at_level(logging.WARNING, logger="lm_mcp.tools"),
+        ):
+            _, called, received = await _progress_of(client, "triage", {}, ask=ask)
+
+        expected = [(1, 2, "alert window read"), (2, 2, "blast radius read")]
+        assert called == (expected if ask else [])
+        assert received == (expected if ask else [])
+        assert [r for r in caplog.records if "progress" in r.getMessage()] == []
+
+    async def test_a_progress_send_failure_is_logged_and_the_call_goes_on(
+        self, client, lm_env, caplog
+    ):
+        from mcp.server.session import ServerSession
+
+        with (
+            patch(
+                "lm_mcp.tools.analyze_alerts.analyze_alerts",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("API timeout"),
+            ),
+            patch.object(
+                ServerSession,
+                "send_progress_notification",
+                new_callable=AsyncMock,
+                side_effect=anyio.ClosedResourceError(),
+            ),
+            caplog.at_level(logging.WARNING, logger="lm_mcp.tools"),
+        ):
+            result, called, _ = await _progress_of(client, "triage", {}, ask=True)
+
+        assert json.loads(result.content[0].text)["blast_radius"] == []
+        assert called == []
+        assert [r.getMessage() for r in caplog.records if r.name == "lm_mcp.tools"] == [
+            "progress notification 1/2 not sent",
+            "progress notification 2/2 not sent",
+        ]
 
 
 class TestHealthCheck:
@@ -1369,10 +1456,26 @@ class TestCapacityPlan:
         assert data["datasources"] == []
         reset_config()
 
+    # ---------------------------------------------------------------------------
+    # TestPortalOverview
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# TestPortalOverview
-# ---------------------------------------------------------------------------
+    @pytest.mark.parametrize("ask", [True, False], ids=["token", "no_token"])
+    @respx.mock
+    async def test_progress_per_phase_only_when_asked(self, auth, lm_env, ask):
+        """R4.3: one notification per phase when the request carries a progressToken."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        _mock_capacity_portal({100: _rising_cpu_and_sparse_mem()})
+
+        _, called, received = await _progress_of(client, "capacity_plan", {"device_id": 1}, ask=ask)
+
+        expected = [
+            (1, 3, "device resolved"),
+            (2, 3, "datasources read"),
+            (3, 3, "instances analyzed"),
+        ]
+        assert called == (expected if ask else [])
+        assert received == (expected if ask else [])
 
 
 class TestPortalOverview:
@@ -1595,10 +1698,51 @@ class TestPortalOverview:
         with pytest.raises(jsonschema.ValidationError):
             jsonschema.validate({**report, "top_talkers": []}, PORTAL_OVERVIEW_OUTPUT_SCHEMA)
 
+    # ---------------------------------------------------------------------------
+    # TestDiagnose
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# TestDiagnose
-# ---------------------------------------------------------------------------
+    @pytest.mark.parametrize(
+        ("detail_level", "ask", "expected"),
+        [
+            (
+                "summary",
+                True,
+                [
+                    (1, 3, "alert window read"),
+                    (2, 3, "collectors read"),
+                    (3, 3, "active SDTs read"),
+                ],
+            ),
+            (
+                "full",
+                True,
+                [
+                    (1, 5, "alert window read"),
+                    (2, 5, "collectors read"),
+                    (3, 5, "active SDTs read"),
+                    (4, 5, "open alerts read"),
+                    (5, 5, "dead devices read"),
+                ],
+            ),
+            ("full", False, []),
+        ],
+        ids=["summary", "full", "no_token"],
+    )
+    @respx.mock
+    async def test_progress_per_phase_only_when_asked(
+        self, auth, lm_env, detail_level, ask, expected
+    ):
+        """R4.3: one notification per phase when the request carries a progressToken."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        self._mock_portal()
+
+        _, called, received = await _progress_of(
+            client, "portal_overview", {"detail_level": detail_level}, ask=ask
+        )
+
+        assert called == expected
+        assert received == expected
 
 
 class TestDiagnose:
@@ -2613,10 +2757,39 @@ class TestDetectSiteOutage:
         assert "analyze_alerts" in result[0].text
         reset_config()
 
+    # ---------------------------------------------------------------------------
+    # TestAuditNetworkMonitoringCoverage
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# TestAuditNetworkMonitoringCoverage
-# ---------------------------------------------------------------------------
+    @pytest.mark.parametrize("ask", [True, False], ids=["token", "no_token"])
+    async def test_progress_per_phase_only_when_asked(self, client, lm_env, ask):
+        """R4.3: one notification per phase when the request carries a progressToken."""
+        health = AsyncMock(
+            return_value=_mock_text({"collectors": [{"id": 1, "is_down": False, "evidence": {}}]})
+        )
+        devices_data = {"devices": [{"id": 1, "status": "normal", "collector_id": 1}]}
+
+        with (
+            _patch_sub("lm_mcp.tools.devices.get_devices", devices_data),
+            patch("lm_mcp.tools.collectors.get_collector_health", health),
+            _patch_window(bursts={"bursts_detected": 0, "bursts": []}),
+            _patch_sub(
+                "lm_mcp.tools.networking.get_power_events",
+                {"total_power_events": 0, "events": []},
+            ),
+        ):
+            _, called, received = await _progress_of(
+                client, "detect_site_outage", {"group_id": 42}, ask=ask
+            )
+
+        expected = [
+            (1, 4, "devices read"),
+            (2, 4, "collectors checked"),
+            (3, 4, "alert window read"),
+            (4, 4, "power events read"),
+        ]
+        assert called == (expected if ask else [])
+        assert received == (expected if ask else [])
 
 
 class TestAuditNetworkMonitoringCoverage:

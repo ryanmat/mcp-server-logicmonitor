@@ -563,9 +563,41 @@ def format_response(data: Any) -> list[TextContent]:
         )
 
     # Success response
-    text = json.dumps(data, indent=2, default=str) if isinstance(data, (dict, list)) else str(data)
+    if isinstance(data, (dict, list)):
+        text = json.dumps(data, separators=(",", ":"), default=str)
+    else:
+        text = str(data)
 
     return [TextContent(type="text", text=text)]
+
+
+async def report_progress(progress: int, total: int, message: str) -> None:
+    """Send a progress notification for the running tool call when its request asked for one.
+
+    A client asks by putting a progressToken in the request's _meta (spec R4.3); without
+    one, or outside an MCP request, nothing is sent. A notification that cannot be sent is
+    logged and the call goes on, since progress is advisory.
+
+    Args:
+        progress: The phases done so far.
+        total: The phases the call runs.
+        message: What the phase just finished did.
+    """
+    from mcp.server.lowlevel.server import request_ctx
+
+    context = request_ctx.get(None)
+    if context is None or context.meta is None or context.meta.progressToken is None:
+        return
+    try:
+        await context.session.send_progress_notification(
+            context.meta.progressToken,
+            progress,
+            total,
+            message,
+            related_request_id=str(context.request_id),
+        )
+    except Exception:
+        logger.warning("progress notification %s/%s not sent", progress, total, exc_info=True)
 
 
 def stamp_portal(result: list[TextContent], portal: str | None) -> list[TextContent]:
