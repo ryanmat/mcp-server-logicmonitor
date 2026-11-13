@@ -467,6 +467,13 @@ class TestRequest:
         req = request(budget_seconds=budget, max_output_chars=cap)
         assert (req.budget_seconds, req.max_output_chars) == expected
 
+    @pytest.mark.parametrize(
+        "url", ["http://[::1", "http://[10.0.0.5]/", "https://10.0.0.5:99999/"]
+    )
+    def test_an_http_url_that_does_not_parse_is_refused(self, url):
+        with pytest.raises(ToolRejectionError, match="not a valid URL"):
+            request("http", collector_id=None, device_id=5, args={"url": url})
+
     @pytest.mark.parametrize("command", [["uptime"], {"x": 1}, "groovy", None])
     def test_an_unknown_command_is_refused(self, command):
         with pytest.raises(ToolRejectionError, match="unknown or disallowed command"):
