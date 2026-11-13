@@ -76,7 +76,7 @@ async def test_client_initializes_and_lists_the_filtered_core_tools(http_env, mo
         listed = await session.list_tools()
 
     expected = [t.name for t in _filter_tools(list(TOOLS), get_config())]
-    assert initialized.serverInfo.name == "logicmonitor-platform"
+    assert initialized.serverInfo.name == "logicmonitor"
     assert listed.nextCursor is None
     assert [tool.name for tool in listed.tools] == expected
 

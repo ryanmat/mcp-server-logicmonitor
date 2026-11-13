@@ -56,7 +56,7 @@ SERVER_INSTRUCTIONS = (
     "Tools that change the portal (create, update, delete, acknowledge, run) are listed "
     "only when the operator sets `LM_ENABLE_WRITE_OPERATIONS=true`."
 )
-server = Server("logicmonitor-platform", version=__version__, instructions=SERVER_INSTRUCTIONS)
+server = Server("logicmonitor", version=__version__, instructions=SERVER_INSTRUCTIONS)
 
 # Global client (initialized on startup)
 _client: LogicMonitorClient | None = None

@@ -74,6 +74,35 @@ class TestWorkflowHygiene:
         assert "${{ github.ref }}" in group
 
 
+class TestRegistryPublish:
+    """R4.4: a tag publishes server.json to the MCP Registry after PyPI, publisher verified."""
+
+    @pytest.fixture
+    def job(self) -> dict[str, Any]:
+        return _load("release.yml")["jobs"]["publish-registry"]
+
+    def test_runs_after_pypi_with_an_oidc_token(self, job: dict[str, Any]) -> None:
+        assert job["needs"] == "pypi"
+        assert job["permissions"] == {"contents": "read", "id-token": "write"}
+
+    def test_publisher_is_pinned_to_a_release_tag(self, job: dict[str, Any]) -> None:
+        assert re.fullmatch(r"v\d+\.\d+\.\d+", job["env"]["MCP_PUBLISHER_VERSION"])
+        script = "\n".join(step.get("run", "") for step in job["steps"])
+        assert "releases/download/${MCP_PUBLISHER_VERSION}" in script
+        assert "latest" not in script
+
+    def test_signature_is_verified_before_the_binary_is_unpacked(self, job: dict[str, Any]) -> None:
+        script = "\n".join(step.get("run", "") for step in job["steps"])
+        assert "cosign verify-blob" in script
+        assert script.index("cosign verify-blob") < script.index("tar xzf")
+
+    def test_logs_in_with_github_oidc_then_publishes(self, job: dict[str, Any]) -> None:
+        runs = [
+            step["run"].strip() for step in job["steps"] if "mcp-publisher " in step.get("run", "")
+        ]
+        assert runs[-2:] == ["./mcp-publisher login github-oidc", "./mcp-publisher publish"]
+
+
 class TestDependabotBaseImage:
     """The base image's Python minor moves with the CI matrix; Dependabot proposes patches only."""
 
