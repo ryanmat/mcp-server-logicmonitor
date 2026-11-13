@@ -173,11 +173,26 @@ Slash-command runbooks that ship with the repo. Clone it and invoke `/lm-triage`
 
 ## Integrations
 
-`terraform_generate` needs no settings. Multi-portal mode and Edwin AI are optional; add their variables to the `env` block or `claude mcp add` command from [Setup](#setup).
+`get_terraform_imports` needs no settings. Multi-portal mode and Edwin AI are optional; add their variables to the `env` block or `claude mcp add` command from [Setup](#setup).
 
 ### Terraform
 
-`terraform_generate` exports an existing LM portal resource as HCL for the `logicmonitor/logicmonitor` provider. It is part of the core tool set and needs no settings of its own.
+`get_terraform_imports` lists one resource type's objects in your portal as Terraform import blocks for the `logicmonitor/logicmonitor` provider, one block per object:
+
+```hcl
+import {
+  to = logicmonitor_device_group.linux_servers_18
+  id = "18"
+}
+```
+
+It covers the 16 resource types whose provider docs (2.1.7) import by ID: `alert_rule`, `collector`, `collector_group`, `dashboard`, `dashboard_group`, `datasource`, `device`, `device_group`, `device_group_cluster_alert_conf`, `escalation_chain`, `report_group`, `role`, `sdt`, `website`, `website_group`, and `widget`. Cluster alert confs are listed per device group, so that type needs `device_group_id`. Each address ends with the object's ID, so objects that share a name get distinct addresses.
+
+Save the blocks in a `.tf` file beside a `provider "logicmonitor"` block and run `terraform plan -generate-config-out=generated.tf` (Terraform 1.5 or later); Terraform writes the matching resource configuration to `generated.tf` for you to review before `terraform apply`.
+
+The provider authenticates only with an LMv1 API token, `api_id` and `api_key` (`LM_API_ID`, `LM_API_KEY`), plus `company` (`LM_COMPANY`). It takes no bearer token, so a server set up with `LM_BEARER_TOKEN` alone needs an LMv1 token for Terraform.
+
+This server does not run Terraform. Use the `terraform` CLI, or HashiCorp's [Terraform MCP server](https://github.com/hashicorp/terraform-mcp-server), which drives runs in HCP Terraform and Terraform Enterprise.
 
 ### Multi-portal mode
 

@@ -8,6 +8,7 @@ from typing import Any
 from mcp.types import Tool, ToolAnnotations
 
 from lm_mcp.resources.guides import TOOL_CATEGORIES
+from lm_mcp.tools.terraform_imports import IMPORTABLE_TYPES
 
 # Annotation presets for tool categorization
 _READ_ONLY = ToolAnnotations(
@@ -6329,16 +6330,19 @@ TOOLS.extend(
     ]
 )
 
-# Terraform HCL generator (always available, uses LM client)
+# Terraform import discovery
 TOOLS.extend(
     [
         Tool(
-            name="terraform_generate",
+            name="get_terraform_imports",
             description=(
-                "Export an existing LogicMonitor resource as Terraform HCL configuration "
-                "using the logicmonitor/logicmonitor provider. Supports device, device_group, "
-                "collector, alert_rule, escalation_chain, dashboard, datasource, sdt, website, "
-                "role, and report_group resource types."
+                "List a resource type's portal objects as Terraform import blocks for the "
+                "logicmonitor/logicmonitor provider, one `import { to, id }` block per object, "
+                "for the 16 provider resource types that import by ID. Run `terraform plan "
+                "-generate-config-out=generated.tf` on the blocks to have Terraform write the "
+                "resource configuration. The provider authenticates with LMv1 api_id and "
+                "api_key only. device_group_id is required for "
+                "device_group_cluster_alert_conf and refused for every other type."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6346,19 +6350,21 @@ TOOLS.extend(
                 "properties": {
                     "resource_type": {
                         "type": "string",
-                        "description": (
-                            "LM resource type to export (device, device_group, collector, "
-                            "collector_group, alert_rule, escalation_chain, dashboard, "
-                            "dashboard_group, datasource, sdt, website, website_group, "
-                            "role, report_group)"
-                        ),
+                        "enum": list(IMPORTABLE_TYPES),
+                        "description": "Provider resource type, without the logicmonitor_ prefix",
                     },
-                    "resource_id": {
+                    "filter": {
+                        "type": "string",
+                        "description": "LogicMonitor filter expression, sent as written",
+                    },
+                    "limit": {"type": "integer", "default": 50, "description": "Max results"},
+                    "offset": {"type": "integer", "default": 0, "description": "Pagination offset"},
+                    "device_group_id": {
                         "type": "integer",
-                        "description": "LogicMonitor resource ID to export",
+                        "description": "Device group whose cluster alert confs to list",
                     },
                 },
-                "required": ["resource_type", "resource_id"],
+                "required": ["resource_type"],
             },
         ),
     ]
@@ -7127,7 +7133,7 @@ def get_tool_handler(tool_name: str) -> Any:
         sdts,
         services,
         session,
-        terraform,
+        terraform_imports,
         topology,
         topology_analysis,
         topologysources,
@@ -7465,7 +7471,7 @@ def get_tool_handler(tool_name: str) -> Any:
         # Universal reference layer (Resource mirror for clients without Resource support)
         "get_reference": reference.get_reference,
         # Terraform IaC
-        "terraform_generate": terraform.terraform_generate,
+        "get_terraform_imports": terraform_imports.get_terraform_imports,
     }
 
     if tool_name not in handlers:

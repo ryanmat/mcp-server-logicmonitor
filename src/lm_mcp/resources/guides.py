@@ -447,9 +447,9 @@ TOOL_CATEGORIES = {
             ],
         },
         "terraform": {
-            "description": "Export LogicMonitor resources as Terraform HCL",
+            "description": "Terraform import blocks for existing LogicMonitor objects",
             "tools": [
-                "terraform_generate",
+                "get_terraform_imports",
             ],
         },
         "remediation": {

@@ -6857,6 +6857,64 @@
       "type": "object"
     }
   },
+  "get_terraform_imports": {
+    "annotations": {
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true,
+      "title": null
+    },
+    "description": "List a resource type's portal objects as Terraform import blocks for the logicmonitor/logicmonitor provider, one `import { to, id }` block per object, for the 16 provider resource types that import by ID. Run `terraform plan -generate-config-out=generated.tf` on the blocks to have Terraform write the resource configuration. The provider authenticates with LMv1 api_id and api_key only. device_group_id is required for device_group_cluster_alert_conf and refused for every other type.",
+    "inputSchema": {
+      "properties": {
+        "device_group_id": {
+          "description": "Device group whose cluster alert confs to list",
+          "type": "integer"
+        },
+        "filter": {
+          "description": "LogicMonitor filter expression, sent as written",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Max results",
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Pagination offset",
+          "type": "integer"
+        },
+        "resource_type": {
+          "description": "Provider resource type, without the logicmonitor_ prefix",
+          "enum": [
+            "alert_rule",
+            "collector",
+            "collector_group",
+            "dashboard",
+            "dashboard_group",
+            "datasource",
+            "device",
+            "device_group",
+            "device_group_cluster_alert_conf",
+            "escalation_chain",
+            "report_group",
+            "role",
+            "sdt",
+            "website",
+            "website_group",
+            "widget"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_type"
+      ],
+      "type": "object"
+    }
+  },
   "get_topology_map": {
     "annotations": {
       "destructiveHint": false,
@@ -8051,33 +8109,6 @@
       "required": [
         "name",
         "value"
-      ],
-      "type": "object"
-    }
-  },
-  "terraform_generate": {
-    "annotations": {
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": true,
-      "readOnlyHint": true,
-      "title": null
-    },
-    "description": "Export an existing LogicMonitor resource as Terraform HCL configuration using the logicmonitor/logicmonitor provider. Supports device, device_group, collector, alert_rule, escalation_chain, dashboard, datasource, sdt, website, role, and report_group resource types.",
-    "inputSchema": {
-      "properties": {
-        "resource_id": {
-          "description": "LogicMonitor resource ID to export",
-          "type": "integer"
-        },
-        "resource_type": {
-          "description": "LM resource type to export (device, device_group, collector, collector_group, alert_rule, escalation_chain, dashboard, dashboard_group, datasource, sdt, website, website_group, role, report_group)",
-          "type": "string"
-        }
-      },
-      "required": [
-        "resource_type",
-        "resource_id"
       ],
       "type": "object"
     }

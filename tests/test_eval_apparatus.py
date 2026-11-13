@@ -34,7 +34,11 @@ def test_two_found_queries_pass_with_exit_0(tmp_path):
     result = _grade(
         tmp_path,
         [
-            {"query": "terraform_generate", "expected": "terraform_generate", "forbidden": []},
+            {
+                "query": "get_terraform_imports",
+                "expected": "get_terraform_imports",
+                "forbidden": [],
+            },
             {"query": "get_reference", "expected": "get_reference", "forbidden": []},
         ],
     )
@@ -50,7 +54,11 @@ def test_a_missed_query_fails_with_a_nonzero_exit(tmp_path):
     result = _grade(
         tmp_path,
         [
-            {"query": "terraform_generate", "expected": "terraform_generate", "forbidden": []},
+            {
+                "query": "get_terraform_imports",
+                "expected": "get_terraform_imports",
+                "forbidden": [],
+            },
             {"query": "zzzz qqqq", "expected": "get_devices", "forbidden": []},
         ],
     )
