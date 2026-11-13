@@ -102,27 +102,28 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
 - `collector_debug`, listed only with writes on and annotated destructive, runs one of 29
   allowlisted collector debug commands (`uptime`, `health_check`, `perf`, `getconfig`, `ping`,
   `snmpwalk`, `wmi`, `http` and the rest) and returns what the collector said. Callers pass a
-  command and its typed arguments, never a command line; a device probe takes its host from the
-  device record and runs on the collector that serves the device, `http` reaches only that
-  host and refuses one written as a loopback, link-local or cloud metadata address or named by
-  a known name for one, and a command that changes the collector, runs code on its host or
-  carries a credential is never sent. A DNS name that resolves to such an address is not
+  command and its typed arguments, never a command line, and a command that changes the
+  collector, runs code on its host or carries a credential is never sent. A device probe takes
+  its host from the device record and runs on the collector that serves the device. `http`
+  reaches only that host and refuses one written as a loopback, link-local or cloud metadata
+  address or named by a known name for one. A DNS name that resolves to such an address is not
   caught, and with writes on `create_device` can name a device for any host; set
-  `LM_DISABLED_TOOLS` to leave either tool out. A WMI WHERE
-  clause allows `!` only as `!=`, and each comparison operator stands alone between spaces;
-  `wmi` and `cim` refuse Win32_Product, the file, directory and environment classes and
-  their parent classes, and never read or test a command-line column; `snmpwalk` never reads
-  the SNMP community or user tables.
-  Output is masked by the credential rule the audit log uses, and the masking and the
-  `health_check` parse grow with the length of the reply. `health_check` leads
-  with each collection method's share of tasks returning NaN for every datapoint and names any
-  checkpoint array it cannot read under `checkpoints_unreadable`. One budget, 2 to 60 seconds,
-  holds the device read, the POST and every poll; `answered` and `no_reply` are results. A
-  request refused before sending is `REJECTED_BY_TOOL`; a refusal after it is `AUTH_FAILED`
-  (no Debug permission), `FEATURE_DISABLED` (debug off on the collector), `INVALID_REQUEST`
-  (a command the collector does not know), `RATE_LIMITED` (this server's own POST budget),
-  `TIMEOUT`, or the code of the portal's error. The command set, the builder and the health-check parse come from #97 by GitHub user
-  barunagarwal.
+  `LM_DISABLED_TOOLS` to leave either tool out. A WMI WHERE clause allows `!` only as `!=`, and
+  each comparison operator stands alone between spaces; `wmi` and `cim` refuse Win32_Product,
+  the file, directory and environment classes and their parent classes, and never read or test
+  a command-line column; `snmpwalk` never reads the SNMP community or user tables. Output is
+  masked by the credential rule the audit log uses. `health_check` leads with each collection
+  method's share of tasks returning NaN for every datapoint and names any checkpoint array it
+  cannot read under `checkpoints_unreadable`. The masking and the `health_check` parse take
+  time linear in the length of the reply. One budget, 2 to 60 seconds, holds the device read,
+  the POST and every poll. A status of `answered` or `no_reply` is a result, not an error. A
+  request this server refuses is `REJECTED_BY_TOOL`, or `RATE_LIMITED` when its own POST budget
+  is spent, and the command is not sent. `TIMEOUT` is a budget spent before the command was
+  sent, or a portal call that timed out at `LM_TIMEOUT`. A refusal by the portal or the
+  collector is `AUTH_FAILED` (no Debug permission), `FEATURE_DISABLED` (debug off on the
+  collector), `INVALID_REQUEST` (a command the collector does not know), `RATE_LIMITED` (the
+  portal's rate limit), or the code of the portal's error. The command set, the builder and the
+  health-check parse come from #97 by GitHub user barunagarwal.
 - Alert thresholds: `get_alert_settings` reads a datapoint's threshold at instance, device or
   group level with the level it comes from (instance, instance group, device datasource, device
   group or global, in LogicMonitor's precedence). `update_alert_settings`, listed only with
