@@ -37,9 +37,9 @@ You can expect:
 ### Inbound HTTP exposure
 - The HTTP transport serves MCP at `/mcp` (the SDK's Streamable HTTP,
   stateless) beside the health, readiness and info routes. A caller that passes
-  the bearer check at `/mcp` calls the tools stdio lists with the server's
-  LogicMonitor credentials, write tools only when
-  `LM_ENABLE_WRITE_OPERATIONS=true`, and every caller shares the server's one
+  the bearer check at `/mcp` can call the tools stdio lists with the server's
+  LogicMonitor credentials, and the write tools only when
+  `LM_ENABLE_WRITE_OPERATIONS=true`. Every caller shares the server's one
   session, its variables and history included. Give the token only to callers
   who may share that portal access.
 - Set `LM_HTTP_AUTH_TOKEN` whenever the port is reachable beyond localhost:

@@ -202,9 +202,9 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   widget: it sets `queryType` `otlp` and the query in the widget's `advancedMetricsGraphInfo`,
   and the portal fills in the line chart. Other widget types refuse it. `create_alert_rule` and
   `update_alert_rule` refuse `otlp_query`, since the v3 alert rule body has no query field.
-- MCP over HTTP: with `LM_TRANSPORT=http`, `/mcp` serves the SDK's Streamable HTTP, stateless and
-  answering with JSON, over the same server and handlers as stdio, so an MCP client initializes
-  there and lists the same tools. It sits behind the `Host` allowlist and the bearer check, and
+- With `LM_TRANSPORT=http`, `/mcp` serves the SDK's Streamable HTTP, stateless and answering with
+  JSON, from the same server and handlers as stdio, so an MCP client initializes there and lists
+  the same tools. A request reaches it only past the `Host` allowlist and the bearer check, and it
   refuses a body that is not `application/json` with `415` and one over 4 MiB with `413`. The
   `mcp` requirement rises from `>=1.19.0` to `>=1.29.0`, the release that added that body limit.
 
