@@ -55,3 +55,49 @@ def alert_lists(
         return _page(active, request, lower_bound)
 
     return respond
+
+
+def busy_window(now: int) -> tuple[list[dict], list[dict]]:
+    """Alerts and audit entries at the scale lmryanmatuszewski returned on 2026-11-13.
+
+    That day a 24-hour window held about 100 clusters, one of 2,315 alerts, device names of
+    up to 97 characters, and 300 audit changes (the read's cap) with descriptions of about
+    320 characters, 121 to 159 of them paired with a spike. Here: 3,000 open alerts on 70
+    devices and 18 datasources, 600 of them in one five-minute bucket an hour back, and
+    300 device updates in the 25 minutes before that bucket.
+    """
+    spike = (now // 300) * 300 - 3600
+    alerts = []
+    cluster = "pod-open-cluster-management-observability-rm-aro-cluster"
+    for number in range(3000):
+        pod = f"observability-thanos-receive-default-{number % 70:02d}"
+        alerts.append(
+            {
+                "id": f"DS{362000000 + number}",
+                "severity": 2 + number % 3,
+                "monitorObjectName": f"{pod}-{cluster}",
+                "monitorObjectId": 400000 + number % 70,
+                "monitorObjectType": "device",
+                "resourceTemplateName": f"Kubernetes_KSM_Datasource_{number % 18:02d}",
+                "dataPointName": f"datapoint{number % 3}",
+                "alertValue": "1.0",
+                "startEpoch": spike + 30 if number < 600 else now - 7200 - number * 25,
+                "endEpoch": 0,
+                "cleared": False,
+            }
+        )
+    filler = "(monitoring) updated the properties of the resource and its group membership " * 3
+    entries = [
+        {
+            "id": number,
+            "happenedOn": spike - 5 * (number + 1),
+            "username": "ryan.matuszewski",
+            "description": (
+                f'"Action=Update"; "Type=Device"; '
+                f'"Device=observability-rbac-query-proxy-deploy-{number:03d} ({451000 + number})"; '
+                f'"Description={filler}"'
+            ),
+        }
+        for number in range(300)
+    ]
+    return alerts, entries

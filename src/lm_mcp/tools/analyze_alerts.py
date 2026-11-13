@@ -62,8 +62,20 @@ BURST_WINDOW_SECONDS = 60
 BURST_MIN_ALERTS = 10
 BURST_MIN_DEVICES = 3
 
-# A burst lists at most this many of its alert ids.
-MAX_BURST_ALERT_IDS = 50
+# The bounds on what a section lists. A busy window holds a hundred clusters, some of
+# thousands of alerts, and hundreds of change and spike pairs; unbounded, one result ran
+# past 300,000 characters, and Claude Code returns no tool result over 50,000. Every
+# section still counts what it found.
+# The bursts section shows this many bursts, largest first, and a burst this many ids.
+MAX_BURSTS = 10
+MAX_BURST_ALERT_IDS = 10
+# The clusters section shows this many clusters of each type, largest first; a cluster
+# lists this many of its alert ids, most severe first, and this many of its devices.
+MAX_CLUSTERS_PER_TYPE = 5
+MAX_CLUSTER_ALERT_IDS = 10
+MAX_CLUSTER_DEVICES = 10
+# The changes section shows this many change and spike pairs, strongest first.
+MAX_CORRELATED_EVENTS = 10
 
 # The changes section buckets alerts by this many seconds to find spikes, and pairs a
 # change with a spike up to CORRELATION_WINDOW_MINUTES after it.
@@ -195,7 +207,10 @@ def _clusters(
 ) -> list[dict]:
     """Group alerts by key_of and report each group of two or more, largest first.
 
-    name_device adds device_id, the device the group's alerts share (_shared_device_id).
+    count is the group's size. alert_ids holds up to MAX_CLUSTER_ALERT_IDS of its ids,
+    most severe first and newest first within a severity. name_device adds device_id, the
+    device the group's alerts share (_shared_device_id). list_devices adds device_count
+    and up to MAX_CLUSTER_DEVICES of the device names, in name order.
     """
     groups: dict[str, list[dict]] = defaultdict(list)
     for alert in alerts:
@@ -210,8 +225,13 @@ def _clusters(
         if name_device:
             cluster["device_id"] = _shared_device_id(members)
         if list_devices:
-            cluster["devices"] = sorted({a.get("monitorObjectName", "") for a in members})
-        cluster["alert_ids"] = [a.get("id") for a in members]
+            devices = sorted({a.get("monitorObjectName", "") for a in members})
+            cluster["device_count"] = len(devices)
+            cluster["devices"] = devices[:MAX_CLUSTER_DEVICES]
+        worst_first = sorted(
+            members, key=lambda a: (a.get("severity", 0), a.get("startEpoch", 0)), reverse=True
+        )
+        cluster["alert_ids"] = [a.get("id") for a in worst_first[:MAX_CLUSTER_ALERT_IDS]]
         cluster["first_alert_time"] = min(epochs)
         cluster["last_alert_time"] = max(epochs)
         clusters.append(cluster)
@@ -245,10 +265,20 @@ def cluster_by_signature(alerts: list[dict]) -> list[dict]:
 
 
 def clusters_section(alerts: list[dict]) -> dict[str, Any]:
-    """Device, datasource and signature clusters, in that order, with their count."""
-    clusters = cluster_by_device(alerts) + cluster_by_datasource(alerts)
-    clusters += cluster_by_signature(alerts)
-    return {"cluster_count": len(clusters), "clusters": clusters}
+    """Device, datasource and signature clusters, in that order.
+
+    cluster_count and by_type count every cluster; clusters holds the
+    MAX_CLUSTERS_PER_TYPE largest of each type.
+    """
+    found = [cluster_by_device(alerts), cluster_by_datasource(alerts), cluster_by_signature(alerts)]
+    return {
+        "cluster_count": sum(len(clusters) for clusters in found),
+        "by_type": {
+            kind: len(clusters)
+            for kind, clusters in zip(("device", "datasource", "signature"), found, strict=True)
+        },
+        "clusters": [c for clusters in found for c in clusters[:MAX_CLUSTERS_PER_TYPE]],
+    }
 
 
 def noise_stats(alerts: list[dict]) -> dict[str, Any]:
@@ -467,14 +497,15 @@ def burst_windows(
 def bursts_section(
     alerts: list[dict], window_seconds: int, min_alerts: int, min_devices: int
 ) -> dict[str, Any]:
-    """The burst thresholds, the number of bursts and the bursts themselves."""
+    """The burst thresholds, the number of bursts and the MAX_BURSTS largest, oldest first."""
     bursts = burst_windows(alerts, window_seconds, min_alerts, min_devices)
+    largest = sorted(bursts, key=lambda b: b["alert_count"], reverse=True)[:MAX_BURSTS]
     return {
         "window_seconds": window_seconds,
         "min_alerts": min_alerts,
         "min_devices": min_devices,
         "bursts_detected": len(bursts),
-        "bursts": bursts,
+        "bursts": sorted(largest, key=lambda b: b["window_start"]),
     }
 
 
@@ -541,7 +572,8 @@ def changes_section(
         correlation_window_minutes: Longest gap from a change to its spike.
 
     Returns:
-        Change and spike totals, the pairs, and up to ten unpaired changes and spikes.
+        Change, spike and pair totals, the MAX_CORRELATED_EVENTS pairs of highest
+        confidence, and up to ten unpaired changes and spikes.
     """
     window_seconds = correlation_window_minutes * 60
     changes = [e for e in entries if is_change_action(str(e.get("description", "")))]
@@ -575,11 +607,13 @@ def changes_section(
         _change_row(c) for c in changes if c.get("id", id(c)) not in correlated_change_ids
     ]
     uncorrelated_spikes = [s for s in spikes if s["timestamp"] not in correlated_spike_ts]
+    correlated_events.sort(key=lambda event: event["confidence"], reverse=True)
     return {
         "correlation_window_minutes": correlation_window_minutes,
         "total_changes": len(changes),
         "total_spikes": len(spikes),
-        "correlated_events": correlated_events,
+        "total_correlated": len(correlated_events),
+        "correlated_events": correlated_events[:MAX_CORRELATED_EVENTS],
         "uncorrelated_changes": uncorrelated_changes[:10],
         "uncorrelated_spikes": uncorrelated_spikes[:10],
     }

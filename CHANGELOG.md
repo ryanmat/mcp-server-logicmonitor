@@ -398,6 +398,15 @@ instead.
 
 ### Fixed
 
+- `analyze_alerts`, `triage`, `portal_overview` and `diagnose` bound what their cluster,
+  burst and change sections list, so a result on a busy portal fits a client's limit. On a
+  5,800-device portal one `triage` result ran to 322,598 characters, and Claude Code returns
+  no tool result over 50,000. The clusters section lists the five largest clusters of each
+  type, each with its ten most severe alert ids and up to ten devices (`device_count` has the
+  total); `cluster_count` and the new `by_type` count every cluster. The bursts section lists
+  the ten largest bursts with ten alert ids each, and `bursts_detected` counts them all. The
+  changes section lists the ten pairs of highest confidence, and the new `total_correlated`
+  counts them all. Narrow the severity, device, datasource or window to see the rest.
 - `get_diagnostic_remediation_assignments` takes `module_type` `diagnostic` or `remediation`.
   Its schema offered `diagnosticsource` and `remediationsource`, which the API answers with
   HTTP 400, and `diagnose` asked for the first, so its `diagnostics.assigned` read failed with

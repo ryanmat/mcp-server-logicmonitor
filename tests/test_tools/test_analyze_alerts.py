@@ -12,7 +12,7 @@ import respx
 
 from lm_mcp.auth.bearer import BearerAuth
 from lm_mcp.client import LogicMonitorClient
-from tests.alert_pages import alert_lists
+from tests.alert_pages import alert_lists, busy_window
 from tests.envelope import envelope
 from tests.sdk_call import replay_through_sdk, structured
 
@@ -333,6 +333,55 @@ class TestClusters:
         assert clusters["cluster_count"] == 3
 
     @respx.mock
+    async def test_the_five_largest_clusters_of_each_type_are_shown_and_all_are_counted(
+        self, client
+    ):
+        """rul-c5874c19c1: a window with twelve clusters of each type lists the five largest
+        of each, and cluster_count and by_type still count all thirty-six."""
+        active = [
+            _make_alert(device * 100 + number, f"web-{device:02d}", f"DS{device:02d}")
+            for device in range(12)
+            for number in range(device + 2)
+        ]
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(active))
+
+        clusters = _body(await _analyze(client, analyses=["clusters"]))["clusters"]
+
+        assert clusters["cluster_count"] == 36
+        assert clusters["by_type"] == {"device": 12, "datasource": 12, "signature": 12}
+        shown = [c["key"] for c in clusters["clusters"] if c["type"] == "device"]
+        assert shown == [f"web-{device:02d}" for device in range(11, 6, -1)]
+        assert len(clusters["clusters"]) == 15
+
+    @respx.mock
+    async def test_a_cluster_lists_its_ten_most_severe_alert_ids_newest_first(self, client):
+        """A cluster of 25 alerts keeps count 25 and names ten ids: the five criticals,
+        newest first, then the five errors."""
+        severities = [2] * 15 + [3] * 5 + [4] * 5
+        active = [
+            _make_alert(number, "db-01", "CPU", severity=severity, start_epoch=BASE_EPOCH + number)
+            for number, severity in enumerate(severities)
+        ]
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(active))
+
+        clusters = _body(await _analyze(client, analyses=["clusters"]))["clusters"]
+
+        (device,) = [c for c in clusters["clusters"] if c["type"] == "device"]
+        assert device["count"] == 25
+        assert device["alert_ids"] == [f"LMA{number}" for number in range(24, 14, -1)]
+
+    @respx.mock
+    async def test_a_cluster_names_ten_of_its_devices_and_counts_them_all(self, client):
+        active = [_make_alert(number, f"web-{number:02d}", "Ping") for number in range(14)]
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(active))
+
+        clusters = _body(await _analyze(client, analyses=["clusters"]))["clusters"]
+
+        (datasource,) = [c for c in clusters["clusters"] if c["type"] == "datasource"]
+        assert datasource["device_count"] == 14
+        assert datasource["devices"] == [f"web-{number:02d}" for number in range(10)]
+
+    @respx.mock
     async def test_single_alerts_form_no_cluster(self, client):
         respx.get(ALERT_URL).mock(
             side_effect=alert_lists([_make_alert(1, "s1", "CPU"), _make_alert(2, "s2", "Disk")])
@@ -340,7 +389,11 @@ class TestClusters:
 
         clusters = _body(await _analyze(client, analyses=["clusters"]))["clusters"]
 
-        assert clusters == {"cluster_count": 0, "clusters": []}
+        assert clusters == {
+            "cluster_count": 0,
+            "by_type": {"device": 0, "datasource": 0, "signature": 0},
+            "clusters": [],
+        }
 
     @respx.mock
     async def test_a_device_cluster_names_the_device_its_alerts_share(self, client):
@@ -570,6 +623,29 @@ class TestBursts:
         assert bursts["bursts_detected"] == 0
 
 
+class TestBurstBounds:
+    """rul-c5874c19c1: an alert storm's bursts are counted in full and listed in part."""
+
+    @respx.mock
+    async def test_the_ten_largest_bursts_are_shown_with_ten_ids_each(self, client):
+        now = int(time.time())
+        active = []
+        for number in range(12):
+            active += _burst(
+                20 + number, f"DS{number:02d}", 4, now - 3600, spacing=1, first_id=number * 100
+            )
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(active))
+
+        bursts = _body(await _analyze(client, analyses=["bursts"]))["bursts"]
+
+        assert bursts["bursts_detected"] == 12
+        shown = bursts["bursts"]
+        assert sorted(b["datasource"] for b in shown) == [f"DS{n:02d}" for n in range(2, 12)]
+        assert {b["alert_count"] for b in shown} == set(range(22, 32))
+        assert all(len(b["alert_ids"]) == 10 for b in shown)
+        assert [b["window_start"] for b in shown] == sorted(b["window_start"] for b in shown)
+
+
 def _aligned_spike_time(now):
     """A five-minute bucket boundary an hour back, so a spike's bucket starts on it."""
     return (now // 300) * 300 - 3600
@@ -619,6 +695,49 @@ class TestChanges:
         assert event["time_gap_minutes"] == 10.0
         assert event["confidence"] == 0.83
         assert changes["uncorrelated_changes"] == []
+
+    @respx.mock
+    async def test_the_ten_strongest_pairs_are_shown_and_all_are_counted(self, client):
+        """rul-c5874c19c1: 25 changes in the 25 minutes before one spike all pair with it;
+        the section lists the ten closest to the spike and total_correlated counts 25."""
+        now = int(time.time())
+        spike_ts = _aligned_spike_time(now)
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(_spike_with_background(spike_ts, now)))
+        entries = [
+            {
+                "id": minutes,
+                "happenedOn": spike_ts - 60 * minutes,
+                "username": "admin",
+                "description": f'"Action=Update"; "Type=Device"; "Device=web-{minutes:02d}"',
+            }
+            for minutes in range(25, 0, -1)
+        ]
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": entries}))
+
+        changes = _body(await _analyze(client, analyses=["changes"]))["changes"]
+
+        assert changes["total_changes"] == 25
+        assert changes["total_correlated"] == 25
+        gaps = [event["time_gap_minutes"] for event in changes["correlated_events"]]
+        assert gaps == [float(minutes) for minutes in range(1, 11)]
+
+    @respx.mock
+    async def test_a_busy_window_fits_the_clients_result_limit(self, client):
+        """Claude Code returns no text result over 50,000 characters (its MCP docs, read
+        2026-11-13). Every analysis of a window at the sandbox's scale stays under it."""
+        alerts, entries = busy_window(int(time.time()))
+        respx.get(ALERT_URL).mock(side_effect=alert_lists(alerts))
+        respx.get(AUDIT_URL).mock(return_value=httpx.Response(200, json={"items": entries}))
+        every = ["statistics", "clusters", "noise", "bursts", "changes"]
+
+        result = await _analyze(client, analyses=every)
+
+        body = _body(result)
+        assert body["total_alerts"] == 3000
+        assert body["clusters"]["cluster_count"] > 30
+        assert body["bursts"]["bursts_detected"] > 10
+        assert body["changes"]["total_correlated"] == 300
+        assert len(result[0].text) < 50_000
 
     @respx.mock
     async def test_a_read_or_login_entry_is_not_a_change(self, client):
