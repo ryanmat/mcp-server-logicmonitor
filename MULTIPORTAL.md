@@ -20,7 +20,8 @@ and a shared default portal would leak data between users.
 - One session per portal: session variables and history belong to the portal a call
   ran against.
 - Every result names its portal: a success result carries `portal`, an error carries
-  it as `error.details.portal`.
+  it as `error.details.portal`. The portal tools and the Edwin AI tools are the
+  exceptions; Edwin is one tenant for every portal.
 
 Until a default is set, a call without a `portal` argument is refused with "No portal
 selected".

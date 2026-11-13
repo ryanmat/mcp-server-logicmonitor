@@ -1176,3 +1176,56 @@ class TestElicitation:
         assert asked == []
         assert handler.await_count == 1
         assert all("elicitation" not in line for _, line in _audit_lines(caplog))
+
+
+class TestElicitationAcrossPortals:
+    """A destructive call asks only when its portal will take the write (Chunk V review)."""
+
+    @pytest.fixture
+    def two_portals(self, tmp_path, monkeypatch, reset_portals):
+        from tests.portal_env import two_portal_vault
+
+        two_portal_vault(tmp_path, monkeypatch)
+
+    async def test_a_read_only_portal_is_refused_without_asking(self, two_portals, caplog):
+        from lm_mcp import portals
+
+        portals.activate("acme")
+        asked: list = []
+
+        with respx.mock, caplog.at_level(logging.INFO, logger="lm_mcp.audit"):
+            result = await _call(
+                "delete_device", {"device_id": 7, "portal": "globex"}, _answering("accept", asked)
+            )
+
+        assert _sdk_error(result)["code"] == "WRITE_DISABLED"
+        assert asked == []
+        assert _audit_lines(caplog) == [
+            (
+                logging.WARNING,
+                "Write operation failed: delete_device args={'device_id': 7} portal=globex",
+            )
+        ]
+
+    async def test_a_writable_portal_is_asked_by_name(self, two_portals):
+        from lm_mcp import portals
+
+        portals.activate("globex")
+        asked: list = []
+
+        with respx.mock:
+            respx.get("https://acme.example.com/santaba/rest/device/devices/7").mock(
+                return_value=httpx.Response(200, json={"id": 7, "displayName": "web-07"})
+            )
+            delete = respx.delete("https://acme.example.com/santaba/rest/device/devices/7").mock(
+                return_value=httpx.Response(200, json={})
+            )
+            result = await _call(
+                "delete_device", {"device_id": 7, "portal": "acme"}, _answering("accept", asked)
+            )
+
+        assert result.isError is False
+        assert delete.call_count == 1
+        assert [params.message for params in asked] == [
+            "Allow delete_device {'device_id': 7} on portal acme?"
+        ]
