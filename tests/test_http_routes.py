@@ -91,7 +91,7 @@ async def test_mcp_initialize_answers_through_the_sdk_stateless(http_env, monkey
 
 
 async def test_mcp_body_over_4_mib_is_413(http_env, monkeypatch):
-    """README, SECURITY.md and the CHANGELOG say 4 MiB; the server sets that limit itself."""
+    """README and the CHANGELOG say 4 MiB; the server sets that limit itself."""
     from lm_mcp.transport.http import _MCP_MAX_BODY_BYTES
 
     oversized = b"[" + b" " * _MCP_MAX_BODY_BYTES + b"]"

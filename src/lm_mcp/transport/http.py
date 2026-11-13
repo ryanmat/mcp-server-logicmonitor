@@ -146,9 +146,9 @@ class JsonContentTypeMiddleware:
         await _send_json_error(send, 415, "Content-Type must be application/json")
 
 
-# The largest request body /mcp reads; a larger one gets 413 before parsing. README,
-# SECURITY.md and the CHANGELOG state this figure, so the server sets it rather than
-# taking the SDK's default.
+# The largest request body /mcp reads; a larger one gets 413 before parsing. README and
+# the CHANGELOG state this figure, so the server sets it rather than taking the SDK's
+# default.
 _MCP_MAX_BODY_BYTES = 4 * 1024 * 1024
 
 
