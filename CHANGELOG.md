@@ -204,9 +204,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `update_alert_rule` refuse `otlp_query`, since the v3 alert rule body has no query field.
 - With `LM_TRANSPORT=http`, `/mcp` serves the SDK's Streamable HTTP, stateless and answering with
   JSON, from the same server and handlers as stdio, so an MCP client initializes there and lists
-  the same tools. A request reaches it only past the `Host` allowlist and the bearer check, and it
-  refuses a body that is not `application/json` with `415` and one over 4 MiB with `413`. The
-  `mcp` requirement rises from `>=1.19.0` to `>=1.29.0`, the release that added that body limit.
+  the same tools. Requests pass the `Host` allowlist first, and the bearer check when
+  `LM_HTTP_AUTH_TOKEN` is set. `/mcp` refuses a body that is not `application/json` with `415` and
+  one over 4 MiB with `413`. The `mcp` requirement rises from `>=1.19.0` to `>=1.29.0`, the release
+  that added that body limit.
 
 ### Removed
 
