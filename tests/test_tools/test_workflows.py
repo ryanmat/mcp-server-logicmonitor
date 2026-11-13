@@ -454,7 +454,7 @@ class TestCheckRequiredTools:
     ids=["health_check", "capacity_plan", "diagnose", "detect_site_outage"],
 )
 def test_the_part_two_output_schemas_refuse_an_undocumented_key(schema):
-    """Step 80 serves these as outputSchema: each is valid and closed to keys it does not
+    """Each composite report schema is a valid JSON Schema and closed to keys it does not
     document, a health_score among them."""
     jsonschema.Draft202012Validator.check_schema(schema)
     assert schema["additionalProperties"] is False
