@@ -8,6 +8,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from mcp.server import Server
+from mcp.server.lowlevel.server import request_ctx
 from mcp.types import (
     CallToolResult,
     ClientCapabilities,
@@ -447,9 +448,8 @@ async def _ask_before_destroying(name: str, arguments: dict) -> str:
     unavailable when the client advertises no elicitation, the session is stateless HTTP
     (it keeps no client capabilities), or the call came from outside an MCP request.
     """
-    try:
-        context = server.request_context
-    except LookupError:
+    context = request_ctx.get(None)
+    if context is None:
         return "unavailable"
     asks = ClientCapabilities(elicitation=ElicitationCapability())
     if not context.session.check_client_capability(asks):
