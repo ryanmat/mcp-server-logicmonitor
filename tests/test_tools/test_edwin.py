@@ -192,7 +192,7 @@ class TestFilterBuilder:
         }
 
     def test_within_matches_the_captured_request(self):
-        # edwin-fullscope-records-insights-within.json, request.filter (2026-11-07).
+        # The filter of a records request captured on 2026-11-07.
         captured = {
             "schemaName": "filterCondition",
             "schemaVersion": "4",
@@ -210,7 +210,7 @@ class TestFilterBuilder:
         assert filter_condition(within("meta.createdTimestamp", 7, "day")) == captured
 
     def test_equals_matches_the_captured_request(self):
-        # edwin-fullscope-records-insights-and-equals.json, request.filter.expression.AND[0].
+        # The first AND condition of a captured records request.
         assert equals("meta.state", "OPEN") == {
             "EQUALS": [{"type": "string", "field": "meta.state"}, "OPEN"]
         }
@@ -431,7 +431,7 @@ VOLUME_BY_STATE = {
     "results": [["cleared", [73]], ["active", [6]]],
 }
 
-# GET /metadata from the 2026-11-07 capture (edwin-samples/edwin-metadata.json), all 29
+# GET /metadata from the 2026-11-07 capture, all 29
 # record types with at most three fields and two extra.* fields each.
 METADATA = json.loads(
     (Path(__file__).parent.parent / "fixtures" / "edwin_metadata.json").read_text()
@@ -687,7 +687,7 @@ class TestGetEdwinMetadata:
 # Edwin's agent and tool catalog, from the 2026-11-10 probe of lmryanmatuszewski.dexda.ai:
 # three of the seven agents, the
 # LMDiagnosticsAgent MCP list verbatim, the query-mcp tool list verbatim, and two of the
-# 68 mcp-server-logicmonitor tools (edwin-fullscope-mcp-mcp-server-logicmonitor-tools.json).
+# 68 mcp-server-logicmonitor tools.
 AGENTS = {
     "agents": [
         {

@@ -288,7 +288,7 @@ class TestBuilder:
 
 
 class TestWhereGrammar:
-    """The 2026-10-31 review, item 2: a WHERE clause cannot carry a command head or a
+    """A WHERE clause cannot carry a command head or a
     key=value token, since check_cmdline reads only the head of the line."""
 
     @pytest.mark.parametrize(
@@ -851,7 +851,7 @@ class TestRedaction:
 
 
 class TestUnclosedTags:
-    """The review, item 6: many distinct unclosed tags cost one scan for closing tags."""
+    """Many distinct unclosed tags cost one scan for closing tags."""
 
     @staticmethod
     def unclosed(n: int) -> str:
@@ -944,7 +944,7 @@ class TestParser:
         assert parse_health_check(LIVE_HEALTH)["checkpoints_unreadable"] == []
 
     def test_a_truncated_reply_names_the_cut_block_unreadable(self):
-        """The review, item 4: a cut array is reported, never read as a clean block."""
+        """A cut array is reported, never read as a clean block."""
         cut = LIVE_HEALTH[: LIVE_HEALTH.index('"name": "cogs.DSTableByNan"') + 200]
         p = parse_health_check(cut)
         assert p["checkpoints_unreadable"] == ["Agent_Check0041_CogsPerformanceCheck.groovy"]
@@ -1037,7 +1037,7 @@ class TestParser:
 
 
 class TestFailureLogging:
-    """The review, item 3: every swallowed exception is logged before it becomes a status."""
+    """Every swallowed exception is logged before it becomes a status."""
 
     LOGGER = "lm_mcp.tools.collector_debug"
 

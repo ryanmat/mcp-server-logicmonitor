@@ -287,7 +287,7 @@ class TestGetDeviceDelta:
 
 
 # (handler module, handler name, endpoint path, required arguments)
-_STEP_68_LISTS = [
+_INVENTORY_LISTS = [
     (
         "datasources",
         "get_datasource_devices",
@@ -300,10 +300,10 @@ _STEP_68_LISTS = [
 ]
 
 
-class TestStep68Paging:
+class TestInventoryReadPaging:
     """R2.5: each declares offset, sends it, and reads a negative total as more."""
 
-    @pytest.mark.parametrize(("module", "name", "path", "kwargs"), _STEP_68_LISTS)
+    @pytest.mark.parametrize(("module", "name", "path", "kwargs"), _INVENTORY_LISTS)
     @respx.mock
     async def test_offset_is_declared_and_sent(self, client, module, name, path, kwargs):
         import importlib
@@ -311,7 +311,7 @@ class TestStep68Paging:
         handler = getattr(importlib.import_module(f"lm_mcp.tools.{module}"), name)
         await assert_offset_declared_and_sent(client, handler, path, kwargs)
 
-    @pytest.mark.parametrize(("module", "name", "path", "kwargs"), _STEP_68_LISTS)
+    @pytest.mark.parametrize(("module", "name", "path", "kwargs"), _INVENTORY_LISTS)
     @respx.mock
     async def test_negative_total_reads_as_more(self, client, module, name, path, kwargs):
         import importlib

@@ -16,7 +16,9 @@ UNFOLLOWABLE = {
     "a ruling id": re.compile("rul" + r"-[0-9a-f]{6,}"),
     "a path under the ignored docs directory": re.compile(r"\bdo" + "cs/"),
     "a probe record's file name": re.compile("probes" + r"-20\d\d-\d\d"),
-    "a numbered item of an unpublished review": re.compile("the review" + ", item"),
+    "a numbered item of an unpublished review": re.compile("review" + r", item \d", re.IGNORECASE),
+    "a capture file the repository leaves out": re.compile("edwin" + r"-(?:samples/|fullscope-)"),
+    "a plan step number in a name": re.compile("(?:_ST" + r"EP_|TestSt" + r"ep)\d"),
 }
 
 

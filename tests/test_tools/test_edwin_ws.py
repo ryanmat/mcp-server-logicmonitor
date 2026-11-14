@@ -15,7 +15,7 @@ from lm_mcp.client.edwin import EdwinClient
 from lm_mcp.tools import edwin as edwin_tools
 from lm_mcp.tools.edwin import ask_edwin
 
-# edwin-samples/edwin-ws-conversation.jsonl, copied verbatim: a header naming the probe
+# A captured Ask Edwin conversation, copied verbatim: a header naming the probe
 # and the message sent, then the 69 frames Edwin answered "which collectors are down" with
 # (61 answer_thought, 7 answer_token, 1 response_end).
 _LINES = (Path(__file__).parent.parent / "fixtures" / "edwin_ws_conversation.jsonl").read_text()
