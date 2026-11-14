@@ -288,7 +288,7 @@ class TestBuilder:
 
 
 class TestWhereGrammar:
-    """A WHERE clause cannot carry a command head or a
+    """The 2026-10-31 review: a WHERE clause cannot carry a command head or a
     key=value token, since check_cmdline reads only the head of the line."""
 
     @pytest.mark.parametrize(

@@ -192,7 +192,7 @@ class TestFilterBuilder:
         }
 
     def test_within_matches_the_captured_request(self):
-        # The filter of a records request captured on 2026-11-07.
+        # The filter of an insights records request captured on 2026-11-07.
         captured = {
             "schemaName": "filterCondition",
             "schemaVersion": "4",
@@ -210,7 +210,7 @@ class TestFilterBuilder:
         assert filter_condition(within("meta.createdTimestamp", 7, "day")) == captured
 
     def test_equals_matches_the_captured_request(self):
-        # The first AND condition of a captured records request.
+        # The first AND condition of a captured insights records request.
         assert equals("meta.state", "OPEN") == {
             "EQUALS": [{"type": "string", "field": "meta.state"}, "OPEN"]
         }
