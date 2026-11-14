@@ -294,7 +294,7 @@ class TestWhereGrammar:
     @pytest.mark.parametrize(
         "where",
         [
-            "Name = 'a' !restart",  # the review's first shape: a command head after a comparison
+            "Name = 'a' !restart",  # a command head after a comparison
             "Name = 'a' ! = 'b'",
             "Name = 'a!'",
             "!Name = 'a'",
@@ -308,7 +308,7 @@ class TestWhereGrammar:
     @pytest.mark.parametrize(
         "where",
         [
-            "Name = 'a' 'h'=evilhost",  # the review's second shape: a quoted key
+            "Name = 'a' 'h'=evilhost",  # a quoted key
             "Name = 'a=b'",
             "State == 'x'",
             "Name = 'a' %=x",
