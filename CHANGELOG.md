@@ -24,7 +24,7 @@ holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
 Windows-only. The Python under `src/` is 38,852 lines, down from 40,839; the eight LogicModule
 tool modules hold 1,785 of those lines and the module table they share (`tools/logicmodules.py`)
-530, 2,315 together, where the eight held 2,785 in 4.3.0. The test suite runs 5,197 tests, where
+530, 2,315 together, where the eight held 2,785 in 4.3.0. The test suite runs 5,198 tests, where
 4.3.0 ran 2,959 and skipped 8.
 
 ### Upgrading from 4.3.0
