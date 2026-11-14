@@ -354,6 +354,8 @@ class TestGetEdwinInsights:
         assert word in body["error"]["message"]
 
     async def test_a_page_of_long_rows_stops_at_the_row_budget(self, client):
+        """R7.2: a list result stays under the limit a client returns, so a skill run can
+        read the insights it asked for."""
         edwin, router = client
         rows = long_rows(PLAIN, "meta.link", 50, 6535)
         router.post(RECORDS).mock(return_value=records_response(*rows, count=77))
@@ -390,6 +392,25 @@ class TestGetEdwinInsights:
 
         assert body["has_more"] is False
         assert "next_offset" not in body
+
+    async def test_an_empty_page_ends_the_listing_whatever_count_edwin_reports(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(return_value=records_response(count=77))
+
+        body = payload(await get_edwin_insights(edwin, offset=50))
+
+        assert body == {"insights": [], "count": 0, "total": 77, "has_more": False}
+
+    async def test_without_a_count_the_total_is_the_rows_read_so_far(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {}, "results": [PLAIN, PLAIN]})
+        )
+
+        body = payload(await get_edwin_insights(edwin, offset=25))
+
+        assert body["total"] == 27
+        assert body["has_more"] is False
 
     async def test_a_negative_offset_is_refused_before_any_request(self, client):
         edwin, router = client
@@ -602,6 +623,7 @@ class TestGetEdwinRecords:
 
     @pytest.mark.parametrize(("source", "row"), [("alerts", ALERT), ("events", EVENT)])
     async def test_a_page_of_long_rows_stops_at_the_row_budget(self, client, source, row):
+        """R7.2: a list result stays under the limit a client returns."""
         edwin, router = client
         rows = long_rows(row, "cf.eventCI", 50, 3600)
         router.post(RECORDS).mock(
@@ -644,6 +666,33 @@ class TestGetEdwinRecords:
         assert body["count"] == 1
         assert body["has_more"] is True
         assert body["next_offset"] == 1
+
+    async def test_an_empty_page_ends_the_listing_whatever_count_edwin_reports(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 10000}, "results": []})
+        )
+
+        body = payload(await get_edwin_records(edwin, source="events", offset=40, columns=["_id"]))
+
+        assert body == {
+            "source": "events",
+            "records": [],
+            "count": 0,
+            "total": 10000,
+            "has_more": False,
+        }
+
+    async def test_without_a_count_the_total_is_the_rows_read_so_far(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {}, "results": [ALERT]})
+        )
+
+        body = payload(await get_edwin_records(edwin, source="alerts", offset=10))
+
+        assert body["total"] == 11
+        assert body["has_more"] is False
 
     async def test_offset_is_sent_and_the_next_one_reported(self, client):
         edwin, router = client

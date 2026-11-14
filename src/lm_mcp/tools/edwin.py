@@ -173,9 +173,10 @@ def _page(
 
     Rows are kept whole, in order, while their compact JSON fits ROW_BUDGET; the first
     row is kept whatever its size. ``has_more`` is true when the budget left out rows
-    this call read or Edwin counts rows past the ones kept, ``next_offset`` is then the
-    offset that reads them, and a ``warning`` says how many rows fit when the budget
-    left some out.
+    this call read, or the page holds rows and Edwin counts more past them; an empty
+    page ends the listing whatever Edwin counts, since its count is a lower bound.
+    ``next_offset`` is the offset that reads the rows left, and a ``warning`` says how
+    many rows fit when the budget left some out.
     """
     kept: list[dict[str, Any]] = []
     used = 0
@@ -190,7 +191,7 @@ def _page(
         key: kept,
         "count": len(kept),
         "total": total,
-        "has_more": cut or total > next_offset,
+        "has_more": cut or (bool(kept) and total > next_offset),
     }
     if page["has_more"]:
         page["next_offset"] = next_offset

@@ -6884,8 +6884,9 @@ TOOLS.extend(
                 "get_edwin_insight reads one insight whole. `total` is Edwin's count of "
                 "matches; it has read exactly 10000 for a window of all time, so treat 10000 "
                 "as a lower bound. A cleared insight reads severity 0. A result carries whole "
-                "rows up to 40,000 characters of them; when rows are left over, `has_more` is "
-                "true and `next_offset` is the `offset` that reads on."
+                "rows up to 40,000 characters of them, or one row alone when it is larger; "
+                "when rows are left over, `has_more` is true and `next_offset` is the `offset` "
+                "that reads on."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6950,9 +6951,10 @@ TOOLS.extend(
                 '{"EQUALS": [{"type": "string", "field": "cf.eventCI"}, "web01"]}; '
                 "get_edwin_metadata lists the field names. Without `columns` every field comes "
                 "back except extra.* (the CI's LogicMonitor properties) and raw.* (the source "
-                "record). A result carries whole rows up to 40,000 characters of them; when "
-                "rows are left over, `has_more` is true and `next_offset` is the `offset` that "
-                "reads on, and naming `columns` fits more rows in a result."
+                "record). A result carries whole rows up to 40,000 characters of them, or one "
+                "row alone when it is larger; when rows are left over, `has_more` is true and "
+                "`next_offset` is the `offset` that reads on, and naming `columns` fits more "
+                "rows in a result."
             ),
             annotations=_READ_ONLY,
             inputSchema={
