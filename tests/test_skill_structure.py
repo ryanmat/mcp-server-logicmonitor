@@ -298,3 +298,25 @@ def test_lm_portal_grants_and_names_the_collector_operations():
     collectors = _step("lm-portal", "Step 3")
     assert "is_down" in collectors
     assert "ask the user" in collectors
+
+
+REPORTING_RULES = """## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+"""
+
+
+@pytest.mark.parametrize("name", EXPECTED_SKILLS)
+def test_every_skill_reports_only_what_it_read_and_says_what_it_did_not_check(name):
+    """R7.2: a report names only what a tool result carried and says what the run left
+    unread. Each skill states the rule in the same words, gives its report template a
+    "Not checked" entry, and says after the rule what that entry names."""
+    text = (SKILLS_DIR / name / "SKILL.md").read_text()
+
+    assert REPORTING_RULES in text
+    template, specifics = text.split("## Reporting rules")
+    assert "Not checked" in template
+    assert 'Under "Not checked"' in specifics

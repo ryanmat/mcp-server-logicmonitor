@@ -321,7 +321,7 @@ def test_a_transcript_with_no_current_verdict_fails_until_it_is_judged(tmp_path,
 
 
 def test_the_unchecked_item_unmet_in_one_scenario_fails_the_run(tmp_path):
-    """Step 89's threshold: no scenario fails the "states what it did not check" item."""
+    """One scenario that fails the "states what it did not check" item fails the run."""
     for number in range(8):
         unmet = ("states_unchecked",) if number == 0 else ()
         skills = _skills(
@@ -336,7 +336,7 @@ def test_the_unchecked_item_unmet_in_one_scenario_fails_the_run(tmp_path):
 
 @pytest.mark.parametrize(("failing", "code"), [(1, 0), (2, 1)])
 def test_another_item_passes_at_14_of_16_of_the_graded_scenarios(tmp_path, failing, code):
-    """Step 89's threshold, 14 of 16, scaled to the scenarios graded: 7 of 8 here."""
+    """Any other item passes at 14 of 16, scaled to the scenarios graded: 7 of 8 here."""
     for number in range(8):
         unmet = ("cites_evidence",) if number < failing else ()
         skills = _skills(

@@ -86,4 +86,16 @@ Use a header per step. End with:
 - Pipelines: [n]; [partition: pipeline names]; [pipelines with no partition]
 - Usage: [usage as read]
 - Saved queries: [groups and query counts]; tracked queries: [n]
+- Not checked: [what this run left unread]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", say that these tools read configuration and return no log lines,
+that the API states no unit or period for the usage figure and no unit for retention,
+and, when a partition was named, that the other partitions were not carried further.

@@ -72,7 +72,9 @@ Present the situation:
 ```
 
 State `active` and `cleared`, and whether the `hourly` counts are rising, steady or
-falling. If the window holds no alerts, report that and stop.
+falling. If the window holds no alerts, report that, say that alerts which opened
+before the window and are still open are outside it (`get_alerts` with
+`cleared=false` lists them), and stop.
 
 ### Step 2: Noise assessment
 
@@ -124,6 +126,8 @@ clusters):
    to list the open alerts with their `id`, `severity` and `start_time`, and pick the
    most severe open alert among the cluster's `alert_ids`, which list its most severe
    first and can include cleared alerts.
+   A `get_alerts` row names no datasource or datapoint; name them only for an alert
+   whose details you read.
 2. Call `get_alert_details` with that alert's id for its datasource, instance,
    datapoint, value and thresholds.
 3. For a device cluster, call `get_device` with its `device_id` for the device type,
@@ -170,4 +174,16 @@ End with:
 - Widest impact: [device] ([neighbor_count] neighbors, [dependent_count] dependents, [critical_alert_count] with critical alerts)
 - Change correlation: [found/none]
 - Recommended action: [brief recommendation]
+- Not checked: [what this run left unread]
 ```
+
+## Reporting rules
+
+Report only what this run's tool results carry. Every figure, id and name comes from a
+result you read; when you add up a count yourself, show its parts. Say nothing about an
+item you did not read: a label, state or finding read for one alert, instance or
+operation is not applied to another. End the report with what you did not check.
+
+Under "Not checked", name the alerts that opened before the window and are still open,
+the clusters the result did not list or you did not open, each section that came back
+null or with a warning, and that nothing was acknowledged or noted.
