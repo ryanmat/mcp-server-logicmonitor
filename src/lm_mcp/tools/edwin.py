@@ -174,7 +174,7 @@ def _page(
     Rows are kept whole, in order, while their compact JSON fits ROW_BUDGET; the first
     row is kept whatever its size. ``has_more`` is true when the budget left out rows
     this call read, or the page holds rows and Edwin counts more past them; an empty
-    page ends the listing whatever Edwin counts, since its count is a lower bound.
+    page ends the listing whatever Edwin counts, since its count is not exact.
     ``next_offset`` is the offset that reads the rows left, and a ``warning`` says how
     many rows fit when the budget left some out.
     """
