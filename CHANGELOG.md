@@ -83,10 +83,10 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   `EDWIN_HOST` overrides the derived host `https://<portal name>.dexda.ai` and is required in
   multi-portal mode. A 403 from Edwin is `SCOPE_MISSING`, naming the credential scope the call
   needs where the path is known. `get_edwin_insights` and `get_edwin_records` return whole
-  rows up to 40,000 characters of them and take `offset`: when rows are left over, `has_more`
-  is true, `next_offset` is the `offset` that reads on and a `warning` says how many fit,
-  which keeps a result under the 50,000 characters Claude Code returns unless one row alone
-  is larger.
+  rows up to 40,000 characters of them and take `offset`. When that budget leaves rows out,
+  a `warning` says how many fit; while rows remain, `has_more` is true and `next_offset` is
+  the `offset` that reads on. That keeps a result under the 50,000 characters Claude Code
+  returns unless one row alone is larger.
   `websockets` (>=14.0) becomes a core dependency for `ask_edwin`.
 - LM Logs reads: `get_log_pipelines` (every pipeline in one call, with its query and partitions),
   `get_tracked_log_queries`, `get_log_query_groups`, `get_log_partitions` (each partition's state
