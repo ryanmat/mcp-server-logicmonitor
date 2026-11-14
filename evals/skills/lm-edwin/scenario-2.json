@@ -1,0 +1,17 @@
+{
+  "skill": "lm-edwin",
+  "user": "/lm-edwin 168 Review the most recent insight Edwin has analyzed; do not ask me to choose.",
+  "state": "The server has the Edwin AI credentials. Which insights the last 168 hours hold, and which of them Edwin analyzed, is read at run time.",
+  "setup": false,
+  "required_tools": [
+    "get_edwin_insights",
+    "get_edwin_insight",
+    "triage"
+  ],
+  "forbidden_tools": [],
+  "rubric": {
+    "answers_question": "The report says, for each claim in Edwin's root cause and impact, whether LogicMonitor's data supports it, contradicts it or cannot test it, and whether the remediation fits.",
+    "cites_evidence": "Every figure, id and name in the report appears in the get_edwin_insight, analyze_metric where it ran, and triage results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report names each comparison it could not make: a causal CI that is no monitored device or has no metric series, impacted CIs in no cluster, a blast-radius row that does not cover the causal CI, an unread audit log."
+  }
+}

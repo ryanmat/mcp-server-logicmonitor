@@ -79,6 +79,15 @@ A change to a tool's name or description can move `search_tools` results. CI gra
 `search_tools` against `evals/search/queries.json` with writes off and on and fails below
 the pass rate; run `uv run python evals/grade.py` before you push.
 
+A change to a skill under `.claude/skills/` can change which tools a run calls. Each
+skill has two scenarios under `evals/skills/<skill>/`: the user line, the sandbox state
+it assumes, the tools the run must call and must not call, and a rubric for the answer.
+The same command grades every transcript saved at
+`evals/skills/<skill>/runs/<scenario>.jsonl` and skips a scenario that has none. With
+`--judge` it asks `claude-opus-5`, through `claude -p`, whether the answer meets the
+rubric and keeps the verdict beside the transcript; without the flag it reads the kept
+verdicts and calls no model, which is how CI runs it.
+
 ## Live shapes and probe records
 
 Every fixture for a new or changed tool is copied from a response a real portal

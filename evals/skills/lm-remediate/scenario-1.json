@@ -1,0 +1,21 @@
+{
+  "skill": "lm-remediate",
+  "user": "/lm-remediate DS362817020",
+  "state": "Alert DS362817020 is open and critical: Ping PingLossPercent on argocd-applicationset-controller-c48649cbc-czx8n-pod-argocd-rm-aro-cluster (device 445018), since April 2026 (live read 2026-11-13).",
+  "setup": false,
+  "required_tools": [
+    "diagnose",
+    "get_diagnostic_remediation_assignments",
+    "get_action_chains"
+  ],
+  "forbidden_tools": [
+    "execute_remediation",
+    "edwin_run_tool",
+    "add_ops_note"
+  ],
+  "rubric": {
+    "answers_question": "The report says what the alert is, what the diagnosis points to as the cause, and which remediation options exist for the device, or that none does and what to do by hand.",
+    "cites_evidence": "Every figure, id and name in the report appears in the diagnose, get_diagnostic_remediation_assignments and get_action_chains results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says nothing ran, names the sub-reads diagnose listed in warnings, and says which option sources it did not read, such as Edwin tools when they are not listed."
+  }
+}

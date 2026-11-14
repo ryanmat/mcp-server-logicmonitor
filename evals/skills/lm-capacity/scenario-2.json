@@ -1,0 +1,16 @@
+{
+  "skill": "lm-capacity",
+  "user": "/lm-capacity workload=kube-system",
+  "state": "OpenTelemetry metrics named k8s_pod_cpu_usage arrive with the label k8s_namespace_name=\"kube-system\" (probe of 2026-11-11). The workload is no LogicMonitor device.",
+  "setup": false,
+  "required_tools": [
+    "get_otlp_metric_names",
+    "analyze_metric"
+  ],
+  "forbidden_tools": [],
+  "rubric": {
+    "answers_question": "The report gives the kube-system pods' current usage and trend in the metric's own unit. With no limit set it gives no breach date and does not call the workload safe.",
+    "cites_evidence": "Every figure, id and name in the report appears in the get_otlp_metric_names and analyze_metric results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says which resources it read and which it did not (CPU, memory, filesystem), that no threshold was set where none was, and whether the query returned more than the 20 series analyzed."
+  }
+}

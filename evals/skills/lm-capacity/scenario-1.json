@@ -1,0 +1,18 @@
+{
+  "skill": "lm-capacity",
+  "user": "/lm-capacity vergeos-demo-vm",
+  "state": "Device 89818, vergeos-demo-vm, is the host of collector 82: normal status, with Microsoft_Windows_CPU, WinMemory64 and WinVolumeUsage- instances (live read 2026-11-13). One device matches the name.",
+  "setup": false,
+  "required_tools": [
+    "get_devices",
+    "get_device_datasources",
+    "get_device_instances",
+    "analyze_metric"
+  ],
+  "forbidden_tools": [],
+  "rubric": {
+    "answers_question": "The report gives, for CPU, memory and disk, the current utilization, the trend and whether a threshold breach is forecast within 30 days, with a recommendation that follows from them.",
+    "cites_evidence": "Every figure, id and name in the report appears in the get_device_datasources, get_device_instances and analyze_metric results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says what it did not analyze: instances or datapoints it left out, a window that came back truncated, a weekly cycle the seven-day window cannot show, and a forecast method that gave no crossing."
+  }
+}

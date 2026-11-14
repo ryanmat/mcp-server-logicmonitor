@@ -1,0 +1,15 @@
+{
+  "skill": "lm-edwin",
+  "user": "/lm-edwin",
+  "state": "The server has the Edwin AI credentials, so the Edwin tools are listed. The insights of the last 24 hours are whatever Edwin holds at run time.",
+  "setup": false,
+  "required_tools": [
+    "get_edwin_insights"
+  ],
+  "forbidden_tools": [],
+  "rubric": {
+    "answers_question": "The report lists the insights of the last 24 hours with state, causal CI, alert count and whether Edwin analyzed each, and asks which to review; with none it says so and stops.",
+    "cites_evidence": "Every figure, id and name in the report appears in the get_edwin_insights results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says it reviewed no insight yet, and says when more insights matched than the list shows."
+  }
+}

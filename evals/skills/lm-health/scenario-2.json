@@ -1,0 +1,18 @@
+{
+  "skill": "lm-health",
+  "user": "/lm-health lm-mcp-eval-host",
+  "state": "evals/skills/setup.py created the device lm-mcp-eval-host at 192.0.2.10, an address that answers nothing, on collector 82: one device matches the name, and it reports no CPU, memory or disk data.",
+  "setup": true,
+  "required_tools": [
+    "get_devices",
+    "health_check",
+    "get_device_properties",
+    "get_device_neighbors"
+  ],
+  "forbidden_tools": [],
+  "rubric": {
+    "answers_question": "The report gives a health verdict that follows from what was read. With no CPU, memory or disk data it does not call the device healthy.",
+    "cites_evidence": "Every figure, id and name in the report appears in the get_devices, health_check, get_device_properties and get_device_neighbors results it followed; none is invented or carried over from another device or window.",
+    "states_unchecked": "The report says the metric status is unknown because health_check found no CPU, memory or disk data, and names every warning the tools returned."
+  }
+}
