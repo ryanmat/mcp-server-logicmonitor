@@ -30,6 +30,12 @@ logger = logging.getLogger(__name__)
 
 _MAX_INSIGHTS = 50
 
+# Most characters of rows one list result carries. Claude Code returns no tool result over
+# 50,000 characters, and the rest of the result needs room beside the rows.
+ROW_BUDGET = 40_000
+# What a records page says, after its warning, about fitting more rows into the budget.
+_COLUMNS_HINT = ", or name the fields you need in columns so more rows fit"
+
 # Longest ask_edwin waits for Edwin's response_end before returning what it has.
 ASK_BUDGET_SECONDS = 120.0
 # The LMDiagnosticsAgent route Ask Edwin answers on.
@@ -123,6 +129,11 @@ def within(field: str, duration: int, unit: str) -> dict[str, Any]:
     return {"WITHIN": [_operand(field, "long"), {"duration": duration, "unit": unit}]}
 
 
+def _offset_field(offset: int) -> dict[str, int]:
+    """The request's offset entry: Edwin skips ``offset`` rows, and none without the key."""
+    return {"offset": offset} if offset else {}
+
+
 def _with_iso_times(row: dict[str, Any]) -> dict[str, Any]:
     """Add the ISO 8601 twin of each epoch-millisecond field the row carries."""
     out = dict(row)
@@ -141,13 +152,55 @@ def _project_insight(row: dict[str, Any]) -> dict[str, Any]:
     return _with_iso_times(kept)
 
 
-def _check_range(hours: int, limit: int | None = None, most: int = 0) -> list[TextContent] | None:
-    """The refusal for an hours or limit argument out of range, or None when each is in it."""
+def _check_range(
+    hours: int, limit: int | None = None, most: int = 0, offset: int = 0
+) -> list[TextContent] | None:
+    """The refusal for an hours, limit or offset argument out of range, or None when each is
+    in it."""
     if hours < 1:
         return validation_error("INVALID_REQUEST", f"hours must be at least 1, got {hours}")
     if limit is not None and not 1 <= limit <= most:
         return validation_error("INVALID_REQUEST", f"limit must be 1 to {most}, got {limit}")
+    if offset < 0:
+        return validation_error("INVALID_REQUEST", f"offset must be 0 or more, got {offset}")
     return None
+
+
+def _page(
+    key: str, rows: list[dict[str, Any]], total: int, offset: int, hint: str = ""
+) -> dict[str, Any]:
+    """The page fields of a list result, with the rows under ``key``.
+
+    Rows are kept whole, in order, while their compact JSON fits ROW_BUDGET; the first
+    row is kept whatever its size. ``has_more`` is true when the budget left out rows
+    this call read or Edwin counts rows past the ones kept, ``next_offset`` is then the
+    offset that reads them, and a ``warning`` says how many rows fit when the budget
+    left some out.
+    """
+    kept: list[dict[str, Any]] = []
+    used = 0
+    for row in rows:
+        used += len(json.dumps(row, separators=(",", ":"), default=str))
+        if kept and used > ROW_BUDGET:
+            break
+        kept.append(row)
+    next_offset = offset + len(kept)
+    cut = len(kept) < len(rows)
+    page: dict[str, Any] = {
+        key: kept,
+        "count": len(kept),
+        "total": total,
+        "has_more": cut or total > next_offset,
+    }
+    if page["has_more"]:
+        page["next_offset"] = next_offset
+    if cut:
+        page["warning"] = (
+            f"{len(kept)} of the {len(rows)} rows read fit this result's "
+            f"{ROW_BUDGET}-character row budget; call again with offset={next_offset} "
+            f"for the rest{hint}."
+        )
+    return page
 
 
 async def get_edwin_insights(
@@ -158,6 +211,7 @@ async def get_edwin_insights(
     causal_ci: str | None = None,
     impacted_ci: str | None = None,
     limit: int = 10,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List Edwin AI insights (correlated incidents) created in the last ``hours``, newest first.
 
@@ -169,12 +223,14 @@ async def get_edwin_insights(
         causal_ci: CI Edwin named as the cause, matched exactly.
         impacted_ci: CI that must be in the insight's impacted list.
         limit: Most insights to return, 1 to 50.
+        offset: Insights to skip, for the page after an earlier call's.
 
     Returns:
-        ``insights`` with Edwin's fields verbatim, ``count``, ``total`` (Edwin's count
-        of matches) and ``has_more``.
+        ``insights`` with Edwin's fields verbatim, as many whole rows as fit ROW_BUDGET,
+        ``count``, ``total`` (Edwin's count of matches), ``has_more``, ``next_offset``
+        while rows remain, and a ``warning`` when the budget left out rows.
     """
-    refusal = _check_range(hours, limit, _MAX_INSIGHTS)
+    refusal = _check_range(hours, limit, _MAX_INSIGHTS, offset)
     if refusal is not None:
         return refusal
     conditions = [within("meta.createdTimestamp", hours, "hour")]
@@ -197,18 +253,12 @@ async def get_edwin_insights(
                 "groups": None,
                 "order": [{"field": "meta.createdTimestamp", "type": "desc", "size": None}],
                 "size": limit,
+                **_offset_field(offset),
             },
         )
         insights = [_project_insight(row) for row in result.get("results", [])]
-        total = result.get("meta", {}).get("count", len(insights))
-        return format_response(
-            {
-                "insights": insights,
-                "count": len(insights),
-                "total": total,
-                "has_more": total > len(insights),
-            }
-        )
+        total = result.get("meta", {}).get("count", offset + len(insights))
+        return format_response(_page("insights", insights, total, offset))
     except Exception as e:
         return handle_error(e)
 
@@ -238,6 +288,7 @@ async def get_edwin_records(
     columns: list[str] | None = None,
     order: list[dict[str, Any]] | None = None,
     limit: int = 10,
+    offset: int = 0,
 ) -> list[TextContent]:
     """List Edwin AI's alert or event records from the last ``hours``, newest first by default.
 
@@ -253,10 +304,13 @@ async def get_edwin_records(
             except the ``extra.*`` and ``raw.*`` ones.
         order: Edwin order entries, ``[{"field", "type": "asc"|"desc", "size": null}]``.
         limit: Most records to return, 1 to 50.
+        offset: Records to skip, for the page after an earlier call's.
 
     Returns:
-        ``source``, ``records``, ``count``, ``total`` (Edwin's count of matches) and
-        ``has_more``, plus a ``note`` when fields were left out.
+        ``source``, ``records`` (as many whole rows as fit ROW_BUDGET), ``count``,
+        ``total`` (Edwin's count of matches), ``has_more``, ``next_offset`` while rows
+        remain, a ``warning`` when the budget left out rows, and a ``note`` when fields
+        were left out.
     """
     if source == "insights":
         return validation_error(
@@ -266,7 +320,7 @@ async def get_edwin_records(
         return validation_error(
             "INVALID_REQUEST", f"source must be alerts or events, got {source!r}"
         )
-    refusal = _check_range(hours, limit, _MAX_RECORDS)
+    refusal = _check_range(hours, limit, _MAX_RECORDS, offset)
     if refusal is not None:
         return refusal
     time_field = _TIME_FIELDS[source]
@@ -284,6 +338,7 @@ async def get_edwin_records(
                 "groups": None,
                 "order": order or [{"field": time_field, "type": "desc", "size": None}],
                 "size": limit,
+                **_offset_field(offset),
             },
         )
         rows = result.get("results", [])
@@ -294,13 +349,10 @@ async def get_edwin_records(
             records = [
                 {k: v for k, v in row.items() if not k.startswith(_BULK_PREFIXES)} for row in rows
             ]
-        total = result.get("meta", {}).get("count", len(records))
+        total = result.get("meta", {}).get("count", offset + len(records))
         response: dict[str, Any] = {
             "source": source,
-            "records": records,
-            "count": len(records),
-            "total": total,
-            "has_more": total > len(records),
+            **_page("records", records, total, offset, _COLUMNS_HINT),
         }
         if not columns:
             response["note"] = (

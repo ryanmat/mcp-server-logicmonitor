@@ -13,6 +13,7 @@ from lm_mcp.client.edwin import build_edwin_client
 from lm_mcp.config import reset_config
 from lm_mcp.logging import log_write_operation
 from lm_mcp.tools.edwin import (
+    ROW_BUDGET,
     edwin_run_tool,
     equals,
     filter_condition,
@@ -157,6 +158,21 @@ def records_response(*rows: dict, count: int) -> httpx.Response:
 
 def payload(result: list) -> dict:
     return json.loads(result[0].text)
+
+
+# Claude Code returns no tool result over this many characters.
+CLIENT_RESULT_LIMIT = 50_000
+
+
+def long_rows(base: dict, field: str, count: int, size: int) -> list[dict]:
+    """``count`` rows of ``base`` with distinct ids, ``field`` padded so each serializes to
+    ``size`` characters."""
+    rows = []
+    for index in range(count):
+        row = {**base, "_id": f"row-{index:03d}", field: ""}
+        row[field] = "x" * (size - len(json.dumps(row, separators=(",", ":"))))
+        rows.append(row)
+    return rows
 
 
 @pytest.fixture
@@ -336,6 +352,54 @@ class TestGetEdwinInsights:
         assert route.call_count == 0
         assert body["error"]["code"] == "INVALID_REQUEST"
         assert word in body["error"]["message"]
+
+    async def test_a_page_of_long_rows_stops_at_the_row_budget(self, client):
+        edwin, router = client
+        rows = long_rows(PLAIN, "meta.link", 50, 6535)
+        router.post(RECORDS).mock(return_value=records_response(*rows, count=77))
+
+        result = await get_edwin_insights(edwin, hours=168, limit=50)
+
+        body = payload(result)
+        fit = ROW_BUDGET // len(json.dumps(body["insights"][0], separators=(",", ":")))
+        assert len(result[0].text) < CLIENT_RESULT_LIMIT
+        assert [row["_id"] for row in body["insights"]] == [row["_id"] for row in rows[:fit]]
+        assert 1 < body["count"] == fit < 50
+        assert body["total"] == 77
+        assert body["has_more"] is True
+        assert body["next_offset"] == fit
+        assert f"offset={fit}" in body["warning"]
+
+    async def test_offset_is_sent_and_the_next_one_reported(self, client):
+        edwin, router = client
+        route = router.post(RECORDS).mock(return_value=records_response(PLAIN, PLAIN, count=77))
+
+        body = payload(await get_edwin_insights(edwin, limit=2, offset=25))
+
+        assert json.loads(route.calls.last.request.content)["offset"] == 25
+        assert body["count"] == 2
+        assert body["has_more"] is True
+        assert body["next_offset"] == 27
+        assert "warning" not in body
+
+    async def test_the_last_page_has_no_next_offset(self, client):
+        edwin, router = client
+        router.post(RECORDS).mock(return_value=records_response(PLAIN, PLAIN, count=27))
+
+        body = payload(await get_edwin_insights(edwin, offset=25))
+
+        assert body["has_more"] is False
+        assert "next_offset" not in body
+
+    async def test_a_negative_offset_is_refused_before_any_request(self, client):
+        edwin, router = client
+        route = router.post(RECORDS).mock(return_value=records_response(count=0))
+
+        body = payload(await get_edwin_insights(edwin, offset=-1))
+
+        assert route.call_count == 0
+        assert body["error"]["code"] == "INVALID_REQUEST"
+        assert "offset" in body["error"]["message"]
 
     async def test_a_403_is_scope_missing_naming_query_records(self, client):
         edwin, router = client
@@ -536,6 +600,64 @@ class TestGetEdwinRecords:
         ]
         assert "note" not in body
 
+    @pytest.mark.parametrize(("source", "row"), [("alerts", ALERT), ("events", EVENT)])
+    async def test_a_page_of_long_rows_stops_at_the_row_budget(self, client, source, row):
+        edwin, router = client
+        rows = long_rows(row, "cf.eventCI", 50, 3600)
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 461}, "results": rows})
+        )
+
+        result = await get_edwin_records(edwin, source=source, hours=168, limit=50)
+
+        body = payload(result)
+        fit = ROW_BUDGET // len(json.dumps(body["records"][0], separators=(",", ":")))
+        assert len(result[0].text) < CLIENT_RESULT_LIMIT
+        assert [record["_id"] for record in body["records"]] == [r["_id"] for r in rows[:fit]]
+        assert 1 < body["count"] == fit < 50
+        assert body["has_more"] is True
+        assert body["next_offset"] == fit
+        assert f"offset={fit}" in body["warning"]
+
+    async def test_one_row_over_the_budget_comes_back_alone(self, client):
+        edwin, router = client
+        rows = long_rows(ALERT, "cf.eventCI", 3, ROW_BUDGET + 500)
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 3}, "results": rows})
+        )
+
+        body = payload(await get_edwin_records(edwin, source="alerts"))
+
+        assert [record["_id"] for record in body["records"]] == ["row-000"]
+        assert body["next_offset"] == 1
+        assert "columns" in body["warning"]
+
+    async def test_a_cut_page_has_more_whatever_count_edwin_reports(self, client):
+        edwin, router = client
+        rows = long_rows(ALERT, "cf.eventCI", 3, ROW_BUDGET + 500)
+        router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 1}, "results": rows})
+        )
+
+        body = payload(await get_edwin_records(edwin, source="alerts"))
+
+        assert body["count"] == 1
+        assert body["has_more"] is True
+        assert body["next_offset"] == 1
+
+    async def test_offset_is_sent_and_the_next_one_reported(self, client):
+        edwin, router = client
+        route = router.post(RECORDS).mock(
+            return_value=httpx.Response(200, json={"meta": {"count": 141}, "results": [ALERT]})
+        )
+
+        body = payload(await get_edwin_records(edwin, source="alerts", limit=1, offset=10))
+
+        assert json.loads(route.calls.last.request.content)["offset"] == 10
+        assert body["has_more"] is True
+        assert body["next_offset"] == 11
+        assert "warning" not in body
+
     @pytest.mark.parametrize(
         ("kwargs", "words"),
         [
@@ -544,6 +666,7 @@ class TestGetEdwinRecords:
             ({"source": "alerts", "hours": 0}, "hours"),
             ({"source": "alerts", "limit": 0}, "limit"),
             ({"source": "alerts", "limit": 51}, "limit"),
+            ({"source": "alerts", "offset": -1}, "offset"),
         ],
     )
     async def test_refusals_send_nothing(self, client, kwargs, words):
