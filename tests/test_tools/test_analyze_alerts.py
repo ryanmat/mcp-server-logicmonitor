@@ -336,7 +336,7 @@ class TestClusters:
     async def test_the_five_largest_clusters_of_each_type_are_shown_and_all_are_counted(
         self, client
     ):
-        """rul-c5874c19c1: a window with twelve clusters of each type lists the five largest
+        """A window with twelve clusters of each type lists the five largest
         of each, and cluster_count and by_type still count all thirty-six."""
         active = [
             _make_alert(device * 100 + number, f"web-{device:02d}", f"DS{device:02d}")
@@ -624,7 +624,7 @@ class TestBursts:
 
 
 class TestBurstBounds:
-    """rul-c5874c19c1: an alert storm's bursts are counted in full and listed in part."""
+    """An alert storm's bursts are counted in full and listed in part."""
 
     @respx.mock
     async def test_the_ten_largest_bursts_are_shown_with_ten_ids_each(self, client):
@@ -698,7 +698,7 @@ class TestChanges:
 
     @respx.mock
     async def test_the_ten_strongest_pairs_are_shown_and_all_are_counted(self, client):
-        """rul-c5874c19c1: 25 changes in the 25 minutes before one spike all pair with it;
+        """25 changes in the 25 minutes before one spike all pair with it;
         the section lists the ten closest to the spike and total_correlated counts 25."""
         now = int(time.time())
         spike_ts = _aligned_spike_time(now)
@@ -865,7 +865,7 @@ class TestRegistration:
         ],
     )
     def test_each_window_tool_states_what_its_lists_are_bounded_to(self, name, counted):
-        """rul-c5874c19c1: a caller learns from the description that the cluster and change
+        """A caller learns from the description that the cluster and change
         lists are the largest few, and which fields still count everything."""
         from lm_mcp.registry import TOOLS
 

@@ -613,7 +613,7 @@ class TestTriage:
 
     @respx.mock
     async def test_a_busy_window_fits_the_clients_result_limit(self, auth, lm_env):
-        """rul-c5874c19c1: triage over a window at the sandbox's scale, with its clusters
+        """Triage over a window at the sandbox's scale, with its clusters
         and changes read through analyze_alerts, returns under 50,000 characters at both
         detail levels."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
@@ -1612,7 +1612,7 @@ class TestPortalOverview:
 
     @respx.mock
     async def test_a_busy_portal_fits_the_clients_result_limit(self, auth, lm_env):
-        """rul-c5874c19c1: at full detail, as the lm-portal skill calls it, a window at the
+        """At full detail, as the lm-portal skill calls it, a window at the
         sandbox's scale returns under Claude Code's 50,000 characters."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         routes = self._mock_portal()
@@ -1920,7 +1920,7 @@ class TestDiagnose:
 
     @respx.mock
     async def test_a_busy_window_fits_the_clients_result_limit(self, auth, lm_env):
-        """rul-c5874c19c1: at full detail, as the lm-remediate skill calls it, diagnose over a
+        """At full detail, as the lm-remediate skill calls it, diagnose over a
         window at the sandbox's scale counts every cluster and pair and returns under 50,000
         characters; its clusters and changes come through analyze_alerts unpatched."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
