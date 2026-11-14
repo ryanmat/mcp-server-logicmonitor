@@ -822,7 +822,7 @@ _SERVICES_82 = f"{_BASE}/setting/collector/collectors/82/services"
 
 
 class TestGetCollectorsIsDown:
-    """Step 51 Finding: a row's status reads 1 up or down, so it carries isDown as is_down."""
+    """A row's status reads 1 up or down, so it carries isDown as is_down."""
 
     @respx.mock
     async def test_rows_carry_is_down_from_the_record(self, client):
@@ -1001,7 +1001,7 @@ class TestRunCollectorStatusCheck:
 # record's; the five config files are placeholders, since the live ones carry the
 # collector's credentials. A restart sent with {} answered job 760 and reset 41's size
 # from Large to Custom (4G); one sent with these fields back changed nothing (probe
-# 2026-11-11, rul-b830622e8b).
+# 2026-11-11).
 _COLLECTOR_41 = {
     "id": 41,
     "hostname": "lm-container-argus-0",

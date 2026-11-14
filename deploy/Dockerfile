@@ -1,7 +1,7 @@
 # Description: Container image for LogicMonitor MCP server.
 # Description: Supports both stdio and HTTP transport modes.
 
-# python:3.11.17-slim-bookworm, digest read from Docker Hub 2026-10-21
+# python:3.11.18-slim-bookworm, digest read from Docker Hub 2026-11-13
 FROM python:3.11.18-slim-bookworm@sha256:a83ba18aef0f865b1a4a611c2cf460fe446f2795673bbb9fe43be570439e3b39 AS builder
 
 WORKDIR /app
@@ -20,7 +20,7 @@ COPY src/ src/
 RUN uv export --no-dev --extra http --frozen --no-emit-project --format requirements-txt -o /app/requirements.txt \
     && uv build --wheel
 
-# python:3.11.17-slim-bookworm, digest read from Docker Hub 2026-10-21
+# python:3.11.18-slim-bookworm, digest read from Docker Hub 2026-11-13
 FROM python:3.11.18-slim-bookworm@sha256:a83ba18aef0f865b1a4a611c2cf460fe446f2795673bbb9fe43be570439e3b39
 
 WORKDIR /app

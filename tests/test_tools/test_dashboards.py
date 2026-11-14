@@ -1303,7 +1303,7 @@ WIDGETS_URL = "https://test.logicmonitor.com/santaba/rest/dashboard/widgets"
 NODE_CPU = 'max by (k8s_node_name) (k8s_node_cpu_usage{cluster_name="rm-aks-cluster"})'
 POD_CPU = 'max by (k8s_pod_name) (k8s_pod_cpu_usage{k8s_namespace_name="kube-system"})'
 # An advancedmetrics widget as GET /dashboard/widgets/{id} returned it on 2026-11-11, after a
-# POST carrying only queryType and query (docs/validation/widget-probe-2026-11-11.json).
+# POST carrying only queryType and query.
 ADVANCED_WIDGET = {
     "id": 7139,
     "name": "probe query_only",

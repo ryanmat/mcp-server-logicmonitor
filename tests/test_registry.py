@@ -560,8 +560,8 @@ class TestListToolGuard:
         assert not own, f"move these onto list_tool: {own}"
 
 
-# R3.6, Step 67: the device and group property tools, Active Discovery and escalation.
-_STEP_67_ANNOTATIONS = {
+# R3.6: the device and group property tools, Active Discovery and escalation.
+_R3_6_ANNOTATIONS = {
     "get_device_group_properties": (True, False),
     "update_device_group_property": (False, False),
     "delete_device_group_property": (False, True),
@@ -578,19 +578,19 @@ _PROPERTY_PATH_TOOLS = (
 )
 
 
-class TestStep67Tools:
+class TestR36Tools:
     """R3.6: the six tools are registered with their handlers, gated, grouped, and refuse a
     property name that is not one path segment."""
 
     def test_each_has_its_handler_and_its_read_and_destructive_hints(self):
-        tools = {tool.name: tool for tool in TOOLS if tool.name in _STEP_67_ANNOTATIONS}
+        tools = {tool.name: tool for tool in TOOLS if tool.name in _R3_6_ANNOTATIONS}
 
         assert {
             name: (tool.annotations.readOnlyHint, tool.annotations.destructiveHint)
             for name, tool in tools.items()
-        } == _STEP_67_ANNOTATIONS
-        assert {name: get_tool_handler(name).__name__ for name in _STEP_67_ANNOTATIONS} == {
-            name: name for name in _STEP_67_ANNOTATIONS
+        } == _R3_6_ANNOTATIONS
+        assert {name: get_tool_handler(name).__name__ for name in _R3_6_ANNOTATIONS} == {
+            name: name for name in _R3_6_ANNOTATIONS
         }
 
     def test_each_write_says_it_requires_write_permission(self):
@@ -598,14 +598,14 @@ class TestStep67Tools:
 
         assert [
             name
-            for name, (read_only, _) in _STEP_67_ANNOTATIONS.items()
+            for name, (read_only, _) in _R3_6_ANNOTATIONS.items()
             if not read_only and "requires write permission" not in tools[name].description
         ] == []
 
     def test_the_schemas_name_their_ids_and_required_arguments(self):
         schemas = {tool.name: tool.inputSchema for tool in TOOLS}
 
-        assert {name: schemas[name]["required"] for name in _STEP_67_ANNOTATIONS} == {
+        assert {name: schemas[name]["required"] for name in _R3_6_ANNOTATIONS} == {
             "get_device_group_properties": ["group_id"],
             "update_device_group_property": ["group_id", "property_name", "property_value"],
             "delete_device_group_property": ["group_id", "property_name"],
@@ -677,7 +677,7 @@ class TestStep67Tools:
 
         assert [
             name
-            for name in _STEP_67_ANNOTATIONS
+            for name in _R3_6_ANNOTATIONS
             if name != "escalate_alert" and "resource" not in tools[name].description.lower()
         ] == []
 
@@ -685,12 +685,12 @@ class TestStep67Tools:
         from lm_mcp.resources.guides import TOOL_CATEGORIES
 
         categories = TOOL_CATEGORIES["categories"]
-        assert set(categories["devices"]["tools"]) >= set(_STEP_67_ANNOTATIONS) - {"escalate_alert"}
+        assert set(categories["devices"]["tools"]) >= set(_R3_6_ANNOTATIONS) - {"escalate_alert"}
         assert "escalate_alert" in categories["alerts"]["tools"]
 
 
-# R3.6, Step 68: the four reads and the category each joins.
-_STEP_68_CATEGORIES = {
+# R3.6: the four reads and the category each joins.
+_R3_6_READ_CATEGORIES = {
     "get_datasource_devices": "datasources",
     "get_unmonitored_devices": "devices",
     "get_website_checkpoints": "websites",
@@ -698,17 +698,17 @@ _STEP_68_CATEGORIES = {
 }
 
 
-class TestStep68Tools:
+class TestR36ReadTools:
     """R3.6: the four reads are registered read-only with their handlers and grouped."""
 
     def test_each_is_read_only_with_its_handler(self):
-        tools = {tool.name: tool for tool in TOOLS if tool.name in _STEP_68_CATEGORIES}
+        tools = {tool.name: tool for tool in TOOLS if tool.name in _R3_6_READ_CATEGORIES}
 
         assert {name: tool.annotations.readOnlyHint for name, tool in tools.items()} == {
-            name: True for name in _STEP_68_CATEGORIES
+            name: True for name in _R3_6_READ_CATEGORIES
         }
-        assert {name: get_tool_handler(name).__name__ for name in _STEP_68_CATEGORIES} == {
-            name: name for name in _STEP_68_CATEGORIES
+        assert {name: get_tool_handler(name).__name__ for name in _R3_6_READ_CATEGORIES} == {
+            name: name for name in _R3_6_READ_CATEGORIES
         }
 
     def test_the_schemas(self):
@@ -743,12 +743,12 @@ class TestStep68Tools:
         categories = TOOL_CATEGORIES["categories"]
         assert [
             name
-            for name, category in _STEP_68_CATEGORIES.items()
+            for name, category in _R3_6_READ_CATEGORIES.items()
             if name not in categories[category]["tools"]
         ] == []
 
 
-# R3.7, Step 69: the device-scoped NetFlow reads replace the two /netflow/flows tools.
+# R3.7: the device-scoped NetFlow reads replace the two /netflow/flows tools.
 _NETFLOW_TOOLS = ("get_device_flows", "get_device_top_talkers")
 
 
@@ -789,11 +789,11 @@ class TestDeviceNetflowTools:
         ] == []
 
 
-# R3.8, Step 70: Service Insights rules and tenants, each read-only in its category.
-_STEP_70_CATEGORIES = {"get_service_insights_rules": "ops", "get_tenants": "users"}
+# R3.8: Service Insights rules and tenants, each read-only in its category.
+_R3_8_CATEGORIES = {"get_service_insights_rules": "ops", "get_tenants": "users"}
 
 
-class TestStep70Tools:
+class TestR38Tools:
     """R3.8: the two reads are registered read-only with their handlers and grouped."""
 
     def test_each_is_read_only_with_its_handler_and_category(self):
@@ -802,16 +802,16 @@ class TestStep70Tools:
         tools = {tool.name: tool for tool in TOOLS}
         categories = TOOL_CATEGORIES["categories"]
 
-        assert [tools[name].annotations.readOnlyHint for name in _STEP_70_CATEGORIES] == [
+        assert [tools[name].annotations.readOnlyHint for name in _R3_8_CATEGORIES] == [
             True,
             True,
         ]
-        assert [get_tool_handler(name).__name__ for name in _STEP_70_CATEGORIES] == list(
-            _STEP_70_CATEGORIES
+        assert [get_tool_handler(name).__name__ for name in _R3_8_CATEGORIES] == list(
+            _R3_8_CATEGORIES
         )
         assert [
             name
-            for name, category in _STEP_70_CATEGORIES.items()
+            for name, category in _R3_8_CATEGORIES.items()
             if name not in categories[category]["tools"]
         ] == []
 
@@ -822,7 +822,7 @@ class TestStep70Tools:
         assert schemas["get_tenants"]["properties"] == {}
 
 
-# R3.10, Step 75: the usage reads from #98, alone in the usage category.
+# R3.10: the usage reads from #98, alone in the usage category.
 _USAGE_TOOLS = ("get_usage_contract", "get_usage_metrics")
 
 

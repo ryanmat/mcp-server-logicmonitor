@@ -796,7 +796,7 @@ class TestAlertListPaging:
         await assert_negative_total_reads_as_more(client, getattr(alerts, name), path, kwargs)
 
 
-# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe). DS362817020 was
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12. DS362817020 was
 # an unacknowledged alert on a one-stage chain; DS362333940 an acknowledged one.
 LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "property_ops.json").read_text())
 _BASE = "https://test.logicmonitor.com/santaba/rest"

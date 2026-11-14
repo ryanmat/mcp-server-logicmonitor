@@ -15,7 +15,7 @@ from lm_mcp.client.edwin import EdwinClient
 from lm_mcp.tools import edwin as edwin_tools
 from lm_mcp.tools.edwin import ask_edwin
 
-# edwin-samples/edwin-ws-conversation.jsonl, copied verbatim: a header naming the probe
+# A captured Ask Edwin conversation, copied verbatim: a header naming the probe
 # and the message sent, then the 69 frames Edwin answered "which collectors are down" with
 # (61 answer_thought, 7 answer_token, 1 response_end).
 _LINES = (Path(__file__).parent.parent / "fixtures" / "edwin_ws_conversation.jsonl").read_text()
@@ -26,8 +26,7 @@ ANSWER = "".join(f["message"] for f in PARSED if f["type"] == "answer_token")
 REASONING = "".join(f["message"] for f in PARSED if f["type"] == "answer_thought")
 TRACE_ID = "87012a12ee47e22c858cd7537fc0aecf"
 
-# POST /api/conversations with {} on lmryanmatuszewski.dexda.ai, 2026-11-10
-# (docs/validation/probes-2026-11.md, Step 57).
+# POST /api/conversations with {} on lmryanmatuszewski.dexda.ai, 2026-11-10.
 CREATED = {
     "conversationId": "38d93fe7-6153-4caa-bf84-e5223f38e912",
     "orgId": "lmryanmatuszewski",

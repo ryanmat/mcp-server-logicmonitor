@@ -60,7 +60,8 @@ jobs:
 
       # Grades search_tools against evals/search/queries.json under the read-only and
       # write-enabled configurations, and exits nonzero when either falls under its
-      # pass line. Only the 3.11 leg runs it.
+      # pass line. It also grades skill run transcripts under evals/skills/*/runs/ when
+      # any are present; a checkout holds none. Only the 3.11 leg runs it.
       - name: Grade the search_tools eval
         if: matrix.python-version == '3.11'
         run: uv run python evals/grade.py

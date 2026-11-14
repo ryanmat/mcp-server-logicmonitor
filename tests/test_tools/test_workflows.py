@@ -1955,7 +1955,7 @@ class TestDiagnose:
     async def test_reads_the_assigned_diagnostics_and_their_latest_results(
         self, auth, lm_env, monkeypatch
     ):
-        """rul-43402c07ec: the device's assigned DiagnosticSources and the latest results of
+        """The device's assigned DiagnosticSources and the latest results of
         the alert's diagnostic runs, read and never run; the summary lifts the trimmed blast
         radius' warning. The list route takes moduleType diagnostic, as the portal does."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
@@ -2025,7 +2025,7 @@ class TestDiagnose:
         assert "health_score" not in DIAGNOSE_OUTPUT_SCHEMA["properties"]
 
     def test_nothing_offers_the_removed_health_score(self):
-        """Step 33 removed score_device_health: a tool description or best practice names
+        """score_device_health is not a tool: a tool description or best practice names
         the health score only as absent or removed."""
         from lm_mcp.registry import TOOLS
         from lm_mcp.resources.best_practices import BEST_PRACTICES

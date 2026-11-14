@@ -311,7 +311,7 @@ class TestUpdateDeviceProperty:
         assert data["property"]["value"] == "hello"
 
 
-# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe). Group 3339 is a
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12. Group 3339 is a
 # throwaway group under the root, 3340 its child and 3341 the child's child; 3343 is a child of
 # another throwaway group, 3342, whose lmmcp.order it inherits. Its property page
 # held six rows; one, an inherited endpoint URL naming a private host, is cut, under the total

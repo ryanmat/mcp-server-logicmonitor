@@ -265,7 +265,7 @@ if __name__ == "__main__":
 
 
 # POST paths whose call changes a monitored host or the collector serving it: a remediation
-# run (rul-43402c07ec) and a collector restart (spec R3.4).
+# run and a collector restart (spec R3.4).
 _DESTRUCTIVE_POSTS = ("/setting/remediationsources/executemanually", "/services/restart")
 
 
@@ -300,7 +300,7 @@ def test_a_tool_that_deletes_or_runs_a_remediation_is_destructive(tool):
 
 
 def test_execute_remediation_is_destructive_and_execute_diagnostic_is_not():
-    """rul-43402c07ec: a remediation changes the host, so elicitation can ask first; a
+    """A remediation changes the host, so elicitation can ask first; a
     diagnostic reads it."""
     tools = {tool.name: tool for tool in TOOLS}
 
