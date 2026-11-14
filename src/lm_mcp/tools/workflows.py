@@ -1249,7 +1249,7 @@ async def diagnose(
                     get_diagnostic_remediation_assignments,
                     client,
                     resource_id=target_device_id,
-                    module_type="diagnosticsource",
+                    module_type="diagnostic",
                 )
                 diagnostics["assigned"] = assigned.get("assigned_sources", [])
             except Exception as exc:

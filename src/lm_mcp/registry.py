@@ -5664,7 +5664,7 @@ TOOLS.extend(
                     },
                     "module_type": {
                         "type": "string",
-                        "enum": ["diagnosticsource", "remediationsource"],
+                        "enum": ["diagnostic", "remediation"],
                         "description": "Restrict to one module type (both if omitted)",
                     },
                     "limit": {"type": "integer", "default": 50, "description": "Max results"},

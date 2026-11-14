@@ -54,7 +54,7 @@ alert, report that and stop.
 ### Step 2: Remediation options
 
 1. Call `get_diagnostic_remediation_assignments` with `resource_id` set to the device
-   ID and `module_type` "remediationsource" for the RemediationSources assigned to the
+   ID and `module_type` "remediation" for the RemediationSources assigned to the
    device. `get_remediationsources` finds a source by name when the operator asks for
    one; a source outside the device's assignments runs a script written for other
    devices, so do not offer it.

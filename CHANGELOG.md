@@ -398,6 +398,11 @@ instead.
 
 ### Fixed
 
+- `get_diagnostic_remediation_assignments` takes `module_type` `diagnostic` or `remediation`.
+  Its schema offered `diagnosticsource` and `remediationsource`, which the API answers with
+  HTTP 400, and `diagnose` asked for the first, so its `diagnostics.assigned` read failed with
+  a warning on every call. The remediation prompt and the `lm-remediate` skill name the
+  accepted value.
 - `get_alerts` with `device_id` reads that device's own alert list. It sent the id as a
   `monitorObjectId` filter, which `/alert/alerts` ignores, so it returned alerts from every
   device; an id that matches no device now answers `NOT_FOUND`. `group_id` beside `device_id` is

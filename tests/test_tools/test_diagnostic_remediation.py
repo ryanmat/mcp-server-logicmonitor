@@ -2,6 +2,8 @@
 # Description: Covers assigned-source listing and structured execution results.
 
 import json
+import re
+from pathlib import Path
 
 import httpx
 import pytest
@@ -12,6 +14,7 @@ from lm_mcp.client import LogicMonitorClient
 from lm_mcp.tools import is_error_result
 
 BASE = "https://test.logicmonitor.com/santaba/rest"
+ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
@@ -39,6 +42,20 @@ def _assigned_source(**overrides) -> dict:
     }
     item.update(overrides)
     return item
+
+
+def assignments_route(request: httpx.Request) -> httpx.Response:
+    """The list route as the sandbox answered on 2026-11-13: moduleType is diagnostic or
+    remediation, and any other value is a 400 with this body."""
+    if request.url.params.get("moduleType") not in (None, "diagnostic", "remediation"):
+        body = {
+            "errorMessage": "Invalid moduleType: use diagnostic or remediation",
+            "errorCode": 1400,
+            "errorDetail": None,
+        }
+        return httpx.Response(400, json=body)
+    body = {"total": 1, "items": [_assigned_source()], "searchId": None, "isMin": False}
+    return httpx.Response(200, json=body)
 
 
 def _execution(**overrides) -> dict:
@@ -93,13 +110,45 @@ class TestGetDiagnosticRemediationAssignments:
         )
 
         await get_diagnostic_remediation_assignments(
-            client, alert_id="DS123", module_type="remediationsource"
+            client, alert_id="DS123", module_type="remediation"
         )
 
         params = route.calls[0].request.url.params
         assert params["alertId"] == "DS123"
-        assert params["moduleType"] == "remediationsource"
+        assert params["moduleType"] == "remediation"
         assert "resourceId" not in params
+
+    @respx.mock
+    async def test_every_module_type_the_schema_offers_is_one_the_api_accepts(self, client):
+        """The schema's enum is the caller's only guide to module_type, and the route
+        answers 400 to any value but diagnostic and remediation."""
+        from lm_mcp.registry import TOOLS
+        from lm_mcp.tools.diagnostic_remediation import (
+            get_diagnostic_remediation_assignments,
+        )
+
+        respx.get(f"{BASE}/setting/diagnosticRemediation/list").mock(side_effect=assignments_route)
+        (tool,) = [t for t in TOOLS if t.name == "get_diagnostic_remediation_assignments"]
+        offered = tool.inputSchema["properties"]["module_type"]["enum"]
+
+        assert offered == ["diagnostic", "remediation"]
+        for module_type in offered:
+            result = await get_diagnostic_remediation_assignments(
+                client, resource_id=42, module_type=module_type
+            )
+            assert not is_error_result(result), module_type
+            assert json.loads(result[0].text)["count"] == 1
+
+    @pytest.mark.parametrize(
+        "path", [".claude/skills/lm-remediate/SKILL.md", "src/lm_mcp/prompts/templates.py"]
+    )
+    def test_the_remediation_runbooks_name_module_types_the_tools_take(self, path):
+        """The skill and the prompt tell the model which module_type to pass to the
+        assignments and results tools; each value they name is one the API accepts."""
+        named = set(re.findall(r'module_type`? "(\w+)"', (ROOT / path).read_text()))
+
+        assert named
+        assert named <= {"diagnostic", "remediation", "both"}
 
     async def test_assignments_requires_target(self, client):
         from lm_mcp.tools.diagnostic_remediation import (

@@ -41,7 +41,7 @@ from lm_mcp.tools.workflows import (
 )
 from tests.alert_pages import alert_lists
 from tests.sdk_call import replay_through_sdk, structured
-from tests.test_tools.test_diagnostic_remediation import _assigned_source, _execution
+from tests.test_tools.test_diagnostic_remediation import _execution, assignments_route
 
 
 @pytest.fixture
@@ -1881,10 +1881,10 @@ class TestDiagnose:
     ):
         """rul-43402c07ec: the device's assigned DiagnosticSources and the latest results of
         the alert's diagnostic runs, read and never run; the summary lifts the trimmed blast
-        radius' warning."""
+        radius' warning. The list route takes moduleType diagnostic, as the portal does."""
         client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
         assigned = respx.get(f"{_BASE}/setting/diagnosticRemediation/list").mock(
-            return_value=_ok({"items": [_assigned_source()], "total": 1})
+            side_effect=assignments_route
         )
         results = respx.get(f"{_BASE}/setting/diagnosticRemediation/executionResults").mock(
             return_value=_ok({"items": [_execution()], "total": 1})
@@ -1897,7 +1897,7 @@ class TestDiagnose:
         data = json.loads(result[0].text)
         assert dict(assigned.calls.last.request.url.params) == {
             "resourceId": "1786",
-            "moduleType": "diagnosticsource",
+            "moduleType": "diagnostic",
         }
         results_params = results.calls.last.request.url.params
         assert results_params["alertId"] == "DS362333940"

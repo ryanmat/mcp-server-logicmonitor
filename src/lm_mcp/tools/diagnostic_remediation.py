@@ -177,8 +177,8 @@ async def get_diagnostic_remediation_assignments(
         client: LogicMonitor API client.
         resource_id: Device/resource ID to list assigned sources for.
         alert_id: Alert ID to list assigned sources for.
-        module_type: Restrict to one type (diagnosticsource or
-            remediationsource); both when omitted.
+        module_type: Restrict to one type (diagnostic or remediation); both when
+            omitted. The API answers 400 to any other value.
         limit: Maximum number of sources to return.
 
     Returns:
