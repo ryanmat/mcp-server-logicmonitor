@@ -105,7 +105,9 @@ and the impacted CIs in the result, then compare:
   cluster, or in several? A cluster holds two or more alerts, so a CI with one alert in
   the window forms no device cluster of its own; it shows up only in a datasource or
   signature cluster's `devices`, when another device alerts on the same datasource (or
-  the same datapoint of it).
+  the same datapoint of it). The result lists the five largest clusters of each type
+  (`by_type` counts them all), and a cluster names up to ten of its `device_count`
+  devices; a CI missing from a list that is cut short is untested, not absent.
   When an impacted CI is in no cluster, say the grouping is untested for it, not that
   LogicMonitor separates it from Edwin's grouping.
 - its correlated changes with Edwin's root cause: a change just before

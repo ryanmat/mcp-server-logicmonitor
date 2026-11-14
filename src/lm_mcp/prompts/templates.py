@@ -25,8 +25,8 @@ Parameters:
 Steps to follow:
 1. Call `triage` with hours_back set to {hours} and the severity filter (leave it out
    for all severities). One call reads the window's alerts once, active and cleared,
-   and returns statistics, clusters (by device, by datasource, and by datasource and
-   datapoint), a noise score, the audit changes that preceded alert spikes, and
+   and returns statistics, the largest clusters (by device, by datasource, and by
+   datasource and datapoint), a noise score, the audit changes that preceded alert spikes, and
    blast-radius counts for up to three of the largest device clusters.
 2. Read the noise score. Above 70, alerting is noisy: name the noisiest
    devices and datasources and pass on the tuning recommendations. The high_alert_noise

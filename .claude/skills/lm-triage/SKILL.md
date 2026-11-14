@@ -44,10 +44,13 @@ window's alerts once, active and cleared, and returns:
 - `noise`: `noise_score` from 0 to 100, `flap_count`, `repeat_ratio`, the noisiest
   devices and datasources, and `recommendations`
 - `clusters`: groups of two or more alerts by device, by datasource and by signature
-  (datasource and datapoint), each with its `alert_ids` and first and last alert times;
-  a device cluster names its `device_id`
+  (datasource and datapoint). `clusters.clusters` lists the five largest of each type,
+  each with its `count`, its ten most severe `alert_ids` (newest first within a
+  severity) and first and last alert times; `cluster_count` and `by_type` count every
+  cluster. A device cluster names its `device_id`
 - `changes`: audit write actions paired with the alert spike that followed each
-  (`correlated_events`, each with `time_gap_minutes` and `confidence`)
+  (`correlated_events`, the ten pairs of highest `confidence`, each with
+  `time_gap_minutes`; `total_correlated` counts every pair)
 - `blast_radius`: for up to three device clusters, largest first, their `neighbor_count`,
   `dependent_count`, `critical_alert_count` and `unreadable_count`
 - `warnings`: an alert window read or a blast-radius read that failed, and a window cut
@@ -87,7 +90,9 @@ For each cluster in `clusters.clusters`:
 - The common factor, and a root cause hypothesis
 - The time span from `first_alert_time` to `last_alert_time`
 
-If `cluster_count` is 0, note that the alerts look independent.
+If `cluster_count` is 0, note that the alerts look independent. When `by_type` counts
+more clusters of a type than are listed, say how many are not shown; a narrower
+`severity`, `device` or window brings them into view.
 
 ### Step 4: Impact
 
@@ -117,7 +122,8 @@ clusters):
 
 1. Call `get_alerts` with `cleared=false` and the same `severity` and `device` filters
    to list the open alerts with their `id`, `severity` and `start_time`, and pick the
-   most severe alert among the cluster's `alert_ids`.
+   most severe open alert among the cluster's `alert_ids`, which list its most severe
+   first and can include cleared alerts.
 2. Call `get_alert_details` with that alert's id for its datasource, instance,
    datapoint, value and thresholds.
 3. For a device cluster, call `get_device` with its `device_id` for the device type,

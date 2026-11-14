@@ -36,7 +36,8 @@ Call `portal_overview` with `hours_back` and `detail_level="full"`. One call ret
 - `alert_statistics`: the window's `active` and `cleared` totals, `by_severity`
   (active and cleared together), the busiest devices and datasources, and `hourly`
 - `alert_clusters`: groups of two or more alerts by device, datasource and
-  signature (datasource and datapoint)
+  signature (datasource and datapoint); `clusters` lists the five largest of each type,
+  and `cluster_count` and `by_type` count every cluster
 - `noise`: `noise_score` from 0 to 100, the noisiest devices and datasources, and
   `recommendations`
 - `collectors`: the first page of collectors (`id`, `hostname`, `status`, `is_down`,
@@ -105,9 +106,10 @@ critical alerts start as SDTs end, flag a likely alert storm at SDT expiry.
 ### Step 5: Alert clusters
 
 Present the five largest clusters from `alert_clusters.clusters`: the common factor
-(shared device, datasource, or datasource and datapoint), the alert count, and a
-root-cause hypothesis. If `cluster_count` is 0, note that the alerts look
-independent.
+(shared device, datasource, or datasource and datapoint), the alert count (`count`),
+and a root-cause hypothesis. Give `cluster_count` as the number of clusters in the
+window, since the list holds at most five of each type. If `cluster_count` is 0, note
+that the alerts look independent.
 
 ### Step 6: Noise
 
@@ -119,11 +121,12 @@ below 40. Name the noisiest devices and datasources, and pass on the
 
 Call `analyze_alerts` with `hours=hours_back` and `analyses=["changes", "bursts"]`:
 - `changes.correlated_events` pair portal changes with the alert spikes that followed
-  them, with `time_gap_minutes` and `confidence`. When `changes.audit_read_failed` is
+  them, with `time_gap_minutes` and `confidence`: the ten pairs of highest confidence,
+  of the `total_correlated` found. When `changes.audit_read_failed` is
   true, the audit log could not be read: report the changes as unknown, since
   `total_changes` then reads 0 whether or not anything changed.
 - `bursts.bursts` are the datasources that fired on several devices at once, each
-  with its `alert_count` and `device_count`.
+  with its `alert_count` and `device_count`: the ten largest of the `bursts_detected`.
 
 ### Step 8: Dead devices
 

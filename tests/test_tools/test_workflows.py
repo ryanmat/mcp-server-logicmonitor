@@ -39,7 +39,7 @@ from lm_mcp.tools.workflows import (
     search_tools,
     triage,
 )
-from tests.alert_pages import alert_lists
+from tests.alert_pages import alert_lists, busy_window
 from tests.sdk_call import replay_through_sdk, structured
 from tests.test_tools.test_diagnostic_remediation import _execution, assignments_route
 
@@ -610,6 +610,34 @@ _EDGE_FW_COUNTS = {
 
 class TestTriage:
     """Tests for the triage composite tool."""
+
+    @respx.mock
+    async def test_a_busy_window_fits_the_clients_result_limit(self, auth, lm_env):
+        """rul-c5874c19c1: triage over a window at the sandbox's scale, with its clusters
+        and changes read through analyze_alerts, returns under 50,000 characters at both
+        detail levels."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        alerts, entries = busy_window(int(time.time()))
+        respx.get(_ALERTS_URL).mock(side_effect=alert_lists(alerts))
+        respx.get(_AUDIT_URL).mock(return_value=_ok({"items": entries}))
+        blast = {
+            "total_affected_devices": 0,
+            "neighbor_count": 0,
+            "dependent_count": 0,
+            "critical_alert_count": 0,
+            "unreadable": [],
+            "affected_devices": [],
+            "critical_path_devices": [],
+        }
+
+        for detail_level in ("summary", "full"):
+            with _patch_sub("lm_mcp.tools.topology_analysis.analyze_blast_radius", blast):
+                result = await triage(client, hours_back=24, detail_level=detail_level)
+
+            data = json.loads(result[0].text)
+            assert data["clusters"]["cluster_count"] > 30, detail_level
+            assert data["changes"]["total_correlated"] == 300, detail_level
+            assert len(result[0].text) < 50_000, detail_level
 
     async def test_happy_path_summary(self, client, monkeypatch):
         """Triage returns a report with expected keys in summary mode."""
@@ -1581,6 +1609,21 @@ class TestPortalOverview:
                 return_value=_ok({"items": [{"id": 5, "displayName": "dead-1"}], "total": 1})
             ),
         }
+
+    @respx.mock
+    async def test_a_busy_portal_fits_the_clients_result_limit(self, auth, lm_env):
+        """rul-c5874c19c1: at full detail, as the lm-portal skill calls it, a window at the
+        sandbox's scale returns under Claude Code's 50,000 characters."""
+        client = LogicMonitorClient(base_url=_BASE, auth=auth, max_retries=0)
+        routes = self._mock_portal()
+        alerts, _ = busy_window(int(time.time()))
+        routes["alerts"].mock(side_effect=alert_lists(alerts))
+
+        result = await portal_overview(client, hours_back=24, detail_level="full")
+
+        data = json.loads(result[0].text)
+        assert data["alert_clusters"]["cluster_count"] > 30
+        assert len(result[0].text) < 50_000
 
     @respx.mock
     async def test_summary_reads_alerts_collectors_and_sdts_once(self, auth, lm_env, monkeypatch):
