@@ -90,6 +90,17 @@ class TestReleaseMetadata:
 
         assert releases[0] == _project_version()
 
+    def test_package_authors_carry_a_name_and_no_email_address(self):
+        """Each author entry in pyproject.toml is a name alone.
+
+        The build writes an author's email into the package metadata, which a
+        published release keeps.
+        """
+        authors = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())["project"]["authors"]
+
+        assert authors
+        assert all(set(author) == {"name"} for author in authors)
+
     @pytest.mark.parametrize("doc", ["README.md", "documentation/client-setup.md", "server.json"])
     def test_docs_state_the_registry_tool_count(self, doc):
         """Every total tool count a doc or the registry manifest states is the registry's."""
