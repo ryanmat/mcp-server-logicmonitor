@@ -1,7 +1,7 @@
 {
   "skill": "lm-apm",
-  "user": "/lm-apm lmryanmatuszewski-frontend-web",
-  "state": "One APM service matches the name: id 1967, deviceType 6 (live read 2026-11-13).",
+  "user": "/lm-apm astro-site-checkout",
+  "state": "One APM service matches the name: id 500967, with one LogicMonitor_APM_Services instance and five LogicMonitor_APM_Operations instances (live read 2026-11-13).",
   "setup": false,
   "required_tools": [
     "get_apm_services",

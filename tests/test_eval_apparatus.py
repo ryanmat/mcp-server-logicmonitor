@@ -23,11 +23,12 @@ QUERIES = ROOT / "evals" / "search" / "queries.json"
 
 
 def _grade(tmp_path: Path, entries: list[dict]) -> subprocess.CompletedProcess:
-    """Run the grader as the Eval command runs it, on a fixture of entries."""
+    """Run the grader as the Eval command runs it, on a fixture of entries and no skill
+    scenarios."""
     fixture = tmp_path / "queries.json"
     fixture.write_text(json.dumps(entries))
     return subprocess.run(
-        [sys.executable, str(GRADER), "--fixture", str(fixture)],
+        [sys.executable, str(GRADER), "--fixture", str(fixture), "--skills", str(tmp_path)],
         capture_output=True,
         text=True,
         cwd=ROOT,
@@ -245,11 +246,15 @@ def _grade_skills(
     )
 
 
-def test_the_committed_scenarios_pass_with_no_transcripts():
-    """Step 88's completion: sixteen scenarios, none run, each skipped with a note, exit 0."""
-    result = subprocess.run(
-        [sys.executable, str(GRADER)], capture_output=True, text=True, cwd=ROOT, timeout=120
-    )
+def test_the_committed_scenarios_pass_with_no_transcripts(tmp_path):
+    """The sixteen scenarios with none run: each is skipped with a note, and the exit is 0.
+    Graded from a copy that leaves out runs/, where a checkout may hold transcripts."""
+    for path in SKILLS.glob("*/scenario-*.json"):
+        target = tmp_path / "skills" / path.parent.name / path.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(path.read_text())
+
+    result = _grade_skills(tmp_path, tmp_path / "skills")
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.count("SKIPPED") == 16
@@ -395,7 +400,9 @@ def _fake_claude(tmp_path: Path, output: dict, exit_code: int = 0) -> dict:
     script.write_text(
         f"#!{sys.executable}\n"
         "import json, os, sys\n"
-        "log = {'argv': sys.argv[1:], 'stdin': sys.stdin.read()}\n"
+        "log = {'argv': sys.argv[1:], 'stdin': sys.stdin.read(), 'cwd': os.getcwd()}\n"
+        "log['writes'] = os.environ.get('LM_ENABLE_WRITE_OPERATIONS')\n"
+        "log['files'] = sorted(str(p) for p in __import__('pathlib').Path('.').rglob('*.md'))\n"
         "open(os.environ['FAKE_CLAUDE_LOG'], 'w').write(json.dumps(log))\n"
         "print(os.environ['FAKE_CLAUDE_OUT'])\n"
         "sys.exit(int(os.environ['FAKE_CLAUDE_EXIT']))\n"
@@ -444,6 +451,34 @@ def test_the_judge_flag_asks_claude_opus_5_and_records_the_verdict(tmp_path):
     assert recorded == _verdict(transcript, SCENARIO["rubric"]) | {"items": recorded["items"]}
     assert recorded["items"]["states_unchecked"] == {"met": True, "reason": "The answer shows it."}
     assert _grade_skills(tmp_path, skills).returncode == 0
+
+
+def test_the_judge_sees_every_tool_result_the_run_received(tmp_path):
+    """A result over the client's size cap comes back as an error naming a saved file, and
+    the run then reads that file with Read or Bash (live runs, 2026-11-13). The figures an
+    answer cites can come from those reads, so they are evidence too; only logicmonitor
+    calls count toward the tool check."""
+    skills = _skills(tmp_path, ["health_check", "get_device_properties"], judged=False)
+    path = skills / "lm-health" / "runs" / "scenario-1.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    read = {"type": "tool_use", "id": "toolu_read", "name": "Read", "input": {"file_path": "/f"}}
+    saved = {"type": "tool_result", "tool_use_id": "toolu_read", "content": "cpu 12 percent"}
+    denied = {"type": "system", "subtype": "permission_denied", "message": "requires approval"}
+    rows[-2:-2] = [
+        {"type": "assistant", "message": {"role": "assistant", "content": [read]}},
+        denied,
+        {"type": "user", "message": {"role": "user", "content": [saved]}},
+    ]
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    env = _fake_claude(tmp_path, _judge_output())
+
+    result = _grade_skills(tmp_path, skills, "--judge", env=env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS    lm-health/scenario-1: tools ok" in result.stdout
+    sent = json.loads((tmp_path / "claude-call.json").read_text())["stdin"]
+    assert "Read returned:\ncpu 12 percent" in sent
+    assert 'health_check returned:\n{"total": 14}' in sent
 
 
 @pytest.mark.parametrize(
@@ -620,3 +655,90 @@ def test_setup_refuses_a_portal_that_is_not_the_sandbox():
 
     assert result.returncode == 2
     assert "refusing to run against acme.logicmonitor.com" in result.stderr
+
+
+# --- evals/skills/run.py ---
+
+_SANDBOX_ENV = {
+    "LM_PORTAL": "lmryanmatuszewski.logicmonitor.com",
+    "LM_BEARER_TOKEN": "lmb_test_token",
+    "LM_ENABLE_WRITE_OPERATIONS": "true",
+}
+
+
+def _run_scenarios(skills: Path, env: dict, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(SKILLS / "run.py"), "--skills", str(skills), *args],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+        timeout=60,
+        env=env,
+    )
+
+
+def test_the_runner_gives_claude_code_the_user_line_and_the_local_server(tmp_path):
+    """One scenario: `claude -p` gets its user line, on claude-sonnet-5-5, with the local
+    server as the only MCP server and writes off, from a directory that holds the skills
+    and no project instructions; what it prints is the transcript."""
+    skills = _skills(tmp_path, None)
+    row = {"type": "result", "subtype": "success", "is_error": False, "result": ANSWER}
+    env = _fake_claude(tmp_path, row) | _SANDBOX_ENV
+
+    result = _run_scenarios(skills, env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    transcript = skills / "lm-health" / "runs" / "scenario-1.jsonl"
+    assert json.loads(transcript.read_text()) == row
+    call = json.loads((tmp_path / "claude-call.json").read_text())
+    argv = call["argv"]
+    assert argv[:2] == ["-p", "/lm-health 89818"]
+    assert argv[argv.index("--model") + 1] == "claude-sonnet-5-5"
+    assert argv[argv.index("--output-format") + 1] == "stream-json"
+    assert argv[argv.index("--setting-sources") + 1] == "project"
+    assert "--strict-mcp-config" in argv
+    servers = json.loads(argv[argv.index("--mcp-config") + 1])["mcpServers"]
+    assert list(servers) == ["logicmonitor"]
+    assert servers["logicmonitor"]["args"][-1] == "lm-mcp-server"
+    assert "env" not in servers["logicmonitor"]
+    assert call["writes"] == "false"
+    assert ".claude/skills/lm-health/SKILL.md" in call["files"]
+    assert "CLAUDE.md" not in call["files"]
+    assert Path(call["cwd"]) != ROOT
+    assert "lm-health/scenario-1: exit 0" in result.stdout
+
+
+def test_the_runner_runs_only_the_scenarios_it_is_given(tmp_path):
+    _skills(tmp_path, None, name="lm-health")
+    skills = _skills(tmp_path, None, name="lm-logs", scenario=SCENARIO | {"user": "/lm-logs"})
+    env = _fake_claude(tmp_path, {"type": "result"}) | _SANDBOX_ENV
+
+    result = _run_scenarios(skills, env, "lm-logs/scenario-1")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (skills / "lm-logs" / "runs" / "scenario-1.jsonl").exists()
+    assert not (skills / "lm-health" / "runs" / "scenario-1.jsonl").exists()
+
+
+def test_the_runner_reports_a_run_that_fails(tmp_path):
+    """claude exits nonzero: the transcript is kept, and the runner exits 1."""
+    skills = _skills(tmp_path, None)
+    env = _fake_claude(tmp_path, {"type": "result", "is_error": True}, 1) | _SANDBOX_ENV
+
+    result = _run_scenarios(skills, env)
+
+    assert result.returncode == 1
+    assert "lm-health/scenario-1: exit 1" in result.stdout
+    assert (skills / "lm-health" / "runs" / "scenario-1.jsonl").exists()
+
+
+def test_the_runner_refuses_a_portal_that_is_not_the_sandbox(tmp_path):
+    skills = _skills(tmp_path, None)
+    env = _fake_claude(tmp_path, {"type": "result"}) | _SANDBOX_ENV
+    env["LM_PORTAL"] = "acme.logicmonitor.com"
+
+    result = _run_scenarios(skills, env)
+
+    assert result.returncode == 2
+    assert "refusing to run against acme.logicmonitor.com" in result.stderr
+    assert not (tmp_path / "claude-call.json").exists()
