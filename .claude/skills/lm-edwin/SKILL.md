@@ -37,9 +37,11 @@ Execute these steps in order. After each step, present findings before moving on
 ### Step 1: Insights
 
 Call `get_edwin_insights` with `hours` set to `hours_back`, and `limit` up to 25 when
-looking for a display id: a row Edwin has analyzed runs to about 1,600 characters, and
-a client can refuse a result of 50 such rows. When the id is not among them, narrow the
-read with `state`, `causal_ci` or a shorter `hours`. Each row carries:
+looking for a display id. A result carries whole rows up to 40,000 characters of them,
+and a row Edwin has analyzed runs to about 1,600, so it can hold fewer rows than
+`limit`. When the id is not among them, read on with `offset` set to the result's
+`next_offset`, or narrow the read with `state`, `causal_ci` or a shorter `hours`. Each
+row carries:
 
 - `meta.displayId`, `meta.state` (`active` or `cleared`) and
   `insightDetails.workflowState`
@@ -56,8 +58,8 @@ Present them:
 |---------|-------|-----------|--------|----------|---------|
 ```
 
-`has_more` true means more insights matched than came back. If none matched, say so
-and stop.
+`has_more` true means more insights matched than came back, and `next_offset` is the
+`offset` that reads them. If none matched, say so and stop.
 
 ### Step 2: The insight
 

@@ -31,6 +31,51 @@ def client(auth):
     )
 
 
+# Rows of GET /device/devices/{id}/properties as a live portal returned them on 2026-11-13,
+# one of each kind seen: an automatic property that lists a property rule, a custom one, an
+# inherited one, a system one that lists four groups, and a system one with no
+# source. A row has no "inherit" key; "type" says custom, inherit, auto or system.
+DEVICE_PROPERTY_ROWS = [
+    {
+        "type": "auto",
+        "name": "auto.lm.age",
+        "value": "0.0004976852",
+        "inheritList": [
+            {"fullpath": "Device_BasicInfo", "id": 60, "value": "", "type": "propertyRule"}
+        ],
+    },
+    {
+        "type": "custom",
+        "name": "system.categories",
+        "value": "",
+        "inheritList": [{"fullpath": "", "id": 1, "value": "", "type": "group"}],
+    },
+    {
+        "type": "inherit",
+        "name": "netapp.ssl",
+        "value": "true",
+        "inheritList": [{"fullpath": "", "id": 1, "value": "true", "type": "group"}],
+    },
+    {
+        "type": "system",
+        "name": "system.deviceGroupId",
+        "value": "16,120",
+        "inheritList": [
+            {
+                "fullpath": "Devices by Type/Minimal Monitoring",
+                "id": 16,
+                "value": "16",
+                "type": "group",
+            },
+            {"fullpath": "Devices by Type", "id": 2, "value": "2", "type": "group"},
+            {"fullpath": "All Devices", "id": 120, "value": "120", "type": "group"},
+            {"fullpath": "", "id": 1, "value": "1", "type": "group"},
+        ],
+    },
+    {"type": "system", "name": "system.enablenetflow", "value": "false", "inheritList": []},
+]
+
+
 class TestGetDeviceProperties:
     """Tests for get_device_properties tool."""
 
@@ -42,29 +87,7 @@ class TestGetDeviceProperties:
         respx.get("https://test.logicmonitor.com/santaba/rest/device/devices/100/properties").mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "items": [
-                        {
-                            "name": "system.hostname",
-                            "value": "server-01.example.com",
-                            "type": "system",
-                            "inherit": False,
-                        },
-                        {
-                            "name": "system.ips",
-                            "value": "192.168.1.100",
-                            "type": "system",
-                            "inherit": False,
-                        },
-                        {
-                            "name": "location",
-                            "value": "US-East",
-                            "type": "custom",
-                            "inherit": True,
-                        },
-                    ],
-                    "total": 3,
-                },
+                json={"items": DEVICE_PROPERTY_ROWS, "total": 5, "searchId": None, "isMin": False},
             )
         )
 
@@ -73,10 +96,46 @@ class TestGetDeviceProperties:
         assert len(result) == 1
         data = json.loads(result[0].text)
         assert data["device_id"] == 100
-        assert data["total"] == 3
-        assert len(data["properties"]) == 3
-        assert data["properties"][0]["name"] == "system.hostname"
-        assert data["properties"][2]["inherit"] is True
+        assert data["total"] == 5
+        assert data["properties"] == [
+            {
+                "name": "auto.lm.age",
+                "value": "0.0004976852",
+                "type": "auto",
+                "sources": [
+                    {"type": "propertyRule", "id": 60, "path": "Device_BasicInfo", "value": ""}
+                ],
+            },
+            {
+                "name": "system.categories",
+                "value": "",
+                "type": "custom",
+                "sources": [{"type": "group", "id": 1, "path": "", "value": ""}],
+            },
+            {
+                "name": "netapp.ssl",
+                "value": "true",
+                "type": "inherit",
+                "sources": [{"type": "group", "id": 1, "path": "", "value": "true"}],
+            },
+            {
+                "name": "system.deviceGroupId",
+                "value": "16,120",
+                "type": "system",
+                "sources": [
+                    {
+                        "type": "group",
+                        "id": 16,
+                        "path": "Devices by Type/Minimal Monitoring",
+                        "value": "16",
+                    },
+                    {"type": "group", "id": 2, "path": "Devices by Type", "value": "2"},
+                    {"type": "group", "id": 120, "path": "All Devices", "value": "120"},
+                    {"type": "group", "id": 1, "path": "", "value": "1"},
+                ],
+            },
+            {"name": "system.enablenetflow", "value": "false", "type": "system", "sources": []},
+        ]
 
     @respx.mock
     async def test_get_device_properties_with_name_filter(self, client):
@@ -114,27 +173,24 @@ class TestGetDeviceProperty:
         from lm_mcp.tools.resources import get_device_property
 
         respx.get(
-            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties/system.hostname"
+            "https://test.logicmonitor.com/santaba/rest/device/devices/100/properties/netapp.ssl"
         ).mock(
             return_value=httpx.Response(
                 200,
-                json={
-                    "name": "system.hostname",
-                    "value": "server-01.example.com",
-                    "type": "system",
-                    "inherit": False,
-                },
+                json=DEVICE_PROPERTY_ROWS[2],
             )
         )
 
-        result = await get_device_property(client, device_id=100, property_name="system.hostname")
+        result = await get_device_property(client, device_id=100, property_name="netapp.ssl")
 
         assert len(result) == 1
-        data = json.loads(result[0].text)
-        assert data["device_id"] == 100
-        assert data["name"] == "system.hostname"
-        assert data["value"] == "server-01.example.com"
-        assert data["type"] == "system"
+        assert json.loads(result[0].text) == {
+            "device_id": 100,
+            "name": "netapp.ssl",
+            "value": "true",
+            "type": "inherit",
+            "sources": [{"type": "group", "id": 1, "path": "", "value": "true"}],
+        }
 
     @respx.mock
     async def test_get_device_property_not_found(self, client):

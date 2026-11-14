@@ -20,12 +20,21 @@ if TYPE_CHECKING:
 
 
 def _device_property_row(item: dict) -> dict:
-    """Project one device properties row onto the get_device_properties fields."""
+    """Project one device property: its value in force, its type (custom, inherit, auto or
+    system), and the groups and property rules the portal lists for the name."""
     return {
         "name": item.get("name"),
         "value": item.get("value"),
         "type": item.get("type"),
-        "inherit": item.get("inherit", False),
+        "sources": [
+            {
+                "type": entry.get("type"),
+                "id": entry.get("id"),
+                "path": entry.get("fullpath"),
+                "value": entry.get("value"),
+            }
+            for entry in item.get("inheritList") or []
+        ],
     }
 
 
@@ -46,7 +55,8 @@ async def get_device_properties(
         offset: Number of results to skip for pagination.
 
     Returns:
-        List of TextContent with property data or error.
+        List of TextContent with the properties, each with its value, type and sources,
+        or an error envelope.
     """
     return await list_tool(
         client,
@@ -73,20 +83,13 @@ async def get_device_property(
         property_name: Name of the property to retrieve.
 
     Returns:
-        List of TextContent with property details or error.
+        List of TextContent with the property's value, type and sources, or an error
+        envelope.
     """
     try:
         result = await client.get(f"/device/devices/{device_id}/properties/{property_name}")
 
-        return format_response(
-            {
-                "device_id": device_id,
-                "name": result.get("name"),
-                "value": result.get("value"),
-                "type": result.get("type"),
-                "inherit": result.get("inherit", False),
-            }
-        )
+        return format_response({"device_id": device_id, **_device_property_row(result)})
     except Exception as e:
         return handle_error(e)
 

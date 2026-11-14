@@ -1,6 +1,8 @@
 # Description: Full integration tests for LogicMonitor MCP server.
 # Description: Tests realistic workflows across multiple tools.
 
+import json
+
 import httpx
 import pytest
 import respx
@@ -1051,13 +1053,15 @@ class TestResourceManagementFlow:
                             "name": "system.hostname",
                             "value": "prod-web-01.example.com",
                             "type": "system",
-                            "inherit": False,
+                            "inheritList": [],
                         },
                         {
                             "name": "location",
                             "value": "US-East",
-                            "type": "custom",
-                            "inherit": False,
+                            "type": "inherit",
+                            "inheritList": [
+                                {"fullpath": "", "id": 1, "value": "US-East", "type": "group"}
+                            ],
                         },
                     ],
                     "total": 2,
@@ -1074,8 +1078,8 @@ class TestResourceManagementFlow:
                 json={
                     "name": "location",
                     "value": "US-East",
-                    "type": "custom",
-                    "inherit": False,
+                    "type": "inherit",
+                    "inheritList": [{"fullpath": "", "id": 1, "value": "US-East", "type": "group"}],
                 },
             )
         )
@@ -1109,6 +1113,9 @@ class TestResourceManagementFlow:
         prop_result = await get_device_property(client, device_id=100, property_name="location")
         assert len(prop_result) == 1
         assert "US-East" in prop_result[0].text
+        assert json.loads(prop_result[0].text)["sources"] == [
+            {"type": "group", "id": 1, "path": "", "value": "US-East"}
+        ]
 
         # Step 4: Update property
         update_result = await update_device_property(

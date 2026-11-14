@@ -2959,7 +2959,11 @@ TOOLS.extend(
     [
         Tool(
             name="get_device_properties",
-            description="Get all properties of a device (resource)",
+            description=(
+                "Get all properties of a device (resource). Each has its value, its type "
+                "(custom, inherit, auto or system) and `sources`: the groups and property "
+                "rules the portal lists for that name, with the value each holds."
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -2981,7 +2985,11 @@ TOOLS.extend(
         ),
         Tool(
             name="get_device_property",
-            description="Get a specific property of a device (resource)",
+            description=(
+                "Get a specific property of a device (resource): its value, its type "
+                "(custom, inherit, auto or system) and `sources`, the groups and property "
+                "rules the portal lists for that name, with the value each holds."
+            ),
             annotations=_READ_ONLY,
             inputSchema={
                 "type": "object",
@@ -6855,6 +6863,12 @@ _EDWIN_LIMIT = {
     "maximum": 50,
     "description": "Most rows to return, 1 to 50",
 }
+_EDWIN_OFFSET = {
+    "type": "integer",
+    "default": 0,
+    "minimum": 0,
+    "description": "Rows to skip; pass an earlier result's next_offset to read on",
+}
 TOOLS.extend(
     [
         Tool(
@@ -6869,7 +6883,10 @@ TOOLS.extend(
                 "concluded about an incident before reading raw alerts and metrics; "
                 "get_edwin_insight reads one insight whole. `total` is Edwin's count of "
                 "matches; it has read exactly 10000 for a window of all time, so treat 10000 "
-                "as a lower bound. A cleared insight reads severity 0."
+                "as a lower bound. A cleared insight reads severity 0. A result carries whole "
+                "rows up to 40,000 characters of them, or one row alone when it is larger; "
+                "when rows are left over, `has_more` is true and `next_offset` is the `offset` "
+                "that reads on."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6900,6 +6917,7 @@ TOOLS.extend(
                         "description": "CI that must be in the insight's impacted list",
                     },
                     "limit": _EDWIN_LIMIT,
+                    "offset": _EDWIN_OFFSET,
                 },
             },
         ),
@@ -6933,7 +6951,10 @@ TOOLS.extend(
                 '{"EQUALS": [{"type": "string", "field": "cf.eventCI"}, "web01"]}; '
                 "get_edwin_metadata lists the field names. Without `columns` every field comes "
                 "back except extra.* (the CI's LogicMonitor properties) and raw.* (the source "
-                "record)."
+                "record). A result carries whole rows up to 40,000 characters of them, or one "
+                "row alone when it is larger; when rows are left over, `has_more` is true and "
+                "`next_offset` is the `offset` that reads on, and naming `columns` fits more "
+                "rows in a result."
             ),
             annotations=_READ_ONLY,
             inputSchema={
@@ -6966,6 +6987,7 @@ TOOLS.extend(
                         '"desc", "size": null}]',
                     },
                     "limit": _EDWIN_LIMIT,
+                    "offset": _EDWIN_OFFSET,
                 },
                 "required": ["source"],
             },

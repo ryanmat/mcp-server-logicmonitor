@@ -82,7 +82,11 @@ The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
   and `ask_edwin` (an Ask Edwin conversation over Edwin's websocket, 120-second budget).
   `EDWIN_HOST` overrides the derived host `https://<portal name>.dexda.ai` and is required in
   multi-portal mode. A 403 from Edwin is `SCOPE_MISSING`, naming the credential scope the call
-  needs where the path is known.
+  needs where the path is known. `get_edwin_insights` and `get_edwin_records` return whole
+  rows up to 40,000 characters of them and take `offset`. When that budget leaves rows out,
+  a `warning` says how many fit; while rows remain, `has_more` is true and `next_offset` is
+  the `offset` that reads on. That keeps a result under the 50,000 characters Claude Code
+  returns unless one row alone is larger.
   `websockets` (>=14.0) becomes a core dependency for `ask_edwin`.
 - LM Logs reads: `get_log_pipelines` (every pipeline in one call, with its query and partitions),
   `get_tracked_log_queries`, `get_log_query_groups`, `get_log_partitions` (each partition's state
@@ -398,6 +402,10 @@ instead.
 
 ### Fixed
 
+- `get_device_properties` and `get_device_property` report each property's `sources`: the
+  groups and property rules the portal lists for the name, with the value each holds.
+  `sources` replaces `inherit`, which read a key the API does not return and so was false
+  for every property. `type` says `custom`, `inherit`, `auto` or `system`.
 - `analyze_alerts`, `triage`, `portal_overview` and `diagnose` bound what their cluster,
   burst and change sections list, so a result on a busy portal fits a client's limit. On a
   5,800-device portal one `triage` result ran to 322,598 characters, and Claude Code returns

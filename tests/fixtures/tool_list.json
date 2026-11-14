@@ -5891,7 +5891,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get all properties of a device (resource)",
+    "description": "Get all properties of a device (resource). Each has its value, its type (custom, inherit, auto or system) and `sources`: the groups and property rules the portal lists for that name, with the value each holds.",
     "inputSchema": {
       "properties": {
         "device_id": {
@@ -5927,7 +5927,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "Get a specific property of a device (resource)",
+    "description": "Get a specific property of a device (resource): its value, its type (custom, inherit, auto or system) and `sources`, the groups and property rules the portal lists for that name, with the value each holds.",
     "inputSchema": {
       "properties": {
         "device_id": {
@@ -6279,7 +6279,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "List the insights Edwin AI created in the last `hours`, newest first. An insight is an incident Edwin built by correlating alerts. Each row has Edwin's id and display id, state, workflow state, severity, causal CI, impacted CIs, alert count and alert keys, a link into Edwin, and once Edwin has analyzed it, its title, summary, root cause, impact, timeline, remediation, evidence, contributing factors and similar incidents. Call this to find what Edwin concluded about an incident before reading raw alerts and metrics; get_edwin_insight reads one insight whole. `total` is Edwin's count of matches; it has read exactly 10000 for a window of all time, so treat 10000 as a lower bound. A cleared insight reads severity 0.",
+    "description": "List the insights Edwin AI created in the last `hours`, newest first. An insight is an incident Edwin built by correlating alerts. Each row has Edwin's id and display id, state, workflow state, severity, causal CI, impacted CIs, alert count and alert keys, a link into Edwin, and once Edwin has analyzed it, its title, summary, root cause, impact, timeline, remediation, evidence, contributing factors and similar incidents. Call this to find what Edwin concluded about an incident before reading raw alerts and metrics; get_edwin_insight reads one insight whole. `total` is Edwin's count of matches; it has read exactly 10000 for a window of all time, so treat 10000 as a lower bound. A cleared insight reads severity 0. A result carries whole rows up to 40,000 characters of them, or one row alone when it is larger; when rows are left over, `has_more` is true and `next_offset` is the `offset` that reads on.",
     "inputSchema": {
       "properties": {
         "causal_ci": {
@@ -6301,6 +6301,12 @@
           "description": "Most rows to return, 1 to 50",
           "maximum": 50,
           "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Rows to skip; pass an earlier result's next_offset to read on",
+          "minimum": 0,
           "type": "integer"
         },
         "severity": {
@@ -6349,7 +6355,7 @@
       "readOnlyHint": true,
       "title": null
     },
-    "description": "List Edwin AI's own copy of the alerts or events it received in the last `hours`, newest first unless `order` says otherwise. Use it to see what Edwin correlated; LogicMonitor's alerts are read with get_alerts and insights with get_edwin_insights. `filter` takes one Edwin filterCondition condition, ANDed with the window, such as {\"EQUALS\": [{\"type\": \"string\", \"field\": \"cf.eventCI\"}, \"web01\"]}; get_edwin_metadata lists the field names. Without `columns` every field comes back except extra.* (the CI's LogicMonitor properties) and raw.* (the source record).",
+    "description": "List Edwin AI's own copy of the alerts or events it received in the last `hours`, newest first unless `order` says otherwise. Use it to see what Edwin correlated; LogicMonitor's alerts are read with get_alerts and insights with get_edwin_insights. `filter` takes one Edwin filterCondition condition, ANDed with the window, such as {\"EQUALS\": [{\"type\": \"string\", \"field\": \"cf.eventCI\"}, \"web01\"]}; get_edwin_metadata lists the field names. Without `columns` every field comes back except extra.* (the CI's LogicMonitor properties) and raw.* (the source record). A result carries whole rows up to 40,000 characters of them, or one row alone when it is larger; when rows are left over, `has_more` is true and `next_offset` is the `offset` that reads on, and naming `columns` fits more rows in a result.",
     "inputSchema": {
       "properties": {
         "columns": {
@@ -6374,6 +6380,12 @@
           "description": "Most rows to return, 1 to 50",
           "maximum": 50,
           "minimum": 1,
+          "type": "integer"
+        },
+        "offset": {
+          "default": 0,
+          "description": "Rows to skip; pass an earlier result's next_offset to read on",
+          "minimum": 0,
           "type": "integer"
         },
         "order": {
