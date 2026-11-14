@@ -63,9 +63,9 @@ BURST_MIN_ALERTS = 10
 BURST_MIN_DEVICES = 3
 
 # The bounds on what a section lists. A busy window holds a hundred clusters, some of
-# thousands of alerts, and hundreds of change and spike pairs; listed in full they come to
-# more than 300,000 characters, and Claude Code returns no tool result over 50,000. Every
-# section still counts what it found.
+# thousands of alerts, and hundreds of change and spike pairs; listed in full they can pass
+# 300,000 characters, and Claude Code returns no tool result over 50,000. Every section
+# still counts what it found.
 # The bursts section shows this many bursts, largest first, and a burst this many ids.
 MAX_BURSTS = 10
 MAX_BURST_ALERT_IDS = 10
