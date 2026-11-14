@@ -8,6 +8,15 @@
 
 A Model Context Protocol (MCP) server that gives AI assistants the LogicMonitor REST API v3 through 273 tools, 3 workflow prompts and 25 resources.
 
+## Upgrading from 4.x
+
+5.0.0 is a breaking release. Check a setup that worked on 4.3.0 against these before it moves to 5.x. The CHANGELOG has the rest under [Upgrading from 4.3.0](https://github.com/ryanmat/mcp-server-logicmonitor/blob/main/CHANGELOG.md#upgrading-from-430).
+
+- 82 of the 306 tool names in 4.3.0 no longer answer: 7 are renamed and 75 removed. The CHANGELOG's table gives each one's 5.0 name or what to call instead.
+- A tool that changes the portal is listed only with `LM_ENABLE_WRITE_OPERATIONS=true`. 4.3.0 listed its write tools and refused the call.
+- A failed call returns one JSON envelope, `{"error": {"code", "message", ...}}`, in place of the `Error:` and `Suggestion:` lines.
+- `uvx --from lm-mcp lm-mcp-server` takes the newest release the first time it runs on a machine and uv's cached one after that, so a setup moves to 5.x when that cache is cleared or refreshed. `uv tool install lm-mcp` stays on its version until `uv tool upgrade lm-mcp`. To hold a setup on 4.3.0, start it with `uvx --from lm-mcp==4.3.0 lm-mcp-server`.
+
 ## Overview
 
 Your MCP client starts the server as a subprocess and talks to it over stdio; the server calls your portal with your API token. It can also run as an HTTP service that serves MCP at `/mcp`.

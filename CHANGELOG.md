@@ -8,6 +8,17 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
+## [5.0.1] - 2026-11-14
+
+A documentation release. No tool, schema or behavior changes from 5.0.0.
+
+### Changed
+
+- The README opens with "Upgrading from 4.x": the tool names that no longer answer, write tools
+  hidden by default, the error envelope, and which version `uvx` and `uv tool install` run, with
+  the pin that holds a setup on 4.3.0. The package page on PyPI shows the README of its release,
+  so this release puts the notice there.
+
 ## [5.0.0] - 2026-11-13
 
 A breaking release. It removes the IBM watsonx, HuggingFace, Ansible Automation Platform and
@@ -2195,7 +2206,8 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
-[Unreleased]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v5.0.0...HEAD
+[Unreleased]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v5.0.1...HEAD
+[5.0.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v5.0.0...v5.0.1
 [5.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.2.1...v4.3.0
 [4.2.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.2.0...v4.2.1

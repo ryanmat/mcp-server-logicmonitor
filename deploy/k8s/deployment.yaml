@@ -44,7 +44,7 @@ spec:
         - name: mcp-server-logicmonitor
           # A release tag, as the release workflow pushes it (no "v" prefix).
           # Move it with each release rather than tracking :latest.
-          image: ghcr.io/ryanmat/mcp-server-logicmonitor:5.0.0
+          image: ghcr.io/ryanmat/mcp-server-logicmonitor:5.0.1
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
