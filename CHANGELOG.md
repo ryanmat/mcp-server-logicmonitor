@@ -8,6 +8,13 @@ that 4.3.0 is a minor release with breaking changes, which its section lists fir
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-13
+
+A breaking release. It removes the IBM watsonx, HuggingFace, Ansible Automation Platform and
+Terraform runner integrations, replaces thirteen analysis tools with `analyze_metric` and
+`analyze_alerts`, and adds Edwin AI, LM Logs, collector operations, usage reads and MCP
+Streamable HTTP. Read Upgrading from 4.3.0 before you install it over a working setup.
+
 Against 4.3.0, the removals, renames and additions below take the server from 306 tools to 273:
 261 with one portal, plus `get_portals`, `use_portal`, `get_current_portal` and
 `run_portal_reload` in multi-portal mode and the eight Edwin AI tools with Edwin credentials.
@@ -15,18 +22,48 @@ With writes off, the default, `tools/list` shows 150 of them, or 154 in multi-po
 seven more with Edwin credentials. Prompts go from 15 to 3 and resources from 26 to 25. `uv.lock`
 holds 59 packages, down from 137, with the model stack gone. `uv export --no-dev --extra http`
 lists 35 runtime packages, 34 of which install on Linux, the same 34 as 4.3.0; `pywin32` is
-Windows-only. The Python under `src/` is 32,172 lines, down from 40,839; the eight LogicModule
-tool modules hold 1,738 of those lines and the module table they share (`tools/logicmodules.py`)
-530, 2,268 together, where the eight held 2,785 in 4.3.0. The test suite runs 3,445 tests; the
-CI runs on main after #149 to #153 merged, at 2,893 to 3,404 tests, finished the test step in
-under a minute on every Python leg, against 2,959 passing and 8 skipped in 179 to 191 s for 4.3.0.
+Windows-only. The Python under `src/` is 38,852 lines, down from 40,839; the eight LogicModule
+tool modules hold 1,785 of those lines and the module table they share (`tools/logicmodules.py`)
+530, 2,315 together, where the eight held 2,785 in 4.3.0. The test suite runs 5,197 tests, where
+4.3.0 ran 2,959 and skipped 8.
 
-The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
-`WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`, `HF_DEVICE`,
-`HF_CACHE_DIR`, `AWX_URL`, `AWX_TOKEN`, `AWX_VERIFY_SSL`, `AWX_TIMEOUT`, `AWX_MAX_RETRIES`,
-`TF_WORKSPACE_DIR`, `TF_TERRAFORM_BINARY`, `TF_TIMEOUT`, `TF_AUTO_APPROVE_ENABLED`,
-`LM_ANALYSIS_MAX_CONCURRENCY`, `LM_API_VERSION`, `LM_CORS_ORIGINS`, `LM_FIELD_VALIDATION`,
-`LM_SESSION_ENABLED` and `LM_SESSION_PERSIST_PATH`.
+### Upgrading from 4.3.0
+
+A setup that worked on 4.3.0 has to account for each of these. The entries under Added,
+Removed, Fixed and Changed give the detail.
+
+- Of the 306 tools in 4.3.0, 82 no longer answer to their names: 7 are renamed and 75 removed.
+  The table under Removed gives each one's 5.0 name or what to call instead.
+- With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 112 tools
+  that change the portal, where 4.3.0 listed them and refused the call. `update_logicmodule` is
+  one of them, so its preview mode needs writes on.
+- A failed call returns one JSON envelope, `{"error": {"code", "message", ...}}`, in place of
+  the `Error:` and `Suggestion:` lines, and `code` comes from a new set of ten. A client that
+  read the old lines needs the new shape (see Changed).
+- `get_device_properties` and `get_device_property` return `sources` for each property in
+  place of `inherit`, which was false for every property (see Fixed).
+- The server ignores these settings if set: `WATSONX_API_KEY`, `WATSONX_URL`,
+  `WATSONX_PROJECT_ID`, `WATSONX_TIMEOUT`, `HF_TTM_MODEL`, `HF_LLM_MODEL`, `HF_DEVICE`,
+  `HF_CACHE_DIR`, `AWX_URL`, `AWX_TOKEN`, `AWX_VERIFY_SSL`, `AWX_TIMEOUT`, `AWX_MAX_RETRIES`,
+  `TF_WORKSPACE_DIR`, `TF_TERRAFORM_BINARY`, `TF_TIMEOUT`, `TF_AUTO_APPROVE_ENABLED`,
+  `LM_ANALYSIS_MAX_CONCURRENCY`, `LM_API_VERSION`, `LM_CORS_ORIGINS`, `LM_FIELD_VALIDATION`,
+  `LM_SESSION_ENABLED` and `LM_SESSION_PERSIST_PATH`. With `LM_SESSION_PERSIST_PATH` gone,
+  session variables and history live in memory and are lost when the process exits.
+- The `ibm` and `huggingface` extras are removed. `mcp` must be 1.29.0 or later, and
+  `websockets` 14.0 or later is a core dependency.
+- On the HTTP transport, `/api/v1/analyze`, `/api/v1/analysis/{id}` and the alert webhook are
+  removed, and so is CORS. `/mcp` serves MCP Streamable HTTP in place of the JSON-RPC route that
+  answered without the MCP handshake.
+- In multi-portal mode, `list_portals`, `current_portal` and `reload_portals` are renamed (see
+  the table). A call runs against the portal selected when it starts, each portal keeps its own
+  session, and every LogicMonitor tool takes an optional `portal` argument.
+- The eight Edwin AI tools are new and optional. They are listed only when `EDWIN_CLIENT_ID`
+  and `EDWIN_CLIENT_TOKEN` are both set; that credential is separate from the LogicMonitor
+  token, and `EDWIN_HOST` is required in multi-portal mode.
+- Of the 15 prompts, 12 are removed; `incident_triage`, `capacity_review` and `remediation`
+  remain.
+- The server names itself `logicmonitor` at initialize, where 4.3.0 said
+  `logicmonitor-platform`.
 
 ### Added
 
@@ -503,7 +540,7 @@ instead.
   `get_<type>` name, where they gated it by the `export_<type>` name.
 - `LM_MCP_CATEGORIES=export` selects the eleven getters that take `raw`, which return the REST
   object the `export_*` tools returned, where it selected the `export_*` tools.
-- With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 101 tools
+- With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 112 tools
   whose annotations say they change the portal (`readOnlyHint` false and `openWorldHint` true),
   and a call to one by name returns the write-disabled error. That includes `update_logicmodule`,
   whose preview mode ran with writes off before. The session tools, `use_portal` and
@@ -513,7 +550,7 @@ instead.
 - When the API reports a page with a negative total, its sign that more rows exist than it
   counted, a list tool leaves `total` out of the response rather than reporting that number as a
   lower bound. `has_more` is true when the page has rows, and `total_note` says the count is not
-  exact. This covers the 54 list tools on the shared pagination helper, `get_devices`,
+  exact. This covers the list tools on the shared pagination helper, `get_devices`,
   `get_alerts` and `get_audit_logs` among them.
 - `get_device_groups`, `get_collector_groups`, `get_website_groups`, `get_dashboard_widgets`,
   `get_sdts`, `get_active_sdts`, `get_upcoming_sdts`, `get_roles`, `get_report_groups`,
@@ -2158,7 +2195,8 @@ HTTP analysis API: `POST /api/v1/analyze`, `GET /api/v1/analysis/{id}`, `POST /a
 - Rate limit handling with exponential backoff
 - Write operation protection (disabled by default)
 
-[Unreleased]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.3.0...HEAD
+[Unreleased]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v5.0.0...HEAD
+[5.0.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.3.0...v5.0.0
 [4.3.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.2.1...v4.3.0
 [4.2.1]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.2.0...v4.2.1
 [4.2.0]: https://github.com/ryanmat/mcp-server-logicmonitor/compare/v4.1.0...v4.2.0

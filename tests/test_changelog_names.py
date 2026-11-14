@@ -14,6 +14,8 @@ CHANGELOG = ROOT / "CHANGELOG.md"
 # The 306 keys of tests/fixtures/tool_list.json at the v4.3.0 tag, one per line.
 NAMES_430 = ROOT / "tests" / "fixtures" / "tool_names-4.3.0.txt"
 TABLE_HEADER = "| 4.3.0 tool | 5.0 tool | Replacement |"
+# The release section that holds the table.
+SECTION = "## [5.0.0]"
 ROW = re.compile(r"^\| `(?P<old>[a-z0-9_]+)` \| (?P<new>`[a-z0-9_]+`|removed) \| (?P<note>.+) \|$")
 
 # The same tool under a new name. Every other row of the table reads "removed".
@@ -38,17 +40,20 @@ def _names_430() -> set[str]:
     return set(NAMES_430.read_text().split())
 
 
-def _unreleased() -> str:
+def _release_section() -> str:
+    """The 5.0.0 section of the CHANGELOG, the release the rename table belongs to."""
     text = CHANGELOG.read_text()
-    start = text.index("## [Unreleased]")
+    marker = f"\n{SECTION} - "
+    assert marker in text, f"CHANGELOG.md has no {SECTION} section"
+    start = text.index(marker) + 1
     return text[start : text.index("\n## [", start + 1)]
 
 
 def _table() -> dict[str, str]:
     """Map each row's 4.3.0 name to its 5.0 cell: a tool name, or "removed"."""
-    lines = _unreleased().splitlines()
+    lines = _release_section().splitlines()
     headers = [i for i, line in enumerate(lines) if line.startswith("| 4.3.0 tool |")]
-    assert len(headers) == 1, f"expected one rename table in [Unreleased], found {len(headers)}"
+    assert len(headers) == 1, f"expected one rename table in {SECTION}, found {len(headers)}"
     assert lines[headers[0]] == TABLE_HEADER
     table: dict[str, str] = {}
     for line in lines[headers[0] + 2 :]:

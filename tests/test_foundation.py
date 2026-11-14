@@ -77,6 +77,19 @@ class TestReleaseMetadata:
         assert server["version"] == _project_version()
         assert [package["version"] for package in server["packages"]] == [_project_version()]
 
+    def test_changelog_newest_release_is_the_package_version(self):
+        """The first dated CHANGELOG section names pyproject.toml's version.
+
+        The release workflow takes the GitHub release notes from the section the tag
+        names, so a version bump and its section land together.
+        """
+        changelog = (REPO_ROOT / "CHANGELOG.md").read_text()
+        releases = re.findall(
+            r"^## \[(\d+\.\d+\.\d+)\] - \d{4}-\d{2}-\d{2}$", changelog, flags=re.MULTILINE
+        )
+
+        assert releases[0] == _project_version()
+
     @pytest.mark.parametrize("doc", ["README.md", "documentation/client-setup.md", "server.json"])
     def test_docs_state_the_registry_tool_count(self, doc):
         """Every total tool count a doc or the registry manifest states is the registry's."""
