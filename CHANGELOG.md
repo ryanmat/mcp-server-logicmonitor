@@ -29,14 +29,14 @@ tool modules hold 1,785 of those lines and the module table they share (`tools/l
 
 ### Upgrading from 4.3.0
 
-A setup that worked on 4.3.0 has to account for each of these. The entries under Added,
+Check a setup that worked on 4.3.0 against each of these. The entries under Added,
 Removed, Fixed and Changed give the detail.
 
 - Of the 306 tools in 4.3.0, 82 no longer answer to their names: 7 are renamed and 75 removed.
   The table under Removed gives each one's 5.0 name or what to call instead.
 - With `LM_ENABLE_WRITE_OPERATIONS` false, the default, `tools/list` leaves out the 112 tools
-  that change the portal, where 4.3.0 listed them and refused the call. `update_logicmodule` is
-  one of them, so its preview mode needs writes on.
+  that change the portal. 4.3.0 listed its write tools and refused the call. `update_logicmodule`
+  is one of the 112, so its preview mode needs writes on.
 - A failed call returns one JSON envelope, `{"error": {"code", "message", ...}}`, in place of
   the `Error:` and `Suggestion:` lines, and `code` comes from a new set of ten. A client that
   read the old lines needs the new shape (see Changed).
