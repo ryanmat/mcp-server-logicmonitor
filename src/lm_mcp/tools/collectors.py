@@ -381,7 +381,7 @@ async def _collector_down_history(
 ) -> tuple[list[dict] | None, str | None]:
     """Fetch recent alerts on a device named for a collector hostname.
 
-    A probe of 2026-11-06 (probes-2026-10.md section f) found no alert type that marks a
+    A probe of 2026-11-06 found no alert type that marks a
     collector going down, so rows are not limited to one; each row's alert_type names
     what it is.
     A failed read is unknown, not an empty history: it returns None and a warning.
@@ -614,7 +614,8 @@ async def run_collector_status_check(
     a newer check (one whose trigger time differs from the first read) finishes or aborts, or
     STATUS_CHECK_BUDGET_SECONDS pass. A newer check still running then is returned with
     finished false and STATUS_CHECK_RUNNING_NOTE; when no newer check has reported, finished
-    is false and STATUS_CHECK_NOT_STARTED_NOTE says the fields are the previous check's.
+    is false and STATUS_CHECK_NOT_STARTED_NOTE says the fields are the previous check's. A
+    newer check that aborted is returned as it reads, aborted true, with no note.
 
     Args:
         client: LogicMonitor API client.

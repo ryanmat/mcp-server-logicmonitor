@@ -31,8 +31,8 @@ HOST = "https://lmryanmatuszewski.dexda.ai"
 RECORDS = f"{HOST}/ui/query/records"
 METRICS = f"{HOST}/ui/query/metrics"
 
-# Insight rows from POST /ui/query/records on lmryanmatuszewski.dexda.ai, 2026-11-10
-# (docs/validation/probes-2026-11.md, Step 54): 26 of the 52 live fields of ANALYZED and
+# Insight rows from POST /ui/query/records on lmryanmatuszewski.dexda.ai, 2026-11-10:
+# 26 of the 52 live fields of ANALYZED and
 # 16 of the 30 of PLAIN. Each keeps the fields get_edwin_insights projects plus some it
 # drops (genAi.logs_summary, meta.alertCurrentSeverities, ml.uiResult), so the tests see
 # them removed. Every string value over 90 characters is cut to its first 90 except
@@ -386,7 +386,7 @@ class TestGetEdwinInsight:
 
 
 # An alert and an event row from POST /ui/query/records on lmryanmatuszewski.dexda.ai,
-# 2026-11-10 (docs/validation/probes-2026-11.md, Step 55): kept fields only, strings
+# 2026-11-10: kept fields only, strings
 # over 90 characters cut to their first 90. Live rows carry 107 to 125 fields.
 ALERT = {
     "_id": "observability-observatorium-api-7974845f49-rs-open-cluster-management-"
@@ -684,8 +684,8 @@ class TestGetEdwinMetadata:
         assert "incidents" in body["error"]["message"]
 
 
-# Edwin's agent and tool catalog, from the 2026-11-10 probe of lmryanmatuszewski.dexda.ai
-# (docs/validation/probes-2026-11.md, Step 56): three of the seven agents, the
+# Edwin's agent and tool catalog, from the 2026-11-10 probe of lmryanmatuszewski.dexda.ai:
+# three of the seven agents, the
 # LMDiagnosticsAgent MCP list verbatim, the query-mcp tool list verbatim, and two of the
 # 68 mcp-server-logicmonitor tools (edwin-fullscope-mcp-mcp-server-logicmonitor-tools.json).
 AGENTS = {

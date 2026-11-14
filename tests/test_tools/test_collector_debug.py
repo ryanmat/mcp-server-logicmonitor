@@ -48,10 +48,10 @@ from lm_mcp.tools.collector_debug import (
 from tests.envelope import envelope
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
-# Collector 161's stored health check, read live on 2026-11-12 (docs/validation/probes-2026-11.md,
-# Step 72): 39 blocks, a WARN and a DISABLED checkpoint, one script at status 1.
+# Collector 161's stored health check, read live on 2026-11-12: 39 blocks, a WARN and a
+# DISABLED checkpoint, one script at status 1.
 LIVE_HEALTH = (FIXTURES / "collector_health_check.txt").read_text()
-# Live POST /debug and GET /debug/{sessionId} exchanges (probes-2026-11.md, Step 73), verbatim.
+# Live POST /debug and GET /debug/{sessionId} exchanges, verbatim.
 LIVE = json.loads((FIXTURES / "collector_debug_exchanges.json").read_text())
 # Built in two parts, so the repository's private-key hook does not read a test as a key.
 PEM_BEGIN = "-----BEGIN RSA " + "PRIVATE KEY-----"
@@ -89,7 +89,7 @@ T = Target(collector_id=7, host="10.0.0.5", portal_host="portal-a.example.net")
 NO_DEVICE = Target(collector_id=7, portal_host="portal-a.example.net")
 PORTAL = "portal-a.example.net"
 
-# Shapes from a live read of the sandbox (docs/validation/probes-2026-11.md, Step 71): a served
+# Shapes from a live read of the sandbox: a served
 # device names its collector as a positive int; a cloud resource answers -2 and a service -4.
 SERVED = {
     "id": 1786,
@@ -624,7 +624,7 @@ class TestRedaction:
             ("SNMP.PRIVTOKEN: x", "SNMP.PRIVTOKEN: ***"),
             ("azure.clientsecret=x DBPASSWORD=y", "azure.clientsecret=*** DBPASSWORD=***"),
             ("snmpcommunity=x adminpassword=y", "snmpcommunity=*** adminpassword=***"),
-            # the review, item 1: dotted property keys the audit log masks are masked here too
+            # dotted property keys the audit log masks are masked here too
             ("meraki.api.key=abc123def", "meraki.api.key=***"),
             ("ssh.key=abc123def", "ssh.key=***"),
             ("api.key: abc123def", "api.key: ***"),
@@ -798,7 +798,7 @@ class TestRedaction:
          "snmp.authid"],
     )  # fmt: skip
     def test_a_dotted_key_is_secret_wherever_the_audit_rule_says_so(self, key):
-        """One credential rule decides the audit line and the masked output (the review, item 1)."""
+        """One credential rule decides the audit line and the masked output."""
         assert cd._is_secret_key(key) or not is_sensitive_key(key)
 
     def test_long_values_fail_closed(self):
@@ -1127,7 +1127,7 @@ class TestFailureLogging:
 # ---------------------------------------------------------------- the tool and its transport
 
 PORTAL_HOST = "test.logicmonitor.com"
-# The device the live !ping ran against (probes-2026-11.md, Step 73), as its record reads.
+# The device the live !ping ran against, as its record reads.
 PROBED = {"id": 89818, "name": "127.0.0.1", "displayName": "example-vm", "currentCollectorId": 82}
 # A device on a routable address, for http, which never reaches a loopback host.
 WEB = {"id": 42, "name": "10.0.0.42", "displayName": "example-web", "currentCollectorId": 82}
@@ -1841,8 +1841,7 @@ class TestRegistry:
 
 
 class TestSecurityReview:
-    """The 2026-11-12 security review (docs/validation/collector-debug-review-2026-11.md),
-    one test group per finding folded into the module."""
+    """The 2026-11-12 security review, one test group per finding folded into the module."""
 
     # H1: one prefix followed by one long run made two masking patterns quadratic; a call then
     # held the event loop for 32.6 s against a 2 s budget.
@@ -2232,7 +2231,7 @@ class TestSecurityReviewRecheck:
             check_cmdline("!uptime !_x")
 
 
-# The classes the sandbox's own WMI datasources collect from (probes-2026-11.md), as
+# The classes the sandbox's own WMI datasources collect from, as
 # their collectorAttribute.queryClass spells them.
 PROBED_CLASSES = [
     "Win32_OperatingSystem",

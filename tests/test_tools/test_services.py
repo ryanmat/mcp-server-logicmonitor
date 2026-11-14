@@ -155,7 +155,7 @@ class TestGetServiceGroups:
         assert 'name~"petclinic"' in sent_filter
 
 
-# The sandbox portal's answer to GET /serviceinsights/rules on 2026-11-12 (Step 70 probe): no
+# The sandbox portal's answer to GET /serviceinsights/rules on 2026-11-12: no
 # rules. The endpoint (LogicMonitor v247) is not in the public swagger, so no rule's fields
 # have been read; the tool returns rows as the API sends them.
 _RULES_EMPTY = {"total": 0, "items": [], "searchId": None, "isMin": False}

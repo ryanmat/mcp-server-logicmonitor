@@ -33,8 +33,8 @@ def token_response(jwt: str) -> httpx.Response:
     """The token exchange's 200 body.
 
     Keys and expires_in from the probe of POST /auth/token on
-    lmryanmatuszewski.dexda.ai, 2026-11-10 (docs/validation/probes-2026-11.md,
-    Step 53); the token, expires_at and now values are replaced.
+    lmryanmatuszewski.dexda.ai, 2026-11-10; the token, expires_at and now values are
+    replaced.
     """
     return httpx.Response(
         200,

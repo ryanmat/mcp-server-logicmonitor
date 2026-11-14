@@ -1001,7 +1001,7 @@ class TestDeviceListPaging:
         await assert_negative_total_reads_as_more(client, getattr(devices, name), path, kwargs)
 
 
-# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 67 probe).
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12.
 LIVE = json.loads((Path(__file__).parent.parent / "fixtures" / "property_ops.json").read_text())
 _BASE = "https://test.logicmonitor.com/santaba/rest"
 

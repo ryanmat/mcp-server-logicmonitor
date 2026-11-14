@@ -424,7 +424,7 @@ class TestOids:
         assert data["oid"] == "1.3.6.1.2.1.1.1"
 
 
-# The sandbox portal's answer to GET /tenants on 2026-11-12 (Step 70 probe), the same as on
+# The sandbox portal's answer to GET /tenants on 2026-11-12, the same as on
 # 2026-11-06; it ignored size and offset.
 _TENANTS = {"tenants": ["argus"]}
 

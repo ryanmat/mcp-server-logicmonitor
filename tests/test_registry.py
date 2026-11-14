@@ -560,7 +560,7 @@ class TestListToolGuard:
         assert not own, f"move these onto list_tool: {own}"
 
 
-# R3.6, Step 67: the device and group property tools, Active Discovery and escalation.
+# R3.6: the device and group property tools, Active Discovery and escalation.
 _STEP_67_ANNOTATIONS = {
     "get_device_group_properties": (True, False),
     "update_device_group_property": (False, False),
@@ -689,7 +689,7 @@ class TestStep67Tools:
         assert "escalate_alert" in categories["alerts"]["tools"]
 
 
-# R3.6, Step 68: the four reads and the category each joins.
+# R3.6: the four reads and the category each joins.
 _STEP_68_CATEGORIES = {
     "get_datasource_devices": "datasources",
     "get_unmonitored_devices": "devices",
@@ -748,7 +748,7 @@ class TestStep68Tools:
         ] == []
 
 
-# R3.7, Step 69: the device-scoped NetFlow reads replace the two /netflow/flows tools.
+# R3.7: the device-scoped NetFlow reads replace the two /netflow/flows tools.
 _NETFLOW_TOOLS = ("get_device_flows", "get_device_top_talkers")
 
 
@@ -789,7 +789,7 @@ class TestDeviceNetflowTools:
         ] == []
 
 
-# R3.8, Step 70: Service Insights rules and tenants, each read-only in its category.
+# R3.8: Service Insights rules and tenants, each read-only in its category.
 _STEP_70_CATEGORIES = {"get_service_insights_rules": "ops", "get_tenants": "users"}
 
 
@@ -822,7 +822,7 @@ class TestStep70Tools:
         assert schemas["get_tenants"]["properties"] == {}
 
 
-# R3.10, Step 75: the usage reads from #98, alone in the usage category.
+# R3.10: the usage reads from #98, alone in the usage category.
 _USAGE_TOOLS = ("get_usage_contract", "get_usage_metrics")
 
 

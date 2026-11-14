@@ -448,8 +448,8 @@ class TestErrorsArrayIn200:
         assert "Unexpected error fetching labels" in result[0].text
 
 
-# POST /metrics/query {"query": "up"} on lmryanmatuszewski, 2026-11-11
-# (docs/validation/otel-probe-2026-11-11.json): two of its six series, each label kept.
+# POST /metrics/query {"query": "up"} on lmryanmatuszewski, 2026-11-11: two of its six
+# series, each label kept.
 _VECTOR_UP = {
     "data": [
         {

@@ -1,4 +1,4 @@
-# Description: Tests for the Step 68 reads: datasource devices, unmonitored devices,
+# Description: Tests for the inventory reads: datasource devices, unmonitored devices,
 # Description: the website checkpoint locations and the device delta.
 
 import json
@@ -13,7 +13,7 @@ from lm_mcp.client import LogicMonitorClient
 from tests.envelope import envelope
 from tests.list_paging import assert_negative_total_reads_as_more, assert_offset_declared_and_sent
 
-# Answers of a sandbox portal at X-Version 3 on 2026-11-12 (Step 68 probe), each with its
+# Answers of a sandbox portal at X-Version 3 on 2026-11-12, each with its
 # request, parameters, status and body. Cuts: datasource_devices_1613 keeps the first 2 of its
 # 10 rows under the total sent; each delta row keeps the first 2 entries of each of its four
 # property lists, a cut that also leaves out the collector's internal hostname and an inherited

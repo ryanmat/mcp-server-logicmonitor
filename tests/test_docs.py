@@ -206,6 +206,7 @@ class TestChangelogLinks:
 def _counts(monkeypatch) -> dict[str, int]:
     """The per-configuration tool counts the docs state, computed from the registry and filter."""
     from lm_mcp import server
+    from lm_mcp.categories import writes_to_portal
     from lm_mcp.registry import TOOLS
 
     default = len(_listed(monkeypatch, {}))
@@ -218,9 +219,7 @@ def _counts(monkeypatch) -> dict[str, int]:
         "default": default,
         "multi_portal": multi,
         "edwin_extra": with_edwin - default,
-        "write_gated": sum(
-            a.readOnlyHint is False and a.openWorldHint is True for a in annotations
-        ),
+        "write_gated": sum(writes_to_portal(tool) for tool in TOOLS),
         "destructive": sum(bool(a.destructiveHint) for a in annotations),
         "workflow": len(_listed(monkeypatch, {"LM_MCP_CATEGORIES": "workflow"})),
         "writes_on": len(_listed(monkeypatch, {"LM_ENABLE_WRITE_OPERATIONS": "true"})),

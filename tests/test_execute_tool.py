@@ -1079,7 +1079,7 @@ def _sdk_error(result: CallToolResult) -> dict:
 
 
 class TestElicitation:
-    """R4.3: a destructive call waits for the user when the client can ask (rul-c876cb01c1)."""
+    """R4.3: a destructive call waits for the user when the client can ask."""
 
     @respx.mock
     async def test_accept_runs_the_call_and_the_audit_line_says_so(self, write_portal, caplog):
