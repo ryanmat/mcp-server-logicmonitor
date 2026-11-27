@@ -6,7 +6,7 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # The ruff version uv.lock pins, which CI runs; tests/test_packaging.py checks it.
-    rev: v0.17.4
+    rev: v0.17.6
     hooks:
       # Scoped to src/ and tests/ so these hooks enforce exactly what CI
       # enforces. contrib/ is community-maintained and outside the CI gates;
